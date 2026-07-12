@@ -25,14 +25,15 @@ async function getJson(url) {
   return r.json();
 }
 
-// "Today" for the demo: use the real current date if the extraction covers it,
-// otherwise fall back to the first extracted date (so the demo never goes empty
-// after the coverage window passes).
-export const demoDate = uaeCalendarDate;
+// Keep the displayed date honest: use the UAE calendar day when it is covered,
+// otherwise show the first published programming day in the extracted window.
+// A crawl made today normally starts tomorrow, so the UI says tomorrow as well.
+export function demoDate() {
+  const today = uaeCalendarDate();
+  return DATA_DATES.includes(today) ? today : DATA_DATES[0] || today;
+}
 
-// The extraction is a verified eight-day programming window. Map the current
-// demo day onto that window at runtime so "today" always has sessions without
-// mutating the source wall-clock times or pretending the extract is live.
+// Map explicit demo offsets within the verified dynamic programming window.
 export function sourceDateForDemoDate(displayDate = demoDate()) {
   return remapDemoDate(displayDate, demoDate(), DATA_DATES);
 }

@@ -654,7 +654,7 @@ export default function App() {
             </div>
           )}
           {stage.view === "cinemas" && <CinemaPicker cinemas={CINEMAS} selected={cinema} onSelect={chooseCinema} onBack={() => setStage(cinemaReturnRef.current || { view: "empty" })} />}
-          {stage.view === "movies" && <MovieGrid movies={stage.movies} cinemaName={stripVox(cinema.name)} onSelect={pickMovie} />}
+          {stage.view === "movies" && <MovieGrid movies={stage.movies} cinemaName={stripVox(cinema.name)} scheduleDate={vista.demoDate()} onSelect={pickMovie} />}
           {stage.view === "showtimes" && <Showtimes movie={stage.movie} sessions={stage.sessions} onSelect={pickSession} onBack={() => clientTools.show_movie_selection()} />}
           {stage.view === "seatmap" && <SeatMap movie={stage.movie} session={stage.session} plan={stage.plan} selected={selectedSeats} onToggle={toggleSeat} onConfirm={confirmSeats} onBack={() => clientTools.show_showtimes({ movieId: stage.movie.id, movieTitle: stage.movie.title })} />}
           {stage.view === "checkout" && stage.order && <Checkout order={stage.order} onPaid={handlePaid} onCancel={() => { clearPendingOrder(); setStage({ view: "seatmap", movie: stage.movie, session: stage.session, plan: planRef.current }); }} />}
