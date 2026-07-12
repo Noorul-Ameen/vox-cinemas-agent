@@ -6,6 +6,8 @@
 //  Same function signatures either way — App.jsx never changes.
 // ============================================================================
 import { FILMS, SESSIONS, seatPlan, BOOKING, CINEMAS, DATA_DATES } from "./mockVistaData.js";
+import { findBooking } from "./bookingStore.js";
+import { remapDemoDate, uaeCalendarDate } from "./lib/demoDates.js";
 
 const BASE = import.meta.env.VITE_VISTA_BASE || "";
 const USE_MOCK = !BASE;
@@ -26,13 +28,17 @@ async function getJson(url) {
 // "Today" for the demo: use the real current date if the extraction covers it,
 // otherwise fall back to the first extracted date (so the demo never goes empty
 // after the coverage window passes).
-export function demoDate() {
-  const today = new Date().toISOString().slice(0, 10);
-  return DATA_DATES.includes(today) ? today : DATA_DATES[0];
+export const demoDate = uaeCalendarDate;
+
+// The extraction is a verified eight-day programming window. Map the current
+// demo day onto that window at runtime so "today" always has sessions without
+// mutating the source wall-clock times or pretending the extract is live.
+export function sourceDateForDemoDate(displayDate = demoDate()) {
+  return remapDemoDate(displayDate, demoDate(), DATA_DATES);
 }
 
 export function getCinemas() {
-  return CINEMAS.map((c) => ({ id: c.ID, name: c.Name }));
+  return CINEMAS.map((c) => ({ id: c.ID, name: c.Name, currency: c.CurrencyCode || "AED" }));
 }
 
 // --- Reference data ---------------------------------------------------------
@@ -41,9 +47,9 @@ export async function getScheduledFilms(cinemaId) {
   let value;
   if (USE_MOCK) {
     await delay(200);
-    const d = demoDate();
+    const d = sourceDateForDemoDate();
     // Only films that actually have sessions today at this cinema
-    const todayFilmIds = new Set(SESSIONS.filter((s) => s.CinemaId === cinemaId && s.Showtime.startsWith(d)).map((s) => s.ScheduledFilmId));
+    const todayFilmIds = new Set(SESSIONS.filter((s) => s.CinemaId === cinemaId && (s.SourceProgrammingDate || s.Showtime.slice(0, 10)) === d).map((s) => s.ScheduledFilmId));
     value = FILMS.filter((f) => f.CinemaId === cinemaId && todayFilmIds.has(f.ScheduledFilmId));
   } else {
     ({ value } = await getJson(`${V2}/OData/ScheduledFilms?$format=json&$filter=CinemaId eq '${cinemaId}'`));
@@ -55,7 +61,10 @@ export async function getScheduledFilms(cinemaId) {
     runtime: Number(f.RunTime) || 0,
     genre: f.genre || "",
     language: f.Language || "",
+    languageName: f.LanguageName || "",
     synopsis: f.Synopsis || "",
+    genres: Array.isArray(f.Genres) && f.Genres.length ? f.Genres : [f.genre || "Film"],
+    subtitles: Array.isArray(f.Subtitles) ? f.Subtitles : [],
     posterUrl: f.posterUrl || null,
     tint: f.tint || ["#63418D", "#B6186C"],
   }));
@@ -65,8 +74,8 @@ export async function getSessions(cinemaId, scheduledFilmId) {
   let value;
   if (USE_MOCK) {
     await delay(200);
-    const d = demoDate();
-    value = SESSIONS.filter((s) => s.CinemaId === cinemaId && s.Showtime.startsWith(d));
+    const d = sourceDateForDemoDate();
+    value = SESSIONS.filter((s) => s.CinemaId === cinemaId && (s.SourceProgrammingDate || s.Showtime.slice(0, 10)) === d);
   } else {
     ({ value } = await getJson(`${V2}/OData/Sessions?$format=json&$filter=CinemaId eq '${cinemaId}'`));
   }
@@ -78,6 +87,10 @@ export async function getSessions(cinemaId, scheduledFilmId) {
       screen: s.ScreenName,
       exp: (s.SessionAttributesNames && s.SessionAttributesNames[0]) || "2D",
       seatsAvailable: s.SeatsAvailable,
+      date: demoDate(),
+      sourceDate: (s.Showtime || "").slice(0, 10),
+      timeSlot: s.TimeSlot || "",
+      status: s.Status || "",
     }))
     .sort((a, b) => a.time.localeCompare(b.time));
 }
@@ -102,27 +115,35 @@ export async function getSeatPlan(cinemaId, sessionId) {
 // --- Booking / cancellation -------------------------------------------------
 
 export async function searchBooking(ref) {
+  const requestedRef = String(ref || "").trim();
+  if (!requestedRef) throw new Error("A booking reference is required.");
   // Demo bookings made during this session take priority.
-  try {
-    const store = JSON.parse(localStorage.getItem("vox_bookings") || "[]");
-    const hit = store.find((b) => b.ref && ref && b.ref.toUpperCase() === String(ref).toUpperCase());
-    if (hit) {
-      return {
-        ref: hit.ref, movieTitle: hit.movieTitle, showtime: hit.showtime,
-        screen: hit.screen, seats: hit.seats,
-        refundAmount: hit.total, currency: "AED", cancelled: !!hit.cancelled,
-      };
-    }
-  } catch {}
+  const hit = findBooking(requestedRef);
+  if (hit) {
+    return {
+      ...hit,
+      refundAmount: hit.refundAmount ?? hit.total,
+      currency: hit.currency || "AED",
+      cancelled: Boolean(hit.cancelled),
+    };
+  }
   let b;
-  if (USE_MOCK) { await delay(250); b = BOOKING; }
+  if (USE_MOCK) {
+    await delay(250);
+    if (requestedRef.toUpperCase() !== String(BOOKING.BookingId).toUpperCase()) {
+      throw new Error(`Booking ${requestedRef} was not found.`);
+    }
+    b = BOOKING;
+  }
   else {
     const r = await fetch(`${BASE}/vistatickets/loyaltyalternate/v1/bookingsearch`, {
       method: "POST",
       headers: { ...HEADERS, "Content-Type": "application/json" },
-      body: JSON.stringify({ BookingId: ref }),
+      body: JSON.stringify({ BookingId: requestedRef }),
     });
+    if (!r.ok) throw new Error(`Booking search failed with status ${r.status}.`);
     b = (await r.json()).Booking;
+    if (!b) throw new Error(`Booking ${requestedRef} was not found.`);
   }
   return {
     ref: b.BookingId,
@@ -132,6 +153,7 @@ export async function searchBooking(ref) {
     seats: b.Seats,
     refundAmount: b.TotalValueCents / 100,
     currency: "AED",
+    cancelled: false,
   };
 }
 
