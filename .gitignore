@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+
+# Local Vite environment files may contain real credentials.
+.env
+.env.*
+!.env.example
+
+*.local
+*.log
+*.pem
+*.key
+*.p12
+*.pfx
+.DS_Store
