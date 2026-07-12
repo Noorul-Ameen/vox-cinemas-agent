@@ -2,12 +2,14 @@ import React from "react";
 import { Film, Clock, Armchair, Ticket, ChevronRight, Check, RotateCcw, MapPin, Search } from "lucide-react";
 import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
+import { getExperienceMedia, getMediaUrl } from "../mediaData.js";
 import BookingQRCode from "./BookingQRCode.jsx";
 
 export function Poster({ tint, title, small, posterUrl }) {
   const { t } = useI18n();
   const [imgOk, setImgOk] = React.useState(!!posterUrl);
   const palette = tint && tint.length === 2 ? tint : [C.purple, C.magenta];
+  React.useEffect(() => setImgOk(!!posterUrl), [posterUrl]);
   return (
     <div style={{
       position: "relative", overflow: "hidden", borderRadius: 12,
@@ -17,7 +19,7 @@ export function Poster({ tint, title, small, posterUrl }) {
       display: "flex", alignItems: "flex-end",
     }}>
       {imgOk && posterUrl && (
-        <img src={posterUrl} alt={title ? `${title} — ${t("movies.poster")}` : t("movies.poster")} onError={() => setImgOk(false)}
+        <img src={posterUrl} alt={title ? `${title} — ${t("movies.poster")}` : t("movies.poster")} loading="lazy" decoding="async" onError={() => setImgOk(false)}
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
       )}
       {!imgOk && <div style={{ position: "absolute", inset: 0, opacity: 0.35, backgroundImage: "radial-gradient(circle at 30% 15%, rgba(255,255,255,.6), transparent 50%)" }} />}
@@ -28,6 +30,21 @@ export function Poster({ tint, title, small, posterUrl }) {
         </div>
       )}
     </div>
+  );
+}
+
+function ExperienceThumbnail({ experience, media }) {
+  const imageUrl = getMediaUrl(getExperienceMedia(experience, media));
+  const [imgOk, setImgOk] = React.useState(!!imageUrl);
+
+  React.useEffect(() => setImgOk(!!imageUrl), [imageUrl]);
+
+  return (
+    <span aria-hidden="true" style={{ display: "grid", width: 24, height: 24, flexShrink: 0, overflow: "hidden", placeItems: "center", borderRadius: 6, background: "rgba(99,65,141,.28)", color: C.lavender }}>
+      {imgOk && imageUrl
+        ? <img src={imageUrl} alt="" loading="lazy" decoding="async" onError={() => setImgOk(false)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        : <Film size={12} />}
+    </span>
   );
 }
 
@@ -77,11 +94,11 @@ export function CinemaPicker({ cinemas, selected, onSelect, onBack }) {
   );
 }
 
-export function MovieGrid({ movies, cinemaName, onSelect }) {
+export function MovieGrid({ movies, cinemaName, scheduleDate, onSelect }) {
   const { t } = useI18n();
   return (
     <div>
-      <Header icon={<Film size={16} />} title={t("movies.title")} sub={t("movies.subtitle", { cinema: cinemaName })} />
+      <Header icon={<Film size={16} />} title={t("movies.title")} sub={t("movies.subtitle", { cinema: cinemaName, date: scheduleDate })} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 12 }}>
         {movies.map((m) => (
           <button key={m.id} onClick={() => onSelect(m)} style={{ ...btnReset, textAlign: "start" }}>
@@ -117,9 +134,10 @@ export function Showtimes({ movie, sessions, onSelect, onBack }) {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
           {sessions.map((s) => (
             <button key={s.sessionId} onClick={() => onSelect(s)} style={rowBtn}>
-              <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 8 }}>
                 <div dir="ltr" style={{ fontSize: 24, fontWeight: 700, color: "#fff" }}>{s.time}</div>
-                <div>
+                <ExperienceThumbnail experience={s.exp} media={s.experienceMedia || s.media} />
+                <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: expColor(s.exp) }}>{s.exp}</div>
                   <div dir="ltr" style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}>{s.screen}</div>
                 </div>

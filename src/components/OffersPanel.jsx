@@ -1,6 +1,7 @@
 import React from "react";
 import { BadgeCheck, ChevronLeft, ChevronRight, CreditCard, ExternalLink, HelpCircle, Search, XCircle } from "lucide-react";
 import { C } from "../theme.js";
+import { getMediaUrl, getOfferMedia } from "../mediaData.js";
 import { COMMON_OFFER_TERMS, OFFER_META, OFFERS } from "../offers/offersData.js";
 import { ELIGIBILITY, evaluateOfferEligibility, searchOffers } from "../offers/offerResolver.js";
 
@@ -87,6 +88,21 @@ function Status({ result, copy, language }) {
   );
 }
 
+function OfferMedia({ media }) {
+  const imageUrl = getMediaUrl(media);
+  const [imgOk, setImgOk] = React.useState(!!imageUrl);
+
+  React.useEffect(() => setImgOk(!!imageUrl), [imageUrl]);
+
+  return (
+    <span aria-hidden="true" style={{ display: "grid", width: 30, height: 30, flexShrink: 0, overflow: "hidden", placeItems: "center", borderRadius: 8, background: "rgba(99,65,141,.34)", color: C.lavender }}>
+      {imgOk && imageUrl
+        ? <img src={imageUrl} alt="" loading="lazy" decoding="async" onError={() => setImgOk(false)} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        : <CreditCard size={15} />}
+    </span>
+  );
+}
+
 function OfferRow({ offer, expanded, onToggle, selectedProfileId, onProfileChange, language, copy, context }) {
   const isRtl = language === "ar";
   const profile = offer.profiles.find((item) => item.id === selectedProfileId) || null;
@@ -103,9 +119,7 @@ function OfferRow({ offer, expanded, onToggle, selectedProfileId, onProfileChang
         aria-label={`${expanded ? copy.collapse : copy.expand}: ${localized(offer.bank, language)}`}
         style={{ display: "flex", width: "100%", alignItems: "center", gap: 10, border: 0, background: "transparent", padding: "11px 12px", color: "#fff", textAlign: isRtl ? "right" : "left", cursor: "pointer" }}
       >
-        <span aria-hidden="true" style={{ display: "grid", width: 30, height: 30, flexShrink: 0, placeItems: "center", borderRadius: 8, background: "rgba(99,65,141,.34)", color: C.lavender }}>
-          <CreditCard size={15} />
-        </span>
+        <OfferMedia media={getOfferMedia(offer)} />
         <span style={{ minWidth: 0, flex: 1 }}>
           <span style={{ display: "block", overflow: "hidden", color: "#fff", fontSize: 13, fontWeight: 800, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{localized(offer.bank, language)}</span>
           <span style={{ display: "block", marginTop: 2, overflow: "hidden", color: "rgba(255,255,255,.52)", fontSize: 10, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{localized(offer.headline, language)}</span>
