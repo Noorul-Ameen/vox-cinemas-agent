@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { getOfferMedia } from "../src/mediaData.js";
 import { OFFER_META, OFFERS } from "../src/offers/offersData.js";
 import { ELIGIBILITY, normalizeExperience, resolveOffer, resolveOfferForBankAndCard, searchOffers } from "../src/offers/offerResolver.js";
 
@@ -70,5 +71,7 @@ expectStatus("ADCB TouchPoints", { experience: "Standard 2D", isMember: false, o
 
 assert.equal(searchOffers("RAK bak")[0]?.id, "rakbank", "fuzzy bank search");
 assert.equal(searchOffers("cashbak plus")[0]?.id, "liv", "fuzzy card search");
+assert.equal(getOfferMedia(OFFERS.find((offer) => offer.id === "arab-bank-signature"))?.code, "ARABBIN7", "Arab Bank Signature must use its own official artwork");
+assert.equal(getOfferMedia(OFFERS.find((offer) => offer.id === "arab-bank"))?.code, "ARAB", "plain Arab Bank must not inherit Signature artwork");
 
 console.log(`Validated ${OFFERS.length} VOX UAE offers, ${OFFERS.reduce((sum, offer) => sum + offer.profiles.length, 0)} card profiles, and tri-state eligibility scenarios.`);
