@@ -235,7 +235,7 @@ export const OFFERS = Object.freeze([
     "UAE-issued Signature, Platinum, Gold, Classic and Mastercard Titanium cards cover most experiences.",
     "تشمل بطاقات Signature وPlatinum وGold وClassic وMastercard Titanium الصادرة في الإمارات معظم التجارب.",
     [card("arab-signature-cards", "Eligible UAE-issued cards", ["Arab Bank Visa Signature", "Arab Bank Visa Platinum", "Arab Bank Visa Gold", "Arab Bank Visa Classic", "Arab Bank Mastercard Titanium"], eligibility(CORE, { excludedExperiences: ["4DX", "OUTDOOR"], excludedAt: MOE_THEATRE_EXCLUSION, excludedSeatsByExperience: { IMAX: ["BALCONY"] } }), { stated: false })],
-    { minTickets: 2, foodBenefit: "Free size upgrade on popcorn and a soft drink" },
+    { minTickets: 2, foodBenefit: "Free size upgrade on popcorn and a soft drink", mediaCode: "ARABBIN7" },
   ),
 
   offer(
@@ -317,7 +317,7 @@ export const OFFERS = Object.freeze([
       card("arab-standard", "Standard eligible cards", ["Arab Bank Classic", "Arab Bank Gold", "Arab Bank Platinum", "Arab Bank Signature", "Arab Bank ISC", "Arab Bank Mastercard Titanium", "Visa Travel Mate", "Arabi Junior"], eligibility(ALL, { excludedExperiences: ["THEATRE"], excludedSeats: ["BALCONY"] }), { maxTickets: 4 }),
       card("arab-premium", "Signature VIP or MCWE", ["Arab Bank Signature VIP", "Arab Bank MCWE", "Signature VIP", "MCWE"], eligibility(ALL, { excludedAt: MOE_THEATRE_EXCLUSION }), { maxTickets: 4 }),
     ],
-    { minTickets: 2, perSessionLimit: { maxTickets: 4 }, foodBenefit: "25% off single, non-combo Candy Bar items with AED 40 minimum spend" },
+    { minTickets: 2, perSessionLimit: { maxTickets: 4 }, foodBenefit: "25% off single, non-combo Candy Bar items with AED 40 minimum spend", mediaCode: "ARAB" },
   ),
 
   offer(
