@@ -4,7 +4,8 @@ VOXi is a React + Vite mobile widget that combines the real ElevenLabs React SDK
 
 ## Included product flows
 
-- 22 VOX UAE cinemas, 41 films, 6,500 deduplicated sessions, eight programming dates, and 13 experiences.
+- A fresh 14–22 July 2026 snapshot with 22 VOX UAE cinemas, 42 scheduled films, 4,344 deduplicated sessions, nine published programming dates, and 13 display experiences.
+- Official code-keyed movie posters, experience artwork, and active bank-offer imagery with first-party source attribution and resilient UI fallbacks.
 - Fuzzy cinema/movie/session resolution with the original six ElevenLabs client tools preserved.
 - Touch and voice journeys for movies, showtimes, seats, simulated checkout, confirmation, and cancellation.
 - Client-side QR tickets, persisted booking history, case-insensitive lookup, and durable cancellation state.
@@ -63,31 +64,40 @@ The connection remains WebRTC with `serverLocation: "eu-residency"`.
 
 ## Data snapshot and refresh
 
-The shipped snapshot covers the 08–15 July 2026 programming window. At runtime, a covered UAE date remains exact; dates outside the window roll onto it so the demo always has sessions. The original VOX wall-clock time is displayed without timezone conversion, and after-midnight sessions remain attached to their requested programming day.
+The shipped snapshot was crawled on 13 July 2026 UAE time and covers every programming date that VOX published from the next day: 14–22 July 2026. The extractor does not assume an eight-day window. It unions the official per-movie `availableDays` responses for Now Showing and Advance Booking, fetches only those movie/date pairs, and stops when the advertised dates are exhausted. A 31-day default safety cap prevents an accidentally unbounded crawl.
+
+At runtime, a covered UAE date remains exact. If the current date is outside the snapshot, the UI displays the first actual programming date rather than labeling old or future sessions as today. Original VOX wall-clock values are retained, and after-midnight sessions stay attached to their requested programming day.
 
 Shipped source assets:
 
-- `data/vox_sessions_08-15Jul.json.gz`
-- `data/movie_metadata_08-15Jul.json`
+- `data/vox_showtimes_full.json` — current flat extraction, crawl metadata, and media provenance
+- `data/vox_sessions_08-15Jul.json.gz` — legacy compact fixture retained for converter regression coverage
+- `data/movie_metadata_08-15Jul.json` — legacy metadata fixture
 - generated `src/mockVistaData.js`
 
 Regenerate the client dataset:
 
 ```bash
-node scripts/extractVoxShowtimes.mjs --start-date 2026-07-08 --output data/vox_showtimes_full.json
+node scripts/extractVoxShowtimes.mjs --output data/vox_showtimes_full.json
 python convert_extraction.py data/vox_showtimes_full.json
 python scripts/validate_converter.py
 ```
 
-`convert_extraction.py` accepts both the shipped compact gzip and the handoff-style flat `{ catalog, cinemas, sessions }` extraction. A fresh flat extraction should keep `programmingDate` on sessions that cross midnight.
+With no `--start-date`, extraction starts tomorrow in `Asia/Dubai`. Optional controls are `--start-date YYYY-MM-DD`, `--max-days 1..90`, and `--workers 1..4`; the conservative default is two workers. The crawler uses only official public-site data routes, avoids booking/seat-plan routes, retries rate limits and transient errors, and fails instead of treating authentication or partial responses as “no availability.”
+
+The current VOX web app requires a rotating browser API key plus a short-lived anonymous guest token. The extractor discovers both at runtime, never logs or stores them, and writes no real environment secrets. `VOX_PUBLIC_API_KEY` is supported only as an optional process-level recovery override and must not be committed. These routes are undocumented and can change; run refreshes from a normal permitted network at a low rate.
+
+`convert_extraction.py` accepts both the current flat `{ catalog, cinemas, sessions, experienceMedia, offerMedia }` extraction and the legacy compact gzip. It preserves official poster URLs and source session IDs; it never fabricates asset URLs.
+
+Artwork URLs remain on official VOX/MAF hosts or their campaign CDN and include source-page provenance. Posters, brand logos, and experience artwork remain the property of their rights holders. Confirm permission before mirroring or redistributing them; the prototype renders remote URLs directly with neutral fallbacks.
 
 ## Validation
 
 `npm run validate` checks:
 
-- data counts, deduplication, metadata completeness, UAE date behavior, and fuzzy title matching;
+- dynamic data counts, source-ID deduplication, crawl completeness, official media URLs, UAE date behavior, and fuzzy title matching;
 - booking migration, lookup, persistence, and cancellation;
-- all 19 offers, all 13 extracted experiences, ambiguous bank/card aliases, and tri-state outcomes;
+- all 19 offer rules, all extracted experiences, ambiguous bank/card aliases, and tri-state outcomes;
 - handover schema, two-failure detection, seat/cancellation context, payment removal, and transcript redaction;
 - English/Arabic dictionary parity;
 - protected ElevenLabs, WebRTC, tool-name, seat-selection, error-boundary, RTL-seat, and 420 px invariants.

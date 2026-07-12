@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Convert the full VOX UAE JSON extraction into Vista-shaped demo data.
+"""Convert a full VOX UAE JSON extraction into Vista-shaped demo data.
 
 Usage:
   python convert_extraction.py [input.json.gz] [src/mockVistaData.js] [metadata.json]
 
-The compact extraction is the validated 08-15 July export documented in
-CODEX_HANDOFF_vox_showtimes_extraction.md. Times are UAE wall-clock values even
-though the source strings carry +00:00, so this converter intentionally slices
-the strings and never performs timezone conversion.
+The current extractor emits a flat schedule with official movie, experience,
+and bank-offer media. The legacy compact gzip remains supported. VOX showtimes
+are retained as source wall-clock values so after-midnight sessions stay tied to
+their source programming date.
 """
 
 from __future__ import annotations
@@ -15,12 +15,13 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
-INPUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "data" / "vox_sessions_08-15Jul.json.gz"
+INPUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "data" / "vox_showtimes_full.json"
 OUTPUT = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "src" / "mockVistaData.js"
 METADATA = Path(sys.argv[3]) if len(sys.argv) > 3 else ROOT / "data" / "movie_metadata_08-15Jul.json"
 
@@ -77,6 +78,11 @@ def parse_rows(extraction: dict):
             time = str(encoded.get("time", ""))[:5]
             status = str(encoded.get("status", ""))
             time_slot = str(encoded.get("timeSlot", ""))
+            session_id = str(encoded.get("sessionId", ""))
+            showtime = str(encoded.get("showtime") or f"{date}T{time}:00")
+            experience_code = str(encoded.get("experienceCode", ""))
+            is_available_for_offer = encoded.get("isAvailableForOffer", True) is not False
+            comment = str(encoded.get("comment", ""))
         else:
             raw_count += 1
             parts = str(encoded).split("|", 5)
@@ -85,7 +91,11 @@ def parse_rows(extraction: dict):
             code, cinema_code, experience, showtime, status, time_slot = parts
             date = showtime[:10]
             time = showtime[11:16]
-        key = (date, code, cinema_code, experience, time)
+            session_id = ""
+            experience_code = ""
+            is_available_for_offer = True
+            comment = ""
+        key = (code, cinema_code, session_id, showtime) if session_id else (date, code, cinema_code, experience, time)
         if key in seen:
             duplicate_count += 1
             continue
@@ -99,6 +109,11 @@ def parse_rows(extraction: dict):
             "time": time,
             "timeSlot": time_slot,
             "status": status,
+            "sessionId": session_id,
+            "showtime": showtime,
+            "experienceCode": experience_code,
+            "isAvailableForOffer": is_available_for_offer,
+            "comment": comment,
         })
     rows.sort(key=lambda row: (
         row["programmingDate"], row["cinemaCode"], row["code"], row["time"], row["experience"]
@@ -112,28 +127,34 @@ def validate(extraction: dict, metadata: list[dict], rows: list[dict], raw_count
     catalog_codes = {item["code"] for item in extraction.get("catalog", metadata)}
     metadata_by_code = {item["code"]: item for item in metadata}
     errors = []
-    if len(dates) != 8:
-        errors.append(f"expected 8 dates, got {len(dates)}")
-    if len(cinema_codes) != 22:
-        errors.append(f"expected 22 cinemas, got {len(cinema_codes)}")
-    if len(catalog_codes) != 41:
-        errors.append(f"expected 41 films, got {len(catalog_codes)}")
-    if raw_count not in {6500, 6501} or len(rows) != 6500:
-        errors.append(f"expected 6500-6501 raw / 6500 dedup sessions, got {raw_count} / {len(rows)}")
+    if not dates:
+        errors.append("no programming dates")
+    if dates != sorted(set(dates)):
+        errors.append("programming dates must be sorted and unique")
+    if not cinema_codes:
+        errors.append("no cinemas")
+    if not catalog_codes:
+        errors.append("no films")
+    if not rows or raw_count < len(rows):
+        errors.append(f"invalid raw / dedup session counts: {raw_count} / {len(rows)}")
     missing_metadata = sorted(catalog_codes - set(metadata_by_code))
     if missing_metadata:
         errors.append(f"missing metadata for {missing_metadata}")
     incomplete_metadata = sorted(
         code for code in catalog_codes
-        if not metadata_by_code.get(code, {}).get("rating")
+        if not metadata_by_code.get(code, {}).get("title")
+        or not metadata_by_code.get(code, {}).get("rating")
         or not metadata_by_code.get(code, {}).get("genres")
-        or not metadata_by_code.get(code, {}).get("synopsis")
     )
     if incomplete_metadata:
-        errors.append(f"incomplete rating/genres/synopsis for {incomplete_metadata}")
-    first_date_codes = {row["code"] for row in rows if row["programmingDate"] == dates[0]}
-    if catalog_codes - first_date_codes:
-        errors.append(f"films missing on first date: {sorted(catalog_codes - first_date_codes)}")
+        errors.append(f"incomplete title/rating/genres for {incomplete_metadata}")
+    row_codes = {row["code"] for row in rows}
+    if catalog_codes != row_codes:
+        errors.append(f"catalog/session film mismatch: missing metadata {sorted(row_codes - catalog_codes)}, unscheduled catalog entries {sorted(catalog_codes - row_codes)}")
+    if isinstance(extraction.get("sessions"), list) and extraction.get("crawl"):
+        bad_posters = sorted(code for code in catalog_codes if not str(metadata_by_code.get(code, {}).get("posterUrl", "")).startswith("https://"))
+        if bad_posters:
+            errors.append(f"missing official HTTPS poster URLs for {bad_posters}")
     bad_rows = [row for row in rows if not row["time"] or not row["experience"]]
     if bad_rows:
         errors.append(f"{len(bad_rows)} rows have empty time or experience")
@@ -158,6 +179,13 @@ def build():
             "genres": item.get("genres", []),
             "synopsis": item.get("synopsis") or item.get("description", ""),
             "subtitles": item.get("subtitles", []),
+            "images": item.get("images", {}),
+            "posterUrl": item.get("posterUrl", ""),
+            "backdropUrl": item.get("backdropUrl", ""),
+            "movieUrl": item.get("movieUrl", ""),
+            "sourcePageUrl": item.get("sourcePageUrl", ""),
+            "categories": item.get("categories", []),
+            "experiences": item.get("experiences", []),
             "sourceUrl": item.get("sourceUrl", "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE"),
         } for item in extraction.get("catalog", [])]
     else:
@@ -185,7 +213,11 @@ def build():
             "genre": meta["genres"][0],
             "Synopsis": meta["synopsis"],
             "Subtitles": meta.get("subtitles", []),
-            "posterUrl": f"https://assets.voxcinemas.com/posters/P_{film_code}.jpg",
+            "posterUrl": meta.get("posterUrl", ""),
+            "backdropUrl": meta.get("backdropUrl", ""),
+            "images": meta.get("images", {}),
+            "movieUrl": meta.get("movieUrl", ""),
+            "sourcePageUrl": meta.get("sourcePageUrl", ""),
             "tint": list(tint(film_code)),
         })
 
@@ -197,8 +229,8 @@ def build():
         sessions.append({
             "CinemaId": row["cinemaCode"],
             "ScheduledFilmId": row["code"],
-            "SessionId": str(index),
-            "Showtime": f"{row['date']}T{row['time']}:00",
+            "SessionId": row.get("sessionId") or str(index),
+            "Showtime": row.get("showtime") or f"{row['date']}T{row['time']}:00",
             "SourceDate": row["date"],
             "SourceProgrammingDate": row["programmingDate"],
             "ScreenName": row["experience"],
@@ -206,25 +238,47 @@ def build():
             "SessionAttributesNames": [row["experience"]],
             "TimeSlot": row["timeSlot"],
             "Status": row["status"],
+            "ExperienceCode": row.get("experienceCode", ""),
+            "IsAvailableForOffer": row.get("isAvailableForOffer", True),
+            "Comment": row.get("comment", ""),
         })
 
     experiences = sorted({row["experience"] for row in rows})
     date_counts = {date: sum(row["programmingDate"] == date for row in rows) for date in dates}
+    source_raw_count = int(extraction.get("crawl", {}).get("rawSessionCount", raw_count))
+    source_duplicate_count = int(extraction.get("crawl", {}).get("duplicateCount", duplicate_count))
     stats = {
         "extractedAt": extraction.get("extractedAt"),
         "sourceDates": dates,
         "filmCount": len(metadata),
         "cinemaCount": len(cinemas),
-        "rawSessionCount": raw_count,
+        "rawSessionCount": source_raw_count,
         "sessionCount": len(sessions),
-        "duplicateCount": duplicate_count,
+        "duplicateCount": source_duplicate_count,
         "experiences": experiences,
         "sessionsByDate": date_counts,
+        "experienceMediaCount": len({
+            re.sub(r"^_+|_+$", "", re.sub(r"[^A-Z0-9]+", "_", str(item.get("name") or item.get("code", "")).upper()))
+            for item in extraction.get("experienceMedia", [])
+            if item.get("name") or item.get("code")
+        }),
+        "offerMediaCount": len(extraction.get("offerMedia", [])),
+        "crawl": extraction.get("crawl", {}),
     }
+
+    def media_key(value: str) -> str:
+        return re.sub(r"^_+|_+$", "", re.sub(r"[^A-Z0-9]+", "_", str(value).upper()))
+
+    experience_media = {
+        media_key(item.get("name") or item.get("code")): item
+        for item in extraction.get("experienceMedia", [])
+        if media_key(item.get("name") or item.get("code"))
+    }
+    offer_media = extraction.get("offerMedia", [])
 
     booking_title = metadata[0]["title"]
     output = f'''// ============================================================================
-//  REAL VOX UAE DATA — generated from the validated 08-15 July extraction
+//  REAL VOX UAE DATA — generated from a validated official VOX extraction
 //  Coverage: {dates[0]} to {dates[-1]} | Cinemas: {len(cinemas)} | Films: {len(metadata)} | Sessions: {len(sessions)}
 //  Regenerate with: python convert_extraction.py
 // ============================================================================
@@ -232,6 +286,10 @@ def build():
 export const DATA_STATS = {json.dumps(stats, ensure_ascii=False, indent=2)};
 
 export const DATA_DATES = {json.dumps(dates)};
+
+export const EXPERIENCE_MEDIA = {json.dumps(experience_media, ensure_ascii=False, indent=2)};
+
+export const OFFER_MEDIA = {json.dumps(offer_media, ensure_ascii=False, indent=2)};
 
 export const CINEMAS = {json.dumps(cinemas, ensure_ascii=False, indent=2)};
 
@@ -281,7 +339,7 @@ export const BOOKING = {{
     OUTPUT.write_text(output, encoding="utf-8")
     print(
         f"Wrote {OUTPUT}: {len(cinemas)} cinemas, {len(metadata)} films, "
-        f"{len(sessions)} sessions ({duplicate_count} duplicate removed), dates {dates[0]}..{dates[-1]}"
+        f"{len(sessions)} sessions ({source_duplicate_count} source duplicates removed), dates {dates[0]}..{dates[-1]}"
     )
 
 
