@@ -7,11 +7,14 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "validate:converter": "python scripts/validate_converter.py",
+    "validate": "node scripts/validateData.mjs && node scripts/validateBookings.mjs && node scripts/validateOffers.mjs && node scripts/validateHandover.mjs && node scripts/validateI18n.mjs && node scripts/validateInvariants.mjs"
   },
   "dependencies": {
     "@elevenlabs/react": "^0.7.0",
     "lucide-react": "^0.383.0",
+    "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
