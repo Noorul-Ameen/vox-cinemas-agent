@@ -32,7 +32,7 @@ export function I18nProvider({ children }) {
   useEffect(() => {
     document.documentElement.lang = locale;
     document.documentElement.dir = dir;
-    document.title = STRINGS[locale]["app.title"];
+    document.title = STRINGS[locale]["app.documentTitle"];
   }, [locale, dir]);
 
   const value = useMemo(() => {
