@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useConversation } from "@elevenlabs/react";
-import { BadgePercent, History, Languages, MapPin, Mic, MicOff, Send, Sparkles } from "lucide-react";
+import { BadgePercent, History, MapPin, Mic, MicOff, Send, Sparkles } from "lucide-react";
 import { C } from "./theme.js";
 import { BookingCard, CinemaPicker, MovieGrid, SeatMap, Showtimes } from "./components/RichMedia.jsx";
 import BookingHistory from "./components/BookingHistory.jsx";
@@ -11,15 +11,21 @@ import { appendBooking, findBooking, markCancelled, readBookings } from "./booki
 import { useI18n } from "./i18n/I18nProvider.jsx";
 import { HANDOVER_TRIGGER, buildHandoverPayload, isClarificationFailureReason } from "./lib/handoverSummary.js";
 import { resolveFilmCandidate } from "./lib/fuzzyResolvers.js";
+import { resolveLanguageSignal } from "./lib/languageSwitch.js";
+import { VOXI_AGENT_PROMPT, VOXI_FIRST_MESSAGES, buildVoxiContext } from "./lib/voxiSession.js";
 import { OFFER_META } from "./offers/offersData.js";
 import { resolveOffer, resolveOfferForBankAndCard } from "./offers/offerResolver.js";
 import * as vista from "./vistaClient.js";
 
 const CINEMAS = vista.getCinemas();
-const DEFAULT_CINEMA = CINEMAS.find((item) => item.id === "0002") || CINEMAS[0];
 const stripVox = (name) => String(name || "").replace(/^VOX\s*[—-]\s*/, "");
 const norm = (value) => String(value ?? "").toLowerCase().trim();
 const localizedValue = (value, locale) => typeof value === "string" ? value : value?.[locale] || value?.en || "";
+const isAgentWelcome = (value) => {
+  const text = String(value || "");
+  return /\bvox concierge\b|i can show you what(?:'|’)s playing, book your seats/i.test(text)
+    || /(?:(?:i(?:'|’)m|i am) voxi|أنا\s+voxi).*(?:how can i help|كيف.*أساعد)/i.test(text);
+};
 const localizedOfferReason = (result, locale) => {
   if (locale !== "ar") return result?.reason || "No matching offer found.";
   if (result?.status === "eligible") return "البطاقة مدرجة ضمن الفئات المؤهلة، مع تأكيد الأهلية النهائية عند الدفع.";
@@ -32,7 +38,7 @@ function newConversationId() {
 }
 
 export default function App() {
-  const { locale, dir, t, setLocale, toggleLocale } = useI18n();
+  const { locale, dir, t, setLocale } = useI18n();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [stage, setStage] = useState({ view: "empty" });
@@ -40,7 +46,9 @@ export default function App() {
   const [booking, setBooking] = useState(null);
   const [bookings, setBookings] = useState(readBookings);
   const [pendingOrder, setPendingOrder] = useState(null);
-  const [cinema, setCinema] = useState(DEFAULT_CINEMA);
+  const [cinema, setCinema] = useState(null);
+  const [sessionMode, setSessionMode] = useState(null);
+  const [startingMode, setStartingMode] = useState(null);
 
   // Blocking cancellation tool state. Seat selection remains deliberately
   // non-blocking so both voice and touch can continue to use select_seats.
@@ -49,6 +57,7 @@ export default function App() {
   // Voice-resolution caches and non-recursive return-navigation snapshots.
   const filmsRef = useRef([]);
   const filmsCinemaRef = useRef("");
+  const filmRequestsRef = useRef(new Map());
   const sessionsRef = useRef([]);
   const sessionsFilmRef = useRef("");
   const planRef = useRef([]);
@@ -69,6 +78,15 @@ export default function App() {
   const clarificationFailuresRef = useRef(0);
   const clarificationFailureLogRef = useRef([]);
   const conversationIdRef = useRef(newConversationId());
+  const sessionModeRef = useRef(null);
+  const requestedSessionModeRef = useRef(null);
+  const sessionStartRef = useRef(null);
+  const switchingSessionRef = useRef(false);
+  const lastSentTextRef = useRef(null);
+  const hasStartedConversationRef = useRef(false);
+  const hasDisplayedWelcomeRef = useRef(false);
+  const continuationSessionRef = useRef(false);
+  const pendingLanguageSwitchRef = useRef(null);
 
   useEffect(() => { stageRef.current = stage; }, [stage]);
   useEffect(() => { cinemaRef.current = cinema; }, [cinema]);
@@ -93,14 +111,26 @@ export default function App() {
     );
   };
 
-  const ensureFilms = useCallback(async (cinemaId = cinemaRef.current.id) => {
-    if (!filmsRef.current.length || filmsCinemaRef.current !== cinemaId) {
-      filmsRef.current = await vista.getScheduledFilms(cinemaId);
-      filmsCinemaRef.current = cinemaId;
-      sessionsRef.current = [];
-      sessionsFilmRef.current = "";
+  const ensureFilms = useCallback(async (cinemaId = cinemaRef.current?.id) => {
+    if (!cinemaId) return [];
+    if (filmsRef.current.length && filmsCinemaRef.current === cinemaId) return filmsRef.current;
+    let request = filmRequestsRef.current.get(cinemaId);
+    if (!request) {
+      request = vista.getScheduledFilms(cinemaId);
+      filmRequestsRef.current.set(cinemaId, request);
     }
-    return filmsRef.current;
+    try {
+      const movies = await request;
+      if (cinemaRef.current?.id === cinemaId) {
+        filmsRef.current = movies;
+        filmsCinemaRef.current = cinemaId;
+        sessionsRef.current = [];
+        sessionsFilmRef.current = "";
+      }
+      return movies;
+    } finally {
+      if (filmRequestsRef.current.get(cinemaId) === request) filmRequestsRef.current.delete(cinemaId);
+    }
   }, []);
 
   const resolveFilm = (idOrTitle) => resolveFilmCandidate(filmsRef.current, idOrTitle);
@@ -137,8 +167,8 @@ export default function App() {
     filmsCinemaRef.current = "";
     sessionsRef.current = [];
     sessionsFilmRef.current = "";
-    ensureFilms(cinema.id).catch(() => {});
-  }, [cinema.id, ensureFilms]);
+    if (cinema?.id) ensureFilms(cinema.id).catch(() => {});
+  }, [cinema?.id, ensureFilms]);
 
   useEffect(() => () => dismissPendingCancellation("widget_unmounted"), []);
 
@@ -155,12 +185,13 @@ export default function App() {
     const current = stageRef.current;
     const movie = current.movie;
     const session = current.session;
-    if (valid.length) {
+    const selectedCinema = cinemaRef.current;
+    if (valid.length && selectedCinema) {
       const order = {
         movieId: movie?.id,
         movieTitle: movie?.title,
-        cinemaId: cinemaRef.current.id,
-        cinemaName: cinemaRef.current.name,
+        cinemaId: selectedCinema.id,
+        cinemaName: selectedCinema.name,
         sessionId: session?.sessionId,
         date: session?.date || vista.demoDate(),
         experience: session?.exp,
@@ -168,7 +199,7 @@ export default function App() {
         showtime: session?.time,
         seats: valid,
         total,
-        currency: cinemaRef.current.currency || "AED",
+        currency: selectedCinema.currency || "AED",
         tint: movie?.tint,
         checkoutId: `checkout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
       };
@@ -217,11 +248,24 @@ export default function App() {
       clearPendingOrder();
       const requested = resolveCinema(cinemaId) || resolveCinema(cinemaName);
       const target = requested || cinemaRef.current;
-      if (target.id !== cinemaRef.current.id) {
+      if (!target) {
+        cinemaReturnRef.current = { view: "empty" };
+        setStage({ view: "cinemas" });
+        resetClarificationFailures();
+        return JSON.stringify({
+          shown: "cinema picker",
+          cinemas: CINEMAS.map((item) => ({ id: item.id, name: item.name })),
+          instruction: "Ask the guest to choose a VOX Cinemas UAE location before listing movies.",
+        });
+      }
+      if (target.id !== cinemaRef.current?.id) {
         cinemaRef.current = target;
         setCinema(target);
       }
       const movies = await ensureFilms(target.id);
+      if (cinemaRef.current?.id !== target.id) {
+        return JSON.stringify({ shown: false, reason: "The guest selected a different VOX Cinemas UAE location while movies were loading." });
+      }
       setStage({ view: "movies", movies });
       resetClarificationFailures();
       return JSON.stringify({
@@ -234,11 +278,18 @@ export default function App() {
     show_showtimes: async ({ movieId, movieTitle } = {}) => {
       dismissPendingCancellation("new_journey");
       clearPendingOrder();
-      await ensureFilms(cinemaRef.current.id);
+      if (!cinemaRef.current) {
+        setStage({ view: "cinemas" });
+        return JSON.stringify({ shown: false, reason: "A VOX Cinemas UAE location must be selected first. The cinema picker is displayed." });
+      }
+      const cinemaId = cinemaRef.current.id;
+      await ensureFilms(cinemaId);
+      if (cinemaRef.current?.id !== cinemaId) return JSON.stringify({ shown: false, reason: "The cinema changed while showtimes were loading." });
       const hasRequestedMovie = Boolean(movieId || movieTitle);
       const movie = resolveFilm(movieId) || resolveFilm(movieTitle) || (!hasRequestedMovie ? filmsRef.current[0] : null);
       if (!movie) return JSON.stringify({ shown: false, reason: `No matching movie was found for ${movieTitle || movieId}. Ask the guest to choose a title from the displayed movie list.` });
-      const sessions = await vista.getSessions(cinemaRef.current.id, movie.id);
+      const sessions = await vista.getSessions(cinemaId, movie.id);
+      if (cinemaRef.current?.id !== cinemaId) return JSON.stringify({ shown: false, reason: "The cinema changed while showtimes were loading." });
       sessionsRef.current = sessions;
       sessionsFilmRef.current = movie.id;
       setStage({ view: "showtimes", movie, sessions });
@@ -253,19 +304,27 @@ export default function App() {
     show_seat_map: async ({ movieTitle, sessionId, showtime } = {}) => {
       dismissPendingCancellation("new_journey");
       clearPendingOrder();
-      await ensureFilms(cinemaRef.current.id);
+      if (!cinemaRef.current) {
+        setStage({ view: "cinemas" });
+        return JSON.stringify({ shown: false, reason: "A VOX Cinemas UAE location must be selected first. The cinema picker is displayed." });
+      }
+      const cinemaId = cinemaRef.current.id;
+      await ensureFilms(cinemaId);
+      if (cinemaRef.current?.id !== cinemaId) return JSON.stringify({ shown: false, reason: "The cinema changed while the seat map was loading." });
       const current = stageRef.current;
       const resolvedMovie = resolveFilm(movieTitle);
       const movie = resolvedMovie || (!movieTitle ? current.movie || filmsRef.current[0] : null);
       if (!movie) return JSON.stringify({ shown: false, reason: `No matching movie was found for ${movieTitle}. Ask the guest to choose a title from the displayed movie list.` });
       let sessions = sessionsRef.current;
       if (!sessions.length || sessionsFilmRef.current !== movie?.id) {
-        sessions = movie ? await vista.getSessions(cinemaRef.current.id, movie.id) : [];
+        sessions = movie ? await vista.getSessions(cinemaId, movie.id) : [];
+        if (cinemaRef.current?.id !== cinemaId) return JSON.stringify({ shown: false, reason: "The cinema changed while the seat map was loading." });
         sessionsRef.current = sessions;
         sessionsFilmRef.current = movie?.id || "";
       }
       const session = resolveSession(sessions, sessionId, showtime) || { sessionId, time: showtime, exp: "", screen: "" };
-      const plan = await vista.getSeatPlan(cinemaRef.current.id, session.sessionId);
+      const plan = await vista.getSeatPlan(cinemaId, session.sessionId);
+      if (cinemaRef.current?.id !== cinemaId) return JSON.stringify({ shown: false, reason: "The cinema changed while the seat map was loading." });
       setSelectedSeats([]);
       seatsRef.current = [];
       planRef.current = plan;
@@ -358,8 +417,8 @@ export default function App() {
       const selectedExperience = experience || current.session?.exp || current.order?.experience || order?.experience || activeBooking?.experience || "";
       const query = [bankName, cardName].filter(Boolean).join(" ").trim();
       const context = {
-        cinemaId: cinemaRef.current.id,
-        cinemaName: cinemaRef.current.name,
+        cinemaId: cinemaRef.current?.id,
+        cinemaName: cinemaRef.current?.name,
         experience: selectedExperience,
         ticketCount: order?.seats?.length || seatsRef.current.length || undefined,
         orderTotal: order?.total,
@@ -460,49 +519,241 @@ export default function App() {
   const conversation = useConversation({
     clientTools,
     serverLocation: "eu-residency",
-    onConnect: () => say("system", t("app.connectedMessage")),
-    onDisconnect: () => say("system", t("app.disconnectedMessage")),
+    onConnect: () => {
+      const connectedMode = requestedSessionModeRef.current || "voice";
+      sessionModeRef.current = connectedMode;
+      setSessionMode(connectedMode);
+      setStartingMode(null);
+      switchingSessionRef.current = false;
+      say("system", t(connectedMode === "text" ? "app.textConnected" : "app.voiceConnected"));
+    },
+    onDisconnect: () => {
+      const switching = switchingSessionRef.current;
+      pendingLanguageSwitchRef.current = null;
+      sessionModeRef.current = null;
+      setSessionMode(null);
+      if (!switching) {
+        requestedSessionModeRef.current = null;
+        setStartingMode(null);
+        say("system", t("app.disconnectedMessage"));
+      }
+    },
     onMessage: (message) => {
       if (!message?.message) return;
       const role = message.source === "user" ? "user" : "agent";
-      say(role, message.message);
-      if (role === "user" && /[\u0600-\u06ff]/.test(message.message) && localeRef.current !== "ar") setLocale("ar");
+      const languageSignal = resolveLanguageSignal({
+        role,
+        text: message.message,
+        currentLocale: localeRef.current,
+        pendingLocale: pendingLanguageSwitchRef.current,
+      });
+      pendingLanguageSwitchRef.current = languageSignal.pendingLocale;
+      if (languageSignal.nextLocale && languageSignal.nextLocale !== localeRef.current) {
+        localeRef.current = languageSignal.nextLocale;
+        setLocale(languageSignal.nextLocale);
+      }
+      if (role === "agent" && isAgentWelcome(message.message)) {
+        const pendingTyped = lastSentTextRef.current;
+        const hasRecentTypedMessage = pendingTyped && Date.now() - pendingTyped.at < 15000;
+        if (pendingTyped && !hasRecentTypedMessage) lastSentTextRef.current = null;
+        if (!hasDisplayedWelcomeRef.current && !continuationSessionRef.current && !hasRecentTypedMessage) {
+          const displayedWelcome = /\bvox concierge\b/i.test(message.message)
+            ? VOXI_FIRST_MESSAGES[localeRef.current]
+            : message.message;
+          say("agent", displayedWelcome);
+        }
+        hasDisplayedWelcomeRef.current = true;
+        return;
+      }
+      const sent = lastSentTextRef.current;
+      const isTypedEcho = role === "user" && sent && sent.text === message.message && Date.now() - sent.at < 15000;
+      if (isTypedEcho) lastSentTextRef.current = null;
+      else say(role, message.message);
     },
-    onError: (error) => say("system", `${t("app.errorPrefix")}: ${typeof error === "string" ? error : error?.message || t("app.unknownError")}`),
+    onError: (error) => {
+      console.error("Conversation error", error);
+      say("system", t("app.connectionError"));
+    },
   });
 
   const status = conversation.status;
   const isConnected = status === "connected";
 
-  const startCall = useCallback(async () => {
+  const startTextSession = useCallback(async () => {
+    if (sessionModeRef.current) return true;
+    const activeStart = sessionStartRef.current;
+    if (activeStart) {
+      await activeStart.promise;
+      if (sessionModeRef.current) return true;
+    }
+
+    requestedSessionModeRef.current = "text";
+    continuationSessionRef.current = hasStartedConversationRef.current;
+    setStartingMode("text");
+    const start = (async () => {
+      try {
+        const activeLocale = localeRef.current;
+        await conversation.startSession({
+          agentId: import.meta.env.VITE_AGENT_ID,
+          connectionType: "websocket",
+          textOnly: true,
+          overrides: {
+            conversation: { textOnly: true },
+          },
+          dynamicVariables: {
+            preferred_language: activeLocale === "ar" ? "Arabic" : "English",
+          },
+        });
+        hasStartedConversationRef.current = true;
+        conversationIdRef.current = conversation.getId?.() || conversationIdRef.current;
+        conversation.sendContextualUpdate?.(`${VOXI_AGENT_PROMPT}\n\n${buildVoxiContext({
+          locale: activeLocale,
+          cinema: cinemaRef.current,
+          scheduleDate: vista.demoDate(),
+          stage: stageRef.current,
+          selectedSeats: seatsRef.current,
+        })}`);
+        return true;
+      } catch (error) {
+        console.error("Text conversation could not start", error);
+        requestedSessionModeRef.current = null;
+        sessionModeRef.current = null;
+        setSessionMode(null);
+        setStartingMode(null);
+        say("system", t("app.textStartError"));
+        return false;
+      }
+    })();
+    const entry = { mode: "text", promise: start };
+    sessionStartRef.current = entry;
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-      await conversation.startSession({
-        agentId: import.meta.env.VITE_AGENT_ID,
-        connectionType: "webrtc",
-      });
-    } catch (error) {
-      say("system", t("app.startError", { message: error?.message || t("app.unknownError") }));
+      return await start;
+    } finally {
+      if (sessionStartRef.current === entry) sessionStartRef.current = null;
     }
   }, [conversation, say, t]);
 
-  const endCall = useCallback(() => conversation.endSession(), [conversation]);
+  const startVoiceSession = useCallback(async () => {
+    if (sessionModeRef.current === "voice") return;
+    const activeStart = sessionStartRef.current;
+    if (activeStart) await activeStart.promise;
+    if (sessionModeRef.current === "voice") return;
 
-  const sendText = useCallback((text) => {
+    const previousMode = sessionModeRef.current;
+    const start = (async () => {
+      let endedPreviousSession = false;
+      setStartingMode("voice");
+      try {
+        // Permission is checked before ending text chat so a denial never
+        // removes the guest's working, microphone-free conversation.
+        const permissionRequest = navigator.mediaDevices.getUserMedia({ audio: true });
+        let permissionTimer;
+        let permissionStream;
+        try {
+          permissionStream = await Promise.race([
+            permissionRequest,
+            new Promise((_, reject) => {
+              permissionTimer = window.setTimeout(() => reject(new Error("Microphone permission timed out")), 10000);
+            }),
+          ]);
+        } catch (error) {
+          permissionRequest.then((lateStream) => lateStream.getTracks().forEach((track) => track.stop())).catch(() => {});
+          throw error;
+        } finally {
+          window.clearTimeout(permissionTimer);
+        }
+        permissionStream.getTracks().forEach((track) => track.stop());
+        if (sessionModeRef.current) {
+          switchingSessionRef.current = true;
+          await conversation.endSession();
+          endedPreviousSession = true;
+        }
+        requestedSessionModeRef.current = "voice";
+        continuationSessionRef.current = hasStartedConversationRef.current;
+        const activeLocale = localeRef.current;
+        await conversation.startSession({
+          agentId: import.meta.env.VITE_AGENT_ID,
+          connectionType: "webrtc",
+          textOnly: false,
+          dynamicVariables: {
+            preferred_language: activeLocale === "ar" ? "Arabic" : "English",
+          },
+        });
+        hasStartedConversationRef.current = true;
+        conversationIdRef.current = conversation.getId?.() || conversationIdRef.current;
+        conversation.sendContextualUpdate?.(`${VOXI_AGENT_PROMPT}\n\n${buildVoxiContext({
+          locale: activeLocale,
+          cinema: cinemaRef.current,
+          scheduleDate: vista.demoDate(),
+          stage: stageRef.current,
+          selectedSeats: seatsRef.current,
+        })}`);
+      } catch (error) {
+        console.error("Voice conversation could not start", error);
+        switchingSessionRef.current = false;
+        setStartingMode(null);
+        if (previousMode && !endedPreviousSession) {
+          requestedSessionModeRef.current = previousMode;
+          sessionModeRef.current = previousMode;
+          setSessionMode(previousMode);
+        } else {
+          requestedSessionModeRef.current = null;
+          sessionModeRef.current = null;
+          setSessionMode(null);
+        }
+        say("system", t("app.voiceStartError"));
+      }
+    })();
+    const entry = { mode: "voice", promise: start };
+    sessionStartRef.current = entry;
+    try {
+      return await start;
+    } finally {
+      if (sessionStartRef.current === entry) sessionStartRef.current = null;
+    }
+  }, [conversation, say, t]);
+
+  const endVoiceSession = useCallback(async () => {
+    switchingSessionRef.current = false;
+    await conversation.endSession();
+  }, [conversation]);
+
+  const sendText = useCallback(async (text) => {
     const value = (text ?? input).trim();
     if (!value) return;
+    const languageSignal = resolveLanguageSignal({
+      role: "user",
+      text: value,
+      currentLocale: localeRef.current,
+      pendingLocale: pendingLanguageSwitchRef.current,
+    });
+    pendingLanguageSwitchRef.current = languageSignal.pendingLocale;
+    if (languageSignal.nextLocale && languageSignal.nextLocale !== localeRef.current) {
+      localeRef.current = languageSignal.nextLocale;
+      setLocale(languageSignal.nextLocale);
+    }
     say("user", value);
     setInput("");
-    if (isConnected && conversation.sendUserMessage) conversation.sendUserMessage(value);
-    else say("system", t("app.startFirst"));
-  }, [conversation, input, isConnected, say, t]);
+    lastSentTextRef.current = { text: value, at: Date.now() };
+    const transition = sessionStartRef.current;
+    if (transition) await transition.promise;
+    const ready = sessionModeRef.current ? true : await startTextSession();
+    if (ready && conversation.sendUserMessage) conversation.sendUserMessage(value);
+    else lastSentTextRef.current = null;
+  }, [conversation, input, say, setLocale, startTextSession]);
 
   const pickMovie = async (movie) => {
+    const cinemaId = cinemaRef.current?.id;
+    if (!cinemaId) {
+      setStage({ view: "cinemas" });
+      return;
+    }
     dismissPendingCancellation("movie_selected");
     clearPendingOrder();
     resetClarificationFailures();
     say("user", movie.title);
-    const sessions = await vista.getSessions(cinemaRef.current.id, movie.id);
+    const sessions = await vista.getSessions(cinemaId, movie.id);
+    if (cinemaRef.current?.id !== cinemaId) return;
     sessionsRef.current = sessions;
     sessionsFilmRef.current = movie.id;
     setStage({ view: "showtimes", movie, sessions });
@@ -510,12 +761,18 @@ export default function App() {
   };
 
   const pickSession = async (session) => {
+    const cinemaId = cinemaRef.current?.id;
+    if (!cinemaId) {
+      setStage({ view: "cinemas" });
+      return;
+    }
     dismissPendingCancellation("session_selected");
     clearPendingOrder();
     resetClarificationFailures();
     const movie = stageRef.current.movie;
     say("user", `${session.time} ${session.exp}`);
-    const plan = await vista.getSeatPlan(cinemaRef.current.id, session.sessionId);
+    const plan = await vista.getSeatPlan(cinemaId, session.sessionId);
+    if (cinemaRef.current?.id !== cinemaId) return;
     planRef.current = plan;
     seatsRef.current = [];
     setSelectedSeats([]);
@@ -542,6 +799,7 @@ export default function App() {
     seatsRef.current = [];
     setSelectedSeats([]);
     const movies = await ensureFilms(nextCinema.id);
+    if (cinemaRef.current?.id !== nextCinema.id) return;
     setStage({ view: "movies", movies });
     say("system", t("app.cinemaChanged", { cinema: stripVox(nextCinema.name) }));
     if (isConnected && conversation.sendContextualUpdate) conversation.sendContextualUpdate(`The guest selected ${nextCinema.name}. Continue using that cinema.`);
@@ -606,38 +864,51 @@ export default function App() {
     resetClarificationFailures();
   };
 
-  const changeLanguage = () => {
-    toggleLocale();
-    const next = locale === "en" ? "Arabic" : "English";
-    if (isConnected && conversation.sendContextualUpdate) conversation.sendContextualUpdate(`The guest switched the interface to ${next}. Continue speaking in ${next}.`);
+  const changeLanguage = (nextLocale) => {
+    if (nextLocale === locale) return;
+    pendingLanguageSwitchRef.current = null;
+    localeRef.current = nextLocale;
+    setLocale(nextLocale);
+    const next = nextLocale === "ar" ? "Arabic" : "English";
+    if (isConnected && conversation.sendContextualUpdate) {
+      conversation.sendContextualUpdate(`The guest explicitly selected ${next}. This visible selector action is confirmed. Preserve the active task and continue in ${next} without repeating the welcome message. ${buildVoxiContext({
+        locale: nextLocale,
+        cinema: cinemaRef.current,
+        scheduleDate: vista.demoDate(),
+        stage: stageRef.current,
+        selectedSeats: seatsRef.current,
+      })}`);
+    }
   };
 
   const scrollRef = useRef(null);
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages]);
 
   const chips = [t("app.chipShowing"), t("app.chipBook"), t("app.chipCancel")];
-  const statusLabel = status === "connected" ? t("app.connected") : status === "connecting" ? t("app.connecting") : t("app.disconnected");
+  const statusLabel = startingMode
+    ? t("app.connectingMode", { mode: t(startingMode === "text" ? "app.textMode" : "app.voiceMode") })
+    : status === "connected"
+      ? t(sessionMode === "text" ? "app.textMode" : "app.voiceMode")
+      : t("app.disconnected");
   const displayedBooking = stage.booking || booking;
 
   return (
     <div lang={locale} dir={dir} style={{ minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
-      <style>{`.voxi-chip-row::-webkit-scrollbar{display:none}`}</style>
-      <div style={{ width: "100%", maxWidth: 420, height: "min(860px, 96vh)", display: "flex", flexDirection: "column", borderRadius: 28, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.55)", background: C.ink, border: "1px solid rgba(255,255,255,.06)" }}>
+      <style>{`.voxi-chip-row::-webkit-scrollbar{display:none}.voxi-widget :is(button,input,select,summary):focus-visible{outline:2px solid ${C.lavender}!important;outline-offset:2px;box-shadow:0 0 0 4px rgba(228,220,240,.16)}`}</style>
+      <div className="voxi-widget" style={{ width: "100%", maxWidth: 420, height: "min(860px, 96vh)", display: "flex", flexDirection: "column", borderRadius: 28, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.55)", background: C.ink, border: "1px solid rgba(255,255,255,.06)" }}>
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, borderBottom: "1px solid rgba(255,255,255,.08)", padding: "11px 12px", flexShrink: 0 }}>
           <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 9 }}>
             <div style={{ display: "flex", height: 32, width: 32, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 8, fontWeight: 900, color: "#fff", background: C.magenta }}>V</div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ overflow: "hidden", fontSize: 14, fontWeight: 700, color: "#fff", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("app.title")}</div>
-              <button onClick={openCinemaPicker} title={t("app.changeCinema")} style={{ display: "flex", maxWidth: 145, alignItems: "center", gap: 3, padding: 0, border: 0, background: "transparent", color: "rgba(255,255,255,.45)", fontSize: 10, cursor: "pointer" }}>
-                <MapPin size={10} />
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{stripVox(cinema.name)}</span>
-              </button>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ overflow: "hidden", fontSize: 14, fontWeight: 700, color: "#fff", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("app.title")}</div>
+                <div dir="ltr" style={{ overflow: "hidden", maxWidth: 128, color: "rgba(255,255,255,.48)", fontSize: 10, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("app.brand")}</div>
+              </div>
             </div>
-          </div>
-          <div style={{ display: "flex", flexShrink: 0, alignItems: "center", gap: 4 }}>
-            <TopButton label={t("app.offers")} onClick={openOffers}><BadgePercent size={14} /></TopButton>
-            <TopButton label={t("app.history")} onClick={openHistory}><History size={14} /></TopButton>
-            <TopButton label={locale === "en" ? "العربية" : "English"} onClick={changeLanguage}><Languages size={14} /></TopButton>
+            <div style={{ display: "flex", flexShrink: 0, alignItems: "center", gap: 4 }}>
+              <TopButton label={cinema ? `${t("app.changeCinema")}: ${stripVox(cinema.name)}` : t("app.chooseCinema")} onClick={openCinemaPicker}><MapPin size={14} /></TopButton>
+              <TopButton label={t("app.offers")} onClick={openOffers}><BadgePercent size={14} /></TopButton>
+              <TopButton label={t("app.history")} onClick={openHistory}><History size={14} /></TopButton>
+              <LanguageSelector locale={locale} label={t("app.language")} onSelect={changeLanguage} />
             <span role="status" aria-live="polite" title={statusLabel} aria-label={statusLabel} style={{ display: "flex", width: 18, height: 28, alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,.52)" }}>
               <span style={{ height: 7, width: 7, borderRadius: 999, background: isConnected ? C.green : status === "connecting" ? "#D9A94B" : "#777" }} />
               <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)" }}>{statusLabel}</span>
@@ -651,10 +922,11 @@ export default function App() {
               <div style={{ display: "flex", height: 56, width: 56, alignItems: "center", justifyContent: "center", borderRadius: 16, background: "rgba(182,24,108,.15)", marginBottom: 16 }}><Sparkles color={C.lavender} size={26} /></div>
               <div style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>{t("app.emptyTitle")}</div>
               <p style={{ maxWidth: 280, marginTop: 8, fontSize: 13, lineHeight: 1.5, color: "rgba(255,255,255,.5)" }}>{t("app.emptyBody")}</p>
+              {!cinema && <button type="button" onClick={openCinemaPicker} style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 12, border: 0, borderRadius: 999, background: C.magenta, padding: "9px 15px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}><MapPin size={14} />{t("app.chooseCinema")}</button>}
             </div>
           )}
           {stage.view === "cinemas" && <CinemaPicker cinemas={CINEMAS} selected={cinema} onSelect={chooseCinema} onBack={() => setStage(cinemaReturnRef.current || { view: "empty" })} />}
-          {stage.view === "movies" && <MovieGrid movies={stage.movies} cinemaName={stripVox(cinema.name)} scheduleDate={vista.demoDate()} onSelect={pickMovie} />}
+          {stage.view === "movies" && cinema && <MovieGrid movies={stage.movies} cinemaName={stripVox(cinema.name)} scheduleDate={vista.demoDate()} onSelect={pickMovie} />}
           {stage.view === "showtimes" && <Showtimes movie={stage.movie} sessions={stage.sessions} onSelect={pickSession} onBack={() => clientTools.show_movie_selection()} />}
           {stage.view === "seatmap" && <SeatMap movie={stage.movie} session={stage.session} plan={stage.plan} selected={selectedSeats} onToggle={toggleSeat} onConfirm={confirmSeats} onBack={() => clientTools.show_showtimes({ movieId: stage.movie.id, movieTitle: stage.movie.title })} />}
           {stage.view === "checkout" && stage.order && <Checkout order={stage.order} onPaid={handlePaid} onCancel={() => { clearPendingOrder(); setStage({ view: "seatmap", movie: stage.movie, session: stage.session, plan: planRef.current }); }} />}
@@ -702,8 +974,8 @@ export default function App() {
             {chips.map((chip) => <button key={chip} onClick={() => sendText(chip)} style={{ flexShrink: 0, borderRadius: 999, border: "1px solid rgba(255,255,255,.15)", background: "none", padding: "5px 11px", color: "rgba(255,255,255,.7)", fontSize: 11, whiteSpace: "nowrap", cursor: "pointer" }}>{chip}</button>)}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, borderTop: "1px solid rgba(255,255,255,.08)", padding: 12 }}>
-            <button onClick={isConnected ? endCall : startCall} title={isConnected ? t("app.endCall") : t("app.startCall")} aria-label={isConnected ? t("app.endCall") : t("app.startCall")} style={{ display: "flex", height: 40, width: 40, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 999, border: "none", cursor: "pointer", color: "#fff", background: isConnected ? "#8D2E3A" : `radial-gradient(circle at 35% 30%, ${C.lavender}, ${C.purple})` }}>{isConnected ? <MicOff size={17} /> : <Mic size={17} />}</button>
-            <input dir="auto" value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => event.key === "Enter" && sendText()} placeholder={t("app.inputPlaceholder")} style={{ minWidth: 0, flex: 1, border: "none", borderRadius: 999, outline: "none", background: "rgba(255,255,255,.05)", padding: "10px 14px", color: "#fff", fontSize: 14, textAlign: "start" }} />
+            <button onClick={isConnected && sessionMode === "voice" ? endVoiceSession : startVoiceSession} disabled={startingMode === "voice"} title={isConnected && sessionMode === "voice" ? t("app.endVoice") : t("app.enableVoice")} aria-label={isConnected && sessionMode === "voice" ? t("app.endVoice") : t("app.enableVoice")} style={{ display: "flex", height: 40, width: 40, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 999, border: "none", cursor: startingMode === "voice" ? "progress" : "pointer", color: "#fff", opacity: startingMode === "voice" ? 0.65 : 1, background: isConnected && sessionMode === "voice" ? "#8D2E3A" : `radial-gradient(circle at 35% 30%, ${C.lavender}, ${C.purple})` }}>{isConnected && sessionMode === "voice" ? <MicOff size={17} /> : <Mic size={17} />}</button>
+            <input dir="auto" value={input} onChange={(event) => { setInput(event.target.value); if (isConnected && conversation.sendUserActivity) conversation.sendUserActivity(); }} onKeyDown={(event) => event.key === "Enter" && !event.nativeEvent.isComposing && sendText()} placeholder={t("app.inputPlaceholder")} aria-label={t("app.inputPlaceholder")} style={{ minWidth: 0, flex: 1, border: "none", borderRadius: 999, outline: "none", background: "rgba(255,255,255,.05)", padding: "10px 14px", color: "#fff", fontSize: 14, textAlign: "start" }} />
             <button onClick={() => sendText()} disabled={!input.trim()} aria-label={t("app.send")} style={{ display: "flex", height: 36, width: 36, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 999, border: "none", cursor: "pointer", color: "#fff", background: C.magenta, opacity: input.trim() ? 1 : 0.3 }}><Send size={16} /></button>
           </div>
         </section>
@@ -714,4 +986,14 @@ export default function App() {
 
 function TopButton({ label, onClick, children }) {
   return <button type="button" title={label} aria-label={label} onClick={onClick} style={{ display: "grid", width: 28, height: 28, flexShrink: 0, placeItems: "center", border: 0, borderRadius: 8, background: "rgba(255,255,255,.05)", color: "rgba(255,255,255,.62)", cursor: "pointer" }}>{children}</button>;
+}
+
+function LanguageSelector({ locale, label, onSelect }) {
+  return (
+    <div role="group" aria-label={label} title={label} style={{ display: "flex", height: 28, flexShrink: 0, alignItems: "center", gap: 1, borderRadius: 8, background: "rgba(255,255,255,.05)", padding: 2 }}>
+      {[{ code: "en", label: "English" }, { code: "ar", label: "العربية" }].map((item) => (
+        <button key={item.code} type="button" aria-pressed={locale === item.code} aria-label={item.code === "en" ? "English" : "العربية"} onClick={() => onSelect(item.code)} style={{ minWidth: item.code === "en" ? 43 : 47, height: 22, border: 0, borderRadius: 6, paddingInline: 5, background: locale === item.code ? C.magenta : "transparent", color: locale === item.code ? "#fff" : "rgba(255,255,255,.55)", fontSize: 9, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{item.label}</button>
+      ))}
+    </div>
+  );
 }
