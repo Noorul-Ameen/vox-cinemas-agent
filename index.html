@@ -3,7 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VOX Concierge — ElevenLabs Agent</title>
+    <title>Voxi | VOX Cinemas UAE</title>
+    <script>
+      try {
+        const locale = localStorage.getItem("vox_locale") === "ar" ? "ar" : "en";
+        document.documentElement.lang = locale;
+        document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
+      } catch {}
+    </script>
     <style>
       * { box-sizing: border-box; }
       html, body, #root { height: 100%; margin: 0; }
