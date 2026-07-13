@@ -167,10 +167,10 @@ Current first-party sources include:
 
 - Transactional booking, cancellation and booking-history commands now bypass FAQ rendering and continue through the journey/tool router. Policy questions still use curated FAQ answers, and cancellation guidance exposes the routing topic expected by the cancellation UI. English and UAE-colloquial Arabic cases are covered by deterministic tests.
 - Offer results are no longer labelled eligible when a material input is unknown. Membership, booking channel, ticket count, order total, monthly usage/spend, cinema, format and seat category are requested when the selected offer depends on them. Generic card tiers such as `Visa Infinite` or `Platinum` no longer guess an issuing bank.
-- Checkout starts with no personal/default card. The required add-card/Luhn prototype path remains available and is explicitly test-only (`4111 1111 1111 1111`). PAN and security code exist only in component memory, are cleared after use, and are never sent to Voxi or a server. Local storage contains only masked display metadata (brand, last four, test name and expiry). `VITE_VISTA_BASE` controls read data only; checkout remains clearly simulated unless a future hosted payment integration explicitly selects another mode.
+- Checkout starts with no personal/default card. The required add-card/Luhn preview path remains available with the supplied payment-preview card (`4111 1111 1111 1111`). PAN and security code exist only in component memory, are cleared after use, and are never sent to Voxi or a server. Local storage contains only masked display metadata (brand, last four, preview name and expiry). `VITE_VISTA_BASE` controls read data only; checkout remains in the transaction sandbox unless a future hosted payment integration explicitly selects another mode.
 - Booking confirmation and history now show cinema, performance date/time and active/cancelled status. Movie, showtime, seat, cinema and offer panels provide explicit empty/error states and optional retry actions.
 - Unknown or invalid experience artwork uses the validated Standard experience image as a generic fallback. All new labels and status messages have matching English and Arabic strings.
-- `scripts/validateSupportingUx.mjs` protects the checkout data boundary, explicit simulation default, booking detail fields, retry copy and experience fallback.
+- `scripts/validateSupportingUx.mjs` protects the checkout data boundary, explicit sandbox default, booking detail fields, retry copy and experience fallback.
 
 ## Verification
 
@@ -186,16 +186,17 @@ Live browser checks covered:
 - cancellation decline and confirmation;
 - manual reset and retained history;
 - live text-only ElevenLabs chat without microphone access;
+- live ElevenLabs voice WebRTC connection and spoken Mall of the Emirates routing into that cinema's movie grid;
 - sourced English and Arabic FAQ answers;
 - explicit English/Arabic RTL/LTR switching;
-- 390 px mobile viewport without horizontal overflow.
+- 390 px and 420 px mobile viewports without horizontal overflow or browser runtime errors.
 
-The in-app test browser did not grant microphone access, so the live WebRTC attempt correctly timed out while preserving the active text session. WebRTC, public `VITE_AGENT_ID`, microphone gating and EU residency are additionally protected by automated invariants.
+The live voice check used the public `VITE_AGENT_ID`, microphone-gated WebRTC transport and the protected EU-residency configuration. The same cinema-selection route is covered for typed and spoken turns by the automated regression suite.
 
 ## Remaining production dependencies and risks
 
 - Configure the ElevenLabs dashboard first message to use `voxi_session_opening` for guaranteed audible no-regreeting.
-- Provide authenticated production Vista, booking/refund, wallet/loyalty, F&B catalog/order and hosted payment services. The current checkout remains simulated even when live read data is configured; real transaction modes must be introduced explicitly behind server-side adapters. Handover remains a deliberate simulation.
+- Provide authenticated production Vista, booking/refund, wallet/loyalty, F&B catalog/order and hosted payment services. The current checkout stays in the transaction sandbox even when live read data is configured; real transaction modes must be introduced explicitly behind server-side adapters. Handover prepares a safe summary until the external connector is enabled.
 - Add an explicit date-selection client tool in the ElevenLabs dashboard only if voice-only guests must change dates without tapping. No new tool name was introduced here.
 - Live cinema hours and current offer eligibility must remain API-driven.
 - The current JavaScript bundle emits Vite’s over-500 kB chunk warning; route/media code splitting is recommended before production rollout.

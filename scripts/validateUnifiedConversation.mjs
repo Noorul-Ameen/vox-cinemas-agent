@@ -6,6 +6,10 @@ const media = fs.readFileSync(new URL("../src/components/RichMedia.jsx", import.
 
 assert.equal((app.match(/role="log"/g) || []).length, 1, "the widget must have one transcript log");
 assert.match(app, /<main ref=\{scrollRef\}[^>]*aria-label=\{t\("app\.conversation"\)\}/, "messages and stage UI must share the main scroll window");
+assert.match(app, /const stageAnchorRef = useRef\(null\)/, "rich panels must have a stable top scroll anchor");
+assert.match(app, /stage\.view !== "empty" && <div ref=\{stageAnchorRef\}/, "the scroll anchor must sit immediately before an active rich panel");
+assert.match(app, /anchor\.getBoundingClientRect\(\)\.top[\s\S]*scroller\.scrollTop = Math\.max\(0, target\)/, "a new rich panel must open at its beginning instead of its bottom");
+assert.doesNotMatch(app, /scrollTo\(0,\s*scrollRef\.current\.scrollHeight\)[\s\S]{0,100}\[messages,\s*stage\]/, "long movie and booking panels must not auto-scroll to their last item");
 assert.doesNotMatch(app, /maxHeight:\s*200/, "the old detached 200px transcript must be removed");
 assert.match(app, /stage\.view === "faq"/, "FAQ results must render as the current inline stage");
 assert.match(app, /<DateStrip\b/, "the extracted date range must render inline");

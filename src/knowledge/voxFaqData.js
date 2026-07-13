@@ -114,8 +114,8 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
     topic: "experiences",
     priority: 80,
     utterances: Object.freeze({
-      en: Object.freeze(["cinema experiences", "ways to watch", "what is max", "what is theatre", "what is gold", "imax or 4dx", "kids cinema"]),
-      ar: Object.freeze(["تجارب السينما", "طرق المشاهدة", "ما هي تجربة ماكس", "ما هي تجربة ثياتر", "ما هي جولد", "آيماكس أو فور دي إكس", "سينما الأطفال"]),
+      en: Object.freeze(["cinema experiences", "ways to watch", "what is imax", "what is max", "what is theatre", "what is gold", "imax or 4dx", "kids cinema"]),
+      ar: Object.freeze(["تجارب السينما", "طرق المشاهدة", "ما هي آيماكس", "ما هي تجربة ماكس", "ما هي تجربة ثياتر", "ما هي جولد", "آيماكس أو فور دي إكس", "سينما الأطفال"]),
     }),
     answer: Object.freeze({
       en: "VOX offers formats for different occasions, including luxury THEATRE and GOLD, the large-format MAX experience with Dolby Atmos, IMAX, multisensory 4DX and family-focused KIDS. The formats available depend on the cinema and showtime.",

@@ -293,14 +293,14 @@ export function BookingCard({ booking, onCancel, onDecline, cancelled }) {
     <div>
       <Header icon={<Ticket size={16} />} title={headerTitle} sub={headerSubtitle} />
       <div style={{ maxWidth: 420, margin: "0 auto", overflow: "hidden", borderRadius: 16, border: "1px solid rgba(255,255,255,.12)", background: "linear-gradient(160deg, rgba(99,65,141,.35), rgba(30,23,40,.6))" }}>
-        <div style={{ display: "flex", gap: 16, padding: 20 }}>
+        <div style={{ display: "flex", gap: 14, padding: "16px 18px" }}>
           <Poster tint={booking.tint || [C.purple, C.magenta]} title={booking.movieTitle} posterUrl={posterUrl} small />
           <div style={{ flex: 1 }}>
             <div dir="auto" style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{booking.movieTitle}</div>
             <div dir="ltr" style={{ fontSize: 12, color: "rgba(255,255,255,.6)" }}>{sessionSummary}</div>
           </div>
         </div>
-        <div style={{ borderTop: "1px dashed rgba(255,255,255,.15)", padding: "12px 20px" }}>
+        <div style={{ borderTop: "1px dashed rgba(255,255,255,.15)", padding: "11px 18px" }}>
           <Row k={t("booking.seats")} v={<span dir="ltr">{(Array.isArray(booking.seats) ? booking.seats : [booking.seats].filter(Boolean)).join(", ")}</span>} />
           <Row k={t("booking.cinema")} v={<bdi dir="auto">{cinemaName}</bdi>} />
           <Row k={t("booking.performance")} v={<span><span>{performanceDate}</span>{booking.showtime && <> · <span dir="ltr">{booking.showtime}</span></>}</span>} />
@@ -335,9 +335,9 @@ export function BookingCard({ booking, onCancel, onDecline, cancelled }) {
 
 function Row({ k, v }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}>
-      <span style={{ color: "rgba(255,255,255,.6)" }}>{k}</span>
-      <span style={{ fontWeight: 600, color: "#fff" }}>{v}</span>
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 14, fontSize: 13, marginTop: 5 }}>
+      <span style={{ flexShrink: 0, color: "rgba(255,255,255,.6)" }}>{k}</span>
+      <span style={{ minWidth: 0, overflowWrap: "anywhere", fontWeight: 600, color: "#fff", textAlign: "end" }}>{v}</span>
     </div>
   );
 }

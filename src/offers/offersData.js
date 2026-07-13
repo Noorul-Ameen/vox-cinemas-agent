@@ -7,8 +7,8 @@ export const OFFER_META = Object.freeze({
   capturedDate: "2026-06-23",
   verifiedDate: "2026-07-08",
   disclaimer: {
-    en: "Offer information is for guidance only. Eligibility is verified at VOX checkout; offers cannot be redeemed in this prototype and may change without notice.",
-    ar: "معلومات العروض إرشادية فقط. يتم التحقق من الأهلية عند إتمام الحجز لدى ڤوكس؛ لا يمكن استرداد العروض في هذا النموذج وقد تتغير دون إشعار.",
+    en: "Offer information is for guidance only. Final eligibility is verified at VOX checkout and remains subject to the bank’s current terms.",
+    ar: "معلومات العروض إرشادية. يتم التحقق من الأهلية النهائية عند إتمام الحجز لدى ڤوكس، وتظل خاضعة لشروط البنك الحالية.",
   },
 });
 

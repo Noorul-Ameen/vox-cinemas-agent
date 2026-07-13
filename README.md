@@ -1,20 +1,20 @@
-# VOXi — VOX Cinemas conversational booking prototype
+# VOXi — VOX Cinemas conversational booking experience
 
-VOXi is a React + Vite mobile widget that combines the real ElevenLabs React SDK with rich, touch-friendly cinema flows. The prototype keeps writes local and simulated: it does not charge cards, redeem bank offers, call Vista write endpoints, or connect to Genesys/OneView.
+VOXi is a React + Vite mobile experience that combines the real ElevenLabs React SDK with rich, touch-friendly cinema flows. The current integration uses official schedule content and an on-device transaction sandbox; production payment, Vista write, offer-redemption, and Genesys/OneView connectors remain explicitly gated.
 
 ## Included product flows
 
 - A fresh 14–22 July 2026 snapshot with 22 VOX UAE cinemas, 42 scheduled films, 4,344 deduplicated sessions, nine published programming dates, and 13 display experiences.
 - Official code-keyed movie posters, experience artwork, and active bank-offer imagery with first-party source attribution and resilient UI fallbacks.
 - Fuzzy cinema/movie/session resolution with the original six ElevenLabs client tools preserved.
-- Text, touch, and voice journeys for movies, showtimes, seats, simulated checkout, confirmation, and cancellation. Typed chat starts without requesting microphone access.
+- Text, touch, and voice journeys for movies, showtimes, seats, checkout, confirmation, and cancellation. Typed chat starts without requesting microphone access.
 - One unified conversation window where messages and the current relevant cinema/date/movie/showtime/ticket/seat/checkout/FAQ component render inline; previous interactive stages are removed.
 - A logical journey ID, structured booking context and redacted recent turns carried across text WebSocket and voice WebRTC transports.
 - The still-current portion of the nine extracted programming dates is selectable in the booking flow, with cinema-and-date-keyed movie loading and honest empty states when a cinema has no schedule.
 - A sourced bilingual FAQ layer with 17 entries across locations/hours, tickets, experiences, food and drinks, offers, accessibility, age ratings, refunds, account/loyalty, wallet, support, and Voxi conversation capabilities.
-- Client-side prototype QR references, persisted local booking history, case-insensitive lookup, and durable local cancellation state. Prototype QR codes are explicitly not valid for cinema entry.
+- Client-side reference QR values, persisted local booking history, case-insensitive lookup, and durable local cancellation state. Reference-only QR values are explicitly distinguished from official cinema-entry tickets.
 - 19 structured VOX UAE bank offers with 41 card profiles and conservative `eligible`, `ineligible`, or `card_required` results.
-- Deterministic simulated human handover after an explicit request or two consecutive failed clarifications.
+- Deterministic Customer Care handover preparation after an explicit request or two consecutive failed clarifications.
 - Payment-free, transcript-sanitized `voxi.oneview-handover.v1` debug payload.
 - Explicit English/Arabic conversation selection, saved language choice, confirmation-only switching, RTL layout, and LTR seat/booking/payment identifiers.
 - VOX Cinemas UAE starts without silently choosing Mall of the Emirates; the guest selects one of 22 UAE cinemas before browsing movies.
@@ -29,7 +29,7 @@ npm run build
 npm run dev
 ```
 
-Open `http://localhost:5173` and type a message to start text chat without a microphone. Use the mic button only when you want voice and allow microphone access at that point. The public client identifier for the current prototype agent is already used as a fallback in `vite.config.js`; `.env` is optional when testing this agent.
+Open `http://localhost:5173` and type a message to start text chat without a microphone. Use the mic button only when you want voice and allow microphone access at that point. The public client identifier for the current Voxi agent is already used as a fallback in `vite.config.js`; `.env` is optional when testing this agent.
 
 To override it locally:
 
@@ -96,7 +96,7 @@ The current VOX web app requires a rotating browser API key plus a short-lived a
 
 `convert_extraction.py` accepts both the current flat `{ catalog, cinemas, sessions, experienceMedia, offerMedia }` extraction and the legacy compact gzip. It preserves official poster URLs and source session IDs; it never fabricates asset URLs.
 
-Artwork URLs remain on official VOX/MAF hosts or their campaign CDN and include source-page provenance. Posters, brand logos, and experience artwork remain the property of their rights holders. Confirm permission before mirroring or redistributing them; the prototype renders remote URLs directly with neutral fallbacks.
+Artwork URLs remain on official VOX/MAF hosts or their campaign CDN and include source-page provenance. Posters, brand logos, and experience artwork remain the property of their rights holders. Confirm permission before mirroring or redistributing them; the interface renders remote URLs directly with neutral fallbacks.
 
 ## Validation
 
@@ -122,16 +122,16 @@ Artwork URLs remain on official VOX/MAF hosts or their campaign CDN and include 
 - `src/offers/` — structured offer knowledge and resolver.
 - `src/knowledge/` — sourced bilingual FAQ data, resolver and bounded agent context.
 - `src/lib/conversationJourney.js` — logical session state and redacted text-to-voice handoff.
-- `src/lib/handoverSummary.js` — safe prototype OneView payload.
+- `src/lib/handoverSummary.js` — safe OneView-ready handover payload.
 - `src/lib/voxiSession.js` and `src/lib/languageSwitch.js` — VOXI runtime guidance and strict bilingual switching.
 - `src/i18n/` — English/Arabic locale provider and copy.
 - `src/components/` — cinema, movie, seat, checkout, QR/history, offers, and handover UI.
 - `CONCIERGE_IMPLEMENTATION.md` — root-cause review, state model, ElevenLabs handoff, FAQ migration plan, verification and production dependencies.
 
-## Prototype boundaries
+## Current integration boundaries
 
-- Checkout, cards, wallets, booking creation, refunds, and cancellation writes are simulated on-device. Setting `VITE_VISTA_BASE` changes read data only; it does not silently enable payment or write operations.
-- QR values contain only the booking reference and prototype QR codes are not cinema-entry tickets.
+- Checkout, cards, wallets, booking creation, refunds, and cancellation writes stay in the on-device transaction sandbox. Setting `VITE_VISTA_BASE` changes read data only; it does not silently enable payment or write operations.
+- Reference QR values contain only the booking reference and are not cinema-entry tickets.
 - Offers are display-only and cannot be redeemed.
-- Handover is a UI simulation; it makes no Genesys or OneView network call.
+- Handover prepares the safe transfer context but makes no Genesys or OneView network call until those connectors are enabled.
 - `VITE_VISTA_BASE` enables a read-shaped live path only when the configured server safely injects credentials. The browser never reads a Vista API key. Future pricing/refund adapters require explicit proxy paths, and unverified local bookings can never invoke a refund write. Do not expose credentials in Vite environment variables.

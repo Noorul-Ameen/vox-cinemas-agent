@@ -1,20 +1,20 @@
 import React from "react";
-import { Check, ChevronDown, Headphones, LoaderCircle, ShieldCheck, UserRound } from "lucide-react";
+import { Check, ChevronDown, LoaderCircle, ShieldCheck } from "lucide-react";
 import { C } from "../theme.js";
 import { HANDOVER_STATUS, stripPaymentFields } from "../lib/handoverSummary.js";
 
 const DEFAULT_LABELS = Object.freeze({
-  connectingTitle: "Connecting you to an agent\u2026",
-  connectingBody: "We're sharing a safe summary so you won't need to repeat yourself.",
-  readyTitle: "You're in the agent queue",
-  readyBody: "A VOX support agent can now pick up this conversation.",
-  simulation: "Prototype simulation",
-  debugTitle: "OneView summary payload",
+  connectingTitle: "Preparing Customer Care summary\u2026",
+  connectingBody: "We're preparing a safe summary so your context is easy to continue.",
+  readyTitle: "Customer Care summary prepared",
+  readyBody: "No external support connection has been started.",
+  simulation: "Summary only",
+  debugTitle: "Summary details",
   debugHint: "Payment fields and digit-heavy transcript data are removed.",
   summaryStep: "Summary",
-  queueReadyStep: "Queue ready",
-  connectingStep: "Connecting",
-  safeContext: "Safe conversation context prepared for OneView",
+  queueReadyStep: "Prepared",
+  connectingStep: "Preparing",
+  safeContext: "Safe conversation summary prepared",
 });
 
 export function HandoverPanel({
@@ -25,7 +25,7 @@ export function HandoverPanel({
   onReady,
   labels: labelOverrides,
   debugOpenByDefault = false,
-  showDebug = true,
+  showDebug = false,
 }) {
   const labels = { ...DEFAULT_LABELS, ...labelOverrides };
   const [internalStatus, setInternalStatus] = React.useState(HANDOVER_STATUS.CONNECTING);
@@ -78,7 +78,7 @@ export function HandoverPanel({
             background: isReady ? "rgba(87,199,154,.16)" : "rgba(182,24,108,.2)",
             color: isReady ? C.green : C.lavender,
           }}>
-            {isReady ? <UserRound size={21} /> : <LoaderCircle size={21} />}
+            {isReady ? <ShieldCheck size={21} /> : <LoaderCircle size={21} />}
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 8px" }}>
@@ -101,7 +101,7 @@ export function HandoverPanel({
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", alignItems: "center", gap: 7, marginTop: 18 }}>
           <ProgressStep active complete={isReady} icon={<Check size={12} />} label={labels.summaryStep} />
           <span aria-hidden="true" style={{ height: 1, background: isReady ? C.green : "rgba(228,220,240,.2)" }} />
-          <ProgressStep active={isReady} icon={isReady ? <Check size={12} /> : <Headphones size={12} />} label={isReady ? labels.queueReadyStep : labels.connectingStep} />
+          <ProgressStep active={isReady} icon={isReady ? <Check size={12} /> : <ShieldCheck size={12} />} label={isReady ? labels.queueReadyStep : labels.connectingStep} />
         </div>
       </div>
 

@@ -181,13 +181,13 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode }) {
   return (
     <div>
       {header}
-      <div id="demo-checkout-notice" role="note" style={demoNotice}>
+      <div id="checkout-safety-notice" role="note" style={demoNotice}>
         <strong>{t("checkout.testOnly")}</strong> · {t("checkout.testNotice")}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-        <button type="button" aria-describedby="demo-checkout-notice" onClick={() => pay("apple", "Apple Pay (demo)")} style={{ ...walletButton, background: "#000", border: "1px solid rgba(255,255,255,.25)" }}>{t("checkout.applePay")}</button>
-        <button type="button" aria-describedby="demo-checkout-notice" onClick={() => pay("samsung", "Samsung Pay (demo)")} style={{ ...walletButton, background: "#1428A0" }}><Smartphone size={15} aria-hidden="true" style={{ marginInlineEnd: 6 }} /> {t("checkout.samsungPay")}</button>
+        <button type="button" aria-describedby="checkout-safety-notice" onClick={() => pay("apple", "Apple Pay")} style={{ ...walletButton, background: "#000", border: "1px solid rgba(255,255,255,.25)" }}>{t("checkout.applePay")}</button>
+        <button type="button" aria-describedby="checkout-safety-notice" onClick={() => pay("samsung", "Samsung Pay")} style={{ ...walletButton, background: "#1428A0" }}><Smartphone size={15} aria-hidden="true" style={{ marginInlineEnd: 6 }} /> {t("checkout.samsungPay")}</button>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 12px", color: "rgba(255,255,255,.35)", fontSize: 11 }}>
         <div style={divider} /> {t("checkout.orCard")} <div style={divider} />
@@ -218,7 +218,7 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode }) {
 
       {adding && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <label><span style={fieldLabel}>{t("checkout.cardNumberLabel")}</span><input dir="ltr" autoComplete="off" aria-describedby="demo-checkout-notice" value={form.pan} onChange={(event) => updateFormField("pan", formatDemoPan(event.target.value))} placeholder={t("checkout.cardNumber")} style={inputStyle} inputMode="numeric" /></label>
+          <label><span style={fieldLabel}>{t("checkout.cardNumberLabel")}</span><input dir="ltr" autoComplete="off" aria-describedby="checkout-safety-notice" value={form.pan} onChange={(event) => updateFormField("pan", formatDemoPan(event.target.value))} placeholder={t("checkout.cardNumber")} style={inputStyle} inputMode="numeric" /></label>
           <label><span style={fieldLabel}>{t("checkout.cardNameLabel")}</span><input dir="ltr" autoComplete="off" value={form.name} onChange={(event) => updateFormField("name", event.target.value)} placeholder={t("checkout.cardName")} style={{ ...inputStyle, textAlign: "start" }} /></label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <label><span style={fieldLabel}>{t("checkout.expiryLabel")}</span><input dir="ltr" autoComplete="off" value={form.exp} onChange={(event) => updateFormField("exp", event.target.value.replace(/[^\d/]/g, "").slice(0, 5))} placeholder={t("checkout.expiry")} style={inputStyle} inputMode="numeric" /></label>
@@ -238,7 +238,7 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode }) {
           disabled={!selected}
           onClick={() => {
             const card = cards.find((item) => item.id === selected);
-            if (card) pay("card", `${card.brand} •••• ${card.last4} (demo)`);
+            if (card) pay("card", `${card.brand} •••• ${card.last4}`);
           }}
           style={{ ...actionButton, display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14, background: C.magenta, opacity: selected ? 1 : 0.4 }}
         >

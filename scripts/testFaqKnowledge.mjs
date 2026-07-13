@@ -4,6 +4,8 @@ import { VOX_FAQ_ENTRIES, buildFaqContextForQuery, classifyFaqActionIntent, reso
 const CASES = [
   ["opening hours", "en", "cinema-locations-hours"],
   ["كيف أستخدم التذكرة الإلكترونية", "ar", "tickets-and-etickets"],
+  ["What is IMAX?", "en", "experiences-overview"],
+  ["ما هي آيماكس؟", "ar", "experiences-overview"],
   ["where is imax available", "en", "experience-availability"],
   ["هل توجد ماكس في هذه السينما", "ar", "experience-availability"],
   ["outside food", "en", "food-and-drinks"],

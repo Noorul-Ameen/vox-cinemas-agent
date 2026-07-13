@@ -47,7 +47,7 @@ Type: client tool
 
 Description:
 
-> Start the simulated VOX human-support handover immediately for an explicit human request, or after two consecutive failed clarification attempts.
+> Prepare the VOX human-support handover immediately for an explicit human request, or after two consecutive failed clarification attempts.
 
 Parameters:
 
@@ -75,7 +75,7 @@ Agent rules:
 
 > After the first genuinely unresolved clarification, call `handover_to_agent` with `reason: "clarification_failure"`. If it returns `handoverStarted: false`, ask exactly one short, concrete clarification. If that clarification also fails, call the tool again with the same reason. Do not start handover after only one failure.
 
-> When `handoverStarted: true`, tell the guest that their safe journey summary is ready for VOX Customer Care. Do not claim that a real Genesys transfer occurred; this prototype is simulated.
+> When `handoverStarted: true`, tell the guest that their safe journey summary is ready for VOX Customer Care. Do not claim that a Genesys transfer occurred until the external connector confirms it.
 
 ## Core prompt safeguards
 
@@ -87,7 +87,7 @@ Agent rules:
 - A guest action on the visible `English` / `العربية` language control is an explicit, confirmed request. Switch immediately when that user action is reported by the web client. A direct command such as “Speak Arabic” or “Switch to English” is also explicit; a question such as “Can you speak Arabic?” still requires confirmation.
 - Preserve the active cinema, movie, showtime, seats, booking, cancellation, refund, offer, and history task across a language switch. Never restart the journey or repeat the welcome message.
 - Bank-offer terms are guidance and remain subject to the bank and VOX checkout.
-- Cancellation writes, payment, offer redemption, Vista writes, Genesys, and OneView are simulated in this prototype.
+- Cancellation writes, payment, offer redemption, Vista writes, Genesys, and OneView remain in the current sandbox until their production connectors are enabled.
 
 ## Language and first-message configuration
 

@@ -12,6 +12,8 @@ import { DEMO_CARD_STORAGE_KEY } from "./checkoutSafety.js";
 import { useI18n } from "./i18n/I18nProvider.jsx";
 import { HANDOVER_TRIGGER, buildHandoverPayload, isClarificationFailureReason } from "./lib/handoverSummary.js";
 import { resolveFilmCandidate } from "./lib/fuzzyResolvers.js";
+import { isCinemaSelectionTurn, isDirectCinemaSelectionUtterance, resolveCinemaCandidate } from "./lib/cinemaRouting.js";
+import { normalizeElevenLabsMessageEvent } from "./lib/conversationMessage.js";
 import { resolveLanguageSignal } from "./lib/languageSwitch.js";
 import { buildTransportHandoff, createConversationJourney, inferIntent, journeyDynamicVariables, journeyReducer, syncJourney } from "./lib/conversationJourney.js";
 import { resolveProgrammingDateSelection } from "./lib/programmingDateSelection.js";
@@ -25,30 +27,6 @@ import * as vista from "./vistaClient.js";
 const CINEMAS = vista.getCinemas();
 const PROGRAMMING_DATES = vista.getProgrammingDates();
 const SEAT_PRICING_PREVIEW = vista.getSeatPricingPreview();
-const CINEMA_ALIASES = Object.freeze({
-  "0036": ["abu dhabi mall", "أبوظبي مول", "ابوظبي مول"],
-  "0009": ["al hamra mall", "الحمرا مول"],
-  "0039": ["al jimi mall", "الجيمي مول", "الجيمي"],
-  "0013": ["burjuman", "برجمان"],
-  "0004": ["city centre ajman", "سيتي سنتر عجمان"],
-  "0055": ["city centre al zahia", "سيتي سنتر الزاهية", "الزاهية"],
-  "0001": ["city centre deira", "سيتي سنتر ديرة", "ديرة"],
-  "0006": ["city centre fujairah", "سيتي سنتر الفجيرة", "الفجيرة"],
-  "0005": ["city centre mirdif", "سيتي سنتر مردف", "مردف"],
-  "0035": ["city centre sharjah", "سيتي سنتر الشارقة"],
-  "0017": ["city centre shindagha", "سيتي سنتر الشندغة", "الشندغة"],
-  "0105": ["dubai festival city", "دبي فستيفال سيتي", "فستيفال سيتي"],
-  "0045": ["kempinski", "كمبينسكي"],
-  "0015": ["megaplex", "cineplex grand hyatt", "ميجابلكس", "جراند حياة"],
-  "0002": ["mall of the emirates", "مول الإمارات", "مول الامارات"],
-  "0007": ["mercato", "ميركاتو"],
-  "0014": ["nation towers", "نيشن تاورز"],
-  "0049": ["palm jumeirah mall", "نخلة جميرا", "بالم جميرا"],
-  "0104": ["reem mall", "الريم مول", "ريم مول"],
-  "0046": ["galleria al maryah", "الغاليريا المارية", "جاليريا المارية"],
-  "0057": ["wafi mall", "وافي مول", "وافي"],
-  "0012": ["yas mall", "ياس مول"],
-});
 const stripVox = (name) => String(name || "").replace(/^VOX\s*[—-]\s*/, "");
 const norm = (value) => String(value ?? "").toLowerCase().trim();
 const localizedValue = (value, locale) => typeof value === "string" ? value : value?.[locale] || value?.en || "";
@@ -392,17 +370,7 @@ export default function App() {
     return intent;
   }, []);
 
-  const resolveCinema = (idOrName) => {
-    const key = norm(idOrName).replace(/^vox\s*[—-]?\s*/, "");
-    if (!key) return null;
-    return (
-      CINEMAS.find((item) => norm(item.id) === key) ||
-      CINEMAS.find((item) => norm(stripVox(item.name)) === key) ||
-      CINEMAS.find((item) => (CINEMA_ALIASES[item.id] || []).some((alias) => key.includes(norm(alias)))) ||
-      CINEMAS.find((item) => norm(item.name).includes(key) || key.includes(norm(stripVox(item.name)))) ||
-      null
-    );
-  };
+  const resolveCinema = (idOrName) => resolveCinemaCandidate(CINEMAS, idOrName);
 
   const ensureFilms = useCallback(async (cinemaId = cinemaRef.current?.id, requestedDate = scheduleDateRef.current) => {
     if (!cinemaId) return [];
@@ -495,6 +463,36 @@ export default function App() {
     pendingTypedMessagesRef.current = pendingTypedMessagesRef.current
       .filter((item) => Date.now() - item.at < 30_000)
       .slice(-10);
+  };
+
+  const dismissStaleTransactionalView = ({ text, actionIntent, historyRequested, cancellationReply = false } = {}) => {
+    const current = stageRef.current;
+    if (!["booking", "history"].includes(current.view)) return false;
+    const refersToDisplayedBooking = /\b(?:this|that|my|the)\s+(?:booking|reservation|tickets?)\b|\b(?:booking|reservation)\s+(?:reference|ref|details?)\b|(?:هذا|هذه|حجزي|الحجز|التذاكر)/i.test(String(text || ""));
+    const keepsTransactionalView = historyRequested
+      || actionIntent === "booking_history"
+      || actionIntent === "cancellation"
+      || cancellationReply
+      || Boolean(cancellationFlowRef.current)
+      || refersToDisplayedBooking;
+    if (keepsTransactionalView) return false;
+
+    // A completed booking remains in storage/history, but its large result card
+    // should not sit under every unrelated turn. Dismiss it before a new FAQ or
+    // discovery panel renders, restoring the current movies or a clean home.
+    const canRestoreMovies = cinemaRef.current
+      && filmsRef.current.length
+      && filmsCinemaRef.current === cinemaRef.current.id
+      && filmsDateRef.current === scheduleDateRef.current;
+    // The stored booking remains available from History, but once the guest
+    // moves to an unrelated task it must no longer act as hidden checkout or
+    // offer context.
+    clearPendingOrder();
+    bookingRef.current = null;
+    setBooking(null);
+    historyReturnRef.current = null;
+    showStage(canRestoreMovies ? { view: "movies", movies: filmsRef.current } : { view: "empty" });
+    return true;
   };
 
   const prepareFaqContext = useCallback((query, { render = true } = {}) => {
@@ -604,9 +602,15 @@ export default function App() {
   };
 
   const applyUtteranceBookingDetails = (text, { actionIntent = null, hasFaq = false } = {}) => {
-    const bookingContext = !hasFaq && (actionIntent === "booking" || journeyRef.current.intent === "booking");
-    if (!bookingContext) return { cinema: null, ticketQuantity: null };
     const mentionedCinema = resolveCinema(text);
+    const bookingContext = isCinemaSelectionTurn({
+      view: stageRef.current.view,
+      intent: journeyRef.current.intent,
+      actionIntent,
+      hasFaq,
+      cinemaMatch: mentionedCinema,
+    }) || (!hasFaq && (actionIntent === "booking" || journeyRef.current.intent === "booking"));
+    if (!bookingContext) return { cinema: null, ticketQuantity: null };
     if (mentionedCinema && mentionedCinema.id !== cinemaRef.current?.id) {
       dismissPendingCancellation("cinema_changed_in_conversation");
       clearPendingOrder();
@@ -741,8 +745,8 @@ export default function App() {
       setPendingOrder(retryOrder);
       showStage({ ...stageRef.current, view: "checkout", order: retryOrder });
       say("system", localeRef.current === "ar"
-        ? "تعذر حفظ الحجز التجريبي على هذا الجهاز. لم يتم تحصيل أي مبلغ."
-        : "The prototype booking could not be saved on this device. No payment was taken.");
+        ? "تعذر حفظ ملخص الحجز على هذا الجهاز. لم يتم تحصيل أي مبلغ."
+        : "The booking summary could not be saved on this device. No payment was taken.");
       return false;
     }
     setBookings(readBookings());
@@ -753,9 +757,9 @@ export default function App() {
     showStage({ view: "booking", booking: completed });
     say("system", t("app.paymentSimulated", { method: label, ref }));
     resetClarificationFailures();
-    sendUiTurn(`Prototype checkout completed for local booking ${ref}.`, {
+    sendUiTurn(`Checkout preview completed for booking summary ${ref}.`, {
       display: false,
-      context: `The on-device prototype checkout simulated ${label}; no payment was charged and no VOX inventory was reserved. A local demo booking with reference ${ref} is displayed for ${order.movieTitle} at ${order.cinemaName} on ${order.performanceDate || order.date} ${order.showtime}, seats ${order.seats.join(", ")}, total ${order.currency || "AED"} ${order.total}. State clearly that it is a local prototype booking, not a real ticket.`,
+      context: `The payment preview used ${label}; no payment was charged and no VOX inventory was reserved. Booking summary ${ref} is displayed for ${order.movieTitle} at ${order.cinemaName} on ${order.performanceDate || order.date} ${order.showtime}, seats ${order.seats.join(", ")}, total ${order.currency || "AED"} ${order.total}. Acknowledge the summary briefly. Mention the no-charge/no-reservation boundary once without applying a product-wide environment label.`,
     });
     return true;
   };
@@ -1074,7 +1078,7 @@ export default function App() {
           refundReference: displayed.refundReference || null,
           demo: displayed.refundStatus === "not_processed_demo",
           message: displayed.refundStatus === "not_processed_demo"
-            ? "This prototype booking was marked cancelled locally. No real refund was processed."
+            ? "This booking is marked cancelled on this device. No refund was processed."
             : undefined,
         });
       }
@@ -1095,8 +1099,8 @@ export default function App() {
             demoOnly: true,
           };
           say("system", localeRef.current === "ar"
-            ? `هل تريد إزالة الحجز التجريبي ${displayed.ref} من هذا الجهاز؟ لن يتم التواصل مع VOX أو إصدار أي استرداد. قل نعم للإزالة محلياً أو لا للإبقاء عليه.`
-            : `Remove prototype booking ${displayed.ref} from this device? This will not contact VOX or issue a refund. Say yes to remove it locally or no to keep it.`);
+            ? `هل تريد تسجيل الحجز ${displayed.ref} كملغى على هذا الجهاز؟ لن يتم التواصل مع VOX أو إصدار أي استرداد. قل نعم لتسجيله كملغى أو لا للإبقاء عليه.`
+            : `Mark booking ${displayed.ref} as cancelled on this device? This will not contact VOX or issue a refund. Say yes to mark it cancelled or no to keep it active.`);
           cancelTimerRef.current = window.setTimeout(() => dismissPendingCancellation("confirmation_timeout"), 90_000);
         });
       }
@@ -1139,8 +1143,8 @@ export default function App() {
     show_offers: async ({ bankName = "", cardName = "", experience = "" } = {}) => {
       dismissPendingCancellation("offers_opened");
       const current = stageRef.current;
-      const activeBooking = bookingRef.current;
-      const order = pendingOrderRef.current;
+      const activeBooking = current.view === "booking" ? bookingRef.current : null;
+      const order = current.view === "checkout" ? pendingOrderRef.current : null;
       const selectedExperience = experience || current.session?.exp || current.order?.experience || order?.experience || activeBooking?.experience || "";
       const query = [bankName, cardName].filter(Boolean).join(" ").trim();
       const context = {
@@ -1236,6 +1240,19 @@ export default function App() {
       clarificationFailureLogRef.current = [];
       return JSON.stringify({ handoverStarted: true, mode: "simulated", status: "connecting", schemaVersion: payload.schemaVersion, handoverId: payload.event.handoverId });
     },
+  };
+
+  const routeRecognizedCinema = async (matchedCinema, requestedDate = null) => {
+    if (!matchedCinema?.id) return { shown: false, reason: "No cinema was recognized." };
+    const rawResult = await clientTools.show_movie_selection({
+      cinemaId: matchedCinema.id,
+      scheduleDate: requestedDate || scheduleDateRef.current,
+    });
+    try {
+      return typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+    } catch {
+      return { shown: false, reason: "The cinema selection returned an unreadable result." };
+    }
   };
 
   const clearConversationState = useCallback((reason = "reset") => {
@@ -1336,10 +1353,11 @@ export default function App() {
       }
     },
     onMessage: (message) => {
-      if (!message?.message) return;
-      const role = message.source === "user" ? "user" : "agent";
+      const normalizedMessage = normalizeElevenLabsMessageEvent(message);
+      if (!normalizedMessage) return;
+      const { role, text: eventText } = normalizedMessage;
       const sentIndex = role === "user"
-        ? pendingTypedMessagesRef.current.findIndex((sent) => sent.text === message.message && Date.now() - sent.at < 15000)
+        ? pendingTypedMessagesRef.current.findIndex((sent) => sent.text === eventText && Date.now() - sent.at < 15000)
         : -1;
       if (sentIndex >= 0) {
         pendingTypedMessagesRef.current.splice(sentIndex, 1);
@@ -1347,34 +1365,60 @@ export default function App() {
         return;
       }
 
-      const sanitized = role === "user" ? sanitizeUserText(message.message) : { safeText: message.message, sensitive: false };
+      const sanitized = role === "user" ? sanitizeUserText(eventText) : { safeText: eventText, sensitive: false };
       const safeMessage = sanitized.safeText;
       if (role === "user") {
         if (sanitized.sensitive) say("system", localeRef.current === "ar" ? "تمت إزالة بيانات الدفع الحساسة من المحادثة. استخدم شاشة الدفع الآمنة فقط." : "Sensitive payment details were removed. Use only the secure checkout screen for payment.");
         say("user", safeMessage);
         const decision = cancellationFlowRef.current ? cancellationDecision(safeMessage) : null;
         if (decision !== null) handleCancellationDecision(decision, { source: "conversation" });
-        const faq = prepareFaqContext(safeMessage);
+        const historyRequested = isBookingHistoryRequest(safeMessage);
+        if (historyRequested) openHistory({ notifyAgent: false, forceOpen: true });
+        const directCinemaSelection = isDirectCinemaSelectionUtterance({
+          text: safeMessage,
+          view: stageRef.current.view,
+          cinemaMatch: resolveCinema(safeMessage),
+        });
         const actionIntent = classifyFaqActionIntent(safeMessage);
+        dismissStaleTransactionalView({ text: safeMessage, actionIntent, historyRequested, cancellationReply: decision !== null });
+        const faq = directCinemaSelection ? { matches: [], context: "" } : prepareFaqContext(safeMessage);
         const details = applyUtteranceBookingDetails(safeMessage, { actionIntent, hasFaq: faq.matches.length > 0 });
         const availableDates = programmingDatesForCinema(cinemaRef.current);
-        const bookingContext = !faq.matches.length && (actionIntent === "booking" || journeyRef.current.intent === "booking");
+        const bookingContext = !faq.matches.length && (
+          actionIntent === "booking"
+          || journeyRef.current.intent === "booking"
+          || isCinemaSelectionTurn({ view: stageRef.current.view, intent: journeyRef.current.intent, actionIntent, cinemaMatch: details.cinema })
+        );
         const dateRequest = bookingContext
           ? captureUserProgrammingDate(safeMessage, availableDates)
           : { requestedDate: null, unavailableDate: null };
         const { requestedDate, unavailableDate } = dateRequest;
         if (requestedDate) {
-          if (requestedDate !== scheduleDateRef.current) chooseDate(requestedDate, { notifyAgent: false, addTranscript: false });
+          if (!details.cinema && requestedDate !== scheduleDateRef.current) chooseDate(requestedDate, { notifyAgent: false, addTranscript: false });
           conversation.sendContextualUpdate?.(`The guest explicitly selected programming date ${requestedDate}; the widget has applied it. Use that date and do not fall back to another date.`);
         } else if (unavailableDate) {
           showUnavailableProgrammingDate(unavailableDate);
           conversation.sendContextualUpdate?.(`The guest requested ${unavailableDate}, but it is not published for the selected cinema. Do not substitute another date. Available dates: ${availableDates.join(", ")}.`);
         }
-        if (details.cinema) conversation.sendContextualUpdate?.(`The guest explicitly named ${details.cinema.name}. The widget selected that cinema; do not ask for it again.`);
+        if (details.cinema && !unavailableDate) {
+          conversation.sendContextualUpdate?.(`The guest explicitly named ${details.cinema.name}. The widget recognized it and is loading that cinema's movie list now. Do not ask for the cinema again and do not describe movies from another location.`);
+          void routeRecognizedCinema(details.cinema, requestedDate).then((result) => {
+            const count = Array.isArray(result?.movies) ? result.movies.length : 0;
+            conversation.sendContextualUpdate?.(result?.shown === "movie list"
+              ? `${details.cinema.name} is selected and ${count} current movies are displayed in the widget. Ask only for the next missing booking detail.`
+              : `${details.cinema.name} is selected, but no movie list was displayed. Reason: ${result?.reason || "No published movies were returned."}`);
+          }).catch((error) => {
+            conversation.sendContextualUpdate?.(`${details.cinema.name} was recognized, but its movie list could not be loaded: ${error?.message || "unknown error"}. Do not claim that movies are displayed.`);
+          });
+        } else if (!details.cinema && !cinemaRef.current && actionIntent === "booking" && !faq.matches.length) {
+          void clientTools.show_movie_selection({});
+          conversation.sendContextualUpdate?.("Only the VOX Cinemas UAE cinema picker is displayed; no movie list is visible yet. Ask the guest for one cinema and do not say that movies are being shown.");
+        } else if (details.cinema) {
+          conversation.sendContextualUpdate?.(`The guest explicitly named ${details.cinema.name}. The widget selected that cinema; do not ask for it again.`);
+        }
         if (details.ticketQuantity) conversation.sendContextualUpdate?.(`The guest explicitly requested ${details.ticketQuantity} tickets. Preserve that quantity through seat selection.`);
-        if (isBookingHistoryRequest(safeMessage)) {
-          openHistory({ notifyAgent: false, forceOpen: true });
-          conversation.sendContextualUpdate?.("The guest's locally stored booking history is already displayed. These records are not provider-verified; do not call a booking-history tool. Ask them to select the relevant booking.");
+        if (historyRequested) {
+          conversation.sendContextualUpdate?.("The guest's booking summaries saved on this device are already displayed. Do not call another booking-history tool or present these summaries as provider confirmations. Ask them to select the relevant booking.");
         }
         if (faq.matches.length) {
           conversation.sendContextualUpdate?.(`${faq.context}\nThe guest's spoken question is: ${safeMessage}. Answer from this approved context without restarting the active task.`);
@@ -1771,22 +1815,40 @@ export default function App() {
     if (decision !== null) handleCancellationDecision(decision, { source: "conversation" });
     const historyRequested = isBookingHistoryRequest(value);
     if (historyRequested) openHistory({ notifyAgent: false, forceOpen: true });
-    const faq = prepareFaqContext(value);
+    const directCinemaSelection = isDirectCinemaSelectionUtterance({
+      text: value,
+      view: stageRef.current.view,
+      cinemaMatch: resolveCinema(value),
+    });
     const actionIntent = classifyFaqActionIntent(value);
+    dismissStaleTransactionalView({ text: value, actionIntent, historyRequested, cancellationReply: decision !== null });
+    const faq = directCinemaSelection ? { matches: [], context: "" } : prepareFaqContext(value);
     const details = applyUtteranceBookingDetails(value, { actionIntent, hasFaq: faq.matches.length > 0 });
-    const bookingContext = !faq.matches.length && (actionIntent === "booking" || journeyRef.current.intent === "booking");
+    const bookingContext = !faq.matches.length && (
+      actionIntent === "booking"
+      || journeyRef.current.intent === "booking"
+      || isCinemaSelectionTurn({ view: stageRef.current.view, intent: journeyRef.current.intent, actionIntent, cinemaMatch: details.cinema })
+    );
     const availableDates = programmingDatesForCinema(cinemaRef.current);
     const dateRequest = bookingContext
       ? captureUserProgrammingDate(value, availableDates)
       : { requestedDate: null, unavailableDate: null };
     const { requestedDate, unavailableDate } = dateRequest;
-    if (requestedDate && requestedDate !== scheduleDateRef.current) chooseDate(requestedDate, { notifyAgent: false, addTranscript: false });
+    if (!details.cinema && requestedDate && requestedDate !== scheduleDateRef.current) chooseDate(requestedDate, { notifyAgent: false, addTranscript: false });
     if (unavailableDate) showUnavailableProgrammingDate(unavailableDate);
     if (!faq.matches.length) updateIntentFromText(value);
     setInput("");
     if (unavailableDate) {
       conversation.sendContextualUpdate?.(`The guest requested ${unavailableDate}, but it is not published for the selected cinema. No movies were displayed and no other date was substituted. Available dates: ${availableDates.join(", ")}.`);
       return;
+    }
+    let cinemaRouteResult = null;
+    let cinemaPickerDisplayed = false;
+    if (details.cinema) {
+      cinemaRouteResult = await routeRecognizedCinema(details.cinema, requestedDate);
+    } else if (!cinemaRef.current && actionIntent === "booking" && !faq.matches.length) {
+      await clientTools.show_movie_selection({});
+      cinemaPickerDisplayed = true;
     }
     queuePendingEcho(value);
     const transition = sessionStartRef.current;
@@ -1795,9 +1857,16 @@ export default function App() {
     if (ready && conversation.sendUserMessage) {
       if (requestedDate) conversation.sendContextualUpdate?.(`The guest explicitly selected programming date ${requestedDate}; the widget has already applied it. Use that date in every movie/session tool call and do not fall back to another date.`);
       if (unavailableDate) conversation.sendContextualUpdate?.(`The guest requested ${unavailableDate}, but it is not published for the selected cinema. Do not substitute another date. Available dates: ${availableDates.join(", ")}.`);
-      if (details.cinema) conversation.sendContextualUpdate?.(`The guest explicitly named ${details.cinema.name}. The widget selected that cinema; do not ask for it again.`);
+      if (details.cinema) {
+        const movieCount = Array.isArray(cinemaRouteResult?.movies) ? cinemaRouteResult.movies.length : 0;
+        conversation.sendContextualUpdate?.(cinemaRouteResult?.shown === "movie list"
+          ? `The guest explicitly named ${details.cinema.name}. The widget selected it and is displaying ${movieCount} current movies for that cinema. Do not ask for the cinema again; ask only for the next missing booking detail.`
+          : `The guest explicitly named ${details.cinema.name}. It is selected, but no movie list is displayed. Reason: ${cinemaRouteResult?.reason || "No published movies were returned."} Do not claim that movies are visible.`);
+      } else if (cinemaPickerDisplayed) {
+        conversation.sendContextualUpdate?.("Only the VOX Cinemas UAE cinema picker is displayed; no movie list is visible yet. Ask the guest for one cinema and do not say that movies are being shown.");
+      }
       if (details.ticketQuantity) conversation.sendContextualUpdate?.(`The guest explicitly requested ${details.ticketQuantity} tickets. Preserve that quantity through seat selection.`);
-      if (historyRequested) conversation.sendContextualUpdate?.("The guest's locally stored booking history is already displayed in the widget. These records are not provider-verified. Acknowledge and ask them to select the booking they need help with.");
+      if (historyRequested) conversation.sendContextualUpdate?.("The guest's booking summaries saved on this device are already displayed. Do not present them as provider confirmations. Acknowledge and ask them to select the booking they need help with.");
       if (faq.matches.length) conversation.sendContextualUpdate?.(`${faq.context}\nThe guest's current question is: ${value}. Answer from this approved context, use live data only when supplied, and do not restart the conversation.`);
       conversation.sendUserMessage(value);
     }
@@ -2002,7 +2071,7 @@ export default function App() {
     setBookings(readBookings());
     showStage({ view: "history" });
     if (notifyAgent) sendUiTurn(localeRef.current === "ar" ? "اعرض حجوزاتي" : "Show my booking history", {
-      context: "The guest opened booking records stored only on this device. They are local prototype records, not provider-verified bookings. Acknowledge briefly and ask them to select one if they need help.",
+      context: "The guest opened booking summaries saved on this device. Do not describe them as provider confirmations. Acknowledge briefly and ask them to select one if they need help.",
     });
   };
 
@@ -2011,7 +2080,10 @@ export default function App() {
       showStage(offersReturnRef.current || { view: "empty" });
       return;
     }
-    clientTools.show_offers({ experience: stageRef.current.session?.exp || pendingOrderRef.current?.experience || bookingRef.current?.experience || "" });
+    const current = stageRef.current;
+    const activeOrder = current.view === "checkout" ? pendingOrderRef.current : null;
+    const activeBooking = current.view === "booking" ? bookingRef.current : null;
+    clientTools.show_offers({ experience: current.session?.exp || activeOrder?.experience || activeBooking?.experience || "" });
   };
 
   const handleOfferSelection = (result) => {
@@ -2037,8 +2109,8 @@ export default function App() {
     bookingRef.current = localBooking;
     setBooking(localBooking);
     showStage({ view: "booking", booking: localBooking });
-    sendUiTurn(localeRef.current === "ar" ? `اخترت الحجز المحلي ${localBooking.ref}` : `I selected local booking ${localBooking.ref}`, {
-      context: `The guest selected local on-device record ${localBooking.ref}; it is not provider verified. Its performance date is ${performanceDate || "not supplied"}; status is ${localBooking.cancelled ? "cancelled" : localBooking.bookingStatus || "locally stored"}; refund status is ${localBooking.refundStatus || "none"}; refund reference is ${localBooking.refundReference || "none"}.`,
+    sendUiTurn(localeRef.current === "ar" ? `اخترت الحجز ${localBooking.ref}` : `I selected booking ${localBooking.ref}`, {
+      context: `The guest selected on-device booking summary ${localBooking.ref}. Do not present it as a provider confirmation. Its performance date is ${performanceDate || "not supplied"}; status is ${localBooking.cancelled ? "cancelled" : localBooking.bookingStatus || "saved"}; refund status is ${localBooking.refundStatus || "none"}; refund reference is ${localBooking.refundReference || "none"}.`,
     });
   };
 
@@ -2146,14 +2218,14 @@ export default function App() {
           localCancellationRecorded: false,
           refundApplied: false,
           bookingRef: current.ref,
-          reason: storageError?.message || "The local demo cancellation could not be saved.",
-          message: "No real refund was processed and the local demo record remains active.",
+          reason: storageError?.message || "The on-device cancellation could not be saved.",
+          message: "No refund was processed and the booking summary remains active on this device.",
         }));
       }
       cancellationFlowRef.current = null;
       say("system", localeRef.current === "ar"
-        ? "تعذر تسجيل الإلغاء التجريبي محلياً. بقي سجل الحجز نشطاً، ولم تتم معالجة أي استرداد حقيقي."
-        : "The demo cancellation could not be saved locally. The booking record remains active and no real refund was processed.");
+        ? "تعذر تسجيل الإلغاء على هذا الجهاز. بقي سجل الحجز نشطاً، ولم تتم معالجة أي استرداد."
+        : "The cancellation could not be saved on this device. The booking summary remains active and no refund was processed.");
       return false;
     }
     bookingRef.current = updated;
@@ -2182,7 +2254,7 @@ export default function App() {
         refundStatus: updated.refundStatus,
         refundReference: null,
         storagePersisted,
-        message: "Prototype only: the booking was marked cancelled in local demo storage. No real refund was processed.",
+        message: "The booking is marked cancelled on this device. No refund was processed.",
       } : {
         confirmed: true,
         simulationOnly: false,
@@ -2201,8 +2273,8 @@ export default function App() {
     cancellationFlowRef.current = null;
     if (isDemoSimulation) {
       say("system", localeRef.current === "ar"
-        ? "هذا نموذج تجريبي فقط: تم تسجيل الإلغاء محلياً، ولم تتم معالجة أي استرداد مالي حقيقي."
-        : "Prototype only: the cancellation was recorded locally. No real refund was processed.");
+        ? "تم تسجيل الحجز كملغى على هذا الجهاز فقط، ولم تتم معالجة أي استرداد مالي."
+        : "The booking is marked cancelled on this device only. No refund was processed.");
     } else if (!storagePersisted) {
       say("system", localeRef.current === "ar"
         ? `تم تأكيد الاسترداد الحقيقي بالمرجع ${refundReference}، لكن تعذر حفظ حالة الإلغاء على هذا الجهاز.`
@@ -2211,7 +2283,7 @@ export default function App() {
     if (source === "ui") {
       sendUiTurn(localeRef.current === "ar" ? `نعم، ألغِ الحجز ${updated.ref}` : `Yes, cancel booking ${updated.ref}`, {
         context: isDemoSimulation
-          ? `The prototype recorded ${updated.ref} as cancelled only in local demo storage. Refund status is not_processed_demo. No real refund was processed and there is no refund reference. State that explicitly; never describe this as a completed refund.`
+          ? `Booking summary ${updated.ref} is marked cancelled only on this device. Refund status is not processed; no refund occurred and there is no refund reference. State that boundary once and never describe it as a completed refund.`
           : `The verified refund adapter confirmed cancellation of ${updated.ref}. Refund route: VOX Wallet. Refund reference: ${refundReference}. Local storage persisted: ${storagePersisted ? "yes" : "no"}. Confirm the refund truthfully and disclose the local-storage warning when present.`,
       });
     }
@@ -2288,7 +2360,26 @@ export default function App() {
   };
 
   const scrollRef = useRef(null);
-  useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages, stage]);
+  const stageAnchorRef = useRef(null);
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    if (stage.view === "empty") {
+      scroller.scrollTop = scroller.scrollHeight;
+      return;
+    }
+    const anchor = stageAnchorRef.current;
+    if (!anchor) return;
+    const target = anchor.getBoundingClientRect().top
+      - scroller.getBoundingClientRect().top
+      + scroller.scrollTop
+      - 10;
+    scroller.scrollTop = Math.max(0, target);
+  }, [stage]);
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (scroller && stageRef.current.view === "empty") scroller.scrollTop = scroller.scrollHeight;
+  }, [messages]);
 
   const chips = [t("app.chipShowing"), t("app.chipBook"), t("app.chipCancel")];
   const statusLabel = startingMode
@@ -2351,6 +2442,7 @@ export default function App() {
               {!cinema && <button type="button" onClick={openCinemaPicker} style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 12, border: 0, borderRadius: 999, background: C.magenta, padding: "9px 15px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}><MapPin size={14} />{t("app.chooseCinema")}</button>}
             </div>
           )}
+          {stage.view !== "empty" && <div ref={stageAnchorRef} aria-hidden="true" />}
           {cinema && ["movies", "showtimes"].includes(stage.view) && <DateStrip dates={displayedProgrammingDates} selected={stage.errorCode === "date_unavailable" ? null : scheduleDate} locale={locale} label={t("dates.label")} onSelect={chooseDate} />}
           {stage.view === "loading" && <LoadingPanel label={stage.label} />}
           {stage.view === "faq" && stage.faq && <FaqPanel result={stage.faq} label={t("faq.official")} capabilityLabel={t("faq.capability")} liveLabel={t("faq.live")} backLabel={t("common.back")} onBack={() => showStage(faqReturnRef.current || { view: "empty" })} />}
@@ -2393,12 +2485,12 @@ export default function App() {
             connectingBody: t("handover.connectingBody"),
             readyTitle: t("handover.ready"),
             readyBody: t("handover.readyBody"),
-            simulation: t("handover.prototype"),
+            simulation: t("handover.badge"),
             debugTitle: t("handover.payload"),
             debugHint: t("handover.debugHint"),
             summaryStep: t("handover.summaryStep"),
             queueReadyStep: t("handover.queueStep"),
-            connectingStep: t("app.connecting"),
+            connectingStep: t("handover.preparingStep"),
             safeContext: t("handover.safeContext"),
           }} />}
         </main>

@@ -8,7 +8,8 @@ assert.equal(new Set(OFFERS.map((offer) => offer.id)).size, 19, "offer IDs must 
 assert.equal(OFFER_META.capturedDate, "2026-06-23");
 assert.equal(OFFER_META.verifiedDate, "2026-07-08");
 assert.match(OFFER_META.disclaimer.en, /guidance only/i);
-assert.match(OFFER_META.disclaimer.en, /cannot be redeemed/i);
+assert.match(OFFER_META.disclaimer.en, /Final eligibility is verified at VOX checkout/i);
+assert.match(OFFER_META.disclaimer.en, /bank’s current terms/i);
 
 for (const offer of OFFERS) {
   assert.ok(offer.bank.en && offer.bank.ar, `${offer.id}: bilingual bank name`);

@@ -14,7 +14,7 @@ import {
 } from "../src/mediaData.js";
 import { STRINGS } from "../src/i18n/strings.js";
 
-assert.equal(isLuhnValid("4111 1111 1111 1111"), true, "the documented prototype card must pass Luhn validation");
+assert.equal(isLuhnValid("4111 1111 1111 1111"), true, "the documented preview card must pass Luhn validation");
 assert.equal(isLuhnValid("4111 1111 1111 1112"), false, "invalid test PAN must fail Luhn validation");
 const july2026 = new Date(2026, 6, 13, 12, 0, 0);
 assert.equal(isValidDemoExpiry("12/30", july2026), true);
@@ -53,17 +53,19 @@ assert.equal(getExperienceMedia("UNKNOWN EXPERIENCE", "javascript:alert(1)"), FA
 const richMediaSource = await readFile(new URL("../src/components/RichMedia.jsx", import.meta.url), "utf8");
 const historySource = await readFile(new URL("../src/components/BookingHistory.jsx", import.meta.url), "utf8");
 const qrSource = await readFile(new URL("../src/components/BookingQRCode.jsx", import.meta.url), "utf8");
+const handoverSource = await readFile(new URL("../src/components/HandoverPanel.jsx", import.meta.url), "utf8");
+const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
 for (const key of ["booking.cinema", "booking.performance", "booking.status"]) assert.match(richMediaSource, new RegExp(key.replace(".", "\\.")), `${key} must be shown on booking confirmation`);
 for (const field of ["cinemaName", "booking.date", "history.cancelled", "history.active"]) assert.match(historySource, new RegExp(field.replace(".", "\\.")), `${field} must be represented in booking history`);
 assert.match(richMediaSource, /booking\.performanceDate\s*\|\|\s*booking\.sourceDate\s*\|\|\s*booking\.date/, "booking cards must prefer the actual performance date and retain after-midnight source dates");
 assert.match(historySource, /booking\.performanceDate\s*\|\|\s*booking\.sourceDate\s*\|\|\s*booking\.date/, "booking history must use the actual performance date fallback chain");
 assert.match(richMediaSource, /m\.language\s*\|\|\s*""/, "movie cards must show language even when runtime is present");
-assert.match(qrSource, /booking\.qrDemoHint/, "prototype QR codes must state that they are not entry tickets");
+assert.match(qrSource, /booking\.qrDemoHint/, "reference QR codes must direct guests to their official VOX ticket for entry");
 assert.match(qrSource, /const providerQrValue =/, "verified bookings must require an explicit provider admission QR payload");
 assert.match(qrSource, /if \(!qrValue\)/, "a verified booking without a provider QR payload must not encode its bare reference as an entry ticket");
-assert.match(richMediaSource, /booking\.noRefundProcessed/, "demo cancellation must not claim that a refund was initiated");
+assert.match(richMediaSource, /booking\.noRefundProcessed/, "device-only cancellation must not claim that a refund was initiated");
 assert.match(richMediaSource, /pricing\?\.tiers\?\.standard/, "seat prices must come from pricing metadata");
-assert.match(richMediaSource, /seats\.demoEstimateLabel/, "demo seat totals must be labeled as prototype estimates");
+assert.match(richMediaSource, /seats\.demoEstimateLabel/, "estimated seat totals must defer final pricing to checkout");
 assert.match(richMediaSource, /seats\.quoteRequiredLabel/, "live pricing must remain pending until a quote is returned");
 assert.doesNotMatch(richMediaSource, /\?\s*63\s*:\s*42/, "the seat map must not hard-code pre-quote tier prices");
 for (const key of [
@@ -78,4 +80,27 @@ for (const key of [
   assert.ok(STRINGS.ar[key], `${key}: Arabic copy missing`);
 }
 
-console.log("Validated supporting UX: safe simulated checkout, expiry and duplicate-submit guards, booking details, retry states, and experience-art fallback.");
+for (const locale of ["en", "ar"]) {
+  const visibleCopy = Object.values(STRINGS[locale]).join("\n");
+  assert.doesNotMatch(
+    visibleCopy,
+    /\bprototype\b|\bdemo only\b|\bprototype simulation\b|تجريبي|محاكاة|نموذج أولي/i,
+    `${locale}: leadership-facing UI must not repeat internal prototype terminology`,
+  );
+}
+assert.match(STRINGS.en["checkout.demoDisclaimer"], /No payment or reservation is submitted/, "checkout must keep its transaction-boundary disclosure");
+assert.match(STRINGS.en["booking.cancelDemoQuestion"], /Mark booking .* as cancelled on this device/, "device-only cancellation must describe the persisted cancelled state");
+assert.match(STRINGS.en["booking.cancelDemoQuestion"], /will not contact VOX or issue a refund/, "device-only cancellation must keep its transaction-boundary disclosure");
+assert.match(STRINGS.en["booking.cancelledLocal"], /Marked cancelled on this device/, "device-only cancellation must not claim the stored record was removed");
+assert.equal(STRINGS.en["history.cancelledLocal"], "Cancelled", "history must show the persisted record as cancelled");
+assert.match(STRINGS.en["booking.qrDemoHint"], /official VOX ticket/, "reference QR must direct guests to an official admission ticket");
+assert.match(handoverSource, /showDebug\s*=\s*false/, "leadership view must hide handover diagnostics by default");
+assert.match(STRINGS.en["handover.readyBody"], /No external support connection has been started/, "handover must state that it only prepares a summary");
+assert.doesNotMatch(handoverSource, /agent queue|pick up this conversation|UserRound|Headphones/i, "handover presentation must not imply a live agent or queue");
+assert.match(appSource, /connectingStep:\s*t\("handover\.preparingStep"\)/, "handover progress must say preparing rather than connecting");
+assert.doesNotMatch(appSource, /booking (?:was|is) removed from this device|Booking summary [^\n]+ removed only from this device/i, "persisted cancellations must not be described as removed records");
+assert.doesNotMatch(checkoutSource, /Apple Pay \(demo\)|Samsung Pay \(demo\)|last4} \(demo\)/, "payment labels must not leak internal demo suffixes");
+assert.doesNotMatch(appSource, /\bPrototype (?:checkout|booking|only)\b|الحجز التجريبي|نموذج تجريبي/i, "conversation copy must not label the overall experience as a prototype");
+assert.match(qrSource, /size\s*=\s*104/, "booking QR should remain compact inside the mobile widget");
+
+console.log("Validated supporting UX: safe checkout preview, leadership-ready copy, compact booking details, retry states, and experience-art fallback.");
