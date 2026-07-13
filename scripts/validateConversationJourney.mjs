@@ -30,6 +30,14 @@ assert.equal(state.ticketQuantity, 2);
 assert.deepEqual(state.seats, ["A1", "A2"]);
 assert.equal(state.bookingProgress, "seat_selection");
 
+const movieBrowseState = syncJourney(state, {
+  cinema: { id: "c1", name: "VOX — Test" },
+  scheduleDate: "2026-07-14",
+  stage: { view: "movies", movies: [] },
+  ticketQuantity: 2,
+});
+assert.equal(movieBrowseState.ticketQuantity, 2, "movie/showtime browsing must retain an explicitly requested ticket quantity for transport handoff");
+
 const variables = journeyDynamicVariables({ ...state, transportConversationId: "old-eleven-id" }, { continuation: true });
 assert.equal(variables.voxi_session_id, logicalId);
 assert.equal(variables.voxi_previous_conversation_id, "old-eleven-id");
@@ -53,4 +61,4 @@ const dates = [...DATA_DATES];
 assert.ok(dates.length > 1, "the full extracted programming window must be exposed");
 assert.deepEqual([...dates].sort(), dates, "programming dates must stay chronological");
 
-console.log("Validated shared logical journey state, redacted text-to-voice handoff, reset, and multi-date programming.");
+console.log("Validated shared logical journey state, ticket quantity continuity, redacted text-to-voice handoff, reset, and multi-date programming.");

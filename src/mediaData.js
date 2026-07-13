@@ -89,6 +89,10 @@ export function getSupportedImageUrl(media) {
   return "";
 }
 
+export const FALLBACK_EXPERIENCE_MEDIA = EXPERIENCE_MEDIA.STANDARD
+  || Object.values(EXPERIENCE_MEDIA).find((media) => getSupportedImageUrl(media))
+  || null;
+
 export function getMoviePosterUrl(movieOrBooking) {
   const direct = [movieOrBooking?.posterUrl, movieOrBooking?.media, movieOrBooking?.images]
     .map(getSupportedImageUrl)
@@ -112,10 +116,11 @@ export function getMoviePosterUrl(movieOrBooking) {
 }
 
 export function getExperienceMedia(experience, sessionMedia) {
-  if (sessionMedia) return sessionMedia;
+  if (sessionMedia && getSupportedImageUrl(sessionMedia)) return sessionMedia;
   const normalized = normalizeExperienceKey(experience);
   const key = EXPERIENCE_ALIASES[normalized] || normalized;
-  return EXPERIENCE_MEDIA[key] || null;
+  const matched = EXPERIENCE_MEDIA[key];
+  return matched && getSupportedImageUrl(matched) ? matched : FALLBACK_EXPERIENCE_MEDIA;
 }
 
 function collectStrings(value) {

@@ -39,6 +39,7 @@ assert.equal(resolveFilmCandidate(sampleFilms, "the minions one")?.id, "HO-MINIO
 assert.equal(resolveFilmCandidate(sampleFilms, "HO-MINIONS")?.title, "Minions & Monsters", "exact film IDs remain authoritative");
 assert.equal(uaeCalendarDate(new Date("2026-07-11T21:30:00.000Z")), "2026-07-12", "Dubai date must not use UTC midnight");
 assert.equal(remapDemoDate(DATA_DATES[0], DATA_DATES[0], DATA_DATES), DATA_DATES[0], "covered dates remain exact");
-assert.equal(remapDemoDate("2099-01-01", "2099-01-01", DATA_DATES), DATA_DATES[0], "outside dates fall back into the extraction window");
+assert.equal(remapDemoDate("2099-01-01", "2099-01-01", DATA_DATES), null, "expired dates must not cycle into a stale extraction window");
+assert.equal(remapDemoDate("not-a-date", DATA_DATES[0], DATA_DATES), null, "invalid dates must not resolve to programming");
 
 console.log(`Validated ${CINEMAS.length} cinemas, ${DATA_STATS.filmCount} films, ${SESSIONS.length} sessions, ${DATA_DATES.length} dates, and official movie/experience/offer media.`);

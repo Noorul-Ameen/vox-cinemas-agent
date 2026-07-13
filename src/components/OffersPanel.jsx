@@ -1,5 +1,5 @@
 import React from "react";
-import { BadgeCheck, ChevronLeft, ChevronRight, CreditCard, ExternalLink, HelpCircle, Search, XCircle } from "lucide-react";
+import { BadgeCheck, ChevronLeft, ChevronRight, CreditCard, ExternalLink, HelpCircle, RefreshCw, Search, XCircle } from "lucide-react";
 import { C } from "../theme.js";
 import { getMediaUrl, getOfferMedia } from "../mediaData.js";
 import { COMMON_OFFER_TERMS, OFFER_META, OFFERS } from "../offers/offersData.js";
@@ -8,7 +8,7 @@ import { ELIGIBILITY, evaluateOfferEligibility, searchOffers } from "../offers/o
 const COPY = {
   en: {
     title: "Bank offers",
-    subtitle: "19 verified VOX UAE offers",
+    subtitle: "19 published VOX UAE offers",
     search: "Search bank or card",
     searchLabel: "Search bank offers",
     cardLabel: "Card to check",
@@ -20,7 +20,23 @@ const COPY = {
     commonTerm: "Member and online-booking rules apply.",
     guestTerm: "TouchPoints can be used by a VOX member or guest; online-booking rules still apply.",
     foodBenefit: "A secondary Candy Bar benefit may apply; review the full bank terms.",
-    verified: "Spot-verified",
+    verified: "Reference checked",
+    detailsNeeded: "Details needed to assess eligibility: {fields}.",
+    exactCardNeeded: "Choose the exact card name so eligibility is not guessed.",
+    fields: {
+      bank: "issuing bank",
+      card: "exact card",
+      experience: "showtime experience",
+      format: "2D/3D format",
+      seatType: "seat category",
+      membership: "VOX membership status",
+      channel: "booking channel",
+      ticketCount: "ticket count",
+      orderTotal: "order total",
+      monthlyTicketsUsed: "monthly offer usage",
+      monthlySpend: "monthly retail spend",
+      cinema: "cinema",
+    },
     source: "Official offer page",
     back: "Go back",
     expand: "Show offer details",
@@ -28,7 +44,7 @@ const COPY = {
   },
   ar: {
     title: "عروض البنوك",
-    subtitle: "19 عرضاً موثقاً من ڤوكس الإمارات",
+    subtitle: "19 عرضاً منشوراً لدى ڤوكس الإمارات",
     search: "ابحث عن البنك أو البطاقة",
     searchLabel: "البحث في عروض البنوك",
     cardLabel: "البطاقة المطلوب التحقق منها",
@@ -40,7 +56,23 @@ const COPY = {
     commonTerm: "تسري شروط العضوية والحجز عبر الإنترنت.",
     guestTerm: "يمكن استخدام TouchPoints كعضو أو كضيف، مع استمرار شروط الحجز عبر الإنترنت.",
     foodBenefit: "قد تنطبق ميزة إضافية لدى الكاندي بار؛ راجع شروط البنك الكاملة.",
-    verified: "آخر تحقق",
+    verified: "تاريخ مراجعة المرجع",
+    detailsNeeded: "نحتاج إلى هذه التفاصيل لتقييم الأهلية: {fields}.",
+    exactCardNeeded: "اختر الاسم الدقيق للبطاقة حتى لا يتم تخمين الأهلية.",
+    fields: {
+      bank: "البنك المُصدر",
+      card: "اسم البطاقة الدقيق",
+      experience: "تجربة موعد العرض",
+      format: "صيغة 2D أو 3D",
+      seatType: "فئة المقعد",
+      membership: "حالة عضوية VOX",
+      channel: "قناة الحجز",
+      ticketCount: "عدد التذاكر",
+      orderTotal: "إجمالي الطلب",
+      monthlyTicketsUsed: "الاستخدام الشهري للعرض",
+      monthlySpend: "الإنفاق الشهري لدى البنك",
+      cinema: "السينما",
+    },
     source: "صفحة العرض الرسمية",
     back: "رجوع",
     expand: "عرض تفاصيل العرض",
@@ -66,13 +98,17 @@ function Status({ result, copy, language }) {
     ? copy.eligible
     : result.status === ELIGIBILITY.INELIGIBLE
       ? copy.ineligible
-      : copy.cardRequired;
+      : language === "ar" ? "نحتاج تفاصيل إضافية" : "More details needed";
+  const missingFields = (result.missingFields || []).map((field) => copy.fields[field] || field);
+  const detailsReason = missingFields.length
+    ? copy.detailsNeeded.replace("{fields}", missingFields.join(language === "ar" ? "، " : ", "))
+    : copy.exactCardNeeded;
   const reason = language === "ar"
     ? result.status === ELIGIBILITY.ELIGIBLE
       ? "هذه البطاقة مدرجة ضمن الفئات المؤهلة للسياق المحدد."
       : result.status === ELIGIBILITY.INELIGIBLE
         ? "لا تتحقق جميع شروط هذا العرض في السياق المحدد؛ راجع الشروط أو أكد الأهلية عند الدفع."
-        : "نحتاج إلى تفاصيل إضافية عن البطاقة أو صيغة العرض أو فئة المقعد لتأكيد الأهلية."
+        : detailsReason
     : result.reason;
   const advisory = language === "ar" && result.advisory
     ? "يتم التأكيد النهائي للأهلية عند إتمام الحجز لدى ڤوكس."
@@ -164,6 +200,8 @@ export function OffersPanel({
   initialOfferId = "",
   initialProfileId = "",
   onSelectionChange,
+  error,
+  onRetry,
 }) {
   const language = String(locale).toLowerCase().startsWith("ar") ? "ar" : "en";
   const copy = COPY[language];
@@ -212,15 +250,20 @@ export function OffersPanel({
 
       <p style={{ margin: "0 1px 10px", color: "rgba(255,255,255,.45)", fontSize: 10 }}>{touchpointsOnly ? copy.guestTerm : copy.commonTerm}</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-        {visibleOffers.map((offer) => (
+        {!error && visibleOffers.map((offer) => (
           <OfferRow
             key={offer.id}
             offer={offer}
             expanded={expandedId === offer.id}
             onToggle={() => {
+              const isOpening = expandedId !== offer.id;
               setExpandedId((current) => current === offer.id ? "" : offer.id);
-              const profile = offer.profiles.find((item) => item.id === profiles[offer.id]) || null;
-              onSelectionChange?.(evaluateOfferEligibility(offer, profile, resolvedContext));
+              if (isOpening) {
+                const profile = offer.profiles.find((item) => item.id === profiles[offer.id])
+                  || offer.profiles.find((item) => item.noCardRequired)
+                  || null;
+                if (profile) onSelectionChange?.(evaluateOfferEligibility(offer, profile, resolvedContext));
+              }
             }}
             selectedProfileId={profiles[offer.id] || ""}
             onProfileChange={(profileId) => {
@@ -233,7 +276,11 @@ export function OffersPanel({
             context={resolvedContext}
           />
         ))}
-        {!visibleOffers.length && <div role="status" style={{ border: "1px dashed rgba(255,255,255,.15)", borderRadius: 11, padding: 18, color: "rgba(255,255,255,.55)", fontSize: 11, textAlign: "center" }}>{copy.noResults}</div>}
+        {error && <div role="alert" style={{ border: "1px dashed rgba(255,207,112,.25)", borderRadius: 11, padding: 18, color: "rgba(255,255,255,.62)", fontSize: 11, textAlign: "center" }}>
+          <div>{language === "ar" ? "تعذر تحميل عروض البطاقات." : "Card offers could not be loaded."}</div>
+          {onRetry && <button type="button" onClick={onRetry} style={{ display: "inline-flex", alignItems: "center", gap: 5, marginTop: 9, border: "1px solid rgba(255,255,255,.16)", borderRadius: 8, background: "rgba(255,255,255,.07)", padding: "7px 10px", color: "#fff", cursor: "pointer", fontSize: 10 }}><RefreshCw size={12} aria-hidden="true" />{language === "ar" ? "حاول مرة أخرى" : "Try again"}</button>}
+        </div>}
+        {!error && !visibleOffers.length && <div role="status" style={{ border: "1px dashed rgba(255,255,255,.15)", borderRadius: 11, padding: 18, color: "rgba(255,255,255,.55)", fontSize: 11, textAlign: "center" }}>{copy.noResults}</div>}
       </div>
 
       <footer style={{ marginTop: 12, borderTop: "1px solid rgba(255,255,255,.08)", paddingTop: 10, color: "rgba(255,255,255,.42)", fontSize: 9, lineHeight: 1.5 }}>

@@ -35,6 +35,21 @@ export default function BookingHistory({ bookings = [], onSelect, onBack }) {
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           {sorted.map((booking) => {
             const cancelled = Boolean(booking.cancelled);
+            const isDemo = booking.verified !== true
+              || booking.demo === true
+              || booking.paymentStatus === "simulated_not_charged"
+              || booking.bookingStatus === "confirmed_demo";
+            const isDemoCancellation = cancelled && (isDemo || booking.refundStatus === "not_processed_demo");
+            const storedPerformanceDate = booking.performanceDate || booking.sourceDate || booking.date;
+            const performanceDate = storedPerformanceDate ? formatDate(storedPerformanceDate) : t("booking.unknownDate");
+            const cinemaName = booking.cinemaName || t("booking.unknownCinema");
+            const statusLabel = isDemoCancellation
+              ? t("history.cancelledLocal")
+              : cancelled
+                ? t("history.cancelled")
+                : isDemo
+                  ? t("history.demo")
+                  : t("history.active");
             return (
               <button key={booking.ref} type="button" onClick={() => onSelect?.(booking)} style={{ width: "100%", overflow: "hidden", borderRadius: 13, border: `1px solid ${cancelled ? "rgba(255,255,255,.10)" : "rgba(87,199,154,.25)"}`, background: "rgba(255,255,255,.035)", padding: 0, color: "inherit", textAlign: "start", cursor: "pointer" }}>
                 <span style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "12px 13px" }}>
@@ -43,12 +58,13 @@ export default function BookingHistory({ bookings = [], onSelect, onBack }) {
                     <span dir={booking.movieTitle ? "auto" : "ltr"} style={{ display: "block", overflow: "hidden", color: "#fff", fontSize: 13, fontWeight: 800, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{booking.movieTitle || booking.ref}</span>
                     <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 7px", marginTop: 4, color: "rgba(255,255,255,.48)", fontSize: 10 }}>
                       <span dir="ltr" style={{ fontFamily: "monospace", color: C.lavender }}>{booking.ref}</span>
-                      {booking.createdAt && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><CalendarDays size={10} />{formatDate(booking.createdAt)}</span>}
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><CalendarDays size={10} />{performanceDate}</span>
                       {booking.showtime && <span dir="ltr">{booking.showtime}</span>}
                       {booking.seats?.length > 0 && <span dir="ltr">{booking.seats.join(", ")}</span>}
                     </span>
+                    <span dir="auto" style={{ display: "block", overflow: "hidden", marginTop: 4, color: "rgba(255,255,255,.56)", fontSize: 10, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cinemaName}</span>
                     <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 7 }}>
-                      <span style={{ borderRadius: 999, background: cancelled ? "rgba(255,255,255,.07)" : "rgba(87,199,154,.13)", padding: "3px 7px", color: cancelled ? "rgba(255,255,255,.55)" : C.green, fontSize: 9, fontWeight: 800 }}>{cancelled ? t("history.cancelled") : t("history.active")}</span>
+                      <span style={{ borderRadius: 999, background: cancelled ? "rgba(255,255,255,.07)" : "rgba(87,199,154,.13)", padding: "3px 7px", color: cancelled ? "rgba(255,255,255,.55)" : C.green, fontSize: 9, fontWeight: 800 }}>{statusLabel}</span>
                       <span dir="ltr" style={{ color: "rgba(255,255,255,.68)", fontSize: 11, fontWeight: 700 }}>{formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}</span>
                     </span>
                   </span>

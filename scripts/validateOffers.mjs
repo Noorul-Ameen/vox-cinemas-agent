@@ -31,28 +31,38 @@ const expectStatus = (query, context, expected, expectedOffer) => {
   return result;
 };
 
+const qualified = (context = {}) => ({
+  isMember: true,
+  channel: "online",
+  ticketCount: 2,
+  orderTotal: 100,
+  monthlyTicketsUsed: 0,
+  monthlySpend: 10_000,
+  cinemaName: "Yas Mall",
+  ...context,
+});
+
 expectStatus("FAB", { experience: "Regular 2D" }, ELIGIBILITY.CARD_REQUIRED, "fab-share");
-expectStatus("FAB SHARE card", { experience: "Regular 2D", cinemaName: "City Centre Mirdif" }, ELIGIBILITY.ELIGIBLE, "fab-share");
+expectStatus("FAB SHARE card", qualified({ experience: "Regular 2D", cinemaName: "City Centre Mirdif" }), ELIGIBILITY.ELIGIBLE, "fab-share");
 expectStatus("FAB SHARE card", { experience: "IMAX 2D" }, ELIGIBILITY.INELIGIBLE, "fab-share");
 expectStatus("HSBC Platinum", { experience: "GOLD 2D" }, ELIGIBILITY.INELIGIBLE, "hsbc");
 expectStatus("HSBC Black", { experience: "THEATRE 2D", cinemaName: "Mall of the Emirates" }, ELIGIBILITY.INELIGIBLE, "hsbc");
-expectStatus("HSBC Black", { experience: "THEATRE 2D", cinemaName: "Yas Mall" }, ELIGIBILITY.ELIGIBLE, "hsbc");
+expectStatus("HSBC Black", qualified({ experience: "THEATRE 2D", cinemaName: "Yas Mall" }), ELIGIBILITY.ELIGIBLE, "hsbc");
 expectStatus("RAK Bank Air Arabia Platinum", { experience: "4DX" }, ELIGIBILITY.INELIGIBLE, "rakbank");
 expectStatus("NBF Visa", { experience: "MAX 2D", monthlySpend: 1000 }, ELIGIBILITY.INELIGIBLE, "nbf");
-expectStatus("ENBD Visa Infinite", { experience: "4DX" }, ELIGIBILITY.ELIGIBLE, "emirates-nbd");
+expectStatus("ENBD Visa Infinite", qualified({ experience: "4DX" }), ELIGIBILITY.ELIGIBLE, "emirates-nbd");
 expectStatus("Citi Life Platinum", { experience: "IMAX 2D", ticketCount: 1 }, ELIGIBILITY.INELIGIBLE, "citibank");
-expectStatus("Citi Life Platinum", { experience: "Standard 2D", ticketCount: 1 }, ELIGIBILITY.ELIGIBLE, "citibank");
-expectStatus("Arab Bank Signature VIP", { experience: "THEATRE", cinemaName: "Mall of the Emirates" }, ELIGIBILITY.INELIGIBLE, "arab-bank");
-const fullEnbd = resolveOfferForBankAndCard("Emirates NBD", "Visa Infinite", { experience: "4DX" });
+expectStatus("Citi Life Platinum", qualified({ experience: "Standard 2D", ticketCount: 1 }), ELIGIBILITY.ELIGIBLE, "citibank");
+expectStatus("Arab Bank Signature VIP", { experience: "THEATRE", cinemaName: "Mall of the Emirates" }, ELIGIBILITY.INELIGIBLE, "arab-bank-signature");
+const fullEnbd = resolveOfferForBankAndCard("Emirates NBD", "Visa Infinite", qualified({ experience: "4DX" }));
 assert.equal(fullEnbd.status, ELIGIBILITY.ELIGIBLE);
-assert.match(fullEnbd.advisory, /membership/i, "unknown membership must remain an explicit condition");
-assert.equal(resolveOfferForBankAndCard("ADCB", "TouchPoints Visa Infinite", { experience: "STANDARD", seatType: "REGULAR", format: "2D" }).offer?.id, "adcb");
-assert.equal(resolveOfferForBankAndCard("ADCB", "TouchPoints Platinum", { experience: "MAX", format: "2D" }).offer?.id, "adcb");
+assert.equal(resolveOfferForBankAndCard("ADCB", "TouchPoints Visa Infinite", qualified({ experience: "STANDARD", seatType: "REGULAR", format: "2D" })).offer?.id, "adcb");
+assert.equal(resolveOfferForBankAndCard("ADCB", "TouchPoints Platinum", qualified({ experience: "MAX", format: "2D" })).offer?.id, "adcb");
 assert.equal(resolveOfferForBankAndCard("FAB", "FAB SHARE card", { experience: "STANDARD" }).status, ELIGIBILITY.CARD_REQUIRED, "missing 2D/3D detail must stay conditional");
 assert.equal(resolveOfferForBankAndCard("FAB", "FAB SHARE card", { experience: "PRIVATE CINEMA" }).status, ELIGIBILITY.INELIGIBLE);
-assert.equal(resolveOfferForBankAndCard("Aafaq", "Platinum Credit Card", { experience: "KIDS 3D", ticketCount: 2 }).status, ELIGIBILITY.ELIGIBLE);
+assert.equal(resolveOfferForBankAndCard("Aafaq", "Platinum Credit Card", qualified({ experience: "KIDS 3D", ticketCount: 2 })).status, ELIGIBILITY.ELIGIBLE);
 assert.equal(resolveOfferForBankAndCard("Citi", "Life Infinite", { experience: "STANDARD 2D", ticketCount: 1 }).status, ELIGIBILITY.INELIGIBLE, "Citi BOGO needs two tickets");
-assert.equal(resolveOfferForBankAndCard("Citi", "Premier", { experience: "STANDARD 2D", ticketCount: 1 }).status, ELIGIBILITY.ELIGIBLE, "Citi 30% has no two-ticket minimum");
+assert.equal(resolveOfferForBankAndCard("Citi", "Premier", qualified({ experience: "STANDARD 2D", ticketCount: 1 })).status, ELIGIBILITY.ELIGIBLE, "Citi 30% has no two-ticket minimum");
 assert.equal(resolveOfferForBankAndCard("Citi", "Life Infinite", { experience: "MAX 2D", cinemaName: "City Centre Deira", seatType: "Balcony", ticketCount: 2 }).status, ELIGIBILITY.INELIGIBLE);
 assert.equal(resolveOfferForBankAndCard("CBD", "Visa Infinite Metal", { experience: "IMAX", seatType: "Sapphire" }).status, ELIGIBILITY.INELIGIBLE);
 
@@ -63,11 +73,19 @@ const experienceMappings = {
 };
 for (const [source, expected] of Object.entries(experienceMappings)) assert.equal(normalizeExperience(source), expected, source);
 
-const cbdConflict = expectStatus("CBD Visa Infinite Metal", { experience: "4DX" }, ELIGIBILITY.ELIGIBLE, "cbd");
+const cbdConflict = expectStatus("CBD Visa Infinite Metal", qualified({ experience: "4DX" }), ELIGIBILITY.ELIGIBLE, "cbd");
 assert.match(cbdConflict.advisory, /conflict/i, "CBD 4DX conflict must be disclosed");
 
-expectStatus("ADCB TouchPoints", { experience: "IMAX 3D", isMember: false, orderTotal: 30 }, ELIGIBILITY.ELIGIBLE, "adcb-touchpoints");
+expectStatus("ADCB TouchPoints", qualified({ experience: "IMAX 3D", isMember: false, orderTotal: 30 }), ELIGIBILITY.ELIGIBLE, "adcb-touchpoints");
 expectStatus("ADCB TouchPoints", { experience: "Standard 2D", isMember: false, orderTotal: 10 }, ELIGIBILITY.INELIGIBLE, "adcb-touchpoints");
+
+const incompleteEnbd = resolveOffer("ENBD Visa Infinite", { experience: "4DX" });
+assert.equal(incompleteEnbd.status, ELIGIBILITY.CARD_REQUIRED, "unknown membership, channel, ticket count and usage must not be called eligible");
+assert.deepEqual(incompleteEnbd.missingFields, ["membership", "channel", "ticketCount", "monthlyTicketsUsed"]);
+assert.equal(resolveOffer("NBF Visa", qualified({ experience: "MAX 2D", monthlySpend: undefined })).status, ELIGIBILITY.CARD_REQUIRED, "missing spend must remain conditional");
+assert.equal(resolveOffer("HSBC Black", qualified({ experience: "THEATRE 2D", cinemaName: undefined })).status, ELIGIBILITY.CARD_REQUIRED, "cinema-specific exclusions require a cinema");
+assert.equal(resolveOffer("Visa Infinite", qualified({ experience: "4DX" })).status, ELIGIBILITY.CARD_REQUIRED, "generic card names must not guess an issuing bank");
+assert.equal(resolveOffer("Platinum", qualified({ experience: "STANDARD 2D" })).status, ELIGIBILITY.CARD_REQUIRED, "ambiguous card tiers must ask for bank and exact card");
 
 assert.equal(searchOffers("RAK bak")[0]?.id, "rakbank", "fuzzy bank search");
 assert.equal(searchOffers("cashbak plus")[0]?.id, "liv", "fuzzy card search");

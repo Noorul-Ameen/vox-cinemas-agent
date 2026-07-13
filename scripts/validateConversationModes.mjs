@@ -26,6 +26,13 @@ assert.match(voiceStartup, /connectionType:\s*["']webrtc["']/, "the protected vo
 assert.match(voiceStartup, /navigator\.mediaDevices\.getUserMedia\(\{\s*audio:\s*true\s*\}\)/, "voice startup must remain explicitly permission-gated");
 assert.match(voiceStartup, /agentId:\s*import\.meta\.env\.VITE_AGENT_ID/, "voice startup must retain the configured public agent ID");
 
+const typedMessageFlow = sliceBetween(app, "const sendText", "const sendUiTurn", "typed message flow");
+assert.doesNotMatch(typedMessageFlow, /sessionModeRef\.current\s*===\s*["']voice["']\)\s*return/, "typing must not be disabled during an active voice session");
+assert.match(typedMessageFlow, /const ready = sessionModeRef\.current \? true : await startTextSession/, "an existing voice session must be reused for typed messages");
+assert.match(typedMessageFlow, /conversation\.sendUserMessage\(value\)/, "typed messages must be sent through the active voice or text conversation");
+const textComposer = sliceBetween(app, '<section aria-label={t("app.conversation")}', "</section>", "text composer");
+assert.match(textComposer, /<input\b[\s\S]*?onKeyDown=\{\(event\) => event\.key === ["']Enter["'][\s\S]*?sendText\(\)/, "the text composer must remain rendered and submit while voice is active");
+
 assert.ok((strings.match(/"app\.title":\s*"Voxi"/g) || []).length >= 2, "both language dictionaries must use the Voxi product name");
 assert.ok((strings.match(/"app\.brand":\s*"VOX Cinemas UAE"/g) || []).length >= 2, "both language dictionaries must retain VOX Cinemas UAE branding");
 assert.match(app, /t\("app\.title"\)/, "the header must render the Voxi product name");

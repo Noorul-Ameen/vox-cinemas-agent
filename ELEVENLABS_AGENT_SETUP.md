@@ -91,7 +91,7 @@ Agent rules:
 
 ## Language and first-message configuration
 
-- The web client supplies the selected locale through `preferred_language` and the session context. It does not send an `agent.language` override.
+- The web client supplies the selected locale through `preferred_language` and the session context. It does not send an `agent.language` override, preserving the current public-agent connection contract.
 - Configure the dashboard first-message field as `{{voxi_session_opening}}`. The client supplies the localized welcome for a first transport and a no-greeting continuation acknowledgement for a text-to-voice transport switch.
 - Keep `voxi_is_continuation`, `voxi_session_id`, `voxi_previous_conversation_id`, `voxi_intent`, `voxi_movie`, `voxi_cinema`, and `voxi_booking_progress` available in the dashboard prompt. The complete redacted journey and recent turns arrive immediately after connection through a contextual update.
 - The client intentionally does not send an `agent.firstMessage` override because that field must be explicitly enabled in ElevenLabs Security and an unauthorized override terminates the session.

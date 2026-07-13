@@ -7,6 +7,7 @@ export const ELIGIBILITY = Object.freeze({
 });
 
 const CARD_STOP_WORDS = new Set(["bank", "card", "credit", "debit", "offer", "deal", "please", "my", "the", "a", "an"]);
+const GENERIC_CARD_ONLY = /^(?:(?:visa|mastercard)\s+)?(?:infinite|signature|platinum|gold|classic|titanium|world|world elite|black|premier|rewards)(?:\s+(?:credit|debit))?(?:\s+card)?$/;
 
 export function normalizeOfferText(value = "") {
   return String(value)
@@ -145,8 +146,17 @@ function failure(offer, profile, reason, context) {
   return { status: ELIGIBILITY.INELIGIBLE, eligible: false, offer, cardProfile: profile, reason, advisory: "", context };
 }
 
-function needsDetails(offer, profile, reason, context) {
-  return { status: ELIGIBILITY.CARD_REQUIRED, eligible: false, offer, cardProfile: profile, reason, advisory: "Final eligibility is confirmed at VOX checkout.", context };
+function needsDetails(offer, profile, reason, context, missingFields = []) {
+  return {
+    status: ELIGIBILITY.CARD_REQUIRED,
+    eligible: false,
+    offer,
+    cardProfile: profile,
+    reason,
+    advisory: "Final eligibility is confirmed at VOX checkout.",
+    context,
+    missingFields: [...new Set(missingFields)],
+  };
 }
 
 export function evaluateOfferEligibility(offer, profile, context = {}) {
@@ -163,7 +173,7 @@ export function evaluateOfferEligibility(offer, profile, context = {}) {
   const cinema = context.cinemaName || context.cinema || context.cinemaId || "";
   const normalizedContext = { ...context, experience, format, seat, cinema };
 
-  if (!experience) return needsDetails(offer, selectedProfile, "Select a showtime experience before checking this offer.", normalizedContext);
+  if (!experience) return needsDetails(offer, selectedProfile, "Select a showtime experience before checking this offer.", normalizedContext, ["experience"]);
   if (experience === "UNSUPPORTED" || ["PRIVATE_CINEMA", "THEATRE_PODS"].includes(experience)) {
     return failure(offer, selectedProfile, `${context.experience || "This experience"} is not listed for this offer.`, normalizedContext);
   }
@@ -177,6 +187,10 @@ export function evaluateOfferEligibility(offer, profile, context = {}) {
   const minTickets = selectedProfile.minTickets ?? offer.minTickets;
   if (minTickets && Number.isFinite(context.ticketCount) && context.ticketCount < minTickets) {
     return failure(offer, selectedProfile, `Choose at least ${minTickets} tickets for this offer.`, normalizedContext);
+  }
+  const maxSessionTickets = offer.perSessionLimit?.maxTickets;
+  if (Number.isFinite(maxSessionTickets) && Number.isFinite(context.ticketCount) && context.ticketCount > maxSessionTickets) {
+    return failure(offer, selectedProfile, `Choose no more than ${maxSessionTickets} tickets in one booking for this offer.`, normalizedContext);
   }
   if (offer.minOrderTotal && Number.isFinite(context.orderTotal) && context.orderTotal < offer.minOrderTotal) {
     return failure(offer, selectedProfile, `The minimum order value is AED ${offer.minOrderTotal}.`, normalizedContext);
@@ -199,10 +213,10 @@ export function evaluateOfferEligibility(offer, profile, context = {}) {
     return failure(offer, selectedProfile, `${experience} is excluded for this card.`, normalizedContext);
   }
   if (rules.formats?.length && !format) {
-    return needsDetails(offer, selectedProfile, "The 2D/3D format is required to confirm this card's eligibility.", normalizedContext);
+    return needsDetails(offer, selectedProfile, "The 2D/3D format is required to confirm this card's eligibility.", normalizedContext, ["format"]);
   }
   if (experience && rules.formatsByExperience?.[experience]?.length && !format) {
-    return needsDetails(offer, selectedProfile, `The ${experience} 2D/3D format is required to confirm eligibility.`, normalizedContext);
+    return needsDetails(offer, selectedProfile, `The ${experience} 2D/3D format is required to confirm eligibility.`, normalizedContext, ["format"]);
   }
   if (format && rules.formats?.length && !rules.formats.includes(format)) {
     return failure(offer, selectedProfile, `${format} is not listed for this card.`, normalizedContext);
@@ -211,7 +225,7 @@ export function evaluateOfferEligibility(offer, profile, context = {}) {
     return failure(offer, selectedProfile, `${experience} ${format} is not listed for this card.`, normalizedContext);
   }
   if (!seat && (rules.allowedSeats?.length || rules.excludedSeats?.length || rules.excludedSeatsByExperience?.[experience]?.length)) {
-    return needsDetails(offer, selectedProfile, "The seat category is required to confirm this card's eligibility.", normalizedContext);
+    return needsDetails(offer, selectedProfile, "The seat category is required to confirm this card's eligibility.", normalizedContext, ["seatType"]);
   }
   if (seat && rules.allowedSeats?.length && !rules.allowedSeats.includes(seat)) {
     return failure(offer, selectedProfile, `${seat} seats are not listed for this card.`, normalizedContext);
@@ -238,16 +252,47 @@ export function evaluateOfferEligibility(offer, profile, context = {}) {
       && (!rule.experiences?.length || rule.experiences.includes(experience))
   ));
   if (unresolvedSeatExclusion) {
-    return needsDetails(offer, selectedProfile, "The seat category is required to check this cinema exclusion.", normalizedContext);
+    return needsDetails(offer, selectedProfile, "The seat category is required to check this cinema exclusion.", normalizedContext, ["seatType"]);
   }
   if (excludedAt) {
     return failure(offer, selectedProfile, `${experience || "This category"}${seat ? ` ${seat}` : ""} is excluded at this cinema.`, normalizedContext);
   }
 
+  const missingFields = [];
+  if (offer.memberRequired && typeof context.isMember !== "boolean") missingFields.push("membership");
+  if (offer.onlineOnly && !normalizeOfferText(context.channel)) missingFields.push("channel");
+  if ((minTickets || Number.isFinite(maxSessionTickets)) && !Number.isFinite(context.ticketCount)) missingFields.push("ticketCount");
+  if (offer.minOrderTotal && !Number.isFinite(context.orderTotal)) missingFields.push("orderTotal");
+  if (Number.isFinite(maxMonthly) && !Number.isFinite(context.monthlyTicketsUsed)) missingFields.push("monthlyTicketsUsed");
+  if (spendRule && !Number.isFinite(context.monthlySpend)) missingFields.push("monthlySpend");
+  const cinemaSpecificExclusions = rules.excludedAt?.some((rule) => (
+    (!rule.experiences?.length || rule.experiences.includes(experience))
+      && (!rule.seats?.length || !seat || rule.seats.includes(seat))
+  ));
+  if (!cinema && (onlyAt || cinemaSpecificExclusions)) missingFields.push("cinema");
+  const cinemaRuleNeedsSeat = rules.excludedAt?.some((rule) => (
+    rule.seats?.length
+      && (!rule.experiences?.length || rule.experiences.includes(experience))
+      && (!cinema || cinemaMatches(cinema, rule.cinemas))
+  ));
+  if (!seat && cinemaRuleNeedsSeat) missingFields.push("seatType");
+
+  if (missingFields.length) {
+    const labels = {
+      membership: "VOX membership status",
+      channel: "booking channel",
+      ticketCount: "ticket count",
+      orderTotal: "order total",
+      monthlyTicketsUsed: "monthly offer usage",
+      monthlySpend: "monthly retail spend",
+      cinema: "cinema",
+      seatType: "seat category",
+    };
+    const readable = missingFields.map((field) => labels[field]).join(", ");
+    return needsDetails(offer, selectedProfile, `More details are needed: ${readable}.`, normalizedContext, missingFields);
+  }
+
   const advisories = [];
-  if (offer.memberRequired && context.isMember !== true) advisories.push("A logged-in VOX membership is required.");
-  if (onlyAt && !cinema) advisories.push(`${experience} is covered only at ${onlyAt.cinemas[0]}.`);
-  if (spendRule && !Number.isFinite(context.monthlySpend)) advisories.push(`A minimum AED ${spendRule.amount} monthly retail spend applies.`);
   if (Number.isFinite(maxMonthly)) advisories.push(`Stated monthly limit: ${maxMonthly} ticket${maxMonthly === 1 ? "" : "s"}.`);
   if (limit?.termsConflict) advisories.push(limit.termsConflict);
   const confirmation = rules.checkoutConfirmation?.find((rule) => !rule.experiences?.length || rule.experiences.includes(experience));
@@ -276,7 +321,10 @@ export function resolveOffer(query, context = {}, offers = OFFERS) {
   const bankMatch = offerRanks[0];
   const globalCardMatch = profileRanks[0];
   const globalCardRunnerUp = profileRanks[1];
-  const uniqueGlobalCard = globalCardMatch?.score >= 0.78 && (!globalCardRunnerUp || globalCardMatch.score - globalCardRunnerUp.score >= 0.035);
+  const plausibleGlobalCard = globalCardMatch?.score >= 0.78;
+  const uniqueGlobalCard = !GENERIC_CARD_ONLY.test(normalizedQuery)
+    && globalCardMatch?.score >= 0.84
+    && (!globalCardRunnerUp || globalCardMatch.score - globalCardRunnerUp.score >= 0.06);
 
   let selectedOffer = bankMatch?.score >= 0.64 ? bankMatch.offer : null;
   let selectedProfile = null;
@@ -288,14 +336,42 @@ export function resolveOffer(query, context = {}, offers = OFFERS) {
   }
 
   if (!selectedOffer) {
+    if (plausibleGlobalCard) {
+      return {
+        status: ELIGIBILITY.CARD_REQUIRED,
+        eligible: false,
+        offer: null,
+        cardProfile: null,
+        reason: "That card name can match more than one published offer. Tell me the issuing bank and exact card name.",
+        advisory: "Final eligibility is confirmed at VOX checkout.",
+        context,
+        missingFields: ["bank", "card"],
+      };
+    }
     return { status: ELIGIBILITY.INELIGIBLE, eligible: false, offer: null, cardProfile: null, reason: "I could not match that bank or card to the 19 published VOX UAE offers.", advisory: "", context };
   }
 
   if (!selectedProfile) {
-    const withinOffer = selectedOffer.profiles
-      .map((profile) => ({ profile, ...bestAlias(query, aliasesForProfile(profile)) }))
-      .sort((a, b) => b.score - a.score || b.alias.length - a.alias.length)[0];
-    if (withinOffer?.score >= 0.72 && withinOffer.score > (bankMatch?.score || 0) + 0.015) selectedProfile = withinOffer.profile;
+    const cardHint = cardHintAfterBank(query, selectedOffer);
+    const withinOfferRanks = selectedOffer.profiles
+      .map((profile) => ({ profile, ...bestAlias(cardHint || query, aliasesForProfile(profile)) }))
+      .sort((a, b) => b.score - a.score || b.alias.length - a.alias.length);
+    const withinOffer = withinOfferRanks[0];
+    const withinRunnerUp = withinOfferRanks[1];
+    const unambiguous = !withinRunnerUp || withinOffer.score - withinRunnerUp.score >= 0.04;
+    if (cardHint && withinOffer?.score >= 0.78 && unambiguous) selectedProfile = withinOffer.profile;
+    if (cardHint && withinOffer?.score >= 0.78 && !unambiguous) {
+      return {
+        status: ELIGIBILITY.CARD_REQUIRED,
+        eligible: false,
+        offer: selectedOffer,
+        cardProfile: null,
+        reason: `That description matches more than one ${selectedOffer.bank.en} card. Tell me the exact card name.`,
+        advisory: "Final eligibility is confirmed at VOX checkout.",
+        context,
+        missingFields: ["card"],
+      };
+    }
   }
   if (!selectedProfile && selectedOffer.profiles.length === 1 && selectedOffer.profiles[0].noCardRequired) {
     selectedProfile = selectedOffer.profiles[0];
@@ -328,11 +404,24 @@ export function resolveOfferForBankAndCard(bankQuery, cardQuery, context = {}, o
     .sort((a, b) => b.cardMatch.score - a.cardMatch.score || b.bankMatch.score - a.bankMatch.score);
 
   const selected = candidates[0];
+  const runnerUp = candidates[1];
   if (!selected) {
     return { status: ELIGIBILITY.INELIGIBLE, eligible: false, offer: null, cardProfile: null, reason: "I could not match that bank to the 19 published VOX UAE offers.", advisory: "", context };
   }
-  if (!selected.cardMatch || selected.cardMatch.score < 0.58) {
+  if (!selected.cardMatch || selected.cardMatch.score < 0.72) {
     return { status: ELIGIBILITY.INELIGIBLE, eligible: false, offer: selected.offer, cardProfile: null, reason: `That card is not in the published eligible-card list for ${selected.offer.bank.en}.`, advisory: "Check the exact card name or confirm at VOX checkout.", context };
+  }
+  if (runnerUp?.cardMatch?.score >= 0.72 && selected.cardMatch.score - runnerUp.cardMatch.score < 0.04) {
+    return {
+      status: ELIGIBILITY.CARD_REQUIRED,
+      eligible: false,
+      offer: selected.offer,
+      cardProfile: null,
+      reason: "That bank and card description is ambiguous. Use the full issuing-bank and card names.",
+      advisory: "Final eligibility is confirmed at VOX checkout.",
+      context,
+      missingFields: ["bank", "card"],
+    };
   }
   return evaluateOfferEligibility(selected.offer, selected.cardMatch.profile, context);
 }

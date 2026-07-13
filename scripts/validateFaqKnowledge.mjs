@@ -47,10 +47,13 @@ for (const entry of VOX_FAQ_ENTRIES) {
 
   const metadata = entry.metadata;
   assert.ok(metadata && typeof metadata === "object", `${entry.id}: metadata is required`);
+  assert.ok(["official", "product"].includes(metadata.provenance), `${entry.id}: metadata provenance must be official or product`);
   assert.ok(isTextArray(metadata.tags?.en), `${entry.id}: English tags are required`);
   assert.ok(isTextArray(metadata.tags?.ar), `${entry.id}: Arabic tags are required`);
   assert.ok(isTextArray(metadata.audience), `${entry.id}: audience is required`);
-  assert.ok(Array.isArray(metadata.source) && metadata.source.length > 0, `${entry.id}: source is required`);
+  assert.ok(Array.isArray(metadata.source), `${entry.id}: source must be an array`);
+  if (metadata.provenance === "official") assert.ok(metadata.source.length > 0, `${entry.id}: official source is required`);
+  if (metadata.provenance === "product") assert.equal(metadata.source.length, 0, `${entry.id}: product capabilities must not cite an unrelated policy source`);
   for (const source of metadata.source) {
     assert.ok(isText(source.title), `${entry.id}: source title is required`);
     assert.equal(source.publisher, "VOX Cinemas UAE", `${entry.id}: sources must be first-party VOX UAE pages`);

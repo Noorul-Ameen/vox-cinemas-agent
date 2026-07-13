@@ -40,7 +40,11 @@ function resultBlock(result, locale, liveData) {
 
   lines.push(`Audience: ${entry.metadata.audience.join(", ")}`);
   lines.push(`Verified: ${entry.metadata.update.reviewedAt}; freshness: ${entry.metadata.update.freshness}`);
-  lines.push(`Official source: ${sourceLine(entry.metadata.source)}`);
+  if (entry.metadata.provenance === "product") {
+    lines.push("Capability basis: current Voxi in-product behavior. Present this as a Voxi capability, not as VOX policy or an external service guarantee.");
+  } else {
+    lines.push(`Official source: ${sourceLine(entry.metadata.source)}`);
+  }
   return lines.join("\n");
 }
 

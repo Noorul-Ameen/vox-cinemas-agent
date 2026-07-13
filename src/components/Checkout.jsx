@@ -1,184 +1,266 @@
-import React, { useState, useEffect } from "react";
-import { CreditCard, Plus, Check, Lock, ChevronLeft, Smartphone } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Check, ChevronLeft, CreditCard, Lock, Plus, Smartphone } from "lucide-react";
 import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
-
-/**
- * Demo checkout — simulates the payment step entirely on-device.
- * - Stored cards persist in localStorage ("vox_cards")
- * - Add-new-card with basic validation (test card: 4111 1111 1111 1111)
- * - Apple Pay / Samsung Pay buttons show a simulated authorization sheet
- * - No card data ever goes to the agent or any server (PCI-correct demo design)
- */
-
-const DEFAULT_CARDS = [
-  { id: "c1", brand: "VISA", last4: "4242", name: "Noorul A", exp: "09/27" },
-  { id: "c2", brand: "MC", last4: "5100", name: "Noorul A", exp: "01/28" },
-];
+import {
+  DEMO_CARD_STORAGE_KEY,
+  formatDemoPan,
+  isLuhnValid,
+  isValidDemoExpiry,
+  sanitizeStoredCardMetadata,
+  toStoredCardMetadata,
+} from "../checkoutSafety.js";
 
 function loadCards() {
-  try { return JSON.parse(localStorage.getItem("vox_cards")) || DEFAULT_CARDS; }
-  catch { return DEFAULT_CARDS; }
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DEMO_CARD_STORAGE_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.map(sanitizeStoredCardMetadata).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
 }
+
 function saveCards(cards) {
-  try { localStorage.setItem("vox_cards", JSON.stringify(cards)); } catch {}
+  try {
+    const metadataOnly = cards.map(sanitizeStoredCardMetadata).filter(Boolean);
+    localStorage.setItem(DEMO_CARD_STORAGE_KEY, JSON.stringify(metadataOnly));
+  } catch {
+    // The checkout remains usable when storage is unavailable.
+  }
 }
 
-const luhnOk = (num) => {
-  const d = num.replace(/\D/g, ""); if (d.length < 13) return false;
-  let sum = 0, alt = false;
-  for (let i = d.length - 1; i >= 0; i--) { let n = +d[i]; if (alt) { n *= 2; if (n > 9) n -= 9; } sum += n; alt = !alt; }
-  return sum % 10 === 0;
-};
-const brandOf = (num) => num.startsWith("4") ? "VISA" : /^5[1-5]/.test(num) ? "MC" : /^3[47]/.test(num) ? "AMEX" : "CARD";
+function resolveCheckoutMode(mode) {
+  const explicitMode = String(mode || "").trim().toLowerCase();
+  if (explicitMode === "live" || explicitMode === "demo") return explicitMode;
+  // Vista configuration controls read data only. Checkout remains simulated unless
+  // a future integration explicitly opts this component into another mode.
+  return "demo";
+}
 
-export default function Checkout({ order, onPaid, onCancel }) {
+function emptyCardForm() {
+  return { pan: "", name: "", exp: "", cvv: "" };
+}
+
+export default function Checkout({ order, onPaid, onCancel, onRetry, mode }) {
   const { t, dir, formatCurrency } = useI18n();
+  const checkoutMode = resolveCheckoutMode(mode);
+  const seats = Array.isArray(order?.seats) ? order.seats : [];
   const [cards, setCards] = useState(loadCards);
-  const [selected, setSelected] = useState(cards[0]?.id || null);
+  const [selected, setSelected] = useState(null);
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ num: "", name: "", exp: "", cvv: "" });
-  const [err, setErr] = useState("");
-  const [paying, setPaying] = useState(null); // null | "card" | "apple" | "samsung"
+  const [form, setForm] = useState(emptyCardForm);
+  const [error, setError] = useState("");
+  const [paying, setPaying] = useState(null);
   const [done, setDone] = useState(false);
-  const timersRef = React.useRef([]);
+  const timersRef = useRef([]);
+  const mountedRef = useRef(true);
+  const paymentStartedRef = useRef(false);
+  const completionSentRef = useRef(false);
+  const sensitiveFormRef = useRef(form);
 
-  useEffect(() => saveCards(cards), [cards]);
-  useEffect(() => () => {
+  const clearTimers = () => {
     timersRef.current.forEach((timer) => window.clearTimeout(timer));
     timersRef.current = [];
+  };
+
+  const clearSensitiveForm = (updateUi = true) => {
+    const cleared = emptyCardForm();
+    sensitiveFormRef.current = cleared;
+    if (updateUi && mountedRef.current) setForm(cleared);
+  };
+
+  const updateFormField = (field, value) => {
+    const next = { ...sensitiveFormRef.current, [field]: value };
+    sensitiveFormRef.current = next;
+    setForm(next);
+  };
+
+  useEffect(() => saveCards(cards), [cards]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      paymentStartedRef.current = true;
+      clearTimers();
+      clearSensitiveForm(false);
+    };
   }, []);
 
+  const cancelCheckout = () => {
+    paymentStartedRef.current = true;
+    clearTimers();
+    clearSensitiveForm();
+    setError("");
+    onCancel?.();
+  };
+
   const pay = (method, label) => {
+    if (checkoutMode !== "demo" || paymentStartedRef.current) return;
+    paymentStartedRef.current = true;
     setPaying(method);
-    const checkoutId = order.checkoutId;
+    const checkoutId = order?.checkoutId;
     const authorizationTimer = window.setTimeout(() => {
+      if (!mountedRef.current) return;
       setDone(true);
-      const completionTimer = window.setTimeout(() => onPaid({ method, label, checkoutId }), 700);
+      const completionTimer = window.setTimeout(() => {
+        if (!mountedRef.current || completionSentRef.current) return;
+        completionSentRef.current = true;
+        clearSensitiveForm();
+        onPaid?.({ method, label, checkoutId });
+      }, 700);
       timersRef.current.push(completionTimer);
     }, 1600);
     timersRef.current.push(authorizationTimer);
   };
 
   const addCard = () => {
-    const num = form.num.replace(/\s/g, "");
-    if (!luhnOk(num)) return setErr(t("checkout.cardInvalid"));
-    if (!/^\d{2}\/\d{2}$/.test(form.exp)) return setErr(t("checkout.expiryInvalid"));
-    if (!/^\d{3,4}$/.test(form.cvv)) return setErr(t("checkout.cvvInvalid"));
-    if (!form.name.trim()) return setErr(t("checkout.nameRequired"));
-    const card = { id: "c" + Date.now(), brand: brandOf(num), last4: num.slice(-4), name: form.name.trim(), exp: form.exp };
-    const next = [...cards, card];
-    setCards(next); setSelected(card.id); setAdding(false); setErr("");
-    setForm({ num: "", name: "", exp: "", cvv: "" });
+    if (!isLuhnValid(form.pan)) return setError(t("checkout.cardInvalid"));
+    if (!isValidDemoExpiry(form.exp)) return setError(t("checkout.expiryInvalid"));
+    if (!/^\d{3,4}$/.test(form.cvv)) return setError(t("checkout.cvvInvalid"));
+    if (!form.name.trim()) return setError(t("checkout.nameRequired"));
+
+    // Only masked, token-like display metadata survives this synchronous handler.
+    const metadata = toStoredCardMetadata(form, `demo-${Date.now()}`);
+    setCards((current) => [...current, metadata]);
+    setSelected(metadata.id);
+    setAdding(false);
+    setError("");
+    clearSensitiveForm();
   };
 
-  const fmtNum = (v) => v.replace(/\D/g, "").slice(0, 16).replace(/(\d{4})(?=\d)/g, "$1 ");
+  const header = (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <button type="button" aria-label={t("common.back")} onClick={cancelCheckout} style={backButton}>
+          <ChevronLeft size={18} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />
+        </button>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{t("checkout.title")}</div>
+          <div style={{ overflow: "hidden", fontSize: 11, color: "rgba(255,255,255,.5)", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <bdi dir="auto">{order?.movieTitle}</bdi> · <span dir="ltr">{order?.showtime}</span> · {t("checkout.seatsLabel")} <span dir="ltr">{seats.join(", ")}</span>
+          </div>
+        </div>
+      </div>
+      <div style={summaryCard}>
+        <span style={{ fontSize: 13, color: "rgba(255,255,255,.6)" }}>{t("checkout.seatCountOnly", { count: seats.length })} · <span dir="ltr">{order?.screen}</span></span>
+        <span dir="ltr" style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{formatCurrency(order?.total || 0, order?.currency || "AED")}</span>
+      </div>
+    </>
+  );
 
-  // ---- paying / done overlay (simulated wallet or card auth sheet) ----------
-  if (paying) {
-    const label = paying === "apple" ? t("checkout.applePay") : paying === "samsung" ? t("checkout.samsungPay") : t("checkout.cardPayment");
+  if (checkoutMode === "live") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 320, textAlign: "center" }}>
-        <div style={{ width: 64, height: 64, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", background: done ? "rgba(87,199,154,.15)" : "rgba(228,220,240,.1)", marginBottom: 18 }}>
-          {done ? <Check size={30} color={C.green} /> :
-            <div style={{ width: 26, height: 26, border: "3px solid rgba(255,255,255,.2)", borderTopColor: C.lavender, borderRadius: "50%", animation: "spin 0.9s linear infinite" }} />}
+      <div>
+        {header}
+        <div role="alert" style={unavailableCard}>
+          <AlertTriangle size={26} color="#FFCF70" aria-hidden="true" />
+          <div style={{ marginTop: 10, color: "#fff", fontSize: 15, fontWeight: 800 }}>{t("checkout.liveUnavailable")}</div>
+          <p style={{ margin: "6px 0 0", color: "rgba(255,255,255,.62)", fontSize: 12, lineHeight: 1.5 }}>{t("checkout.liveUnavailableBody")}</p>
+          {onRetry && <button type="button" onClick={onRetry} style={{ ...actionButton, marginTop: 12, background: C.purple }}>{t("error.retry")}</button>}
         </div>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{done ? t("checkout.approved") : t("checkout.authorizing", { method: label })}</div>
-        <div style={{ marginTop: 6, fontSize: 12, color: "rgba(255,255,255,.5)" }}>
-          {done ? t("checkout.confirming") : t("checkout.demoAuth")}
-        </div>
-        <div dir="ltr" style={{ marginTop: 14, fontSize: 22, fontWeight: 800, color: "#fff" }}>{formatCurrency(order.total, order.currency || "AED")}</div>
       </div>
     );
   }
 
-  // ---- main checkout ---------------------------------------------------------
+  if (paying) {
+    const label = paying === "apple" ? t("checkout.applePay") : paying === "samsung" ? t("checkout.samsungPay") : t("checkout.cardPayment");
+    return (
+      <div style={{ display: "flex", minHeight: 320, flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+        <div style={{ marginBottom: 10, borderRadius: 999, background: "rgba(255,207,112,.14)", padding: "4px 9px", color: "#FFCF70", fontSize: 10, fontWeight: 900, letterSpacing: ".08em" }}>{t("checkout.testOnly")}</div>
+        <div style={{ display: "flex", width: 64, height: 64, alignItems: "center", justifyContent: "center", borderRadius: 20, background: done ? "rgba(87,199,154,.15)" : "rgba(228,220,240,.1)", marginBottom: 18 }}>
+          {done ? <Check size={30} color={C.green} /> : <div style={spinner} />}
+        </div>
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>{done ? t("checkout.approved") : t("checkout.authorizing", { method: label })}</div>
+        <div style={{ marginTop: 6, color: "rgba(255,255,255,.5)", fontSize: 12 }}>{done ? t("checkout.confirming") : t("checkout.demoAuth")}</div>
+        <div dir="ltr" style={{ marginTop: 14, color: "#fff", fontSize: 22, fontWeight: 800 }}>{formatCurrency(order?.total || 0, order?.currency || "AED")}</div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-        <button aria-label={t("common.back")} onClick={onCancel} style={{ background: "none", border: "none", color: "rgba(255,255,255,.5)", cursor: "pointer", padding: 4 }}><ChevronLeft size={18} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} /></button>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{t("checkout.title")}</div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}><bdi dir="auto">{order.movieTitle}</bdi> · <span dir="ltr">{order.showtime}</span> · {t("checkout.seatsLabel")} <span dir="ltr">{order.seats.join(", ")}</span></div>
-        </div>
+      {header}
+      <div id="demo-checkout-notice" role="note" style={demoNotice}>
+        <strong>{t("checkout.testOnly")}</strong> · {t("checkout.testNotice")}
       </div>
 
-      {/* Order summary */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: 12, border: "1px solid rgba(255,255,255,.1)", background: "rgba(0,0,0,.25)", padding: "12px 14px", marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: "rgba(255,255,255,.6)" }}>{t("checkout.seatCountOnly", { count: order.seats.length })} · <span dir="ltr">{order.screen}</span></span>
-        <span dir="ltr" style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{formatCurrency(order.total, order.currency || "AED")}</span>
-      </div>
-
-      {/* Express wallets (simulated) */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
-        <button onClick={() => pay("apple", "Apple Pay")} style={{ ...walletBtn, background: "#000", border: "1px solid rgba(255,255,255,.25)" }}>
-          {t("checkout.applePay")}
-        </button>
-        <button onClick={() => pay("samsung", "Samsung Pay")} style={{ ...walletBtn, background: "#1428A0" }}>
-          <Smartphone size={15} style={{ marginInlineEnd: 6 }} /> {t("checkout.samsungPay")}
-        </button>
+        <button type="button" aria-describedby="demo-checkout-notice" onClick={() => pay("apple", "Apple Pay (demo)")} style={{ ...walletButton, background: "#000", border: "1px solid rgba(255,255,255,.25)" }}>{t("checkout.applePay")}</button>
+        <button type="button" aria-describedby="demo-checkout-notice" onClick={() => pay("samsung", "Samsung Pay (demo)")} style={{ ...walletButton, background: "#1428A0" }}><Smartphone size={15} aria-hidden="true" style={{ marginInlineEnd: 6 }} /> {t("checkout.samsungPay")}</button>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 12px", color: "rgba(255,255,255,.35)", fontSize: 11 }}>
-        <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.12)" }} /> {t("checkout.orCard")} <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,.12)" }} />
+        <div style={divider} /> {t("checkout.orCard")} <div style={divider} />
       </div>
 
-      {/* Stored cards */}
       {!adding && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {cards.map((c) => (
-            <button key={c.id} onClick={() => setSelected(c.id)} aria-pressed={selected === c.id}
-              style={{ display: "flex", alignItems: "center", gap: 12, borderRadius: 12, padding: "12px 14px", cursor: "pointer", textAlign: "start",
-                border: selected === c.id ? `1.5px solid ${C.magenta}` : "1px solid rgba(255,255,255,.12)",
-                background: selected === c.id ? "rgba(182,24,108,.12)" : "rgba(255,255,255,.03)" }}>
-              <CreditCard size={18} color={C.lavender} />
+          {!cards.length && <div role="status" style={emptyCard}>{t("checkout.noSavedCards")}</div>}
+          {cards.map((card) => (
+            <button
+              key={card.id}
+              type="button"
+              onClick={() => setSelected(card.id)}
+              aria-pressed={selected === card.id}
+              style={{ ...storedCardButton, border: selected === card.id ? `1.5px solid ${C.magenta}` : "1px solid rgba(255,255,255,.12)", background: selected === card.id ? "rgba(182,24,108,.12)" : "rgba(255,255,255,.03)" }}
+            >
+              <CreditCard size={18} color={C.lavender} aria-hidden="true" />
               <div dir="ltr" style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{c.brand} •••• {c.last4}</div>
-                <div style={{ overflow: "hidden", fontSize: 11, color: "rgba(255,255,255,.45)", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name} · {c.exp}</div>
+                <div style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>{card.brand} •••• {card.last4}</div>
+                <div style={{ overflow: "hidden", color: "rgba(255,255,255,.45)", fontSize: 11, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.name} · {card.exp}</div>
               </div>
-              {selected === c.id && <Check size={16} color={C.magenta} />}
+              {selected === card.id && <Check size={16} color={C.magenta} aria-hidden="true" />}
             </button>
           ))}
-          <button onClick={() => { setAdding(true); setErr(""); }}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, padding: "11px", cursor: "pointer", border: "1px dashed rgba(255,255,255,.25)", background: "none", color: "rgba(255,255,255,.6)", fontSize: 13 }}>
-            <Plus size={15} /> {t("checkout.addCard")}
-          </button>
+          <button type="button" onClick={() => { setAdding(true); setError(""); }} style={addCardButton}><Plus size={15} aria-hidden="true" /> {t("checkout.addCard")}</button>
         </div>
       )}
 
-      {/* Add new card form */}
       {adding && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <label><span style={fieldLabel}>{t("checkout.cardNumberLabel")}</span><input dir="ltr" value={form.num} onChange={(e) => setForm({ ...form, num: fmtNum(e.target.value) })} placeholder={t("checkout.cardNumber")} style={inp} inputMode="numeric" /></label>
-          <label><span style={fieldLabel}>{t("checkout.cardNameLabel")}</span><input dir="ltr" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("checkout.cardName")} style={{ ...inp, textAlign: "start" }} /></label>
+          <label><span style={fieldLabel}>{t("checkout.cardNumberLabel")}</span><input dir="ltr" autoComplete="off" aria-describedby="demo-checkout-notice" value={form.pan} onChange={(event) => updateFormField("pan", formatDemoPan(event.target.value))} placeholder={t("checkout.cardNumber")} style={inputStyle} inputMode="numeric" /></label>
+          <label><span style={fieldLabel}>{t("checkout.cardNameLabel")}</span><input dir="ltr" autoComplete="off" value={form.name} onChange={(event) => updateFormField("name", event.target.value)} placeholder={t("checkout.cardName")} style={{ ...inputStyle, textAlign: "start" }} /></label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <label><span style={fieldLabel}>{t("checkout.expiryLabel")}</span><input dir="ltr" value={form.exp} onChange={(e) => setForm({ ...form, exp: e.target.value.replace(/[^\d/]/g, "").slice(0, 5) })} placeholder={t("checkout.expiry")} style={inp} inputMode="numeric" /></label>
-            <label><span style={fieldLabel}>{t("checkout.cvvLabel")}</span><input dir="ltr" value={form.cvv} onChange={(e) => setForm({ ...form, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder={t("checkout.cvv")} style={inp} inputMode="numeric" type="password" /></label>
+            <label><span style={fieldLabel}>{t("checkout.expiryLabel")}</span><input dir="ltr" autoComplete="off" value={form.exp} onChange={(event) => updateFormField("exp", event.target.value.replace(/[^\d/]/g, "").slice(0, 5))} placeholder={t("checkout.expiry")} style={inputStyle} inputMode="numeric" /></label>
+            <label><span style={fieldLabel}>{t("checkout.cvvLabel")}</span><input dir="ltr" autoComplete="off" value={form.cvv} onChange={(event) => updateFormField("cvv", event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder={t("checkout.cvv")} style={inputStyle} inputMode="numeric" type="password" /></label>
           </div>
-          {err && <div role="alert" aria-live="assertive" style={{ fontSize: 12, color: "#D9556B" }}>{err}</div>}
+          {error && <div role="alert" aria-live="assertive" style={{ color: "#FF8C9C", fontSize: 12 }}>{error}</div>}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button onClick={() => { setAdding(false); setErr(""); }} style={{ ...actionBtn, background: "rgba(255,255,255,.08)" }}>{t("common.cancel")}</button>
-            <button onClick={addCard} style={{ ...actionBtn, background: C.purple }}>{t("checkout.saveCard")}</button>
+            <button type="button" onClick={() => { setAdding(false); setError(""); clearSensitiveForm(); }} style={{ ...actionButton, background: "rgba(255,255,255,.08)" }}>{t("common.cancel")}</button>
+            <button type="button" onClick={addCard} style={{ ...actionButton, background: C.purple }}>{t("checkout.saveCard")}</button>
           </div>
         </div>
       )}
 
-      {/* Pay button */}
       {!adding && (
-        <button disabled={!selected} onClick={() => { const c = cards.find(x => x.id === selected); pay("card", `${c.brand} •••• ${c.last4}`); }}
-          style={{ ...actionBtn, width: "100%", marginTop: 14, background: C.magenta, opacity: selected ? 1 : 0.4, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <Lock size={14} /> {t("checkout.pay", { amount: formatCurrency(order.total, order.currency || "AED") })}
+        <button
+          type="button"
+          disabled={!selected}
+          onClick={() => {
+            const card = cards.find((item) => item.id === selected);
+            if (card) pay("card", `${card.brand} •••• ${card.last4} (demo)`);
+          }}
+          style={{ ...actionButton, display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14, background: C.magenta, opacity: selected ? 1 : 0.4 }}
+        >
+          <Lock size={14} aria-hidden="true" /> {t("checkout.pay", { amount: formatCurrency(order?.total || 0, order?.currency || "AED") })}
         </button>
       )}
 
-      <div style={{ marginTop: 10, textAlign: "center", fontSize: 10, color: "rgba(255,255,255,.35)" }}>
-        {t("checkout.demoDisclaimer")}
-      </div>
+      <div style={{ marginTop: 10, color: "rgba(255,255,255,.35)", fontSize: 10, textAlign: "center" }}>{t("checkout.demoDisclaimer")}</div>
     </div>
   );
 }
 
-const walletBtn = { display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 12, padding: "12px", cursor: "pointer", border: "none", color: "#fff", fontSize: 14, fontWeight: 700 };
-const inp = { background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 10, padding: "11px 13px", color: "#fff", fontSize: 13, width: "100%", boxSizing: "border-box" };
+const backButton = { border: "none", background: "none", color: "rgba(255,255,255,.5)", cursor: "pointer", padding: 4 };
+const summaryCard = { display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, background: "rgba(0,0,0,.25)", padding: "12px 14px", marginBottom: 12 };
+const demoNotice = { border: "1px solid rgba(255,207,112,.28)", borderRadius: 10, background: "rgba(255,207,112,.08)", padding: "9px 11px", marginBottom: 12, color: "rgba(255,255,255,.72)", fontSize: 10, lineHeight: 1.45 };
+const unavailableCard = { border: "1px solid rgba(255,207,112,.25)", borderRadius: 14, background: "rgba(255,207,112,.07)", padding: 20, textAlign: "center" };
+const spinner = { width: 26, height: 26, border: "3px solid rgba(255,255,255,.2)", borderTopColor: C.lavender, borderRadius: "50%", animation: "spin 0.9s linear infinite" };
+const walletButton = { display: "flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 12, padding: 12, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700 };
+const divider = { flex: 1, height: 1, background: "rgba(255,255,255,.12)" };
+const emptyCard = { border: "1px dashed rgba(255,255,255,.15)", borderRadius: 11, padding: 12, color: "rgba(255,255,255,.5)", fontSize: 11, textAlign: "center" };
+const storedCardButton = { display: "flex", alignItems: "center", gap: 12, borderRadius: 12, padding: "12px 14px", cursor: "pointer", textAlign: "start" };
+const addCardButton = { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "1px dashed rgba(255,255,255,.25)", borderRadius: 12, background: "none", padding: 11, color: "rgba(255,255,255,.6)", cursor: "pointer", fontSize: 13 };
+const inputStyle = { width: "100%", boxSizing: "border-box", border: "1px solid rgba(255,255,255,.12)", borderRadius: 10, background: "rgba(255,255,255,.06)", padding: "11px 13px", color: "#fff", fontSize: 13 };
 const fieldLabel = { display: "block", margin: "0 2px 4px", color: "rgba(255,255,255,.5)", fontSize: 10, fontWeight: 700 };
-const actionBtn = { borderRadius: 10, padding: "12px", cursor: "pointer", border: "none", color: "#fff", fontSize: 14, fontWeight: 700 };
+const actionButton = { border: "none", borderRadius: 10, padding: 12, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700 };

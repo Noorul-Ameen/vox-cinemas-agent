@@ -9,15 +9,22 @@ export function uaeCalendarDate(now = new Date()) {
   return `${value.year}-${value.month}-${value.day}`;
 }
 
-export function remapDemoDate(displayDate, today, sourceDates) {
-  const dates = Array.isArray(sourceDates) ? sourceDates : [];
-  if (!dates.length) return displayDate;
-  if (dates.includes(displayDate)) return displayDate;
-  const dayMs = 24 * 60 * 60 * 1000;
-  const offset = Math.round((Date.parse(`${displayDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / dayMs);
-  const todayIndex = dates.indexOf(today);
-  const baseIndex = todayIndex >= 0 ? todayIndex : 0;
-  const index = (((baseIndex + offset) % dates.length) + dates.length) % dates.length;
-  return dates[index];
+export function isIsoCalendarDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
+export function addCalendarDays(value, days) {
+  if (!isIsoCalendarDate(value) || !Number.isFinite(Number(days))) return null;
+  const date = new Date(`${value}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + Number(days));
+  return date.toISOString().slice(0, 10);
+}
+
+// Snapshot dates are authoritative. Never cycle an expired or invalid request
+// back into the published window, because that silently serves the wrong day.
+export function remapDemoDate(displayDate, _today, sourceDates) {
+  const dates = Array.isArray(sourceDates) ? sourceDates : [];
+  return isIsoCalendarDate(displayDate) && dates.includes(displayDate) ? displayDate : null;
+}

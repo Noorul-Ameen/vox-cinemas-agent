@@ -10,9 +10,9 @@ VOXi is a React + Vite mobile widget that combines the real ElevenLabs React SDK
 - Text, touch, and voice journeys for movies, showtimes, seats, simulated checkout, confirmation, and cancellation. Typed chat starts without requesting microphone access.
 - One unified conversation window where messages and the current relevant cinema/date/movie/showtime/ticket/seat/checkout/FAQ component render inline; previous interactive stages are removed.
 - A logical journey ID, structured booking context and redacted recent turns carried across text WebSocket and voice WebRTC transports.
-- All nine extracted programming dates selectable in the booking flow, with cinema-and-date-keyed movie loading.
-- A sourced bilingual FAQ layer with 16 entries across locations/hours, tickets, experiences, food and drinks, offers, accessibility, age ratings, refunds, account/loyalty, wallet and support.
-- Client-side QR tickets, persisted booking history, case-insensitive lookup, and durable cancellation state.
+- The still-current portion of the nine extracted programming dates is selectable in the booking flow, with cinema-and-date-keyed movie loading and honest empty states when a cinema has no schedule.
+- A sourced bilingual FAQ layer with 17 entries across locations/hours, tickets, experiences, food and drinks, offers, accessibility, age ratings, refunds, account/loyalty, wallet, support, and Voxi conversation capabilities.
+- Client-side prototype QR references, persisted local booking history, case-insensitive lookup, and durable local cancellation state. Prototype QR codes are explicitly not valid for cinema entry.
 - 19 structured VOX UAE bank offers with 41 card profiles and conservative `eligible`, `ineligible`, or `card_required` results.
 - Deterministic simulated human handover after an explicit request or two consecutive failed clarifications.
 - Payment-free, transcript-sanitized `voxi.oneview-handover.v1` debug payload.
@@ -73,7 +73,7 @@ For an audible text-to-voice continuation without another welcome, configure the
 
 The shipped snapshot was crawled on 13 July 2026 UAE time and covers every programming date that VOX published from the next day: 14–22 July 2026. The extractor does not assume an eight-day window. It unions the official per-movie `availableDays` responses for Now Showing and Advance Booking, fetches only those movie/date pairs, and stops when the advertised dates are exhausted. A 31-day default safety cap prevents an accidentally unbounded crawl.
 
-At runtime, a covered UAE date remains exact. If the current date is outside the snapshot, the UI displays the first actual programming date rather than labeling old or future sessions as today. Original VOX wall-clock values are retained, and after-midnight sessions stay attached to their requested programming day.
+At runtime, a covered UAE date remains exact and past snapshot dates are not presented as current availability. If the current UAE date is outside the snapshot, the widget shows an honest no-programming state rather than cycling into stale sessions. Original VOX wall-clock values are retained, and an after-midnight session keeps both its programming day and actual performance date.
 
 Shipped source assets:
 
@@ -130,8 +130,8 @@ Artwork URLs remain on official VOX/MAF hosts or their campaign CDN and include 
 
 ## Prototype boundaries
 
-- Checkout, cards, wallets, booking creation, refunds, and cancellation writes are simulated on-device.
-- QR values contain only the booking reference.
+- Checkout, cards, wallets, booking creation, refunds, and cancellation writes are simulated on-device. Setting `VITE_VISTA_BASE` changes read data only; it does not silently enable payment or write operations.
+- QR values contain only the booking reference and prototype QR codes are not cinema-entry tickets.
 - Offers are display-only and cannot be redeemed.
 - Handover is a UI simulation; it makes no Genesys or OneView network call.
-- `VITE_VISTA_BASE` enables a read-shaped live path only when the configured server safely injects credentials. Do not expose credentials in Vite environment variables.
+- `VITE_VISTA_BASE` enables a read-shaped live path only when the configured server safely injects credentials. The browser never reads a Vista API key. Future pricing/refund adapters require explicit proxy paths, and unverified local bookings can never invoke a refund write. Do not expose credentials in Vite environment variables.

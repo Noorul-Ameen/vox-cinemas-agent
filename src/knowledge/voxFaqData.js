@@ -52,11 +52,12 @@ const apiUpdate = (provider) => Object.freeze({
   freshness: `resolve current values from ${provider}; do not treat this entry as live inventory`,
 });
 
-const metadata = ({ tags, source, audience = ["all"], update }) => Object.freeze({
+const metadata = ({ tags, source, audience = ["all"], update, provenance = "official" }) => Object.freeze({
   tags: Object.freeze({ en: Object.freeze(tags.en), ar: Object.freeze(tags.ar) }),
   source: Object.freeze(source),
   audience: Object.freeze(audience),
   update,
+  provenance,
 });
 
 const STATIC = Object.freeze({ kind: "static" });
@@ -284,10 +285,12 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
   Object.freeze({
     id: "cancellation-and-refunds",
     topic: "booking_refund",
+    routingTopic: "cancellations_refunds",
+    intent: "cancellation",
     priority: 100,
     utterances: Object.freeze({
-      en: Object.freeze(["cancel my booking", "refund my tickets", "refund policy", "exchange my ticket", "cash refund", "refund deadline"]),
-      ar: Object.freeze(["إلغاء حجزي", "استرداد التذاكر", "سياسة الاسترداد", "تبديل التذكرة", "استرداد نقدي", "موعد الاسترداد"]),
+      en: Object.freeze(["can I cancel a booking", "ticket refund eligibility", "refund policy", "can tickets be exchanged", "cash refund", "refund deadline", "how do cancellations work"]),
+      ar: Object.freeze(["هل أقدر ألغي حجزي", "كيف ألغي الحجز", "استرداد التذاكر", "سياسة الاسترداد", "تبديل التذكرة", "استرداد نقدي", "موعد الاسترداد", "وش شروط الاسترجاع", "متى آخر وقت للإلغاء", "ممكن أسترجع قيمة التذاكر"]),
     }),
     answer: Object.freeze({
       en: "Eligible online purchases may be submitted for refund up to 30 minutes before the movie starts. Approved refunds are VOX credits, not cash. Guest bookings, bank or telco offers, promotions, collected or scanned tickets, and activated F&B orders can be ineligible. Registered users should open My Account, Past Purchases, then Manage Booking; approval remains subject to the official policy.",
@@ -295,7 +298,7 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
     }),
     delivery: STATIC,
     metadata: metadata({
-      tags: { en: ["cancel", "refund", "exchange", "credit", "booking", "deadline"], ar: ["إلغاء", "استرداد", "تبديل", "رصيد", "حجز", "موعد"] },
+      tags: { en: ["cancel", "refund", "exchange", "credit", "booking", "deadline", "policy"], ar: ["إلغاء", "الغي", "استرداد", "استرجاع", "تبديل", "رصيد", "حجز", "موعد", "شروط", "سياسة"] },
       source: [VOX_OFFICIAL_SOURCES.refunds, VOX_OFFICIAL_SOURCES.faq],
       audience: ["all", "registered-members", "guest-bookers"],
       update: staticUpdate("high"),
@@ -359,6 +362,47 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
       source: [VOX_OFFICIAL_SOURCES.share],
       audience: ["all", "share-members"],
       update: staticUpdate("high"),
+    }),
+  }),
+  Object.freeze({
+    id: "voxi-language-support",
+    topic: "support",
+    priority: 120,
+    utterances: Object.freeze({
+      en: Object.freeze([
+        "what languages can we use",
+        "which languages do you support",
+        "what languages does voxi support",
+        "can you speak arabic",
+        "can you speak english",
+        "can i type during voice",
+        "can i use text during voice chat",
+        "does text work while voice is on",
+      ]),
+      ar: Object.freeze([
+        "ما اللغات التي يمكننا استخدامها",
+        "ما اللغات التي تدعمها ڤوكسي",
+        "هل تتحدث العربية",
+        "هل تتحدث الإنجليزية",
+        "هل يمكنني الكتابة أثناء المحادثة الصوتية",
+        "هل يمكنني استخدام النص أثناء المحادثة الصوتية",
+        "هل تعمل الكتابة أثناء تشغيل الصوت",
+      ]),
+    }),
+    answer: Object.freeze({
+      en: "Voxi supports English and Arabic. You can type at any time, including during an active voice conversation; typed messages stay in the same conversation and keep the current booking context. Use the language selector to choose English or العربية.",
+      ar: "تدعم ڤوكسي المحادثة بالإنجليزية والعربية. يمكنك الكتابة في أي وقت، حتى أثناء محادثة صوتية نشطة؛ وتبقى الرسائل المكتوبة ضمن المحادثة نفسها مع الاحتفاظ بسياق الحجز الحالي. استخدم محدد اللغة لاختيار English أو العربية.",
+    }),
+    delivery: STATIC,
+    metadata: metadata({
+      tags: {
+        en: ["language support", "english", "arabic", "voice and text", "type during voice"],
+        ar: ["دعم اللغات", "الإنجليزية", "العربية", "الصوت والكتابة", "الكتابة أثناء الصوت"],
+      },
+      source: [],
+      audience: ["all"],
+      update: staticUpdate("low"),
+      provenance: "product",
     }),
   }),
   Object.freeze({

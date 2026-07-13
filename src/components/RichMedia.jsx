@@ -1,8 +1,8 @@
 import React from "react";
-import { Film, Clock, Armchair, Ticket, ChevronRight, Check, RotateCcw, MapPin, Search } from "lucide-react";
+import { AlertTriangle, Film, Clock, Armchair, Ticket, ChevronRight, Check, RefreshCw, RotateCcw, MapPin, Search } from "lucide-react";
 import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
-import { getExperienceMedia, getMediaUrl, getMoviePosterUrl, getSupportedImageUrl } from "../mediaData.js";
+import { getExperienceMedia, getMoviePosterUrl, getSupportedImageUrl } from "../mediaData.js";
 import BookingQRCode from "./BookingQRCode.jsx";
 
 export function Poster({ tint, title, small, posterUrl }) {
@@ -36,7 +36,7 @@ export function Poster({ tint, title, small, posterUrl }) {
 }
 
 function ExperienceThumbnail({ experience, media }) {
-  const imageUrl = getMediaUrl(getExperienceMedia(experience, media));
+  const imageUrl = getSupportedImageUrl(getExperienceMedia(experience, media));
   const [imgOk, setImgOk] = React.useState(!!imageUrl);
 
   React.useEffect(() => setImgOk(!!imageUrl), [imageUrl]);
@@ -68,7 +68,19 @@ function Header({ icon, title, sub, onBack }) {
   );
 }
 
-export function CinemaPicker({ cinemas, selected, onSelect, onBack }) {
+function InlineState({ title, onRetry, error = false }) {
+  const { t } = useI18n();
+  const Icon = error ? AlertTriangle : Film;
+  return (
+    <div role={error ? "alert" : "status"} style={{ display: "flex", minHeight: 150, flexDirection: "column", alignItems: "center", justifyContent: "center", border: "1px dashed rgba(255,255,255,.15)", borderRadius: 13, padding: 20, color: "rgba(255,255,255,.55)", textAlign: "center" }}>
+      <Icon size={25} color={error ? "#FFCF70" : C.lavender} aria-hidden="true" />
+      <div style={{ marginTop: 9, fontSize: 12, lineHeight: 1.45 }}>{title}</div>
+      {onRetry && <button type="button" onClick={onRetry} style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 11, border: "1px solid rgba(255,255,255,.16)", borderRadius: 8, background: "rgba(255,255,255,.07)", padding: "8px 11px", color: "#fff", cursor: "pointer", fontSize: 11 }}><RefreshCw size={13} aria-hidden="true" />{t("common.retry")}</button>}
+    </div>
+  );
+}
+
+export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, onRetry }) {
   const { t, dir } = useI18n();
   const [query, setQuery] = React.useState("");
   const key = query.trim().toLowerCase();
@@ -80,7 +92,7 @@ export function CinemaPicker({ cinemas, selected, onSelect, onBack }) {
         <Search size={15} color="rgba(255,255,255,.45)" />
         <input dir="auto" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("cinema.search")} style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: "transparent", color: "#fff", fontSize: 13, textAlign: "start" }} />
       </label>
-      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      {error ? <InlineState title={t("cinema.error")} onRetry={onRetry} error /> : <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         {visible.map((cinema) => (
           <button key={cinema.id} onClick={() => onSelect(cinema)} style={{ ...rowBtn, padding: "11px 13px", borderColor: selected?.id === cinema.id ? C.magenta : "rgba(255,255,255,.12)" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
@@ -91,34 +103,38 @@ export function CinemaPicker({ cinemas, selected, onSelect, onBack }) {
           </button>
         ))}
         {!visible.length && <div style={{ padding: 18, textAlign: "center", fontSize: 12, color: "rgba(255,255,255,.45)" }}>{t("cinema.none")}</div>}
-      </div>
+      </div>}
     </div>
   );
 }
 
-export function MovieGrid({ movies, cinemaName, scheduleDate, onSelect }) {
+export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, error, onRetry }) {
   const { t } = useI18n();
   return (
     <div>
       <Header icon={<Film size={16} />} title={t("movies.title")} sub={<span><bdi dir="auto">{cinemaName}</bdi> · <span dir="ltr">{scheduleDate}</span></span>} />
-      <div style={{ display: "grid", maxWidth: "100%", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 12 }}>
+      {error ? <InlineState title={typeof error === "string" ? error : t("movies.error")} onRetry={onRetry} error /> : !movies.length ? <InlineState title={t("movies.empty")} onRetry={onRetry} /> : <div style={{ display: "grid", maxWidth: "100%", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 12 }}>
         {movies.map((m) => (
           <button key={m.id} onClick={() => onSelect(m)} style={{ ...btnReset, width: "100%", minWidth: 0, textAlign: "start" }}>
             <Poster tint={m.tint} title={m.title} posterUrl={m.posterUrl} />
             <div dir="auto" style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: "#fff", lineHeight: 1.15 }}>{m.title}</div>
             <div style={{ marginTop: 2, fontSize: 11, color: "rgba(255,255,255,.5)" }}>
               <span style={{ background: "rgba(182,24,108,.25)", color: C.lavender, borderRadius: 3, padding: "0 4px", marginInlineEnd: 6 }}>{m.rating}</span>
-              {(m.genres || [m.genre]).slice(0, 2).join(" · ")}{m.runtime ? ` · ${t("showtimes.minutes", { count: m.runtime })}` : m.language ? ` · ${m.language}` : ""}
+              {[
+                ...(m.genres || [m.genre]).filter(Boolean).slice(0, 2),
+                m.runtime ? t("showtimes.minutes", { count: m.runtime }) : "",
+                m.language || "",
+              ].filter(Boolean).join(" · ")}
             </div>
             <div dir="auto" style={{ marginTop: 5, fontSize: 10, lineHeight: 1.35, color: "rgba(255,255,255,.42)", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.synopsis}</div>
           </button>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
 
-export function Showtimes({ movie, sessions, onSelect, onBack }) {
+export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRetry }) {
   const { t, dir } = useI18n();
   const expColor = (e) => (["IMAX", "MAX"].includes(e) ? "#C79A4B" : e === "GOLD" ? "#D9A94B" : e === "KIDS" ? C.green : C.lavender);
   return (
@@ -134,7 +150,7 @@ export function Showtimes({ movie, sessions, onSelect, onBack }) {
       <div style={{ display: "flex", width: "100%", maxWidth: "100%", minWidth: 0, gap: 12, alignItems: "flex-start" }}>
         <div style={{ width: 72, maxWidth: "22%", flexShrink: 0 }}><Poster tint={movie.tint} title={movie.title} posterUrl={movie.posterUrl} /></div>
         <div style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
-          {sessions.map((s) => (
+          {error ? <InlineState title={typeof error === "string" ? error : t("showtimes.error")} onRetry={onRetry} error /> : !sessions.length ? <InlineState title={t("showtimes.empty")} onRetry={onRetry} /> : sessions.map((s) => (
             <button key={s.sessionId} onClick={() => onSelect(s)} style={{ ...rowBtn, minWidth: 0, gap: 8 }}>
               <div style={{ display: "flex", minWidth: 0, flex: 1, alignItems: "center", gap: 8, overflow: "hidden" }}>
                 <div dir="ltr" style={{ flexShrink: 0, fontSize: 24, fontWeight: 700, color: "#fff" }}>{s.time}</div>
@@ -156,16 +172,37 @@ export function Showtimes({ movie, sessions, onSelect, onBack }) {
   );
 }
 
-export function SeatMap({ movie, session, plan, selected, onToggle, onConfirm, onBack }) {
+export function SeatMap({ movie, session, plan = [], selected = [], pricing, onToggle, onConfirm, onBack, error, onRetry, notice }) {
   const { t, formatCurrency } = useI18n();
-  const price = (p) => (p ? 63 : 42);
-  const total = selected.reduce((sum, id) => {
+  const standardPrice = Number(pricing?.tiers?.standard);
+  const premiumPrice = Number(pricing?.tiers?.premium);
+  const hasDemoEstimate = pricing?.demo === true && Number.isFinite(standardPrice) && Number.isFinite(premiumPrice);
+  const currency = pricing?.currency || "AED";
+  const price = (premium) => (premium ? premiumPrice : standardPrice);
+  const total = hasDemoEstimate ? selected.reduce((sum, id) => {
     const seat = plan.flatMap((r) => r.seats).find((s) => s.id === id);
     return sum + (seat ? price(seat.premium) : 0);
-  }, 0);
+  }, 0) : null;
+  const standardLabel = hasDemoEstimate
+    ? t("seats.standardEstimate", { price: formatCurrency(standardPrice, currency) })
+    : t("seats.standardQuoteRequired");
+  const premiumLabel = hasDemoEstimate
+    ? t("seats.premiumEstimate", { price: formatCurrency(premiumPrice, currency) })
+    : t("seats.premiumQuoteRequired");
+  if (error || !plan.length) {
+    return (
+      <div>
+        <Header icon={<Armchair size={16} />} title={<span><bdi dir="auto">{movie.title}</bdi> · <span dir="ltr">{session.time}</span></span>} sub={t("seats.tap")} onBack={onBack} />
+        <InlineState title={t(error ? "seats.error" : "seats.empty")} onRetry={onRetry} error={Boolean(error)} />
+      </div>
+    );
+  }
   return (
     <div>
       <Header icon={<Armchair size={16} />} title={<span><bdi dir="auto">{movie.title}</bdi> · <span dir="ltr">{session.time}</span></span>} sub={<span><span dir="ltr">{session.exp} · {session.screen}</span> · {t("seats.tap")}</span>} onBack={onBack} />
+      {notice && <div role="note" style={{ marginBottom: 16, border: "1px solid rgba(255,207,112,.24)", borderRadius: 10, background: "rgba(255,207,112,.08)", padding: "9px 11px", color: "#FFCF70", fontSize: 10, lineHeight: 1.45 }}>{notice === true ? t("seats.demoNotice") : notice}</div>}
+      {!notice && pricing?.demo === true && <div role="note" style={{ marginBottom: 16, border: "1px solid rgba(255,207,112,.24)", borderRadius: 10, background: "rgba(255,207,112,.08)", padding: "9px 11px", color: "#FFCF70", fontSize: 10, lineHeight: 1.45 }}>{t("seats.demoPricingNotice")}</div>}
+      {pricing?.mode === "quote_required" && <div role="note" style={{ marginBottom: 16, border: "1px solid rgba(255,255,255,.12)", borderRadius: 10, background: "rgba(255,255,255,.04)", padding: "9px 11px", color: "rgba(255,255,255,.72)", fontSize: 10, lineHeight: 1.45 }}>{t("seats.quoteRequiredNotice")}</div>}
       <div dir="ltr" style={{ maxWidth: 420, margin: "0 auto 24px" }}>
         <div style={{ height: 6, borderRadius: 999, background: `linear-gradient(90deg, transparent, ${C.lavender}, transparent)`, boxShadow: "0 0 24px 4px rgba(228,220,240,.35)" }} />
         <div style={{ marginTop: 4, textAlign: "center", fontSize: 10, letterSpacing: 6, textTransform: "uppercase", color: "rgba(255,255,255,.4)" }}>{t("seats.screen")}</div>
@@ -196,15 +233,16 @@ export function SeatMap({ movie, session, plan, selected, onToggle, onConfirm, o
         ))}
       </div>
       <div style={{ marginTop: 20, display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 16, fontSize: 10, color: "rgba(255,255,255,.5)" }}>
-        <Legend swatch="rgba(228,220,240,.14)" label={t("seats.standard")} />
-        <Legend swatch="rgba(199,154,75,.25)" label={t("seats.premium")} />
+        <Legend swatch="rgba(228,220,240,.14)" label={standardLabel} />
+        <Legend swatch="rgba(199,154,75,.25)" label={premiumLabel} />
         <Legend swatch={C.magenta} label={t("seats.selected")} />
         <Legend swatch="rgba(255,255,255,.06)" label={t("seats.sold")} />
       </div>
       <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(0,0,0,.25)", padding: "12px 16px" }}>
         <div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,.5)" }}>{selected.length ? <>{t("seats.countLabel", { count: selected.length })} <span dir="ltr">{selected.join(", ")}</span></> : t("seats.none")}</div>
-          <div dir="ltr" style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{formatCurrency(total, "AED")}</div>
+          <div style={{ fontSize: 9, color: "rgba(255,255,255,.55)" }}>{hasDemoEstimate ? t("seats.demoEstimateLabel") : t("seats.quoteRequiredLabel")}</div>
+          {hasDemoEstimate && <div dir="ltr" style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{formatCurrency(total, currency)}</div>}
         </div>
         <button disabled={!selected.length} onClick={() => onConfirm(selected, total)}
           style={{ borderRadius: 8, border: "none", padding: "10px 20px", fontSize: 14, fontWeight: 600, color: "#fff", background: C.magenta, opacity: selected.length ? 1 : 0.3, cursor: selected.length ? "pointer" : "not-allowed" }}>
@@ -216,45 +254,78 @@ export function SeatMap({ movie, session, plan, selected, onToggle, onConfirm, o
 }
 
 export function BookingCard({ booking, onCancel, onDecline, cancelled }) {
-  const { t, formatCurrency } = useI18n();
+  const { t, formatCurrency, formatDate } = useI18n();
   const isCancelled = cancelled ?? booking.cancelled;
+  const isDemo = booking.verified !== true
+    || booking.demo === true
+    || booking.paymentStatus === "simulated_not_charged"
+    || booking.bookingStatus === "confirmed_demo";
+  const isDemoCancellation = isCancelled && (isDemo || booking.refundStatus === "not_processed_demo");
   const posterUrl = getMoviePosterUrl(booking);
+  const cinemaName = booking.cinemaName || t("booking.unknownCinema");
+  const storedPerformanceDate = booking.performanceDate || booking.sourceDate || booking.date;
+  const performanceDate = storedPerformanceDate ? formatDate(storedPerformanceDate) : t("booking.unknownDate");
+  const sessionSummary = [booking.experience, booking.screen, booking.showtime].filter(Boolean).join(" · ");
+  const headerTitle = isDemoCancellation
+    ? t("booking.cancelledLocal")
+    : isCancelled
+      ? t("booking.cancelled")
+      : isDemo
+        ? t("booking.demoConfirmed")
+        : t("booking.confirmed");
+  const headerSubtitle = isDemoCancellation
+    ? t("booking.noRefundProcessed")
+    : isCancelled
+      ? t("booking.refundStarted")
+      : isDemo
+        ? t("booking.demoReady")
+        : t("booking.ready");
+  const statusLabel = isDemoCancellation
+    ? t("history.cancelledLocal")
+    : isCancelled
+      ? t("history.cancelled")
+      : isDemo
+        ? t("history.demo")
+        : t("history.active");
   const [confirmingCancellation, setConfirmingCancellation] = React.useState(false);
   React.useEffect(() => setConfirmingCancellation(false), [booking.ref, isCancelled]);
   return (
     <div>
-      <Header icon={<Ticket size={16} />} title={isCancelled ? t("booking.cancelled") : t("booking.confirmed")} sub={isCancelled ? t("booking.refundStarted") : t("booking.ready")} />
+      <Header icon={<Ticket size={16} />} title={headerTitle} sub={headerSubtitle} />
       <div style={{ maxWidth: 420, margin: "0 auto", overflow: "hidden", borderRadius: 16, border: "1px solid rgba(255,255,255,.12)", background: "linear-gradient(160deg, rgba(99,65,141,.35), rgba(30,23,40,.6))" }}>
         <div style={{ display: "flex", gap: 16, padding: 20 }}>
           <Poster tint={booking.tint || [C.purple, C.magenta]} title={booking.movieTitle} posterUrl={posterUrl} small />
           <div style={{ flex: 1 }}>
             <div dir="auto" style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{booking.movieTitle}</div>
-            <div dir="ltr" style={{ fontSize: 12, color: "rgba(255,255,255,.6)" }}>{booking.screen} · {booking.showtime}</div>
+            <div dir="ltr" style={{ fontSize: 12, color: "rgba(255,255,255,.6)" }}>{sessionSummary}</div>
           </div>
         </div>
         <div style={{ borderTop: "1px dashed rgba(255,255,255,.15)", padding: "12px 20px" }}>
           <Row k={t("booking.seats")} v={<span dir="ltr">{(Array.isArray(booking.seats) ? booking.seats : [booking.seats].filter(Boolean)).join(", ")}</span>} />
+          <Row k={t("booking.cinema")} v={<bdi dir="auto">{cinemaName}</bdi>} />
+          <Row k={t("booking.performance")} v={<span><span>{performanceDate}</span>{booking.showtime && <> · <span dir="ltr">{booking.showtime}</span></>}</span>} />
+          <Row k={t("booking.status")} v={statusLabel} />
           <Row k={t("booking.ref")} v={<span dir="ltr" style={{ fontFamily: "monospace", color: C.lavender }}>{booking.ref}</span>} />
           <Row k={t("booking.total")} v={<span dir="ltr">{formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}</span>} />
         </div>
         <BookingQRCode booking={{ ...booking, cancelled: isCancelled }} />
         {!isCancelled && confirmingCancellation ? (
-          <div role="group" aria-label={t("booking.cancelConfirmationLabel")} style={{ borderTop: "1px solid rgba(255,255,255,.12)", padding: 14 }}>
+          <div role="group" aria-label={t(isDemo ? "booking.cancelDemoConfirmationLabel" : "booking.cancelConfirmationLabel")} style={{ borderTop: "1px solid rgba(255,255,255,.12)", padding: 14 }}>
             <p style={{ margin: 0, color: "rgba(255,255,255,.72)", fontSize: 12, lineHeight: 1.5 }}>
-              {t("booking.cancelQuestion", { ref: booking.ref, amount: formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED") })}
+              {t(isDemo ? "booking.cancelDemoQuestion" : "booking.cancelQuestion", { ref: booking.ref, amount: formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED") })}
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
               <button type="button" onClick={() => { setConfirmingCancellation(false); onDecline?.(); }} style={{ border: "1px solid rgba(255,255,255,.14)", borderRadius: 8, background: "transparent", padding: "8px 12px", color: "rgba(255,255,255,.72)", cursor: "pointer" }}>{t("common.back")}</button>
-              <button type="button" onClick={onCancel} style={{ border: 0, borderRadius: 8, background: C.magenta, padding: "8px 12px", color: "#fff", fontWeight: 700, cursor: "pointer" }}>{t("booking.confirmCancel")}</button>
+              <button type="button" onClick={onCancel} style={{ border: 0, borderRadius: 8, background: C.magenta, padding: "8px 12px", color: "#fff", fontWeight: 700, cursor: "pointer" }}>{t(isDemo ? "booking.confirmCancelDemo" : "booking.confirmCancel")}</button>
             </div>
           </div>
         ) : !isCancelled ? (
           <button type="button" onClick={() => setConfirmingCancellation(true)} style={{ ...cardFootBtn, color: "rgba(255,255,255,.7)" }}>
-            <RotateCcw size={14} /> {t("booking.cancelRefund")}
+            <RotateCcw size={14} /> {t(isDemo ? "booking.cancelDemo" : "booking.cancelRefund")}
           </button>
         ) : (
-          <div style={{ ...cardFootBtn, color: C.green, cursor: "default" }}>
-            <Check size={14} /> {t("booking.refundAmount", { amount: formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED") })}
+          <div style={{ ...cardFootBtn, color: isDemoCancellation ? "#FFCF70" : C.green, cursor: "default" }}>
+            <Check size={14} /> {isDemoCancellation ? t("booking.noRefundProcessed") : t("booking.refundAmount", { amount: formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED") })}
           </div>
         )}
       </div>

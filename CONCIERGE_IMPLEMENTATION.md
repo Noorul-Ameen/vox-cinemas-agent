@@ -9,7 +9,7 @@ The widget now treats chat, voice and visual booking controls as one logical Vox
 1. The transcript and the rich stage were rendered in separate scroll regions. A client tool could change the stage, but it could not place that result beside the assistant turn that caused it.
 2. Booking context was split across `stage`, independent React state and refs. A newly created ElevenLabs transport received only a short UI summary, so text-to-voice switching lost intent and recent turns.
 3. The logical conversation ID was overwritten by each ElevenLabs conversation ID. That made a transport switch look like a new customer journey.
-4. Disconnects ended the SDK session but left visual booking state mounted. There was no manual restart, idle reset or logout/new-conversation event contract.
+4. Transport disconnects and intentional conversation resets had no distinct lifecycle contract. The UI needs to survive an SDK-only disconnect, while explicit restart, logout and the privacy timeout must still clear transient state.
 5. Completed orders stored a movie title and tint but did not always retain the poster URL. Title-only or remote bookings therefore had no deterministic media path.
 6. The crawl contained nine programming dates, but the Vista-shaped client always filtered films and sessions to one date.
 7. General-enquiry facts were embedded only in prompting, without a versioned bilingual schema, source metadata, static/API distinction or deterministic resolver.
@@ -90,9 +90,10 @@ For guaranteed audible no-regreeting, the ElevenLabs dashboard first-message fie
 
 ### Conversation lifecycle
 
+An unexpected SDK disconnect ends only the text/voice transport. The transcript, selected cinema and current local view (including booking history) remain mounted, and the next text turn reconnects with the same logical journey context.
+
 Transient state is cleared on:
 
-- normal SDK disconnect/end;
 - the header “new conversation” action;
 - 15 minutes of inactivity;
 - `window` event `voxi:new-conversation`;
@@ -127,7 +128,7 @@ The nine extracted dates are selectable inline. Film caching is keyed by cinema 
 
 ## FAQ and knowledge design
 
-`src/knowledge/voxFaqData.js` contains 16 bilingual customer entries across 11 requested topics:
+`src/knowledge/voxFaqData.js` contains 17 bilingual customer entries across 11 requested topics, plus explicit Voxi product-capability guidance within that catalog:
 
 - locations and hours;
 - tickets/e-tickets;
@@ -140,7 +141,7 @@ The nine extracted dates are selectable inline. Film caching is keyed by cinema 
 - account/loyalty and VOX Wallet/Credit;
 - contact/support.
 
-Each entry includes an ID, topic, priority, English/Arabic utterances and answer, tags, official sources, audience, review date, freshness/cadence and `delivery.kind` (`static` or `api`). High-volatility values are routed to existing providers: cinemas/sessions use the Vista-shaped layer and offers use the current offer resolver. Cinema hours are never invented.
+Each entry includes an ID, topic, priority, English/Arabic utterances and answer, tags, audience, review date, freshness/cadence and `delivery.kind` (`static` or `api`). Policy entries cite official sources; the language/voice/text entry is explicitly marked as current Voxi product behavior rather than VOX policy. High-volatility values are routed to existing providers: cinemas/sessions use the Vista-shaped layer and offers use the current offer resolver. Cinema hours are never invented.
 
 The deterministic resolver supports Arabic normalization and mixed-language queries but always answers in the explicitly selected locale. Query-specific FAQ context is sent before the user message. A bounded catalog is also supplied at session start for voice turns.
 
@@ -162,6 +163,15 @@ Current first-party sources include:
 - <https://uae.voxcinemas.com/share>
 - <https://uae.voxcinemas.com/vox-cinemas-app>
 
+## Supporting UX and safety hardening
+
+- Transactional booking, cancellation and booking-history commands now bypass FAQ rendering and continue through the journey/tool router. Policy questions still use curated FAQ answers, and cancellation guidance exposes the routing topic expected by the cancellation UI. English and UAE-colloquial Arabic cases are covered by deterministic tests.
+- Offer results are no longer labelled eligible when a material input is unknown. Membership, booking channel, ticket count, order total, monthly usage/spend, cinema, format and seat category are requested when the selected offer depends on them. Generic card tiers such as `Visa Infinite` or `Platinum` no longer guess an issuing bank.
+- Checkout starts with no personal/default card. The required add-card/Luhn prototype path remains available and is explicitly test-only (`4111 1111 1111 1111`). PAN and security code exist only in component memory, are cleared after use, and are never sent to Voxi or a server. Local storage contains only masked display metadata (brand, last four, test name and expiry). `VITE_VISTA_BASE` controls read data only; checkout remains clearly simulated unless a future hosted payment integration explicitly selects another mode.
+- Booking confirmation and history now show cinema, performance date/time and active/cancelled status. Movie, showtime, seat, cinema and offer panels provide explicit empty/error states and optional retry actions.
+- Unknown or invalid experience artwork uses the validated Standard experience image as a generic fallback. All new labels and status messages have matching English and Arabic strings.
+- `scripts/validateSupportingUx.mjs` protects the checkout data boundary, explicit simulation default, booking detail fields, retry copy and experience fallback.
+
 ## Verification
 
 Automated validation covers extracted data, booking persistence, offers, handover redaction, English/Arabic parity, explicit language switching, protected transport/tool invariants, FAQ schema/resolution, logical journey handoff, lifecycle hooks, unified UI, dates and poster wiring.
@@ -172,7 +182,7 @@ Live browser checks covered:
 - all nine programming dates;
 - movie posters and showtimes;
 - ticket quantity, two-seat selection and checkout;
-- completed booking persistence and real confirmation poster;
+- completed local booking persistence and confirmation poster rendering;
 - cancellation decline and confirmation;
 - manual reset and retained history;
 - live text-only ElevenLabs chat without microphone access;
@@ -185,7 +195,7 @@ The in-app test browser did not grant microphone access, so the live WebRTC atte
 ## Remaining production dependencies and risks
 
 - Configure the ElevenLabs dashboard first message to use `voxi_session_opening` for guaranteed audible no-regreeting.
-- Provide authenticated production Vista, booking/refund, wallet/loyalty, F&B catalog/order and payment services. Current payment and handover remain deliberate simulations.
+- Provide authenticated production Vista, booking/refund, wallet/loyalty, F&B catalog/order and hosted payment services. The current checkout remains simulated even when live read data is configured; real transaction modes must be introduced explicitly behind server-side adapters. Handover remains a deliberate simulation.
 - Add an explicit date-selection client tool in the ElevenLabs dashboard only if voice-only guests must change dates without tapping. No new tool name was introduced here.
 - Live cinema hours and current offer eligibility must remain API-driven.
 - The current JavaScript bundle emits Vite’s over-500 kB chunk warning; route/media code splitting is recommended before production rollout.

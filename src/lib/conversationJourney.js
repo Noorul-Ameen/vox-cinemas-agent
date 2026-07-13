@@ -46,6 +46,10 @@ export function createConversationJourney(sessionId) {
     foodItems: [],
     bookingProgress: "start",
     bookingRef: null,
+    bookingStatus: null,
+    refundRoute: null,
+    refundStatus: null,
+    refundReference: null,
     lastActivityAt: new Date().toISOString(),
   };
 }
@@ -92,18 +96,26 @@ export function syncJourney(current, {
     : view === "seatmap" && !activeOrder && !activeBooking
       ? selectedSeats
     : activeOrder?.seats?.length ? activeOrder.seats : activeBooking?.seats?.length ? activeBooking.seats : selectedSeats?.length ? selectedSeats : current.seats);
-  const quantity = clearsSession && !activeOrder && !activeBooking
-    ? null
-    : Number(ticketQuantity || activeOrder?.ticketQuantity || activeBooking?.ticketQuantity || seats.length || current.ticketQuantity) || null;
+  const explicitQuantity = Number(ticketQuantity || activeOrder?.ticketQuantity || activeBooking?.ticketQuantity || seats.length) || null;
+  const quantity = explicitQuantity
+    || (clearsSession && !activeOrder && !activeBooking ? null : Number(current.ticketQuantity) || null);
   const ticketType = clearsSession && !activeOrder && !activeBooking
     ? null
     : activeOrder?.ticketType || activeBooking?.ticketType || current.ticketType || null;
+  const activeCinema = cinema
+    || (activeOrder?.cinemaId || activeOrder?.cinemaName ? { id: activeOrder.cinemaId, name: activeOrder.cinemaName } : null)
+    || (activeBooking?.cinemaId || activeBooking?.cinemaName ? { id: activeBooking.cinemaId, name: activeBooking.cinemaName } : null);
+  const bookingStatus = activeBooking
+    ? (activeBooking.bookingStatus || (activeBooking.cancelled ? "cancelled" : "confirmed"))
+    : activeOrder
+      ? "payment_pending"
+      : (clearsMovie || clearsSession ? null : current.bookingStatus);
 
   return {
     ...current,
     locale: locale || current.locale,
-    cinema: compactCinema(cinema) || current.cinema,
-    scheduleDate: scheduleDate || session?.date || current.scheduleDate,
+    cinema: compactCinema(activeCinema) || current.cinema,
+    scheduleDate: session?.date || scheduleDate || current.scheduleDate,
     movie: compactMovie(movie),
     session: compactSession(session, scheduleDate),
     ticketQuantity: quantity,
@@ -112,6 +124,10 @@ export function syncJourney(current, {
     seats,
     bookingProgress: VIEW_PROGRESS[view] || view,
     bookingRef: activeBooking?.ref || activeOrder?.ref || (clearsMovie || clearsSession ? null : current.bookingRef) || null,
+    bookingStatus,
+    refundRoute: activeBooking?.refundRoute || (bookingStatus?.startsWith("cancelled") ? current.refundRoute : null),
+    refundStatus: activeBooking?.refundStatus || (bookingStatus?.startsWith("cancelled") ? current.refundStatus : null),
+    refundReference: activeBooking?.refundReference || (bookingStatus?.startsWith("cancelled") ? current.refundReference : null),
     intent: intent || inferIntent({ view, previousIntent: current.intent }),
     transportConversationId: transportConversationId === undefined ? current.transportConversationId : transportConversationId,
     previousTransportConversationId: previousTransportConversationId === undefined ? current.previousTransportConversationId : previousTransportConversationId,
@@ -157,6 +173,10 @@ export function buildTransportHandoff(journey, messages) {
     experience: journey.experience || "not selected",
     bookingProgress: journey.bookingProgress,
     bookingRef: journey.bookingRef || "not confirmed",
+    bookingStatus: journey.bookingStatus || "not confirmed",
+    refundRoute: journey.refundRoute || "not applicable",
+    refundStatus: journey.refundStatus || "not applicable",
+    refundReference: journey.refundReference || "not issued",
   };
   return [
     "CONTINUATION CONTEXT: This is the same guest and the same Voxi journey across a transport change.",
@@ -177,5 +197,9 @@ export function journeyDynamicVariables(journey, { continuation = false } = {}) 
     voxi_movie: String(journey.movie?.title || "not_selected"),
     voxi_cinema: String(journey.cinema?.name || "not_selected"),
     voxi_booking_progress: String(journey.bookingProgress || "start"),
+    voxi_booking_status: String(journey.bookingStatus || "not_confirmed"),
+    voxi_performance_date: String(journey.session?.date || journey.scheduleDate || "not_selected"),
+    voxi_refund_status: String(journey.refundStatus || "not_applicable"),
+    voxi_refund_reference: String(journey.refundReference || "not_issued"),
   };
 }

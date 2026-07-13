@@ -13,7 +13,16 @@ assert.match(app, /<TicketQuantityControl\b/, "ticket quantity must stay visible
 assert.match(app, /voxi:new-conversation/);
 assert.match(app, /voxi:logout/);
 assert.match(app, /CONVERSATION_IDLE_MS/);
+assert.match(app, /if \(reason === "timeout"\) \{\s*clearConversationState\(reason\);\s*\} else if \(cancelResolver\.current/, "only the deliberate app inactivity timeout should clear local UI state on disconnect");
+assert.match(app, /dismissPendingCancellation\("transport_disconnected"\)/, "a dead transport must resolve any still-pending cancellation confirmation");
 assert.match(app, /posterUrl:\s*movie\?\.posterUrl/, "completed orders must retain their poster URL");
 assert.match(media, /getMoviePosterUrl\(booking\)/, "booking confirmation must resolve a poster with fallback support");
+const cancellationTool = app.slice(app.indexOf("show_booking_for_cancellation: async"), app.indexOf("show_offers: async"));
+assert.match(cancellationTool, /const demoOnly =/, "cancellation must distinguish prototype records before discussing a refund route");
+assert.match(cancellationTool, /phase:\s*"final_confirmation"[\s\S]*refundRoute:\s*null[\s\S]*demoOnly:\s*true/, "prototype removal must bypass VOX Wallet selection");
+assert.match(cancellationTool, /This will not contact VOX or issue a refund/, "prototype removal copy must not promise a real cancellation or refund");
+assert.match(cancellationTool, /Cancellation eligibility could not be verified/, "unverified live cancellation eligibility must fail closed");
+assert.match(app, /refundRoute:\s*isDemoSimulation\s*\?\s*null\s*:\s*"VOX Wallet"/, "prototype cancellation records must not claim a VOX Wallet refund route");
+assert.doesNotMatch(app, /Ø§Ø®ØªØ±Øª/, "Arabic cinema selection transcript must not contain mojibake");
 
-console.log("Validated unified inline rendering, guided controls, lifecycle resets, and confirmation poster wiring.");
+console.log("Validated unified inline rendering, guided controls, disconnect preservation, lifecycle resets, and confirmation poster wiring.");

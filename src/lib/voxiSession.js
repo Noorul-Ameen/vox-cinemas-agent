@@ -33,17 +33,19 @@ Tool behavior
 - Use show_showtimes only for a real movie returned by show_movie_selection.
 - Use show_seat_map only for a real returned session, then use select_seats after the guest chooses seat labels. Never invent IDs.
 - Use show_booking_summary to display a known booking summary.
-- For cancellation, identify and confirm the exact booking and explain the refund route before using show_booking_for_cancellation. Never claim cancellation succeeded until its result confirms it.
+- For cancellation, identify the exact booking record returned by the widget. For a provider-verified booking, explain that eligible refunds default to VOX Wallet credit and ask whether that route is acceptable before the final proceed confirmation. For a local prototype record, explain that removal is on-device only and no refund will occur. The first generic yes selects the route only; require a separate final yes before cancellation. Never claim cash or card refund, and never claim cancellation succeeded until show_booking_for_cancellation confirms the result.
+- A result with demo, simulationOnly, refundStatus not_processed_demo, or refundApplied false is only a local prototype update. Explicitly say that no real refund was processed and never invent a refund reference or describe it as a completed refund.
 - Use show_offers for bank/card offers and describe the result as guidance subject to checkout. Never say an offer was applied.
 - Use handover_to_agent for an explicit human request or after two genuine failed clarifications.
 - While checking information, use one short natural filler in the active language, then give the result.
 
 Journey rules
 - First infer whether the guest wants to make a booking or ask a general question. Preserve that intent until it is completed or explicitly changed.
-- For a booking, collect only missing details in this order: cinema, movie, date, showtime/experience, ticket quantity, seats, optional food and drinks, summary, confirmation and payment.
+- For a booking, collect only missing details in this order: cinema, movie, date, showtime/experience, ticket quantity, seats, summary, confirmation and simulated checkout. Food and beverage ordering is not part of this prototype; answer only approved general F&B questions from FAQ context.
 - Never ask again for a detail already present in the continuation context or supplied through a visible selection.
 - Treat taps and voice/text answers as the same journey: when the guest selects something on screen, acknowledge it and continue from the next missing detail.
 - Never suggest past showtimes. Respect the schedule dates returned by the widget, including future dates; do not claim that only today's films can be shown.
+- If the guest's requested date is not published, never retry a movie or showtime tool with a different date. Ask the guest to choose one of the published dates and continue only after their explicit choice.
 - Keep lists short. Summarize the closest few options and ask whether the guest wants more.
 - Do not restart the conversation, repeat the welcome, or lose the active task after an interruption or language change.
 `.trim();
@@ -51,8 +53,20 @@ Journey rules
 export function buildVoxiContext({ locale, cinema, scheduleDate, stage, selectedSeats, journey, messages }) {
   const language = locale === "ar" ? "Arabic" : "English";
   const movie = stage?.movie?.title || stage?.order?.movieTitle || stage?.booking?.movieTitle || "none selected";
-  const session = stage?.session
-    ? `${stage.session.date || scheduleDate || "date pending"} ${stage.session.time || "time pending"} ${stage.session.exp || ""}`.trim()
+  const activeBooking = stage?.booking || (stage?.view === "booking" ? journey : null);
+  const sessionValue = stage?.session || (stage?.order ? {
+    date: stage.order.date,
+    time: stage.order.showtime,
+    exp: stage.order.experience,
+    screen: stage.order.screen,
+  } : activeBooking ? {
+    date: activeBooking.date || journey?.session?.date,
+    time: activeBooking.showtime || journey?.session?.time,
+    exp: activeBooking.experience || journey?.session?.experience,
+    screen: activeBooking.screen || journey?.session?.screen,
+  } : journey?.session);
+  const session = sessionValue
+    ? `${sessionValue.date || scheduleDate || "date pending"} ${sessionValue.time || "time pending"} ${sessionValue.exp || sessionValue.experience || ""} ${sessionValue.screen || ""}`.trim()
     : "none selected";
   const context = journey || {};
   const history = relevantConversationHistory(messages, 6);
@@ -60,10 +74,10 @@ export function buildVoxiContext({ locale, cinema, scheduleDate, stage, selected
     `The guest explicitly selected ${language} as the active language.`,
     `The product scope is VOX Cinemas UAE.`,
     `Logical Voxi session ID: ${context.sessionId || "not assigned"}; current ElevenLabs transport conversation ID: ${context.transportConversationId || "not connected"}.`,
-    `Current cinema: ${cinema?.name || "not selected; ask the guest to choose a VOX Cinemas UAE location before listing films"}.`,
+    `Current cinema: ${cinema?.name || context.cinema?.name || stage?.order?.cinemaName || stage?.booking?.cinemaName || "not selected; ask the guest to choose a VOX Cinemas UAE location before listing films"}.`,
     `Current published schedule date: ${scheduleDate || "not available"}.`,
     `Current journey: ${stage?.view || "empty"}; movie: ${movie}; session: ${session}; selected seats: ${(selectedSeats || []).join(", ") || "none"}.`,
-    `Structured progress: intent ${context.intent || "not yet known"}; ticket quantity ${context.ticketQuantity || "not selected"}; ticket type ${context.ticketType || "not selected"}; experience ${context.experience || "not selected"}; booking progress ${context.bookingProgress || stage?.view || "start"}; booking reference ${context.bookingRef || "not confirmed"}.`,
+    `Structured progress: intent ${context.intent || "not yet known"}; ticket quantity ${context.ticketQuantity || "not selected"}; ticket type ${context.ticketType || "not selected"}; experience ${context.experience || "not selected"}; booking progress ${context.bookingProgress || stage?.view || "start"}; booking reference ${context.bookingRef || stage?.booking?.ref || "not confirmed"}; booking status ${context.bookingStatus || stage?.booking?.bookingStatus || (stage?.booking?.cancelled ? "cancelled" : stage?.booking ? "confirmed" : "not confirmed")}; refund route ${context.refundRoute || stage?.booking?.refundRoute || "not applicable"}; refund status ${context.refundStatus || stage?.booking?.refundStatus || "not applicable"}; refund reference ${context.refundReference || stage?.booking?.refundReference || "not issued"}.`,
     `Recent relevant conversation history: ${history.length ? JSON.stringify(history) : "none"}.`,
     `Continue the active task in ${language}, keep the response short, and do not repeat the welcome message.`,
   ].join(" ");
