@@ -33,6 +33,10 @@ export function demoDate() {
   return DATA_DATES.includes(today) ? today : DATA_DATES[0] || today;
 }
 
+export function getProgrammingDates() {
+  return DATA_DATES.length ? [...DATA_DATES] : [demoDate()];
+}
+
 // Map explicit demo offsets within the verified dynamic programming window.
 export function sourceDateForDemoDate(displayDate = demoDate()) {
   return remapDemoDate(displayDate, demoDate(), DATA_DATES);
@@ -44,11 +48,11 @@ export function getCinemas() {
 
 // --- Reference data ---------------------------------------------------------
 
-export async function getScheduledFilms(cinemaId) {
+export async function getScheduledFilms(cinemaId, displayDate = demoDate()) {
   let value;
   if (USE_MOCK) {
     await delay(200);
-    const d = sourceDateForDemoDate();
+    const d = sourceDateForDemoDate(displayDate);
     // Only films that actually have sessions today at this cinema
     const todayFilmIds = new Set(SESSIONS.filter((s) => s.CinemaId === cinemaId && (s.SourceProgrammingDate || s.Showtime.slice(0, 10)) === d).map((s) => s.ScheduledFilmId));
     value = FILMS.filter((f) => f.CinemaId === cinemaId && todayFilmIds.has(f.ScheduledFilmId));
@@ -71,11 +75,11 @@ export async function getScheduledFilms(cinemaId) {
   }));
 }
 
-export async function getSessions(cinemaId, scheduledFilmId) {
+export async function getSessions(cinemaId, scheduledFilmId, displayDate = demoDate()) {
   let value;
   if (USE_MOCK) {
     await delay(200);
-    const d = sourceDateForDemoDate();
+    const d = sourceDateForDemoDate(displayDate);
     value = SESSIONS.filter((s) => s.CinemaId === cinemaId && (s.SourceProgrammingDate || s.Showtime.slice(0, 10)) === d);
   } else {
     ({ value } = await getJson(`${V2}/OData/Sessions?$format=json&$filter=CinemaId eq '${cinemaId}'`));
@@ -88,7 +92,7 @@ export async function getSessions(cinemaId, scheduledFilmId) {
       screen: s.ScreenName,
       exp: (s.SessionAttributesNames && s.SessionAttributesNames[0]) || "2D",
       seatsAvailable: s.SeatsAvailable,
-      date: demoDate(),
+      date: displayDate,
       sourceDate: (s.Showtime || "").slice(0, 10),
       timeSlot: s.TimeSlot || "",
       status: s.Status || "",

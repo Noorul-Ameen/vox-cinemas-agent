@@ -2,14 +2,15 @@ import React from "react";
 import { Film, Clock, Armchair, Ticket, ChevronRight, Check, RotateCcw, MapPin, Search } from "lucide-react";
 import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
-import { getExperienceMedia, getMediaUrl } from "../mediaData.js";
+import { getExperienceMedia, getMediaUrl, getMoviePosterUrl, getSupportedImageUrl } from "../mediaData.js";
 import BookingQRCode from "./BookingQRCode.jsx";
 
 export function Poster({ tint, title, small, posterUrl }) {
   const { t } = useI18n();
-  const [imgOk, setImgOk] = React.useState(!!posterUrl);
+  const imageUrl = getSupportedImageUrl(posterUrl);
+  const [imgOk, setImgOk] = React.useState(!!imageUrl);
   const palette = tint && tint.length === 2 ? tint : [C.purple, C.magenta];
-  React.useEffect(() => setImgOk(!!posterUrl), [posterUrl]);
+  React.useEffect(() => setImgOk(!!imageUrl), [imageUrl]);
   return (
     <div style={{
       position: "relative", overflow: "hidden", borderRadius: 12,
@@ -19,8 +20,8 @@ export function Poster({ tint, title, small, posterUrl }) {
       background: `linear-gradient(150deg, ${palette[0]}, ${palette[1]})`,
       display: "flex", flexShrink: 0, alignItems: "flex-end", boxSizing: "border-box",
     }}>
-      {imgOk && posterUrl && (
-        <img src={posterUrl} alt={title ? `${title} — ${t("movies.poster")}` : t("movies.poster")} loading="lazy" decoding="async" onError={() => setImgOk(false)}
+      {imgOk && imageUrl && (
+        <img src={imageUrl} alt={title ? `${title} — ${t("movies.poster")}` : t("movies.poster")} loading="lazy" decoding="async" onLoad={(event) => { if (!event.currentTarget.naturalWidth || !event.currentTarget.naturalHeight) setImgOk(false); }} onError={() => setImgOk(false)}
           style={{ position: "absolute", inset: 0, display: "block", width: "100%", maxWidth: "100%", height: "100%", maxHeight: "100%", objectFit: "contain" }} />
       )}
       {!imgOk && <div style={{ position: "absolute", inset: 0, opacity: 0.35, backgroundImage: "radial-gradient(circle at 30% 15%, rgba(255,255,255,.6), transparent 50%)" }} />}
@@ -214,9 +215,10 @@ export function SeatMap({ movie, session, plan, selected, onToggle, onConfirm, o
   );
 }
 
-export function BookingCard({ booking, onCancel, cancelled }) {
+export function BookingCard({ booking, onCancel, onDecline, cancelled }) {
   const { t, formatCurrency } = useI18n();
   const isCancelled = cancelled ?? booking.cancelled;
+  const posterUrl = getMoviePosterUrl(booking);
   const [confirmingCancellation, setConfirmingCancellation] = React.useState(false);
   React.useEffect(() => setConfirmingCancellation(false), [booking.ref, isCancelled]);
   return (
@@ -224,7 +226,7 @@ export function BookingCard({ booking, onCancel, cancelled }) {
       <Header icon={<Ticket size={16} />} title={isCancelled ? t("booking.cancelled") : t("booking.confirmed")} sub={isCancelled ? t("booking.refundStarted") : t("booking.ready")} />
       <div style={{ maxWidth: 420, margin: "0 auto", overflow: "hidden", borderRadius: 16, border: "1px solid rgba(255,255,255,.12)", background: "linear-gradient(160deg, rgba(99,65,141,.35), rgba(30,23,40,.6))" }}>
         <div style={{ display: "flex", gap: 16, padding: 20 }}>
-          <Poster tint={booking.tint || [C.purple, C.magenta]} small />
+          <Poster tint={booking.tint || [C.purple, C.magenta]} title={booking.movieTitle} posterUrl={posterUrl} small />
           <div style={{ flex: 1 }}>
             <div dir="auto" style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{booking.movieTitle}</div>
             <div dir="ltr" style={{ fontSize: 12, color: "rgba(255,255,255,.6)" }}>{booking.screen} · {booking.showtime}</div>
@@ -242,7 +244,7 @@ export function BookingCard({ booking, onCancel, cancelled }) {
               {t("booking.cancelQuestion", { ref: booking.ref, amount: formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED") })}
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-              <button type="button" onClick={() => setConfirmingCancellation(false)} style={{ border: "1px solid rgba(255,255,255,.14)", borderRadius: 8, background: "transparent", padding: "8px 12px", color: "rgba(255,255,255,.72)", cursor: "pointer" }}>{t("common.back")}</button>
+              <button type="button" onClick={() => { setConfirmingCancellation(false); onDecline?.(); }} style={{ border: "1px solid rgba(255,255,255,.14)", borderRadius: 8, background: "transparent", padding: "8px 12px", color: "rgba(255,255,255,.72)", cursor: "pointer" }}>{t("common.back")}</button>
               <button type="button" onClick={onCancel} style={{ border: 0, borderRadius: 8, background: C.magenta, padding: "8px 12px", color: "#fff", fontWeight: 700, cursor: "pointer" }}>{t("booking.confirmCancel")}</button>
             </div>
           </div>

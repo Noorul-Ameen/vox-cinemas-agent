@@ -8,6 +8,10 @@ VOXi is a React + Vite mobile widget that combines the real ElevenLabs React SDK
 - Official code-keyed movie posters, experience artwork, and active bank-offer imagery with first-party source attribution and resilient UI fallbacks.
 - Fuzzy cinema/movie/session resolution with the original six ElevenLabs client tools preserved.
 - Text, touch, and voice journeys for movies, showtimes, seats, simulated checkout, confirmation, and cancellation. Typed chat starts without requesting microphone access.
+- One unified conversation window where messages and the current relevant cinema/date/movie/showtime/ticket/seat/checkout/FAQ component render inline; previous interactive stages are removed.
+- A logical journey ID, structured booking context and redacted recent turns carried across text WebSocket and voice WebRTC transports.
+- All nine extracted programming dates selectable in the booking flow, with cinema-and-date-keyed movie loading.
+- A sourced bilingual FAQ layer with 16 entries across locations/hours, tickets, experiences, food and drinks, offers, accessibility, age ratings, refunds, account/loyalty, wallet and support.
 - Client-side QR tickets, persisted booking history, case-insensitive lookup, and durable cancellation state.
 - 19 structured VOX UAE bank offers with 41 card profiles and conservative `eligible`, `ineligible`, or `card_required` results.
 - Deterministic simulated human handover after an explicit request or two consecutive failed clarifications.
@@ -63,6 +67,8 @@ The two new declarations and prompt rules must also be present in the ElevenLabs
 
 The protected voice connection remains WebRTC with `serverLocation: "eu-residency"`. Text chat uses the SDK's text-only WebSocket path so it does not create an audio context or request microphone access.
 
+For an audible text-to-voice continuation without another welcome, configure the dashboard first-message field as `{{voxi_session_opening}}`. The client supplies a localized first welcome or a continuation acknowledgement and then sends the full structured context with `sendContextualUpdate`. See [ELEVENLABS_AGENT_SETUP.md](./ELEVENLABS_AGENT_SETUP.md).
+
 ## Data snapshot and refresh
 
 The shipped snapshot was crawled on 13 July 2026 UAE time and covers every programming date that VOX published from the next day: 14–22 July 2026. The extractor does not assume an eight-day window. It unions the official per-movie `availableDays` responses for Now Showing and Advance Booking, fetches only those movie/date pairs, and stops when the advertised dates are exhausted. A 31-day default safety cap prevents an accidentally unbounded crawl.
@@ -101,6 +107,8 @@ Artwork URLs remain on official VOX/MAF hosts or their campaign CDN and include 
 - all 19 offer rules, all extracted experiences, ambiguous bank/card aliases, and tri-state outcomes;
 - handover schema, two-failure detection, seat/cancellation context, payment removal, and transcript redaction;
 - English/Arabic dictionary parity and confirmation-only language-switch scenarios;
+- sourced bilingual FAQ schema, intent resolution, API/static classification and knowledge serialization;
+- logical conversation continuity, handoff redaction, multi-date selection, unified inline rendering and lifecycle reset hooks;
 - mic-free text startup, protected ElevenLabs voice WebRTC, tool-name, seat-selection, error-boundary, RTL-seat, branding, and 420 px invariants.
 
 `npm run validate:converter` separately exercises the Python compact/flat conversion compatibility path.
@@ -112,10 +120,13 @@ Artwork URLs remain on official VOX/MAF hosts or their campaign CDN and include 
 - `src/mockVistaData.js` — generated, deterministic UAE schedule snapshot.
 - `src/bookingStore.js` — backward-compatible local booking persistence.
 - `src/offers/` — structured offer knowledge and resolver.
+- `src/knowledge/` — sourced bilingual FAQ data, resolver and bounded agent context.
+- `src/lib/conversationJourney.js` — logical session state and redacted text-to-voice handoff.
 - `src/lib/handoverSummary.js` — safe prototype OneView payload.
 - `src/lib/voxiSession.js` and `src/lib/languageSwitch.js` — VOXI runtime guidance and strict bilingual switching.
 - `src/i18n/` — English/Arabic locale provider and copy.
 - `src/components/` — cinema, movie, seat, checkout, QR/history, offers, and handover UI.
+- `CONCIERGE_IMPLEMENTATION.md` — root-cause review, state model, ElevenLabs handoff, FAQ migration plan, verification and production dependencies.
 
 ## Prototype boundaries
 

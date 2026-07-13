@@ -92,7 +92,9 @@ Agent rules:
 ## Language and first-message configuration
 
 - The web client supplies the selected locale through `preferred_language` and the session context. It does not send an `agent.language` override.
-- Configure dashboard first-message behavior to honor `preferred_language` and produce exactly one English or Arabic welcome that matches the VOXi prompt. The client does not override `firstMessage`.
+- Configure the dashboard first-message field as `{{voxi_session_opening}}`. The client supplies the localized welcome for a first transport and a no-greeting continuation acknowledgement for a text-to-voice transport switch.
+- Keep `voxi_is_continuation`, `voxi_session_id`, `voxi_previous_conversation_id`, `voxi_intent`, `voxi_movie`, `voxi_cinema`, and `voxi_booking_progress` available in the dashboard prompt. The complete redacted journey and recent turns arrive immediately after connection through a contextual update.
+- The client intentionally does not send an `agent.firstMessage` override because that field must be explicitly enabled in ElevenLabs Security and an unauthorized override terminates the session.
 - A stored language selection must be used for the next text or voice session. Changing language during a connected session must not replay a first message.
 - Confirm that the agent prompt distinguishes an actual language-control action from automatic platform language detection. Only the former is explicit confirmation.
 
@@ -107,7 +109,7 @@ Agent rules:
 
 1. Confirm all eight client-tool declarations are enabled for the target agent.
 2. Confirm WebRTC/public-agent access is allowed for the StackBlitz origin.
-3. Confirm dashboard first-message behavior honors `preferred_language` and emits exactly one welcome in that language; do not rely on client `agent.language` or `firstMessage` overrides.
+3. Set the first message to `{{voxi_session_opening}}`; verify the first transport welcomes once and a text-to-voice transport switch acknowledges the current step without a new greeting.
 4. Confirm the prompt contains the strict language-switching, two-failure, and payment-data safeguards above. Remove any instruction that switches merely because the guest speaks Arabic or English.
 5. Start with English, say one Arabic word or a mixed-language sentence, and verify VOXi asks for confirmation in English without switching or calling a business tool.
 6. While a booking or cancellation is active, confirm a switch to Arabic and verify the same task resumes in Arabic without another welcome message.

@@ -1,3 +1,5 @@
+import { relevantConversationHistory } from "./conversationJourney.js";
+
 export const VOXI_FIRST_MESSAGES = {
   en: "Hi, welcome to VOX Cinemas. I’m Voxi, your AI assistant. How can I help you today?",
   ar: "أهلاً بك في ڤوكس سينما. أنا Voxi، مساعدك الذكي. كيف أقدر أساعدك اليوم؟",
@@ -37,23 +39,32 @@ Tool behavior
 - While checking information, use one short natural filler in the active language, then give the result.
 
 Journey rules
+- First infer whether the guest wants to make a booking or ask a general question. Preserve that intent until it is completed or explicitly changed.
+- For a booking, collect only missing details in this order: cinema, movie, date, showtime/experience, ticket quantity, seats, optional food and drinks, summary, confirmation and payment.
+- Never ask again for a detail already present in the continuation context or supplied through a visible selection.
+- Treat taps and voice/text answers as the same journey: when the guest selects something on screen, acknowledge it and continue from the next missing detail.
 - Never suggest past showtimes. Respect the schedule dates returned by the widget, including future dates; do not claim that only today's films can be shown.
 - Keep lists short. Summarize the closest few options and ask whether the guest wants more.
 - Do not restart the conversation, repeat the welcome, or lose the active task after an interruption or language change.
 `.trim();
 
-export function buildVoxiContext({ locale, cinema, scheduleDate, stage, selectedSeats }) {
+export function buildVoxiContext({ locale, cinema, scheduleDate, stage, selectedSeats, journey, messages }) {
   const language = locale === "ar" ? "Arabic" : "English";
   const movie = stage?.movie?.title || stage?.order?.movieTitle || stage?.booking?.movieTitle || "none selected";
   const session = stage?.session
     ? `${stage.session.date || scheduleDate || "date pending"} ${stage.session.time || "time pending"} ${stage.session.exp || ""}`.trim()
     : "none selected";
+  const context = journey || {};
+  const history = relevantConversationHistory(messages, 6);
   return [
     `The guest explicitly selected ${language} as the active language.`,
     `The product scope is VOX Cinemas UAE.`,
+    `Logical Voxi session ID: ${context.sessionId || "not assigned"}; current ElevenLabs transport conversation ID: ${context.transportConversationId || "not connected"}.`,
     `Current cinema: ${cinema?.name || "not selected; ask the guest to choose a VOX Cinemas UAE location before listing films"}.`,
     `Current published schedule date: ${scheduleDate || "not available"}.`,
     `Current journey: ${stage?.view || "empty"}; movie: ${movie}; session: ${session}; selected seats: ${(selectedSeats || []).join(", ") || "none"}.`,
+    `Structured progress: intent ${context.intent || "not yet known"}; ticket quantity ${context.ticketQuantity || "not selected"}; ticket type ${context.ticketType || "not selected"}; experience ${context.experience || "not selected"}; booking progress ${context.bookingProgress || stage?.view || "start"}; booking reference ${context.bookingRef || "not confirmed"}.`,
+    `Recent relevant conversation history: ${history.length ? JSON.stringify(history) : "none"}.`,
     `Continue the active task in ${language}, keep the response short, and do not repeat the welcome message.`,
   ].join(" ");
 }

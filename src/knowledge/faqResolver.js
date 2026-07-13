@@ -1,0 +1,121 @@
+import { VOX_FAQ_ENTRIES } from "./voxFaqData.js";
+
+const STOP_WORDS = new Set([
+  "a", "an", "and", "are", "at", "can", "do", "does", "for", "from", "how", "i", "in", "is", "it", "me", "my", "of", "on", "the", "to", "what", "when", "where", "which", "with", "you",
+  "أو", "اين", "أين", "الى", "إلى", "انا", "أنا", "ان", "أن", "في", "عن", "على", "ما", "ماذا", "متى", "من", "هل", "هو", "هي", "كيف", "لي", "مع",
+]);
+
+export function normalizeFaqText(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\u064b-\u065f\u0670]/g, "")
+    .replace(/[إأآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ڤ/g, "ف")
+    .replace(/[’'`]/g, "")
+    .replace(/[^\p{L}\p{N}+#]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokens(value) {
+  return normalizeFaqText(value)
+    .split(" ")
+    .filter((token) => token.length > 1 && !STOP_WORDS.has(token));
+}
+
+function localizedValues(value, locale) {
+  const preferred = value?.[locale] || [];
+  const fallback = value?.[locale === "ar" ? "en" : "ar"] || [];
+  return [
+    ...preferred.map((text) => ({ text, weight: 1 })),
+    ...fallback.map((text) => ({ text, weight: 0.82 })),
+  ];
+}
+
+function scorePhrase(query, queryTokens, phrase, weight) {
+  const normalized = normalizeFaqText(phrase);
+  if (!normalized) return 0;
+  const phraseTokens = tokens(normalized);
+  if (query === normalized) return 1000 * weight + phraseTokens.length;
+  if (query.includes(normalized)) return (240 + phraseTokens.length * 14) * weight;
+  if (queryTokens.length > 1 && normalized.includes(query)) return (150 + queryTokens.length * 10) * weight;
+
+  const querySet = new Set(queryTokens);
+  const overlap = phraseTokens.filter((token) => querySet.has(token)).length;
+  if (!overlap) return 0;
+  const coverage = overlap / Math.max(phraseTokens.length, 1);
+  return (overlap * 18 + coverage * 50) * weight;
+}
+
+function scoreTag(query, queryTokens, tag, weight) {
+  const normalized = normalizeFaqText(tag);
+  if (!normalized) return 0;
+  if (query === normalized) return 180 * weight;
+  if (query.includes(normalized)) return 70 * weight;
+  const tagTokens = tokens(normalized);
+  const querySet = new Set(queryTokens);
+  const overlap = tagTokens.filter((token) => querySet.has(token)).length;
+  return overlap * 28 * weight;
+}
+
+export function scoreFaqEntry(queryText, entry, { locale = "en" } = {}) {
+  const activeLocale = locale === "ar" ? "ar" : "en";
+  const query = normalizeFaqText(queryText);
+  if (!query) return 0;
+  const queryTokens = tokens(query);
+
+  const phraseScore = localizedValues(entry.utterances, activeLocale)
+    .reduce((best, item) => Math.max(best, scorePhrase(query, queryTokens, item.text, item.weight)), 0);
+  const tagScore = localizedValues(entry.metadata.tags, activeLocale)
+    .reduce((sum, item) => sum + scoreTag(query, queryTokens, item.text, item.weight), 0);
+  return Math.round((phraseScore + tagScore) * 100) / 100;
+}
+
+function audienceMatches(entry, audience) {
+  if (!audience || audience === "all") return true;
+  return entry.metadata.audience.includes("all") || entry.metadata.audience.includes(audience);
+}
+
+function toResult(entry, score, locale) {
+  const activeLocale = locale === "ar" ? "ar" : "en";
+  return Object.freeze({
+    id: entry.id,
+    topic: entry.topic,
+    score,
+    answer: entry.answer[activeLocale],
+    locale: activeLocale,
+    dataMode: entry.delivery.kind,
+    needsLiveData: entry.delivery.kind === "api",
+    delivery: entry.delivery,
+    metadata: entry.metadata,
+    entry,
+  });
+}
+
+export function resolveFaqQuery(queryText, {
+  locale = "en",
+  audience = "all",
+  limit = 3,
+  minScore = 25,
+  entries = VOX_FAQ_ENTRIES,
+} = {}) {
+  const activeLocale = locale === "ar" ? "ar" : "en";
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 1, 10));
+  return entries
+    .filter((entry) => audienceMatches(entry, audience))
+    .map((entry) => ({ entry, score: scoreFaqEntry(queryText, entry, { locale: activeLocale }) }))
+    .filter((candidate) => candidate.score >= minScore)
+    .sort((left, right) => (
+      right.score - left.score ||
+      (right.entry.priority || 0) - (left.entry.priority || 0) ||
+      left.entry.id.localeCompare(right.entry.id)
+    ))
+    .slice(0, safeLimit)
+    .map(({ entry, score }) => toResult(entry, score, activeLocale));
+}
+
+export function resolveFaqOne(queryText, options = {}) {
+  return resolveFaqQuery(queryText, { ...options, limit: 1 })[0] || null;
+}

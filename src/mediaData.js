@@ -8,6 +8,13 @@ const normalizeExperienceKey = (value) => String(value || "")
   .replace(/[^A-Z0-9]+/g, "_")
   .replace(/^_+|_+$/g, "");
 
+const normalizeMovieKey = (value) => String(value || "")
+  .normalize("NFKD")
+  .replace(/\p{Mark}/gu, "")
+  .toLocaleLowerCase()
+  .replace(/[^\p{Letter}\p{Number}]+/gu, " ")
+  .trim();
+
 const EXPERIENCE_ALIASES = Object.freeze({
   THEATRE_BY_RHODES: "THEATRE",
   THEATRE_AT_VOX: "THEATRE",
@@ -40,6 +47,7 @@ const generatedOfferMedia = generatedExports.OFFER_MEDIA
   || generatedExports.MEDIA?.offers
   || generatedExports.MEDIA?.offerMedia
   || [];
+const generatedFilms = Array.isArray(generatedExports.FILMS) ? generatedExports.FILMS : [];
 
 export const EXPERIENCE_MEDIA = Object.freeze(normalizeRegistry(generatedExperienceMedia));
 export const OFFER_MEDIA = Object.freeze(
@@ -58,6 +66,11 @@ export function getMediaUrl(media) {
     media.image?.urlMobileSmall,
     media.image?.urlWeb,
     media.image?.urlMobile,
+    media.thumbnail,
+    media.mediumMobile,
+    media.largeMobile,
+    media.medium,
+    media.large,
     media.url,
     media.src,
     media.posterUrl,
@@ -66,6 +79,36 @@ export function getMediaUrl(media) {
     media.heroUrl,
     media.backdropUrl,
   ].find((value) => typeof value === "string" && value.trim())?.trim() || "";
+}
+
+export function getSupportedImageUrl(media) {
+  const url = getMediaUrl(media);
+  if (!url || /[\u0000-\u001f\u007f]/.test(url)) return "";
+  if (/^(?:https?:)?\/\//i.test(url) || /^(?:blob:|data:image\/(?:avif|gif|jpeg|jpg|png|svg\+xml|webp)[;,])/i.test(url)) return url;
+  if (/^(?:\.{0,2}\/|[^:\\]+$)/.test(url)) return url;
+  return "";
+}
+
+export function getMoviePosterUrl(movieOrBooking) {
+  const direct = [movieOrBooking?.posterUrl, movieOrBooking?.media, movieOrBooking?.images]
+    .map(getSupportedImageUrl)
+    .find(Boolean);
+  if (direct) return direct;
+
+  const requestedId = String(
+    movieOrBooking?.movieId
+      || movieOrBooking?.id
+      || movieOrBooking?.ScheduledFilmId
+      || "",
+  ).trim().toUpperCase();
+  const requestedTitle = normalizeMovieKey(
+    movieOrBooking?.movieTitle
+      || movieOrBooking?.title
+      || movieOrBooking?.Title,
+  );
+  const match = (requestedId && generatedFilms.find((film) => String(film.ScheduledFilmId || film.movieId || "").trim().toUpperCase() === requestedId && getSupportedImageUrl(film)))
+    || (requestedTitle && generatedFilms.find((film) => normalizeMovieKey(film.Title || film.title) === requestedTitle && getSupportedImageUrl(film)));
+  return getSupportedImageUrl(match);
 }
 
 export function getExperienceMedia(experience, sessionMedia) {
