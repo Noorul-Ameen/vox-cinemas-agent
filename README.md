@@ -7,12 +7,13 @@ VOXi is a React + Vite mobile widget that combines the real ElevenLabs React SDK
 - A fresh 14–22 July 2026 snapshot with 22 VOX UAE cinemas, 42 scheduled films, 4,344 deduplicated sessions, nine published programming dates, and 13 display experiences.
 - Official code-keyed movie posters, experience artwork, and active bank-offer imagery with first-party source attribution and resilient UI fallbacks.
 - Fuzzy cinema/movie/session resolution with the original six ElevenLabs client tools preserved.
-- Touch and voice journeys for movies, showtimes, seats, simulated checkout, confirmation, and cancellation.
+- Text, touch, and voice journeys for movies, showtimes, seats, simulated checkout, confirmation, and cancellation. Typed chat starts without requesting microphone access.
 - Client-side QR tickets, persisted booking history, case-insensitive lookup, and durable cancellation state.
 - 19 structured VOX UAE bank offers with 41 card profiles and conservative `eligible`, `ineligible`, or `card_required` results.
 - Deterministic simulated human handover after an explicit request or two consecutive failed clarifications.
 - Payment-free, transcript-sanitized `voxi.oneview-handover.v1` debug payload.
-- English and Arabic UI, saved language choice, RTL layout, and LTR seat/booking/payment identifiers.
+- Explicit English/Arabic conversation selection, saved language choice, confirmation-only switching, RTL layout, and LTR seat/booking/payment identifiers.
+- VOX Cinemas UAE starts without silently choosing Mall of the Emirates; the guest selects one of 22 UAE cinemas before browsing movies.
 - A protected 420 px mobile layout and the existing React error boundary.
 
 ## Run locally
@@ -24,7 +25,7 @@ npm run build
 npm run dev
 ```
 
-Open `http://localhost:5173`, tap the mic, and allow microphone access. The public client identifier for the current prototype agent is already used as a fallback in `vite.config.js`; `.env` is optional when testing this agent.
+Open `http://localhost:5173` and type a message to start text chat without a microphone. Use the mic button only when you want voice and allow microphone access at that point. The public client identifier for the current prototype agent is already used as a fallback in `vite.config.js`; `.env` is optional when testing this agent.
 
 To override it locally:
 
@@ -40,7 +41,7 @@ The GitHub import URL is:
 
 <https://stackblitz.com/github/Noorul-Ameen/vox-cinemas-agent>
 
-StackBlitz installs from `package.json` and starts Vite. Microphone/WebRTC access requires the preview to be opened in a browser context that permits microphone access.
+StackBlitz installs from `package.json` and starts Vite. Text chat needs no microphone permission. Voice WebRTC requires the preview to be opened in a browser context that permits microphone access.
 
 ## ElevenLabs client tools
 
@@ -60,7 +61,7 @@ The complete product adds:
 
 The two new declarations and prompt rules must also be present in the ElevenLabs dashboard for the agent to invoke them. See [ELEVENLABS_AGENT_SETUP.md](./ELEVENLABS_AGENT_SETUP.md).
 
-The connection remains WebRTC with `serverLocation: "eu-residency"`.
+The protected voice connection remains WebRTC with `serverLocation: "eu-residency"`. Text chat uses the SDK's text-only WebSocket path so it does not create an audio context or request microphone access.
 
 ## Data snapshot and refresh
 
@@ -99,8 +100,8 @@ Artwork URLs remain on official VOX/MAF hosts or their campaign CDN and include 
 - booking migration, lookup, persistence, and cancellation;
 - all 19 offer rules, all extracted experiences, ambiguous bank/card aliases, and tri-state outcomes;
 - handover schema, two-failure detection, seat/cancellation context, payment removal, and transcript redaction;
-- English/Arabic dictionary parity;
-- protected ElevenLabs, WebRTC, tool-name, seat-selection, error-boundary, RTL-seat, and 420 px invariants.
+- English/Arabic dictionary parity and confirmation-only language-switch scenarios;
+- mic-free text startup, protected ElevenLabs voice WebRTC, tool-name, seat-selection, error-boundary, RTL-seat, branding, and 420 px invariants.
 
 `npm run validate:converter` separately exercises the Python compact/flat conversion compatibility path.
 
@@ -112,6 +113,7 @@ Artwork URLs remain on official VOX/MAF hosts or their campaign CDN and include 
 - `src/bookingStore.js` — backward-compatible local booking persistence.
 - `src/offers/` — structured offer knowledge and resolver.
 - `src/lib/handoverSummary.js` — safe prototype OneView payload.
+- `src/lib/voxiSession.js` and `src/lib/languageSwitch.js` — VOXI runtime guidance and strict bilingual switching.
 - `src/i18n/` — English/Arabic locale provider and copy.
 - `src/components/` — cinema, movie, seat, checkout, QR/history, offers, and handover UI.
 
