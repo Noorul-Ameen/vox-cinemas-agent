@@ -9,6 +9,7 @@ import { normalizeElevenLabsMessageEvent } from "../src/lib/conversationMessage.
 import * as vista from "../src/vistaClient.js";
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const richMedia = fs.readFileSync(new URL("../src/components/RichMedia.jsx", import.meta.url), "utf8");
 const cinemas = vista.getCinemas();
 
 function sliceBetween(source, startMarker, endMarker, label) {
@@ -174,10 +175,17 @@ const typedMessageFlow = sliceBetween(app, "const sendText", "const sendUiTurn",
 assert.match(voiceMessageFlow, /normalizeElevenLabsMessageEvent\(message\)/, "SDK events must be normalized from the documented ElevenLabs onMessage contract");
 for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMessageFlow]]) {
   assert.match(flow, /isDirectCinemaSelectionUtterance\(/, `${label} must identify a direct cinema reply before FAQ rendering`);
-  assert.match(flow, /directCinemaSelection\s*\?\s*\{\s*matches:\s*\[\],\s*context:\s*""\s*\}\s*:\s*prepareFaqContext/, `${label} must not let generic cinema FAQ tags swallow a direct selection`);
+  assert.match(flow, /directCinemaSelection\s*\|\|\s*directCancellation\s*\?\s*\{\s*matches:\s*\[\],\s*context:\s*""\s*\}\s*:\s*prepareFaqContext/, `${label} must not let generic FAQ tags swallow direct cinema or cancellation actions`);
   assert.match(flow, /dismissStaleTransactionalView\(/, `${label} turns must dismiss a stale booking/history panel when the turn is unrelated`);
   assert.ok(flow.indexOf("dismissStaleTransactionalView(") < flow.indexOf("prepareFaqContext("), `${label} turns must clear hidden transactional context before an FAQ panel replaces it`);
+  assert.match(flow, /classifyBookingHistoryRequest\(/, `${label} must use the shared bilingual current/history classifier`);
+  assert.match(flow, /openHistory\(\{\s*notifyAgent:\s*false,\s*forceOpen:\s*true,\s*activeOnly:\s*historyRequest\.activeOnly\s*\}\)/, `${label} must apply the classifier's active-only scope to the visible list`);
   assert.match(flow, /cancellationReply:\s*decision\s*!==\s*null/, `${label} cancellation confirmations must keep the active booking panel`);
+  assert.match(flow, /isDirectCancellationRequest\(/, `${label} must classify contextual cancellation before stale-view cleanup`);
+  assert.ok(flow.indexOf("isDirectCancellationRequest(") < flow.indexOf("dismissStaleTransactionalView("), `${label} must recognize contextual cancellation before stale booking context can be dismissed`);
+  assert.match(flow, /actionIntent:\s*directCancellation\s*\?\s*["']cancellation["']\s*:\s*actionIntent/, `${label} must preserve the visible booking while shared cancellation routing begins`);
+  assert.match(flow, /routeCancellationTurn\(/, `${label} must initiate cancellation through the shared local router`);
+  assert.match(flow, /handleCancellationDecision\(decision,\s*\{\s*source:\s*["']conversation["']\s*\}\)/, `${label} must continue pending yes/no cancellation through the shared decision handler`);
   assert.match(flow, /routeRecognizedCinema\(details\.cinema,\s*requestedDate\)/, `${label} turns must route a recognized cinema without requiring a picker click`);
   assert.match(flow, /clientTools\.show_movie_selection\(\{\}\)/, `${label} first-turn movie discovery without a cinema must display the cinema picker`);
   assert.match(flow, /Only the VOX Cinemas UAE cinema picker is displayed; no movie list is visible yet/, `${label} context must not claim that movies are shown before a cinema is selected`);
@@ -213,5 +221,48 @@ for (const [component, view] of guardedPanels) {
 }
 assert.match(mainRender, /stage\.view === "booking" && displayedBooking && <BookingCard\b/, "a stored booking must not render unless booking is the active view");
 assert.match(mainRender, /stage\.view === "history" && <BookingHistory\b/, "booking history must not render unless history is the active view");
+assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}cancellation=\{[\s\S]{0,350}\bcancellationState\b/, "BookingCard must render the booking-scoped shared cancellation state used by text, voice, and touch");
+assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}onRequestCancel=\{/, "BookingCard must initiate cancellation through its parent-owned router");
+assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}onConfirm=\{/, "BookingCard confirmation must use the shared cancellation decision handler");
 
-console.log("Validated the live ElevenLabs voice-event fixture, stateful text/voice cinema routing, Mall of the Emirates speech variants, stale booking-panel dismissal, and exclusive rich-panel rendering.");
+assert.match(app, /const routeCancellationTurn\s*=\s*/, "App must define one shared local cancellation initiation router");
+assert.ok((app.match(/routeCancellationTurn\(/g) || []).length >= 2, "the shared cancellation router must be used by both SDK voice and typed turns");
+assert.match(app, /const IDLE_CANCELLATION_STATE\s*=\s*Object\.freeze\(\{\s*phase:\s*["']idle["']/, "cancellation rendering must begin from an explicit idle phase");
+const cancellationTool = sliceBetween(app, "show_booking_for_cancellation:", "show_offers:", "cancellation tool");
+assert.match(cancellationTool, /setHistoryFilter\(["']active["']\)/, "zero or multiple cancellation targets must render the active-bookings list with matching current-booking copy");
+const unresolvedCancellationTarget = sliceBetween(cancellationTool, "if (!target.bookingRef)", "if ([\"already_cancelled\", \"not_current_booking\"]", "unresolved cancellation target");
+assert.match(unresolvedCancellationTarget, /dismissPendingCancellation\(["']target_selection_required["']\)/, "zero or multiple targets must clear pending cancellation state before showing history");
+assert.doesNotMatch(unresolvedCancellationTarget, /setCancellationFlow\(/, "a target-selection outcome must not create a hidden confirmation or error flow");
+const inactiveCancellationTarget = sliceBetween(cancellationTool, "if ([\"already_cancelled\", \"not_current_booking\"]", "const existingFlow", "inactive cancellation target");
+assert.match(inactiveCancellationTarget, /dismissPendingCancellation\(target\.reason\)/, "known cancelled or past bookings must end the shared flow without confirmation");
+assert.match(inactiveCancellationTarget, /eligible:\s*false[\s\S]{0,180}confirmationRequired:\s*false/, "known past bookings must be returned as ineligible without confirmation");
+assert.ok(cancellationTool.indexOf("if (!isCurrentBooking(displayed))") < cancellationTool.indexOf("if (demoOnly)"), "a provider or fixture result must be rejected as past before any local cancellation confirmation is offered");
+assert.match(cancellationTool, /cancellationRequestId[\s\S]{0,900}cancellationRequestIsStale\(\)[\s\S]{0,300}staleCancellationResult\(\)/, "an obsolete booking lookup must not restore cancellation state after the guest moves to another task");
+assert.match(app, /const bookingHistoryTurnContext[\s\S]{0,900}no active bookings saved on this device[\s\S]{0,300}Do not ask them to select a booking/, "an empty current-booking result must not ask the guest to select a missing booking");
+assert.match(app, /cancellationFlowRef\.current[\s\S]{0,120}scroller\.scrollTop\s*=\s*scroller\.scrollHeight/, "new conversation messages must keep an active cancellation confirmation in view");
+const cancellationDecisionHandler = sliceBetween(app, "const handleCancellationDecision", "const publishCancellationDecision", "cancellation decision handler");
+assert.match(cancellationDecisionHandler, /flow\.phase === ["']error["'][\s\S]{0,450}dismissPendingCancellation\(["']error_dismissed["']\)/, "the error-panel keep action must dismiss the failed flow while leaving the booking unchanged");
+const cancellationContext = sliceBetween(app, "const cancellationResultContext", "const bookingHistoryTurnContext", "cancellation result context");
+assert.match(cancellationContext, /result\.reason === ["']no_active_booking["'][\s\S]{0,360}Do not ask for a booking reference/, "an empty current-booking cancellation must not ask for a missing reference");
+assert.match(cancellationContext, /result\.reason === ["']not_current_booking["'][\s\S]{0,360}Do not ask for confirmation/, "a past booking must be explained without reopening confirmation");
+const historyCancelHandler = sliceBetween(app, "const cancelHistoryBooking", "const toggleSeat", "history cancellation handler");
+assert.ok(historyCancelHandler.indexOf("existingFlow") < historyCancelHandler.indexOf("selectHistoryBooking(selected)"), "a repeated history cancel click must be ignored before it can invalidate the active lookup");
+assert.match(historyCancelHandler, /\["checking", "route_confirmation", "final_confirmation", "processing"\]\.includes\(existingFlow\.phase\)/, "history cancellation must guard every active phase against repeated clicks");
+const historyOpenHandler = sliceBetween(app, "const openHistory", "const openOffers", "history open handler");
+assert.match(historyOpenHandler, /preserveReturn\s*=\s*false[\s\S]{0,600}if \(!preserveReturn\) historyReturnRef\.current = stageRef\.current/, "returning from a selected booking must preserve the history panel's original parent view");
+assert.match(mainRender, /openHistory\(\{[^}]*preserveReturn:\s*true/, "the booking card's back action must reopen history without overwriting its original return target");
+const completionHandler = sliceBetween(app, "const completeCancellation", "const handleCancellationDecision", "cancellation completion handler");
+assert.match(completionHandler, /!isCurrentBooking\(current\)/, "final cancellation must re-check that the showtime is still current before any mutation");
+const cardCancelHandler = sliceBetween(app, "const cancelBooking", "const changeLanguage", "booking-card cancellation handler");
+assert.match(cardCancelHandler, /!isCurrentBooking\(current\)/, "the booking-card action must refuse past or cancelled records");
+for (const phase of ["checking", "route_confirmation", "final_confirmation", "processing", "error"]) {
+  assert.match(app, new RegExp(`phase:\\s*["']${phase}["']`), `App cancellation state must represent the ${phase} phase`);
+  assert.match(richMedia, new RegExp(`["']${phase}["']`), `BookingCard must render the ${phase} phase`);
+}
+assert.doesNotMatch(richMedia, /confirmingCancellation|setConfirmingCancellation/, "BookingCard must not keep a private confirmation state split from text and voice");
+assert.match(richMedia, /export function BookingCard\(\{[\s\S]{0,400}\bcancellation\b/, "BookingCard must receive parent-owned cancellation state");
+assert.match(richMedia, /const isCurrent = isCurrentBooking\(/, "BookingCard must share the current-showtime predicate used by text and voice routing");
+assert.match(richMedia, /\{isCurrent && !cancellationActive \? \(/, "BookingCard must not render a cancellation action for a past showtime");
+assert.match(richMedia, /cancellationActive[\s\S]{0,1800}<CancellationPanel\b/, "active cancellation phases must replace the normal card footer with one inline panel");
+
+console.log("Validated live voice-event normalization, text/voice cinema and cancellation routing parity, shared cancellation rendering phases, stale-panel dismissal, and exclusive rich-panel rendering.");

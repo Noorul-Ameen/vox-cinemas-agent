@@ -1,4 +1,5 @@
 import { VOX_FAQ_ENTRIES } from "./voxFaqData.js";
+import { classifyBookingHistoryRequest, isDirectCancellationRequest } from "../lib/cancellationRouting.js";
 
 const STOP_WORDS = new Set([
   "a", "an", "and", "are", "at", "can", "do", "does", "for", "from", "how", "i", "in", "is", "it", "me", "my", "of", "on", "the", "to", "what", "when", "where", "which", "with", "you",
@@ -37,8 +38,10 @@ export function classifyFaqActionIntent(queryText) {
   const query = normalizeFaqText(queryText);
   if (!query || PRIVATE_EVENT_HINT.test(query)) return null;
   if (PROGRAMMING_DISCOVERY_HINT.test(query)) return "booking";
+  if (isDirectCancellationRequest(queryText)) return "cancellation";
   if (CANCELLATION_REQUEST_TO_ASSISTANT_HINT.test(query)) return "cancellation";
   if (!CANCELLATION_POLICY_HINT.test(query) && CANCELLATION_ACTION_HINT.test(query)) return "cancellation";
+  if (classifyBookingHistoryRequest(queryText).requested) return "booking_history";
   if (BOOKING_HISTORY_ACTION_HINT.test(query)) return "booking_history";
   if (BOOKING_ACTION_HINT.test(query)) return "booking";
   return null;

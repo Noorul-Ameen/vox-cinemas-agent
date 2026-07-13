@@ -62,11 +62,15 @@ const ACTION_CASES = [
   ["\u0645\u0627\u0630\u0627 \u064a\u0639\u0631\u0636 \u0627\u0644\u0644\u064a\u0644\u0629\u061f", "booking"],
   ["أبغي أحجز تذكرتين", "booking"],
   ["Cancel my booking WL12345", "cancellation"],
+  ["Cancel this booking", "cancellation"],
   ["Can you cancel my booking?", "cancellation"],
   ["Could you please refund my tickets?", "cancellation"],
   ["أبغي ألغي حجزي", "cancellation"],
+  ["الغي هذا الحجز", "cancellation"],
   ["هل يمكنك إلغاء حجزي؟", "cancellation"],
   ["Show my booking history", "booking_history"],
+  ["Show my current bookings", "booking_history"],
+  ["اعرض حجوزاتي الحالية", "booking_history"],
 ];
 for (const [query, intent] of ACTION_CASES) {
   assert.equal(classifyFaqActionIntent(query), intent, `${query}: wrong action intent`);
@@ -74,6 +78,8 @@ for (const [query, intent] of ACTION_CASES) {
 }
 assert.equal(classifyFaqActionIntent("Can I cancel a booking?"), null, "policy questions must remain FAQ-eligible");
 assert.equal(resolveFaqOne("Can I cancel a booking?", { locale: "en" })?.topic, "cancellations_refunds", "cancellation policies must expose the cancellation routing topic");
+assert.equal(classifyFaqActionIntent("هل يمكنني إلغاء الحجز؟"), null, "Arabic policy questions must remain FAQ-eligible");
+assert.equal(resolveFaqOne("هل يمكنني إلغاء الحجز؟", { locale: "ar" })?.topic, "cancellations_refunds", "Arabic cancellation policies must expose the cancellation routing topic");
 assert.equal(classifyFaqActionIntent("private screening booking"), null, "private-event enquiries must remain FAQ-eligible");
 
 const first = resolveFaqQuery("refund credit wallet", { locale: "en", limit: 4 });

@@ -30,7 +30,10 @@ assert.match(app, /showtimeRequired/);
 
 const seatMapSegment = app.slice(app.indexOf("show_seat_map:"), app.indexOf("select_seats:"));
 assert.doesNotMatch(seatMapSegment, /new Promise/, "show_seat_map must remain non-blocking");
-assert.match(app.slice(app.indexOf("show_booking_for_cancellation:"), app.indexOf("show_offers:")), /new Promise/, "cancellation confirmation remains blocking only for active bookings");
+const cancellationSegment = app.slice(app.indexOf("show_booking_for_cancellation:"), app.indexOf("show_offers:"));
+assert.doesNotMatch(cancellationSegment, /new Promise/, "cancellation tools must return phase state promptly so text, voice, and touch can share one confirmation UI");
+assert.match(cancellationSegment, /confirmationRequired:\s*true[\s\S]*phase:\s*"final_confirmation"/, "device cancellation must return an explicit final-confirmation phase");
+assert.match(cancellationSegment, /confirmationRequired:\s*true[\s\S]*phase:\s*"route_confirmation"/, "verified cancellation must return an explicit refund-route phase");
 const cinemaPickerSegment = app.slice(app.indexOf("const openCinemaPicker"), app.indexOf("const chooseCinema"));
 const historyPickerSegment = app.slice(app.indexOf("const openHistory"), app.indexOf("const openOffers"));
 assert.doesNotMatch(cinemaPickerSegment, /clearPendingOrder/, "opening the cinema picker must preserve an in-progress checkout");

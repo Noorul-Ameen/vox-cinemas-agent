@@ -17,8 +17,12 @@ assert.match(app, /<TicketQuantityControl\b/, "ticket quantity must stay visible
 assert.match(app, /voxi:new-conversation/);
 assert.match(app, /voxi:logout/);
 assert.match(app, /CONVERSATION_IDLE_MS/);
-assert.match(app, /if \(reason === "timeout"\) \{\s*clearConversationState\(reason\);\s*\} else if \(cancelResolver\.current/, "only the deliberate app inactivity timeout should clear local UI state on disconnect");
-assert.match(app, /dismissPendingCancellation\("transport_disconnected"\)/, "a dead transport must resolve any still-pending cancellation confirmation");
+const appCallbacksStart = app.indexOf("const transportCallbacks = {");
+const disconnectStart = app.indexOf("onDisconnect:", appCallbacksStart);
+const disconnectFlow = app.slice(disconnectStart, app.indexOf("onMessage:", disconnectStart));
+assert.match(disconnectFlow, /if \(reason === "timeout"\) \{\s*clearConversationState\(reason\);\s*\}/, "only the deliberate app inactivity timeout should clear local UI state on disconnect");
+assert.doesNotMatch(disconnectFlow, /dismissPendingCancellation|setCancellationFlow\(null\)/, "a transport-only disconnect must preserve the shared cancellation confirmation so text can continue it");
+assert.doesNotMatch(app, /cancelResolver/, "non-blocking cancellation must not retain obsolete promise-resolver transport branches");
 assert.match(app, /posterUrl:\s*movie\?\.posterUrl/, "completed orders must retain their poster URL");
 assert.match(media, /getMoviePosterUrl\(booking\)/, "booking confirmation must resolve a poster with fallback support");
 const cancellationTool = app.slice(app.indexOf("show_booking_for_cancellation: async"), app.indexOf("show_offers: async"));

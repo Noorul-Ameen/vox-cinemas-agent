@@ -57,6 +57,9 @@ const handoverSource = await readFile(new URL("../src/components/HandoverPanel.j
 const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
 for (const key of ["booking.cinema", "booking.performance", "booking.status"]) assert.match(richMediaSource, new RegExp(key.replace(".", "\\.")), `${key} must be shown on booking confirmation`);
 for (const field of ["cinemaName", "booking.date", "history.cancelled", "history.active"]) assert.match(historySource, new RegExp(field.replace(".", "\\.")), `${field} must be represented in booking history`);
+assert.match(historySource, /const current = isCurrentBooking\(booking\)/, "booking history must classify each record using the shared current-booking rules");
+assert.match(historySource, /: !current\s*\? t\("history\.past"\)/, "elapsed records must be labelled as past shows");
+assert.match(historySource, /\{current && cancelBooking && \(/, "only current bookings may expose the cancellation action");
 assert.match(richMediaSource, /booking\.performanceDate\s*\|\|\s*booking\.sourceDate\s*\|\|\s*booking\.date/, "booking cards must prefer the actual performance date and retain after-midnight source dates");
 assert.match(historySource, /booking\.performanceDate\s*\|\|\s*booking\.sourceDate\s*\|\|\s*booking\.date/, "booking history must use the actual performance date fallback chain");
 assert.match(richMediaSource, /m\.language\s*\|\|\s*""/, "movie cards must show language even when runtime is present");
@@ -74,7 +77,7 @@ for (const key of [
   "seats.standardQuoteRequired", "seats.premiumQuoteRequired", "seats.demoPricingNotice",
   "seats.quoteRequiredNotice", "seats.demoEstimateLabel", "seats.quoteRequiredLabel", "checkout.testOnly", "checkout.liveUnavailable",
   "booking.demoConfirmed", "booking.cancelledLocal", "booking.noRefundProcessed", "booking.qrDemoHint", "booking.qrReferenceOnly",
-  "history.demo", "history.cancelledLocal", "app.paymentSimulated", "app.dateUnavailable",
+  "history.demo", "history.cancelledLocal", "history.past", "app.paymentSimulated", "app.dateUnavailable",
 ]) {
   assert.ok(STRINGS.en[key], `${key}: English copy missing`);
   assert.ok(STRINGS.ar[key], `${key}: Arabic copy missing`);

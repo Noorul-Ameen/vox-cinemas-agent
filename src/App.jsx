@@ -13,6 +13,7 @@ import { useI18n } from "./i18n/I18nProvider.jsx";
 import { HANDOVER_TRIGGER, buildHandoverPayload, isClarificationFailureReason } from "./lib/handoverSummary.js";
 import { resolveFilmCandidate } from "./lib/fuzzyResolvers.js";
 import { isCinemaSelectionTurn, isDirectCinemaSelectionUtterance, resolveCinemaCandidate } from "./lib/cinemaRouting.js";
+import { bookingHistoryAgentContext, classifyBookingHistoryRequest, isCurrentBooking, isDirectCancellationRequest, resolveCancellationTarget } from "./lib/cancellationRouting.js";
 import { normalizeElevenLabsMessageEvent } from "./lib/conversationMessage.js";
 import { resolveLanguageSignal } from "./lib/languageSwitch.js";
 import { buildTransportHandoff, createConversationJourney, inferIntent, journeyDynamicVariables, journeyReducer, syncJourney } from "./lib/conversationJourney.js";
@@ -63,6 +64,7 @@ const localizedOfferReason = (result, locale) => {
 
 const CONVERSATION_IDLE_MS = 15 * 60 * 1000;
 const MAX_TICKETS = 10;
+const IDLE_CANCELLATION_STATE = Object.freeze({ phase: "idle", bookingRef: null, demoOnly: false, refundRoute: null, message: null, error: null });
 
 const ElevenLabsTransport = forwardRef(function ElevenLabsTransport({
   callbacks,
@@ -211,10 +213,11 @@ function extractTicketQuantity(text) {
   return quantity >= 1 && quantity <= MAX_TICKETS ? quantity : null;
 }
 
-const isBookingHistoryRequest = (text) => /\b(my|past|previous|booking)\s+(bookings?|history)\b|\bbooking history\b|حجوزات[يي]?|سجل\s+الحجوزات/i.test(String(text || ""));
 const cancellationDecision = (text) => {
   const value = norm(text).replace(/[.!?،؟]/g, "").trim();
   if (/^(yes|yes please|confirm|proceed|go ahead|cancel it|yes cancel it|نعم|ايوه|أيوه|الغ[يه]|الغي الحجز|أكد|تاكيد|تأكيد)$/.test(value)) return true;
+  if (/^yes(?: please)?[, ]+(?:cancel|refund|void)(?: (?:my|this|the))?(?: (?:booking|reservation|tickets?))?(?: wl[a-z0-9-]+)?$/.test(value)) return true;
+  if (/^نعم[, ]+(?:الغ[يه]|الغي|ألغي)(?: (?:حجزي|الحجز))?(?: wl[a-z0-9-]+)?$/.test(value)) return true;
   if (/^(no|no thanks|do not cancel|dont cancel|keep it|back|لا|لأ|لا تلغ[يه]|احتفظ بالحجز|تراجع)$/.test(value)) return false;
   return null;
 };
@@ -242,6 +245,7 @@ export default function App() {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [booking, setBooking] = useState(null);
   const [bookings, setBookings] = useState(readBookings);
+  const [historyFilter, setHistoryFilter] = useState("all");
   const [pendingOrder, setPendingOrder] = useState(null);
   const [cinema, setCinema] = useState(null);
   const [sessionMode, setSessionMode] = useState(null);
@@ -252,10 +256,11 @@ export default function App() {
   const [ticketQuantity, setTicketQuantity] = useState(null);
   const [transportGeneration, setTransportGeneration] = useState(0);
   const [transportStatus, setTransportStatus] = useState("disconnected");
+  const [cancellationState, setCancellationState] = useState(IDLE_CANCELLATION_STATE);
 
-  // Blocking cancellation tool state. Seat selection remains deliberately
-  // non-blocking so both voice and touch can continue to use select_seats.
-  const cancelResolver = useRef(null);
+  // Cancellation tools return promptly so the agent can speak each prompt.
+  // The ref is the synchronous source for SDK callbacks; cancellationState is
+  // its renderable mirror for the shared text, voice, and touch experience.
   const cancelTimerRef = useRef(null);
   const cancellationFlowRef = useRef(null);
   const cancellationInFlightRef = useRef(false);
@@ -272,6 +277,7 @@ export default function App() {
   const planContextRef = useRef(null);
   const cinemaReturnRef = useRef(null);
   const historyReturnRef = useRef(null);
+  const bookingOpenedFromHistoryRef = useRef(false);
   const offersReturnRef = useRef(null);
   const faqReturnRef = useRef(null);
 
@@ -312,6 +318,20 @@ export default function App() {
   const disconnectReasonRef = useRef("ended");
   const suppressDisconnectNoticeRef = useRef(false);
   const requestEpochRef = useRef(0);
+
+  const setCancellationFlow = useCallback((nextFlow) => {
+    const resolved = typeof nextFlow === "function" ? nextFlow(cancellationFlowRef.current) : nextFlow;
+    cancellationFlowRef.current = resolved || null;
+    setCancellationState(resolved ? {
+      phase: resolved.phase || "idle",
+      bookingRef: resolved.bookingRef || null,
+      demoOnly: Boolean(resolved.demoOnly),
+      refundRoute: resolved.refundRoute || null,
+      message: resolved.message || null,
+      error: resolved.error || null,
+    } : IDLE_CANCELLATION_STATE);
+    return resolved || null;
+  }, []);
 
   useEffect(() => { stageRef.current = stage; }, [stage]);
   useEffect(() => { cinemaRef.current = cinema; }, [cinema]);
@@ -421,10 +441,7 @@ export default function App() {
     cancellationInFlightRef.current = false;
     window.clearTimeout(cancelTimerRef.current);
     cancelTimerRef.current = null;
-    const resolver = cancelResolver.current;
-    cancelResolver.current = null;
-    cancellationFlowRef.current = null;
-    if (resolver) resolver(JSON.stringify({ confirmed: false, reason }));
+    setCancellationFlow(null);
   };
 
   const clearPendingOrder = () => {
@@ -489,7 +506,9 @@ export default function App() {
     // offer context.
     clearPendingOrder();
     bookingRef.current = null;
+    bookingOpenedFromHistoryRef.current = false;
     setBooking(null);
+    setHistoryFilter("all");
     historyReturnRef.current = null;
     showStage(canRestoreMovies ? { view: "movies", movies: filmsRef.current } : { view: "empty" });
     return true;
@@ -530,7 +549,7 @@ export default function App() {
           : "general_enquiry";
     journeyRef.current = { ...journeyRef.current, intent: faqIntent };
     dispatchJourney({ type: "intent", intent: faqIntent });
-    const transactionalAction = Boolean(actionIntent) || isBookingHistoryRequest(query);
+    const transactionalAction = Boolean(actionIntent) || classifyBookingHistoryRequest(query).requested;
     if (render && !transactionalAction) {
       if (current?.view !== "faq") faqReturnRef.current = current || { view: "empty" };
       showStage({ view: "faq", faq: primary });
@@ -751,6 +770,7 @@ export default function App() {
     }
     setBookings(readBookings());
     bookingRef.current = completed;
+    bookingOpenedFromHistoryRef.current = false;
     pendingOrderRef.current = null;
     setBooking(completed);
     setPendingOrder(null);
@@ -1022,6 +1042,7 @@ export default function App() {
       const locallyStored = Boolean(storedRecord);
       const providerVerified = !locallyStored && withTint.verified === true;
       bookingRef.current = withTint;
+      bookingOpenedFromHistoryRef.current = false;
       setBooking(withTint);
       showStage({ view: "booking", booking: withTint });
       resetClarificationFailures();
@@ -1043,18 +1064,97 @@ export default function App() {
     },
 
     show_booking_for_cancellation: async ({ bookingRef: requestedRef } = {}) => {
+      const openedFromHistory = stageRef.current.view === "history" || bookingOpenedFromHistoryRef.current;
+      const storedBookings = readBookings();
+      const target = resolveCancellationTarget({
+        requestedRef,
+        visibleBooking: stageRef.current.view === "booking" ? bookingRef.current : null,
+        storedBookings,
+      });
+      if (!target.bookingRef) {
+        dismissPendingCancellation("target_selection_required");
+        const visibleBookings = storedBookings.filter((item) => isCurrentBooking(item));
+        if (stageRef.current.view !== "history") historyReturnRef.current = stageRef.current;
+        setHistoryFilter("active");
+        setBookings(visibleBookings);
+        showStage({ view: "history" });
+        const multiple = target.reason === "multiple_active_bookings";
+        const message = localeRef.current === "ar"
+          ? (multiple ? "لديك أكثر من حجز نشط. اختر الحجز الذي تريد إلغاءه." : "لا توجد حجوزات نشطة محفوظة على هذا الجهاز.")
+          : (multiple ? "You have more than one active booking. Select the booking you want to cancel." : "No active bookings are saved on this device.");
+        return JSON.stringify({
+          found: false,
+          confirmationRequired: false,
+          phase: "idle",
+          reason: target.reason,
+          candidates: target.candidates,
+          message,
+          instruction: multiple ? "Ask the guest to select one of the visible bookings. Never guess." : "Tell the guest no active on-device booking was found.",
+        });
+      }
+
+      if (["already_cancelled", "not_current_booking"].includes(target.reason)) {
+        dismissPendingCancellation(target.reason);
+        const alreadyCancelled = target.reason === "already_cancelled";
+        const message = localeRef.current === "ar"
+          ? (alreadyCancelled ? "هذا الحجز ملغى بالفعل." : "انتهى موعد هذا العرض، لذلك لم يعد الحجز متاحاً للإلغاء.")
+          : (alreadyCancelled ? "This booking is already cancelled." : "This showtime has passed, so the booking is no longer available for cancellation.");
+        return JSON.stringify({
+          found: true,
+          eligible: false,
+          confirmationRequired: false,
+          phase: "idle",
+          reason: target.reason,
+          alreadyCancelled,
+          bookingRef: target.bookingRef,
+          message,
+        });
+      }
+
+      const existingFlow = cancellationFlowRef.current;
+      if (existingFlow?.bookingRef && norm(existingFlow.bookingRef) === norm(target.bookingRef)
+        && ["checking", "route_confirmation", "final_confirmation", "processing"].includes(existingFlow.phase)) {
+        return JSON.stringify({
+          found: true,
+          bookingRef: existingFlow.bookingRef,
+          confirmationRequired: ["route_confirmation", "final_confirmation"].includes(existingFlow.phase),
+          phase: existingFlow.phase,
+          refundRoute: existingFlow.refundRoute || null,
+          simulationOnly: Boolean(existingFlow.demoOnly),
+          message: existingFlow.message || "The cancellation flow is already active in the widget. Do not restart it.",
+        });
+      }
+
       dismissPendingCancellation("replaced");
       clearPendingOrder();
+      setCancellationFlow({ phase: "checking", bookingRef: target.bookingRef, message: localeRef.current === "ar" ? "جارٍ التحقق من إمكانية إلغاء الحجز…" : "Checking cancellation eligibility…" });
       const requestRevision = stageRevisionRef.current;
+      const cancellationRequestId = cancellationOperationRef.current;
+      const cancellationRequestIsStale = () => cancellationOperationRef.current !== cancellationRequestId
+        || stageRevisionRef.current !== requestRevision;
+      const staleCancellationResult = () => {
+        if (cancellationOperationRef.current === cancellationRequestId) setCancellationFlow(null);
+        const message = localeRef.current === "ar" ? "تم الانتقال إلى طلب آخر قبل اكتمال التحقق من الحجز." : "The booking check stopped because you moved to another task.";
+        return JSON.stringify({ found: false, bookingRef: target.bookingRef, confirmationRequired: false, reason: "task_changed", message });
+      };
       let found;
       try {
-        found = await vista.searchBooking(requestedRef);
+        found = await vista.searchBooking(target.bookingRef);
       } catch (error) {
-        return JSON.stringify({ found: false, bookingRef: requestedRef || null, reason: error?.message || "Booking not found." });
+        if (cancellationRequestIsStale()) return staleCancellationResult();
+        const reason = error?.message || "Booking not found.";
+        const message = localeRef.current === "ar" ? "تعذر العثور على هذا الحجز. تحقق من مرجع الحجز وحاول مرة أخرى." : "This booking could not be found. Check the booking reference and try again.";
+        const visibleMatch = stageRef.current.view === "booking"
+          && norm(bookingRef.current?.ref) === norm(target.bookingRef);
+        if (visibleMatch) {
+          setCancellationFlow({ phase: "error", bookingRef: target.bookingRef, error: reason, message });
+        } else {
+          dismissPendingCancellation("booking_lookup_failed");
+          say("system", message);
+        }
+        return JSON.stringify({ found: false, bookingRef: target.bookingRef, confirmationRequired: false, reason, message });
       }
-      if (stageRevisionRef.current !== requestRevision) {
-        return JSON.stringify({ found: false, bookingRef: requestedRef || null, reason: "The guest moved to another task while the booking was being checked." });
-      }
+      if (cancellationRequestIsStale()) return staleCancellationResult();
       const displayed = {
         ...found,
         date: found.performanceDate || found.sourceDate || found.date || null,
@@ -1065,21 +1165,41 @@ export default function App() {
         bookingStatus: found.bookingStatus || (found.cancelled ? "cancelled" : "confirmed"),
       };
       bookingRef.current = displayed;
+      bookingOpenedFromHistoryRef.current = openedFromHistory;
       setBooking(displayed);
       showStage({ view: "booking", booking: displayed });
       resetClarificationFailures();
       if (displayed.cancelled) {
+        const message = localeRef.current === "ar"
+          ? (displayed.refundStatus === "not_processed_demo" ? "هذا الحجز مسجل كملغى على هذا الجهاز، ولم تتم معالجة أي استرداد." : "هذا الحجز ملغى بالفعل.")
+          : (displayed.refundStatus === "not_processed_demo" ? "This booking is marked cancelled on this device. No refund was processed." : "This booking is already cancelled.");
+        dismissPendingCancellation("already_cancelled");
         return JSON.stringify({
           confirmed: false,
+          confirmationRequired: false,
           alreadyCancelled: true,
           bookingRef: displayed.ref,
           bookingStatus: displayed.bookingStatus,
           refundStatus: displayed.refundStatus || null,
           refundReference: displayed.refundReference || null,
           demo: displayed.refundStatus === "not_processed_demo",
-          message: displayed.refundStatus === "not_processed_demo"
-            ? "This booking is marked cancelled on this device. No refund was processed."
-            : undefined,
+          message,
+        });
+      }
+      if (!isCurrentBooking(displayed)) {
+        const message = localeRef.current === "ar"
+          ? "انتهى موعد هذا العرض، لذلك لم يعد الحجز متاحاً للإلغاء. لم يتم تغيير الحجز."
+          : "This showtime has passed, so the booking is no longer available for cancellation. The booking was not changed.";
+        dismissPendingCancellation("not_current_booking");
+        return JSON.stringify({
+          confirmed: false,
+          confirmationRequired: false,
+          found: true,
+          eligible: false,
+          phase: "idle",
+          bookingRef: displayed.ref,
+          reason: "not_current_booking",
+          message,
         });
       }
       const demoOnly = displayed.cancellation?.demoOnly === true
@@ -1089,55 +1209,60 @@ export default function App() {
         || displayed.paymentStatus === "simulated_not_charged"
         || displayed.bookingStatus === "confirmed_demo";
       if (demoOnly) {
-        return await new Promise((resolve) => {
-          cancelResolver.current = resolve;
-          cancellationFlowRef.current = {
-            bookingRef: displayed.ref,
-            phase: "final_confirmation",
-            refundRoute: null,
-            eligibilityStatus: "local_demo_only",
-            demoOnly: true,
-          };
-          say("system", localeRef.current === "ar"
-            ? `هل تريد تسجيل الحجز ${displayed.ref} كملغى على هذا الجهاز؟ لن يتم التواصل مع VOX أو إصدار أي استرداد. قل نعم لتسجيله كملغى أو لا للإبقاء عليه.`
-            : `Mark booking ${displayed.ref} as cancelled on this device? This will not contact VOX or issue a refund. Say yes to mark it cancelled or no to keep it active.`);
-          cancelTimerRef.current = window.setTimeout(() => dismissPendingCancellation("confirmation_timeout"), 90_000);
-        });
+        const message = localeRef.current === "ar"
+          ? `هل تريد تسجيل الحجز ${displayed.ref} كملغى على هذا الجهاز؟ لن يتم التواصل مع VOX أو إصدار أي استرداد. قل نعم لتسجيله كملغى أو لا للإبقاء عليه.`
+          : `Mark booking ${displayed.ref} as cancelled on this device? This will not contact VOX or issue a refund. Say yes to mark it cancelled or no to keep it active.`;
+        setCancellationFlow({
+          bookingRef: displayed.ref,
+          phase: "final_confirmation",
+          refundRoute: null,
+          eligibilityStatus: "local_demo_only",
+        demoOnly: true,
+        message,
+      });
+        cancelTimerRef.current = window.setTimeout(() => dismissPendingCancellation("confirmation_timeout"), 90_000);
+        return JSON.stringify({ found: true, bookingRef: displayed.ref, eligible: true, simulationOnly: true, confirmationRequired: true, phase: "final_confirmation", refundRoute: null, message });
       }
       if (displayed.cancellation?.status === "ineligible") {
+        const message = localeRef.current === "ar" ? "هذا الحجز غير مؤهل للإلغاء." : "This booking is not eligible for cancellation.";
+        setCancellationFlow({ phase: "error", bookingRef: displayed.ref, error: displayed.cancellation.reason, message });
         return JSON.stringify({
           confirmed: false,
+          confirmationRequired: false,
           found: true,
           eligible: false,
           bookingRef: displayed.ref,
           reason: displayed.cancellation.reason,
-          message: "This booking is not eligible for cancellation. Do not ask the guest to confirm a refund.",
+          message,
         });
       }
       if (displayed.cancellation?.status !== "eligible") {
+        const message = localeRef.current === "ar" ? "تعذر التحقق من أهلية الإلغاء. استخدم خدمة إدارة الحجز الرسمية من VOX." : "Cancellation eligibility could not be verified. Use the official VOX Manage Booking service.";
+        setCancellationFlow({ phase: "error", bookingRef: displayed.ref, error: displayed.cancellation?.reason || "provider_verification_required", message });
         return JSON.stringify({
           confirmed: false,
+          confirmationRequired: false,
           found: true,
           eligible: false,
           reviewRequired: true,
           bookingRef: displayed.ref,
           reason: displayed.cancellation?.reason || "provider_verification_required",
-          message: "Cancellation eligibility could not be verified. Do not ask the guest to confirm a refund; direct them to the official VOX Manage Booking flow.",
+          message,
         });
       }
-      return await new Promise((resolve) => {
-        cancelResolver.current = resolve;
-        cancellationFlowRef.current = {
-          bookingRef: displayed.ref,
-          phase: "route_confirmation",
-          refundRoute: "VOX Wallet",
-          eligibilityStatus: displayed.cancellation?.status || "unknown",
-        };
-        say("system", localeRef.current === "ar"
-          ? `سيُعاد المبلغ المؤهل افتراضياً إلى محفظة VOX للحجز ${displayed.ref}. قل نعم لاختيار محفظة VOX، ثم سأطلب تأكيداً نهائياً منفصلاً.`
-          : `Eligible refunds default to VOX Wallet credit for booking ${displayed.ref}. Say yes to choose VOX Wallet; Voxi will then ask for a separate final confirmation.`);
-        cancelTimerRef.current = window.setTimeout(() => dismissPendingCancellation("confirmation_timeout"), 90_000);
+      const message = localeRef.current === "ar"
+        ? `سيُعاد المبلغ المؤهل افتراضياً إلى محفظة VOX للحجز ${displayed.ref}. قل نعم لاختيار محفظة VOX، ثم سأطلب تأكيداً نهائياً منفصلاً.`
+        : `Eligible refunds default to VOX Wallet credit for booking ${displayed.ref}. Say yes to choose VOX Wallet; Voxi will then ask for a separate final confirmation.`;
+      setCancellationFlow({
+        bookingRef: displayed.ref,
+        phase: "route_confirmation",
+        refundRoute: "VOX Wallet",
+        eligibilityStatus: displayed.cancellation?.status || "unknown",
+        demoOnly: false,
+        message,
       });
+      cancelTimerRef.current = window.setTimeout(() => dismissPendingCancellation("confirmation_timeout"), 90_000);
+      return JSON.stringify({ found: true, bookingRef: displayed.ref, eligible: true, simulationOnly: false, confirmationRequired: true, phase: "route_confirmation", refundRoute: "VOX Wallet", message });
     },
 
     show_offers: async ({ bankName = "", cardName = "", experience = "" } = {}) => {
@@ -1242,6 +1367,60 @@ export default function App() {
     },
   };
 
+  const routeCancellationTurn = async (text) => {
+    const storedBookings = readBookings();
+    const target = resolveCancellationTarget({
+      text,
+      visibleBooking: stageRef.current.view === "booking" ? bookingRef.current : null,
+      storedBookings,
+    });
+    const rawResult = await clientTools.show_booking_for_cancellation({ bookingRef: target.bookingRef || undefined });
+    try {
+      return typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+    } catch {
+      return { found: false, confirmationRequired: false, reason: "unreadable_cancellation_result", message: "The cancellation check returned an unreadable result." };
+    }
+  };
+
+  const cancellationResultContext = (result, { promptAlreadyVisible = false } = {}) => {
+    if (!result) return "The widget could not determine the cancellation state. Do not claim that the booking was cancelled.";
+    if (result.confirmed) {
+      return result.simulationOnly
+        ? `The widget marked booking ${result.bookingRef} cancelled on this device. No refund was processed. Confirm this boundary once.`
+        : `The verified refund adapter confirmed booking ${result.bookingRef} cancelled. Refund reference: ${result.refundReference || "not returned"}.`;
+    }
+    if (result.phase === "processing") return `The widget is processing cancellation for ${result.bookingRef}. Do not claim success until a completed result is supplied.`;
+    if (result.confirmationRequired) {
+      if (promptAlreadyVisible) {
+        return `The widget is awaiting ${result.phase} for booking ${result.bookingRef}. The exact confirmation prompt and controls are already visible in the widget. Do not repeat the prompt or call show_booking_for_cancellation again. Reply with one short sentence in the active language telling the guest to use the confirmation below or answer yes/no.`;
+      }
+      return `The widget is awaiting ${result.phase} for booking ${result.bookingRef}. Speak this confirmation prompt now: ${result.message} Do not call show_booking_for_cancellation again while this phase is active.`;
+    }
+    if (result.reason === "multiple_active_bookings") {
+      return `${bookingHistoryAgentContext(readBookings().filter((item) => isCurrentBooking(item)))} Ask the guest to select or name exactly one booking; never guess.`;
+    }
+    if (result.reason === "no_active_booking") {
+      return `The widget found no active bookings saved on this device. Reply with only one short sentence in the active language saying there are no current bookings available to cancel, then end the turn. Do not ask for a booking reference, offer a lookup, or imply that a hidden booking may still be active.`;
+    }
+    if (result.reason === "not_current_booking") {
+      return `Booking ${result.bookingRef || "the requested booking"} is a past showtime and cannot be cancelled here. Tell the guest the showtime has passed and the booking was not changed. Do not ask for confirmation.`;
+    }
+    if (result.reason === "already_cancelled") {
+      return `Booking ${result.bookingRef || "the requested booking"} is already cancelled. State that briefly and do not ask for confirmation or a booking reference.`;
+    }
+    return `The cancellation did not proceed. Reason: ${result.reason || result.message || "unknown"}. Do not claim the booking was cancelled or refunded.`;
+  };
+
+  const bookingHistoryTurnContext = (visibleBookings, { activeOnly = false } = {}) => {
+    const items = Array.isArray(visibleBookings) ? visibleBookings : [];
+    const instruction = items.length
+      ? "Acknowledge briefly and ask the guest to select the booking they need help with."
+      : activeOnly
+        ? "Tell the guest there are no active bookings saved on this device. Do not ask them to select a booking."
+        : "Tell the guest there are no booking summaries saved on this device. Do not ask them to select a booking.";
+    return `${bookingHistoryAgentContext(items)} ${instruction}`;
+  };
+
   const routeRecognizedCinema = async (matchedCinema, requestedDate = null) => {
     if (!matchedCinema?.id) return { shown: false, reason: "No cinema was recognized." };
     const rawResult = await clientTools.show_movie_selection({
@@ -1260,7 +1439,6 @@ export default function App() {
     cancellationOperationRef.current += 1;
     requestedSessionEpochRef.current = null;
     dismissPendingCancellation(reason);
-    cancellationFlowRef.current = null;
     cancellationInFlightRef.current = false;
     messagesRef.current = [];
     setMessages([]);
@@ -1271,6 +1449,7 @@ export default function App() {
     cinemaRef.current = null;
     setCinema(null);
     bookingRef.current = null;
+    bookingOpenedFromHistoryRef.current = false;
     setBooking(null);
     pendingOrderRef.current = null;
     setPendingOrder(null);
@@ -1346,8 +1525,6 @@ export default function App() {
         // perform their own full reset in restartConversation.
         if (reason === "timeout") {
           clearConversationState(reason);
-        } else if (cancelResolver.current && !cancellationInFlightRef.current) {
-          dismissPendingCancellation("transport_disconnected");
         }
         if (!suppressNotice) say("system", t(reason === "timeout" ? "app.timeoutMessage" : "app.disconnectedMessage"));
       }
@@ -1371,17 +1548,21 @@ export default function App() {
         if (sanitized.sensitive) say("system", localeRef.current === "ar" ? "تمت إزالة بيانات الدفع الحساسة من المحادثة. استخدم شاشة الدفع الآمنة فقط." : "Sensitive payment details were removed. Use only the secure checkout screen for payment.");
         say("user", safeMessage);
         const decision = cancellationFlowRef.current ? cancellationDecision(safeMessage) : null;
-        if (decision !== null) handleCancellationDecision(decision, { source: "conversation" });
-        const historyRequested = isBookingHistoryRequest(safeMessage);
-        if (historyRequested) openHistory({ notifyAgent: false, forceOpen: true });
+        if (decision !== null) publishCancellationDecision(handleCancellationDecision(decision, { source: "conversation" }));
+        const historyRequest = classifyBookingHistoryRequest(safeMessage);
+        const visibleHistory = historyRequest.requested
+          ? openHistory({ notifyAgent: false, forceOpen: true, activeOnly: historyRequest.activeOnly })
+          : null;
         const directCinemaSelection = isDirectCinemaSelectionUtterance({
           text: safeMessage,
           view: stageRef.current.view,
           cinemaMatch: resolveCinema(safeMessage),
         });
         const actionIntent = classifyFaqActionIntent(safeMessage);
-        dismissStaleTransactionalView({ text: safeMessage, actionIntent, historyRequested, cancellationReply: decision !== null });
-        const faq = directCinemaSelection ? { matches: [], context: "" } : prepareFaqContext(safeMessage);
+        const hasBookingContext = ["booking", "history"].includes(stageRef.current.view);
+        const directCancellation = decision === null && isDirectCancellationRequest(safeMessage, { hasBookingContext });
+        dismissStaleTransactionalView({ text: safeMessage, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
+        const faq = directCinemaSelection || directCancellation ? { matches: [], context: "" } : prepareFaqContext(safeMessage);
         const details = applyUtteranceBookingDetails(safeMessage, { actionIntent, hasFaq: faq.matches.length > 0 });
         const availableDates = programmingDatesForCinema(cinemaRef.current);
         const bookingContext = !faq.matches.length && (
@@ -1417,8 +1598,16 @@ export default function App() {
           conversation.sendContextualUpdate?.(`The guest explicitly named ${details.cinema.name}. The widget selected that cinema; do not ask for it again.`);
         }
         if (details.ticketQuantity) conversation.sendContextualUpdate?.(`The guest explicitly requested ${details.ticketQuantity} tickets. Preserve that quantity through seat selection.`);
-        if (historyRequested) {
-          conversation.sendContextualUpdate?.("The guest's booking summaries saved on this device are already displayed. Do not call another booking-history tool or present these summaries as provider confirmations. Ask them to select the relevant booking.");
+        if (historyRequest.requested) {
+          conversation.sendContextualUpdate?.(`${bookingHistoryTurnContext(visibleHistory, { activeOnly: historyRequest.activeOnly })} Do not call another booking-history tool.`);
+        }
+        if (directCancellation) {
+          conversation.sendContextualUpdate?.("The widget is resolving the exact cancellation target and checking eligibility. Do not guess a booking or claim cancellation yet.");
+          void routeCancellationTurn(safeMessage).then((result) => {
+            conversation.sendContextualUpdate?.(cancellationResultContext(result));
+          }).catch((error) => {
+            conversation.sendContextualUpdate?.(`The cancellation check failed: ${error?.message || "unknown error"}. Do not claim cancellation or refund success.`);
+          });
         }
         if (faq.matches.length) {
           conversation.sendContextualUpdate?.(`${faq.context}\nThe guest's spoken question is: ${safeMessage}. Answer from this approved context without restarting the active task.`);
@@ -1698,10 +1887,6 @@ export default function App() {
         permissionStream.getTracks().forEach((track) => track.stop());
         if (epoch !== sessionEpochRef.current) return false;
         if (sessionModeRef.current) {
-          if (cancelResolver.current) {
-            dismissPendingCancellation("transport_switch_retry_required");
-            say("system", localeRef.current === "ar" ? "أعد طلب الإلغاء بعد تشغيل الصوت لتأكيده بأمان." : "Please restart the cancellation check after voice connects so its confirmation stays attached to the active session.");
-          }
           switchingSessionRef.current = true;
           await conversation.endSession();
           endedPreviousSession = true;
@@ -1812,17 +1997,21 @@ export default function App() {
     }
     const localMessage = say("user", value);
     const decision = cancellationFlowRef.current ? cancellationDecision(value) : null;
-    if (decision !== null) handleCancellationDecision(decision, { source: "conversation" });
-    const historyRequested = isBookingHistoryRequest(value);
-    if (historyRequested) openHistory({ notifyAgent: false, forceOpen: true });
+    if (decision !== null) publishCancellationDecision(handleCancellationDecision(decision, { source: "conversation" }), { promptAlreadyVisible: true });
+    const historyRequest = classifyBookingHistoryRequest(value);
+    const visibleHistory = historyRequest.requested
+      ? openHistory({ notifyAgent: false, forceOpen: true, activeOnly: historyRequest.activeOnly })
+      : null;
     const directCinemaSelection = isDirectCinemaSelectionUtterance({
       text: value,
       view: stageRef.current.view,
       cinemaMatch: resolveCinema(value),
     });
     const actionIntent = classifyFaqActionIntent(value);
-    dismissStaleTransactionalView({ text: value, actionIntent, historyRequested, cancellationReply: decision !== null });
-    const faq = directCinemaSelection ? { matches: [], context: "" } : prepareFaqContext(value);
+    const hasBookingContext = ["booking", "history"].includes(stageRef.current.view);
+    const directCancellation = decision === null && isDirectCancellationRequest(value, { hasBookingContext });
+    dismissStaleTransactionalView({ text: value, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
+    const faq = directCinemaSelection || directCancellation ? { matches: [], context: "" } : prepareFaqContext(value);
     const details = applyUtteranceBookingDetails(value, { actionIntent, hasFaq: faq.matches.length > 0 });
     const bookingContext = !faq.matches.length && (
       actionIntent === "booking"
@@ -1844,6 +2033,7 @@ export default function App() {
     }
     let cinemaRouteResult = null;
     let cinemaPickerDisplayed = false;
+    const cancellationRoutePromise = directCancellation ? routeCancellationTurn(value) : null;
     if (details.cinema) {
       cinemaRouteResult = await routeRecognizedCinema(details.cinema, requestedDate);
     } else if (!cinemaRef.current && actionIntent === "booking" && !faq.matches.length) {
@@ -1866,7 +2056,15 @@ export default function App() {
         conversation.sendContextualUpdate?.("Only the VOX Cinemas UAE cinema picker is displayed; no movie list is visible yet. Ask the guest for one cinema and do not say that movies are being shown.");
       }
       if (details.ticketQuantity) conversation.sendContextualUpdate?.(`The guest explicitly requested ${details.ticketQuantity} tickets. Preserve that quantity through seat selection.`);
-      if (historyRequested) conversation.sendContextualUpdate?.("The guest's booking summaries saved on this device are already displayed. Do not present them as provider confirmations. Acknowledge and ask them to select the booking they need help with.");
+      if (historyRequest.requested) conversation.sendContextualUpdate?.(bookingHistoryTurnContext(visibleHistory, { activeOnly: historyRequest.activeOnly }));
+      if (cancellationRoutePromise) {
+        try {
+          const cancellationResult = await cancellationRoutePromise;
+          conversation.sendContextualUpdate?.(cancellationResultContext(cancellationResult, { promptAlreadyVisible: true }));
+        } catch (error) {
+          conversation.sendContextualUpdate?.(`The cancellation check failed: ${error?.message || "unknown error"}. Do not claim cancellation or refund success.`);
+        }
+      }
       if (faq.matches.length) conversation.sendContextualUpdate?.(`${faq.context}\nThe guest's current question is: ${value}. Answer from this approved context, use live data only when supplied, and do not restart the conversation.`);
       conversation.sendUserMessage(value);
     }
@@ -2061,18 +2259,21 @@ export default function App() {
     });
   };
 
-  const openHistory = ({ notifyAgent = true, forceOpen = false } = {}) => {
+  const openHistory = ({ notifyAgent = true, forceOpen = false, activeOnly = false, preserveReturn = false } = {}) => {
     dismissPendingCancellation("history_opened");
     if (stageRef.current.view === "history" && !forceOpen) {
       showStage(historyReturnRef.current || { view: "empty" });
-      return;
+      return [];
     }
-    historyReturnRef.current = stageRef.current;
-    setBookings(readBookings());
+    if (!preserveReturn) historyReturnRef.current = stageRef.current;
+    const visibleBookings = readBookings().filter((item) => !activeOnly || isCurrentBooking(item));
+    setHistoryFilter(activeOnly ? "active" : "all");
+    setBookings(visibleBookings);
     showStage({ view: "history" });
     if (notifyAgent) sendUiTurn(localeRef.current === "ar" ? "اعرض حجوزاتي" : "Show my booking history", {
-      context: "The guest opened booking summaries saved on this device. Do not describe them as provider confirmations. Acknowledge briefly and ask them to select one if they need help.",
+      context: bookingHistoryTurnContext(visibleBookings, { activeOnly }),
     });
+    return visibleBookings;
   };
 
   const openOffers = () => {
@@ -2107,11 +2308,34 @@ export default function App() {
       setCinema(selectedCinema);
     }
     bookingRef.current = localBooking;
+    bookingOpenedFromHistoryRef.current = true;
     setBooking(localBooking);
     showStage({ view: "booking", booking: localBooking });
     sendUiTurn(localeRef.current === "ar" ? `اخترت الحجز ${localBooking.ref}` : `I selected booking ${localBooking.ref}`, {
       context: `The guest selected on-device booking summary ${localBooking.ref}. Do not present it as a provider confirmation. Its performance date is ${performanceDate || "not supplied"}; status is ${localBooking.cancelled ? "cancelled" : localBooking.bookingStatus || "saved"}; refund status is ${localBooking.refundStatus || "none"}; refund reference is ${localBooking.refundReference || "none"}.`,
     });
+  };
+
+  const cancelHistoryBooking = async (selected) => {
+    const selectedRef = selected?.ref;
+    const existingFlow = cancellationFlowRef.current;
+    if (selectedRef && existingFlow?.bookingRef && norm(existingFlow.bookingRef) === norm(selectedRef)
+      && ["checking", "route_confirmation", "final_confirmation", "processing"].includes(existingFlow.phase)) {
+      return {
+        found: true,
+        bookingRef: existingFlow.bookingRef,
+        confirmationRequired: ["route_confirmation", "final_confirmation"].includes(existingFlow.phase),
+        phase: existingFlow.phase,
+        refundRoute: existingFlow.refundRoute || null,
+        simulationOnly: Boolean(existingFlow.demoOnly),
+        message: existingFlow.message || null,
+      };
+    }
+    selectHistoryBooking(selected);
+    const rawResult = await clientTools.show_booking_for_cancellation({ bookingRef: selectedRef });
+    const result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+    conversation.sendContextualUpdate?.(cancellationResultContext(result, { promptAlreadyVisible: true }));
+    return result;
   };
 
   const toggleSeat = (seat) => {
@@ -2145,13 +2369,14 @@ export default function App() {
   const completeCancellation = async ({ source = "ui" } = {}) => {
     const current = bookingRef.current;
     const flow = cancellationFlowRef.current;
-    if (!current || current.cancelled || cancellationInFlightRef.current) return false;
-    if (flow?.bookingRef && norm(flow.bookingRef) !== norm(current.ref)) return false;
+    if (!current || !isCurrentBooking(current) || cancellationInFlightRef.current) return { confirmed: false, reason: "cancellation_unavailable" };
+    if (flow?.bookingRef && norm(flow.bookingRef) !== norm(current.ref)) return { confirmed: false, reason: "booking_context_changed" };
     const operationId = cancellationOperationRef.current + 1;
     cancellationOperationRef.current = operationId;
     const operationSessionEpoch = sessionEpochRef.current;
     const operationBookingRef = norm(current.ref);
     cancellationInFlightRef.current = true;
+    setCancellationFlow({ ...flow, bookingRef: current.ref, phase: "processing", message: localeRef.current === "ar" ? "جارٍ معالجة طلب الإلغاء…" : "Processing cancellation…", error: null });
     let refundResult;
     try {
       refundResult = await vista.refundBooking(current.ref, { booking: current });
@@ -2184,18 +2409,16 @@ export default function App() {
       // Never repopulate device storage after a reset/logout. A verified live
       // refund remains provider truth, but it must not leak into a new session.
       if (liveRefundSucceeded) console.warn("A live refund completed after its Voxi session was no longer active", refundReference);
-      return liveRefundSucceeded;
+      return { confirmed: liveRefundSucceeded, bookingRef: current.ref, reason: liveRefundSucceeded ? null : "session_changed", refundReference };
     }
     if (!isDemoSimulation && !liveRefundSucceeded) {
       const reason = refundResult?.ErrorDescription || refundResult?.message || "The refund adapter did not confirm cancellation.";
+      const message = localeRef.current === "ar" ? "لم يتم تأكيد الإلغاء. بقي الحجز نشطاً." : "Cancellation could not be confirmed. The booking remains active.";
       window.clearTimeout(cancelTimerRef.current);
       cancelTimerRef.current = null;
-      const resolver = cancelResolver.current;
-      cancelResolver.current = null;
-      cancellationFlowRef.current = null;
-      if (resolver) resolver(JSON.stringify({ confirmed: false, bookingRef: current.ref, reason }));
-      say("system", localeRef.current === "ar" ? `لم يتم إلغاء الحجز: ${reason}` : `The booking was not cancelled: ${reason}`);
-      return false;
+      setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: Boolean(flow?.demoOnly), refundRoute: flow?.refundRoute || null, error: reason, message });
+      say("system", message);
+      return { confirmed: false, bookingRef: current.ref, reason };
     }
     let storagePersisted = false;
     let storageError = null;
@@ -2207,26 +2430,15 @@ export default function App() {
       console.error("Cancellation result could not be written to local booking history", error);
     }
     if (isDemoSimulation && !storagePersisted) {
-      if (cancelResolver.current) {
-        window.clearTimeout(cancelTimerRef.current);
-        cancelTimerRef.current = null;
-        const resolver = cancelResolver.current;
-        cancelResolver.current = null;
-        resolver(JSON.stringify({
-          confirmed: false,
-          simulationOnly: true,
-          localCancellationRecorded: false,
-          refundApplied: false,
-          bookingRef: current.ref,
-          reason: storageError?.message || "The on-device cancellation could not be saved.",
-          message: "No refund was processed and the booking summary remains active on this device.",
-        }));
-      }
-      cancellationFlowRef.current = null;
+      window.clearTimeout(cancelTimerRef.current);
+      cancelTimerRef.current = null;
+      const reason = storageError?.message || "The on-device cancellation could not be saved.";
+      const message = localeRef.current === "ar" ? "تعذر حفظ حالة الإلغاء على هذا الجهاز. بقي الحجز نشطاً." : "The cancellation could not be saved on this device. The booking remains active.";
+      setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: true, refundRoute: null, error: reason, message });
       say("system", localeRef.current === "ar"
         ? "تعذر تسجيل الإلغاء على هذا الجهاز. بقي سجل الحجز نشطاً، ولم تتم معالجة أي استرداد."
         : "The cancellation could not be saved on this device. The booking summary remains active and no refund was processed.");
-      return false;
+      return { confirmed: false, simulationOnly: true, bookingRef: current.ref, reason };
     }
     bookingRef.current = updated;
     setBooking(updated);
@@ -2236,41 +2448,9 @@ export default function App() {
         ? existing.map((item) => norm(item.ref) === operationBookingRef ? updated : item)
         : [...existing, updated]);
     showStage({ view: "booking", booking: updated });
-    if (cancelResolver.current) {
-      window.clearTimeout(cancelTimerRef.current);
-      cancelTimerRef.current = null;
-      const resolver = cancelResolver.current;
-      cancelResolver.current = null;
-      resolver(JSON.stringify(isDemoSimulation ? {
-        confirmed: true,
-        simulationOnly: true,
-        localCancellationRecorded: true,
-        liveRefundConfirmed: false,
-        refundApplied: false,
-        bookingRef: updated.ref,
-        bookingStatus: updated.bookingStatus,
-        cancelledAt: updated.cancelledAt,
-        refundRoute: updated.refundRoute,
-        refundStatus: updated.refundStatus,
-        refundReference: null,
-        storagePersisted,
-        message: "The booking is marked cancelled on this device. No refund was processed.",
-      } : {
-        confirmed: true,
-        simulationOnly: false,
-        liveRefundConfirmed: true,
-        refundApplied: true,
-        bookingRef: updated.ref,
-        bookingStatus: updated.bookingStatus,
-        cancelledAt: updated.cancelledAt,
-        refundRoute: updated.refundRoute,
-        refundStatus: updated.refundStatus,
-        refundReference,
-        storagePersisted,
-        localStorageWarning: storagePersisted ? null : "The verified refund was applied, but the device booking record could not be saved.",
-      }));
-    }
-    cancellationFlowRef.current = null;
+    window.clearTimeout(cancelTimerRef.current);
+    cancelTimerRef.current = null;
+    setCancellationFlow(null);
     if (isDemoSimulation) {
       say("system", localeRef.current === "ar"
         ? "تم تسجيل الحجز كملغى على هذا الجهاز فقط، ولم تتم معالجة أي استرداد مالي."
@@ -2288,50 +2468,74 @@ export default function App() {
       });
     }
     resetClarificationFailures();
-    return true;
+    return {
+      confirmed: true,
+      simulationOnly: isDemoSimulation,
+      localCancellationRecorded: isDemoSimulation,
+      liveRefundConfirmed: liveRefundSucceeded,
+      refundApplied: liveRefundSucceeded,
+      bookingRef: updated.ref,
+      bookingStatus: updated.bookingStatus,
+      refundStatus: updated.refundStatus,
+      refundReference,
+      storagePersisted,
+    };
   };
 
-  const handleCancellationDecision = (decision, { source = "conversation", explicitFinal = false } = {}) => {
-    if (!cancellationFlowRef.current && explicitFinal && bookingRef.current?.ref) {
-      const current = bookingRef.current;
-      const demoOnly = current.demo === true
-        || current.verified !== true
-        || current.paymentStatus === "simulated_not_charged"
-        || current.bookingStatus === "confirmed_demo";
-      cancellationFlowRef.current = { bookingRef: current.ref, phase: "final_confirmation", refundRoute: demoOnly ? null : "VOX Wallet", demoOnly };
-    }
+  const handleCancellationDecision = (decision, { source = "conversation" } = {}) => {
     const flow = cancellationFlowRef.current;
-    if (!flow) return false;
-    if (!decision) {
-      dismissPendingCancellation("guest_declined");
-      cancellationFlowRef.current = null;
-      say("system", localeRef.current === "ar" ? "لم يتم إلغاء الحجز." : "The booking was kept active.");
-      return true;
+    if (!flow) {
+      return { handled: false, phase: "idle", reason: "confirmation_not_expected" };
     }
-    if (flow.phase === "route_confirmation" && !explicitFinal) {
-      flow.phase = "final_confirmation";
+    if (flow.phase === "error" && !decision) {
+      const bookingRef = flow.bookingRef;
+      dismissPendingCancellation("error_dismissed");
+      say("system", localeRef.current === "ar" ? "بقي الحجز من دون تغيير." : "The booking remains unchanged.");
+      return { handled: true, confirmed: false, phase: "idle", bookingRef, reason: "error_dismissed" };
+    }
+    if (!["route_confirmation", "final_confirmation"].includes(flow.phase)) {
+      return { handled: false, phase: flow?.phase || "idle", reason: "confirmation_not_expected" };
+    }
+    if (!decision) {
+      const bookingRef = flow.bookingRef;
+      dismissPendingCancellation("guest_declined");
+      say("system", localeRef.current === "ar" ? "لم يتم إلغاء الحجز." : "The booking was kept active.");
+      return { handled: true, confirmed: false, phase: "idle", bookingRef, reason: "guest_declined" };
+    }
+    if (flow.phase === "route_confirmation") {
       window.clearTimeout(cancelTimerRef.current);
       cancelTimerRef.current = window.setTimeout(() => dismissPendingCancellation("confirmation_timeout"), 90_000);
       const current = bookingRef.current;
-      say("system", localeRef.current === "ar"
+      const message = localeRef.current === "ar"
         ? `تأكيد نهائي: هل تريد إلغاء الحجز ${flow.bookingRef} وإعادة ${current?.total ?? current?.refundAmount ?? "المبلغ"} درهماً إلى محفظة VOX؟ قل نعم للمتابعة أو لا للإبقاء على الحجز.`
-        : `Final confirmation: cancel booking ${flow.bookingRef} and return AED ${current?.total ?? current?.refundAmount ?? "the eligible amount"} to VOX Wallet? Say yes to proceed or no to keep the booking.`);
-      return true;
+        : `Final confirmation: cancel booking ${flow.bookingRef} and return AED ${current?.total ?? current?.refundAmount ?? "the eligible amount"} to VOX Wallet? Say yes to proceed or no to keep the booking.`;
+      setCancellationFlow({ ...flow, phase: "final_confirmation", message, error: null });
+      return { handled: true, confirmed: false, confirmationRequired: true, phase: "final_confirmation", bookingRef: flow.bookingRef, refundRoute: flow.refundRoute, message };
     }
-    completeCancellation({ source });
-    return true;
+    const completion = completeCancellation({ source });
+    return { handled: true, confirmed: false, phase: "processing", bookingRef: flow.bookingRef, completion };
   };
 
-  const cancelBooking = () => {
-    if (!cancellationFlowRef.current && bookingRef.current?.ref) {
-      const current = bookingRef.current;
-      const demoOnly = current.demo === true
-        || current.verified !== true
-        || current.paymentStatus === "simulated_not_charged"
-        || current.bookingStatus === "confirmed_demo";
-      cancellationFlowRef.current = { bookingRef: current.ref, phase: "final_confirmation", refundRoute: demoOnly ? null : "VOX Wallet", demoOnly };
+  const publishCancellationDecision = (outcome, { promptAlreadyVisible = false } = {}) => {
+    if (!outcome?.handled) return outcome;
+    conversation.sendContextualUpdate?.(cancellationResultContext(outcome, { promptAlreadyVisible }));
+    if (outcome.completion) {
+      void outcome.completion.then((result) => {
+        conversation.sendContextualUpdate?.(cancellationResultContext(result));
+      }).catch((error) => {
+        conversation.sendContextualUpdate?.(`The cancellation failed: ${error?.message || "unknown error"}. Do not claim cancellation or refund success.`);
+      });
     }
-    handleCancellationDecision(true, { source: "ui", explicitFinal: true });
+    return outcome;
+  };
+
+  const cancelBooking = async () => {
+    const current = stageRef.current.view === "booking" ? bookingRef.current : null;
+    if (!current?.ref || !isCurrentBooking(current)) return { found: false, reason: "active_booking_required" };
+    const rawResult = await clientTools.show_booking_for_cancellation({ bookingRef: current.ref });
+    const result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+    conversation.sendContextualUpdate?.(cancellationResultContext(result, { promptAlreadyVisible: true }));
+    return result;
   };
 
   const changeLanguage = (nextLocale) => {
@@ -2378,8 +2582,11 @@ export default function App() {
   }, [stage]);
   useEffect(() => {
     const scroller = scrollRef.current;
-    if (scroller && stageRef.current.view === "empty") scroller.scrollTop = scroller.scrollHeight;
-  }, [messages]);
+    if (!scroller) return;
+    if (stageRef.current.view === "empty" || cancellationFlowRef.current) {
+      scroller.scrollTop = scroller.scrollHeight;
+    }
+  }, [messages, cancellationState.phase, cancellationState.bookingRef]);
 
   const chips = [t("app.chipShowing"), t("app.chipBook"), t("app.chipCancel")];
   const statusLabel = startingMode
@@ -2464,8 +2671,16 @@ export default function App() {
             </div>
           )}
           {stage.view === "checkout" && stage.order && <Checkout key={stage.order.checkoutId} order={stage.order} onPaid={handlePaid} onCancel={() => { clearPendingOrder(); showStage({ view: "seatmap", movie: stage.movie, session: stage.session, plan: planRef.current, planMeta: stage.planMeta || vista.getResultMeta(planRef.current) }); }} />}
-          {stage.view === "booking" && displayedBooking && <BookingCard booking={displayedBooking} onCancel={cancelBooking} onDecline={() => handleCancellationDecision(false, { source: "ui" })} cancelled={displayedBooking.cancelled} />}
-          {stage.view === "history" && <BookingHistory bookings={bookings} onSelect={selectHistoryBooking} onBack={() => showStage(historyReturnRef.current || { view: "empty" })} />}
+          {stage.view === "booking" && displayedBooking && <BookingCard
+            booking={displayedBooking}
+            cancellation={cancellationState.bookingRef && norm(cancellationState.bookingRef) !== norm(displayedBooking.ref) ? IDLE_CANCELLATION_STATE : cancellationState}
+            onRequestCancel={cancelBooking}
+            onConfirm={() => publishCancellationDecision(handleCancellationDecision(true, { source: "ui" }), { promptAlreadyVisible: true })}
+            onDecline={() => publishCancellationDecision(handleCancellationDecision(false, { source: "ui" }), { promptAlreadyVisible: true })}
+            onBack={bookingOpenedFromHistoryRef.current ? () => { dismissPendingCancellation("back_to_history"); openHistory({ notifyAgent: false, forceOpen: true, activeOnly: historyFilter === "active", preserveReturn: true }); } : undefined}
+            cancelled={displayedBooking.cancelled}
+          />}
+          {stage.view === "history" && <BookingHistory bookings={bookings} filter={historyFilter} onCancel={cancelHistoryBooking} onSelect={selectHistoryBooking} onBack={() => showStage(historyReturnRef.current || { view: "empty" })} />}
           {stage.view === "offers" && (
             <div>
               {stage.showtimeRequired && <div role="status" style={{ marginBottom: 10, borderRadius: 10, background: "rgba(217,169,75,.12)", padding: "9px 11px", color: "#EAD19A", fontSize: 10, lineHeight: 1.45 }}>{t("offers.showtimeRequired")}</div>}

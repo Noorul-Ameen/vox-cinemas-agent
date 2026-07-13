@@ -3,6 +3,7 @@ import { AlertTriangle, Film, Clock, Armchair, Ticket, ChevronRight, Check, Refr
 import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 import { getExperienceMedia, getMoviePosterUrl, getSupportedImageUrl } from "../mediaData.js";
+import { isCurrentBooking } from "../lib/cancellationRouting.js";
 import BookingQRCode from "./BookingQRCode.jsx";
 
 export function Poster({ tint, title, small, posterUrl }) {
@@ -253,9 +254,18 @@ export function SeatMap({ movie, session, plan = [], selected = [], pricing, onT
   );
 }
 
-export function BookingCard({ booking, onCancel, onDecline, cancelled }) {
-  const { t, formatCurrency, formatDate } = useI18n();
+export function BookingCard({
+  booking,
+  cancellation = null,
+  onRequestCancel,
+  onConfirm,
+  onDecline,
+  onBack,
+  cancelled,
+}) {
+  const { t, dir, formatCurrency, formatDate } = useI18n();
   const isCancelled = cancelled ?? booking.cancelled;
+  const isCurrent = isCurrentBooking({ ...booking, cancelled: isCancelled });
   const isDemo = booking.verified !== true
     || booking.demo === true
     || booking.paymentStatus === "simulated_not_charged"
@@ -284,20 +294,59 @@ export function BookingCard({ booking, onCancel, onDecline, cancelled }) {
     ? t("history.cancelledLocal")
     : isCancelled
       ? t("history.cancelled")
+      : !isCurrent
+        ? t("history.past")
       : isDemo
         ? t("history.demo")
         : t("history.active");
-  const [confirmingCancellation, setConfirmingCancellation] = React.useState(false);
-  React.useEffect(() => setConfirmingCancellation(false), [booking.ref, isCancelled]);
+  const rawCancellationPhase = String(cancellation?.phase || "idle");
+  const cancellationPhase = ({
+    checking_eligibility: "checking",
+    route: "route_confirmation",
+    final: "final_confirmation",
+    in_flight: "processing",
+  })[rawCancellationPhase] || rawCancellationPhase;
+  const cancellationActive = isCurrent && !["idle", "success", "cancelled", "declined"].includes(cancellationPhase);
+  const cancellationDemoOnly = cancellation?.demoOnly ?? isDemo;
+  const cancellationBusy = Boolean(cancellation?.inFlight) || ["checking", "processing"].includes(cancellationPhase);
+  const cancellationRef = cancellation?.bookingRef || booking.ref;
+  const cancellationPanelRef = React.useRef(null);
+  const lastFocusedCancellationPhaseRef = React.useRef("idle");
+
+  React.useEffect(() => {
+    if (!cancellationActive) {
+      lastFocusedCancellationPhaseRef.current = "idle";
+      return undefined;
+    }
+    const focusKey = `${cancellationRef || "unknown"}:${cancellationPhase}`;
+    if (lastFocusedCancellationPhaseRef.current === focusKey) return undefined;
+    lastFocusedCancellationPhaseRef.current = focusKey;
+    const frame = window.requestAnimationFrame(() => {
+      const panel = cancellationPanelRef.current;
+      if (!panel) return;
+      panel.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: "auto" });
+      if (["route_confirmation", "final_confirmation", "error"].includes(cancellationPhase)) {
+        panel.focus?.({ preventScroll: true });
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [cancellationActive, cancellationPhase, cancellationRef]);
+
   return (
     <div>
+      {onBack && (
+        <button type="button" onClick={onBack} style={backToBookingsButton}>
+          <ChevronRight size={14} style={{ transform: dir === "rtl" ? "none" : "rotate(180deg)" }} />
+          {t("history.back")}
+        </button>
+      )}
       <Header icon={<Ticket size={16} />} title={headerTitle} sub={headerSubtitle} />
-      <div style={{ maxWidth: 420, margin: "0 auto", overflow: "hidden", borderRadius: 16, border: "1px solid rgba(255,255,255,.12)", background: "linear-gradient(160deg, rgba(99,65,141,.35), rgba(30,23,40,.6))" }}>
+      <div aria-busy={cancellationBusy || undefined} style={{ maxWidth: 420, margin: "0 auto", overflow: "hidden", borderRadius: 16, border: "1px solid rgba(255,255,255,.12)", background: "linear-gradient(160deg, rgba(99,65,141,.35), rgba(30,23,40,.6))" }}>
         <div style={{ display: "flex", gap: 14, padding: "16px 18px" }}>
           <Poster tint={booking.tint || [C.purple, C.magenta]} title={booking.movieTitle} posterUrl={posterUrl} small />
-          <div style={{ flex: 1 }}>
-            <div dir="auto" style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{booking.movieTitle}</div>
-            <div dir="ltr" style={{ fontSize: 12, color: "rgba(255,255,255,.6)" }}>{sessionSummary}</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div dir="auto" style={{ overflowWrap: "anywhere", fontSize: 16, fontWeight: 700, color: "#fff" }}>{booking.movieTitle}</div>
+            <div dir="ltr" style={{ overflowWrap: "anywhere", fontSize: 12, color: "rgba(255,255,255,.6)" }}>{sessionSummary}</div>
           </div>
         </div>
         <div style={{ borderTop: "1px dashed rgba(255,255,255,.15)", padding: "11px 18px" }}>
@@ -307,31 +356,104 @@ export function BookingCard({ booking, onCancel, onDecline, cancelled }) {
           <Row k={t("booking.status")} v={statusLabel} />
           <Row k={t("booking.ref")} v={<span dir="ltr" style={{ fontFamily: "monospace", color: C.lavender }}>{booking.ref}</span>} />
           <Row k={t("booking.total")} v={<span dir="ltr">{formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}</span>} />
+          {isCancelled && !isDemoCancellation && booking.refundRoute && <Row k={t("booking.refundRoute")} v={<bdi dir="auto">{booking.refundRoute}</bdi>} />}
+          {isCancelled && !isDemoCancellation && booking.refundReference && <Row k={t("booking.refundReference")} v={<span dir="ltr" style={{ fontFamily: "monospace", color: C.lavender }}>{booking.refundReference}</span>} />}
         </div>
-        <BookingQRCode booking={{ ...booking, cancelled: isCancelled }} />
-        {!isCancelled && confirmingCancellation ? (
-          <div role="group" aria-label={t(isDemo ? "booking.cancelDemoConfirmationLabel" : "booking.cancelConfirmationLabel")} style={{ borderTop: "1px solid rgba(255,255,255,.12)", padding: 14 }}>
-            <p style={{ margin: 0, color: "rgba(255,255,255,.72)", fontSize: 12, lineHeight: 1.5 }}>
-              {t(isDemo ? "booking.cancelDemoQuestion" : "booking.cancelQuestion", { ref: booking.ref, amount: formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED") })}
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-              <button type="button" onClick={() => { setConfirmingCancellation(false); onDecline?.(); }} style={{ border: "1px solid rgba(255,255,255,.14)", borderRadius: 8, background: "transparent", padding: "8px 12px", color: "rgba(255,255,255,.72)", cursor: "pointer" }}>{t("common.back")}</button>
-              <button type="button" onClick={onCancel} style={{ border: 0, borderRadius: 8, background: C.magenta, padding: "8px 12px", color: "#fff", fontWeight: 700, cursor: "pointer" }}>{t(isDemo ? "booking.confirmCancelDemo" : "booking.confirmCancel")}</button>
-            </div>
-          </div>
-        ) : !isCancelled ? (
-          <button type="button" onClick={() => setConfirmingCancellation(true)} style={{ ...cardFootBtn, color: "rgba(255,255,255,.7)" }}>
+        {cancellationActive && (
+          <CancellationPanel
+            ref={cancellationPanelRef}
+            phase={cancellationPhase}
+            demoOnly={cancellationDemoOnly}
+            busy={cancellationBusy}
+            bookingRef={cancellationRef}
+            amount={formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}
+            error={cancellation?.error}
+            message={cancellation?.message}
+            onConfirm={onConfirm}
+            onDecline={onDecline}
+            onRetry={onRequestCancel}
+          />
+        )}
+        {!cancellationActive && <BookingQRCode booking={{ ...booking, cancelled: isCancelled }} />}
+        {isCurrent && !cancellationActive ? (
+          <button type="button" onClick={onRequestCancel} disabled={!onRequestCancel} style={{ ...cardFootBtn, color: "rgba(255,255,255,.7)", opacity: onRequestCancel ? 1 : 0.45, cursor: onRequestCancel ? "pointer" : "not-allowed" }}>
             <RotateCcw size={14} /> {t(isDemo ? "booking.cancelDemo" : "booking.cancelRefund")}
           </button>
-        ) : (
+        ) : isCancelled ? (
           <div style={{ ...cardFootBtn, color: isDemoCancellation ? "#FFCF70" : C.green, cursor: "default" }}>
             <Check size={14} /> {isDemoCancellation ? t("booking.noRefundProcessed") : t("booking.refundAmount", { amount: formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED") })}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
 }
+
+const CancellationPanel = React.forwardRef(function CancellationPanel({
+  phase,
+  demoOnly,
+  busy,
+  bookingRef,
+  amount,
+  error,
+  message,
+  onConfirm,
+  onDecline,
+  onRetry,
+}, ref) {
+  const { t } = useI18n();
+  const isError = phase === "error";
+  const isInteractive = ["route_confirmation", "final_confirmation", "error"].includes(phase);
+  const title = phase === "checking"
+    ? t("booking.cancelCheckingTitle")
+    : phase === "processing"
+      ? t("booking.cancelProcessingTitle")
+      : isError
+        ? t("booking.cancelErrorTitle")
+        : t(demoOnly ? "booking.cancelDemoConfirmationLabel" : "booking.cancelConfirmationLabel");
+  const body = phase === "checking"
+    ? t("booking.cancelChecking", { ref: bookingRef })
+    : phase === "processing"
+      ? t("booking.cancelProcessing", { ref: bookingRef })
+      : isError
+        ? (message || (/[_-]/.test(String(error || "")) ? "" : error) || t("booking.cancelError"))
+        : phase === "route_confirmation"
+          ? t("booking.walletQuestion", { ref: bookingRef, amount })
+          : t(demoOnly ? "booking.cancelDemoQuestion" : "booking.cancelQuestion", { ref: bookingRef, amount });
+
+  return (
+    <div
+      ref={ref}
+      role={isError ? "alert" : isInteractive ? "group" : "status"}
+      aria-live={isError ? "assertive" : isInteractive ? "off" : "polite"}
+      aria-label={title}
+      tabIndex={isInteractive ? -1 : undefined}
+      style={{ borderTop: "1px solid rgba(255,255,255,.12)", background: isError ? "rgba(190,62,89,.10)" : "rgba(11,8,18,.26)", padding: 14, outline: "none" }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+        <span aria-hidden="true" style={{ display: "grid", width: 26, height: 26, flexShrink: 0, placeItems: "center", borderRadius: 8, background: isError ? "rgba(255,116,139,.13)" : "rgba(228,220,240,.10)", color: isError ? "#FF8EA3" : C.lavender }}>
+          {busy ? <RefreshCw size={14} /> : isError ? <AlertTriangle size={14} /> : <RotateCcw size={14} />}
+        </span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ color: "#fff", fontSize: 12, fontWeight: 800 }}>{title}</div>
+          <p dir="auto" style={{ margin: "4px 0 0", overflowWrap: "anywhere", color: "rgba(255,255,255,.72)", fontSize: 11, lineHeight: 1.5 }}>{body}</p>
+        </div>
+      </div>
+      {isInteractive && (
+        <div style={cancellationActions}>
+          <button type="button" onClick={onDecline} disabled={busy} style={secondaryCancelButton}>{t("booking.keepBooking")}</button>
+          {isError ? (
+            <button type="button" onClick={onRetry} disabled={busy || !onRetry} style={{ ...primaryCancelButton, opacity: onRetry ? 1 : 0.5 }}>{t("common.retry")}</button>
+          ) : (
+            <button type="button" onClick={onConfirm} disabled={busy || !onConfirm} style={{ ...primaryCancelButton, opacity: onConfirm ? 1 : 0.5 }}>
+              {t(phase === "route_confirmation" ? "booking.useWallet" : demoOnly ? "booking.confirmCancelDemo" : "booking.confirmCancel")}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
 
 function Row({ k, v }) {
   return (
@@ -348,4 +470,8 @@ function Legend({ swatch, label }) {
 const btnReset = { background: "none", border: "none", padding: 0, cursor: "pointer", color: "inherit" };
 const btnGhost = { ...btnReset, borderRadius: 8, padding: 6, color: "rgba(255,255,255,.5)" };
 const rowBtn = { display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.03)", padding: "12px 16px", textAlign: "start", cursor: "pointer" };
-const cardFootBtn = { display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: 8, borderTop: "1px solid rgba(255,255,255,.12)", padding: "12px 0", fontSize: 14, fontWeight: 500, background: "none", border: "none", cursor: "pointer" };
+const backToBookingsButton = { display: "inline-flex", alignItems: "center", gap: 5, margin: "0 0 10px", border: 0, borderRadius: 8, background: "rgba(255,255,255,.05)", padding: "6px 9px", color: "rgba(255,255,255,.72)", fontSize: 10, fontWeight: 700, cursor: "pointer" };
+const cardFootBtn = { display: "flex", width: "100%", boxSizing: "border-box", alignItems: "center", justifyContent: "center", gap: 8, border: "none", borderTop: "1px solid rgba(255,255,255,.12)", padding: "12px 10px", fontSize: 14, fontWeight: 500, background: "none", cursor: "pointer" };
+const cancellationActions = { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 8, marginTop: 12 };
+const secondaryCancelButton = { flex: "1 1 120px", minHeight: 38, border: "1px solid rgba(255,255,255,.14)", borderRadius: 8, background: "transparent", padding: "8px 12px", color: "rgba(255,255,255,.78)", fontSize: 11, fontWeight: 700, cursor: "pointer" };
+const primaryCancelButton = { flex: "1 1 140px", minHeight: 38, border: 0, borderRadius: 8, background: C.magenta, padding: "8px 12px", color: "#fff", fontSize: 11, fontWeight: 800, cursor: "pointer" };
