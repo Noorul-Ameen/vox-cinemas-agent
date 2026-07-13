@@ -88,7 +88,7 @@ export default function Checkout({ order, onPaid, onCancel }) {
         <div style={{ marginTop: 6, fontSize: 12, color: "rgba(255,255,255,.5)" }}>
           {done ? t("checkout.confirming") : t("checkout.demoAuth")}
         </div>
-        <div style={{ marginTop: 14, fontSize: 22, fontWeight: 800, color: "#fff" }}>{formatCurrency(order.total, order.currency || "AED")}</div>
+        <div dir="ltr" style={{ marginTop: 14, fontSize: 22, fontWeight: 800, color: "#fff" }}>{formatCurrency(order.total, order.currency || "AED")}</div>
       </div>
     );
   }
@@ -100,14 +100,14 @@ export default function Checkout({ order, onPaid, onCancel }) {
         <button aria-label={t("common.back")} onClick={onCancel} style={{ background: "none", border: "none", color: "rgba(255,255,255,.5)", cursor: "pointer", padding: 4 }}><ChevronLeft size={18} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} /></button>
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{t("checkout.title")}</div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}>{order.movieTitle} · <span dir="ltr">{order.showtime}</span> · {t("checkout.seatsLabel")} <span dir="ltr">{order.seats.join(", ")}</span></div>
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}><bdi dir="auto">{order.movieTitle}</bdi> · <span dir="ltr">{order.showtime}</span> · {t("checkout.seatsLabel")} <span dir="ltr">{order.seats.join(", ")}</span></div>
         </div>
       </div>
 
       {/* Order summary */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderRadius: 12, border: "1px solid rgba(255,255,255,.1)", background: "rgba(0,0,0,.25)", padding: "12px 14px", marginBottom: 16 }}>
         <span style={{ fontSize: 13, color: "rgba(255,255,255,.6)" }}>{t("checkout.seatCountOnly", { count: order.seats.length })} · <span dir="ltr">{order.screen}</span></span>
-        <span style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{formatCurrency(order.total, order.currency || "AED")}</span>
+        <span dir="ltr" style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{formatCurrency(order.total, order.currency || "AED")}</span>
       </div>
 
       {/* Express wallets (simulated) */}
@@ -150,7 +150,7 @@ export default function Checkout({ order, onPaid, onCancel }) {
       {adding && (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <label><span style={fieldLabel}>{t("checkout.cardNumberLabel")}</span><input dir="ltr" value={form.num} onChange={(e) => setForm({ ...form, num: fmtNum(e.target.value) })} placeholder={t("checkout.cardNumber")} style={inp} inputMode="numeric" /></label>
-          <label><span style={fieldLabel}>{t("checkout.cardNameLabel")}</span><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("checkout.cardName")} style={{ ...inp, textAlign: "start" }} /></label>
+          <label><span style={fieldLabel}>{t("checkout.cardNameLabel")}</span><input dir="ltr" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={t("checkout.cardName")} style={{ ...inp, textAlign: "start" }} /></label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <label><span style={fieldLabel}>{t("checkout.expiryLabel")}</span><input dir="ltr" value={form.exp} onChange={(e) => setForm({ ...form, exp: e.target.value.replace(/[^\d/]/g, "").slice(0, 5) })} placeholder={t("checkout.expiry")} style={inp} inputMode="numeric" /></label>
             <label><span style={fieldLabel}>{t("checkout.cvvLabel")}</span><input dir="ltr" value={form.cvv} onChange={(e) => setForm({ ...form, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder={t("checkout.cvv")} style={inp} inputMode="numeric" type="password" /></label>

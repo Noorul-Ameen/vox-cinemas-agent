@@ -40,7 +40,7 @@ export default function BookingHistory({ bookings = [], onSelect, onBack }) {
                 <span style={{ display: "flex", alignItems: "flex-start", gap: 11, padding: "12px 13px" }}>
                   <span aria-hidden="true" style={{ display: "grid", width: 32, height: 32, flexShrink: 0, placeItems: "center", borderRadius: 9, background: cancelled ? "rgba(255,255,255,.06)" : "rgba(87,199,154,.12)", color: cancelled ? "rgba(255,255,255,.45)" : C.green }}>{cancelled ? <X size={15} /> : <Check size={15} />}</span>
                   <span style={{ minWidth: 0, flex: 1 }}>
-                    <span style={{ display: "block", overflow: "hidden", color: "#fff", fontSize: 13, fontWeight: 800, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{booking.movieTitle || booking.ref}</span>
+                    <span dir={booking.movieTitle ? "auto" : "ltr"} style={{ display: "block", overflow: "hidden", color: "#fff", fontSize: 13, fontWeight: 800, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{booking.movieTitle || booking.ref}</span>
                     <span style={{ display: "flex", flexWrap: "wrap", gap: "3px 7px", marginTop: 4, color: "rgba(255,255,255,.48)", fontSize: 10 }}>
                       <span dir="ltr" style={{ fontFamily: "monospace", color: C.lavender }}>{booking.ref}</span>
                       {booking.createdAt && <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><CalendarDays size={10} />{formatDate(booking.createdAt)}</span>}
@@ -49,7 +49,7 @@ export default function BookingHistory({ bookings = [], onSelect, onBack }) {
                     </span>
                     <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 7 }}>
                       <span style={{ borderRadius: 999, background: cancelled ? "rgba(255,255,255,.07)" : "rgba(87,199,154,.13)", padding: "3px 7px", color: cancelled ? "rgba(255,255,255,.55)" : C.green, fontSize: 9, fontWeight: 800 }}>{cancelled ? t("history.cancelled") : t("history.active")}</span>
-                      <span style={{ color: "rgba(255,255,255,.68)", fontSize: 11, fontWeight: 700 }}>{formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}</span>
+                      <span dir="ltr" style={{ color: "rgba(255,255,255,.68)", fontSize: 11, fontWeight: 700 }}>{formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}</span>
                     </span>
                   </span>
                   {dir === "rtl" ? <ChevronLeft size={16} color="rgba(255,255,255,.35)" /> : <ChevronRight size={16} color="rgba(255,255,255,.35)" />}

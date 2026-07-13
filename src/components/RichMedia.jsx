@@ -14,19 +14,20 @@ export function Poster({ tint, title, small, posterUrl }) {
     <div style={{
       position: "relative", overflow: "hidden", borderRadius: 12,
       width: small ? 56 : "100%", height: small ? 80 : undefined,
+      maxWidth: small ? 56 : 104, maxHeight: small ? 80 : 156,
       aspectRatio: small ? undefined : "2/3",
       background: `linear-gradient(150deg, ${palette[0]}, ${palette[1]})`,
-      display: "flex", alignItems: "flex-end",
+      display: "flex", flexShrink: 0, alignItems: "flex-end", boxSizing: "border-box",
     }}>
       {imgOk && posterUrl && (
         <img src={posterUrl} alt={title ? `${title} — ${t("movies.poster")}` : t("movies.poster")} loading="lazy" decoding="async" onError={() => setImgOk(false)}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+          style={{ position: "absolute", inset: 0, display: "block", width: "100%", maxWidth: "100%", height: "100%", maxHeight: "100%", objectFit: "contain" }} />
       )}
       {!imgOk && <div style={{ position: "absolute", inset: 0, opacity: 0.35, backgroundImage: "radial-gradient(circle at 30% 15%, rgba(255,255,255,.6), transparent 50%)" }} />}
       {!imgOk && <Film style={{ position: "absolute", right: 8, top: 8, opacity: 0.45 }} size={small ? 12 : 18} color="#fff" />}
       {!small && title && (
-        <div style={{ position: "relative", width: "100%", padding: "10px 10px 12px", background: "linear-gradient(transparent, rgba(0,0,0,.65))" }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: "#fff", lineHeight: 1.1, letterSpacing: 0.2, textShadow: "0 1px 3px rgba(0,0,0,.6)" }}>{title}</div>
+        <div style={{ position: "relative", width: "100%", padding: "8px 8px 9px", background: "linear-gradient(transparent, rgba(0,0,0,.72))" }}>
+          <div dir="auto" style={{ display: "-webkit-box", overflow: "hidden", fontSize: 11, fontWeight: 800, color: "#fff", lineHeight: 1.15, letterSpacing: 0.1, textShadow: "0 1px 3px rgba(0,0,0,.6)", WebkitBoxOrient: "vertical", WebkitLineClamp: 2 }}>{title}</div>
         </div>
       )}
     </div>
@@ -59,7 +60,7 @@ function Header({ icon, title, sub, onBack }) {
       )}
       <div style={{ display: "flex", height: 32, width: 32, alignItems: "center", justifyContent: "center", borderRadius: 8, background: "rgba(182,24,108,.2)", color: C.lavender }}>{icon}</div>
       <div>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#fff", lineHeight: 1.1 }}>{title}</div>
+        <div dir="auto" style={{ fontSize: 16, fontWeight: 700, color: "#fff", lineHeight: 1.1 }}>{title}</div>
         <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}>{sub}</div>
       </div>
     </div>
@@ -76,14 +77,14 @@ export function CinemaPicker({ cinemas, selected, onSelect, onBack }) {
       <Header icon={<MapPin size={16} />} title={t("cinema.title")} sub={t("cinema.count", { count: cinemas.length })} onBack={onBack} />
       <label style={{ display: "flex", alignItems: "center", gap: 8, borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.04)", padding: "9px 12px", marginBottom: 12 }}>
         <Search size={15} color="rgba(255,255,255,.45)" />
-        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("cinema.search")} style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: "transparent", color: "#fff", fontSize: 13, textAlign: "start" }} />
+        <input dir="auto" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("cinema.search")} style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: "transparent", color: "#fff", fontSize: 13, textAlign: "start" }} />
       </label>
       <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         {visible.map((cinema) => (
           <button key={cinema.id} onClick={() => onSelect(cinema)} style={{ ...rowBtn, padding: "11px 13px", borderColor: selected?.id === cinema.id ? C.magenta : "rgba(255,255,255,.12)" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
               <MapPin size={15} color={selected?.id === cinema.id ? C.magenta : C.lavender} />
-              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, color: "#fff" }}>{cinema.name.replace(/^VOX\s*[—-]\s*/, "")}</span>
+              <span dir="auto" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, color: "#fff" }}>{cinema.name.replace(/^VOX\s*[—-]\s*/, "")}</span>
             </span>
             {selected?.id === cinema.id ? <Check size={15} color={C.green} /> : <ChevronRight size={16} color="rgba(255,255,255,.35)" style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />}
           </button>
@@ -98,12 +99,12 @@ export function MovieGrid({ movies, cinemaName, scheduleDate, onSelect }) {
   const { t } = useI18n();
   return (
     <div>
-      <Header icon={<Film size={16} />} title={t("movies.title")} sub={t("movies.subtitle", { cinema: cinemaName, date: scheduleDate })} />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 12 }}>
+      <Header icon={<Film size={16} />} title={t("movies.title")} sub={<span><bdi dir="auto">{cinemaName}</bdi> · <span dir="ltr">{scheduleDate}</span></span>} />
+      <div style={{ display: "grid", maxWidth: "100%", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 12 }}>
         {movies.map((m) => (
-          <button key={m.id} onClick={() => onSelect(m)} style={{ ...btnReset, textAlign: "start" }}>
+          <button key={m.id} onClick={() => onSelect(m)} style={{ ...btnReset, width: "100%", minWidth: 0, textAlign: "start" }}>
             <Poster tint={m.tint} title={m.title} posterUrl={m.posterUrl} />
-            <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: "#fff", lineHeight: 1.15 }}>{m.title}</div>
+            <div dir="auto" style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: "#fff", lineHeight: 1.15 }}>{m.title}</div>
             <div style={{ marginTop: 2, fontSize: 11, color: "rgba(255,255,255,.5)" }}>
               <span style={{ background: "rgba(182,24,108,.25)", color: C.lavender, borderRadius: 3, padding: "0 4px", marginInlineEnd: 6 }}>{m.rating}</span>
               {(m.genres || [m.genre]).slice(0, 2).join(" · ")}{m.runtime ? ` · ${t("showtimes.minutes", { count: m.runtime })}` : m.language ? ` · ${m.language}` : ""}
@@ -129,21 +130,21 @@ export function Showtimes({ movie, sessions, onSelect, onBack }) {
         </div>
         <p dir="auto" style={{ margin: 0, fontSize: 11, lineHeight: 1.45, color: "rgba(255,255,255,.58)" }}>{movie.synopsis}</p>
       </div>
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-        <div style={{ width: 96, flexShrink: 0 }}><Poster tint={movie.tint} title={movie.title} posterUrl={movie.posterUrl} /></div>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", width: "100%", maxWidth: "100%", minWidth: 0, gap: 12, alignItems: "flex-start" }}>
+        <div style={{ width: 72, maxWidth: "22%", flexShrink: 0 }}><Poster tint={movie.tint} title={movie.title} posterUrl={movie.posterUrl} /></div>
+        <div style={{ minWidth: 0, flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
           {sessions.map((s) => (
-            <button key={s.sessionId} onClick={() => onSelect(s)} style={rowBtn}>
-              <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 8 }}>
-                <div dir="ltr" style={{ fontSize: 24, fontWeight: 700, color: "#fff" }}>{s.time}</div>
+            <button key={s.sessionId} onClick={() => onSelect(s)} style={{ ...rowBtn, minWidth: 0, gap: 8 }}>
+              <div style={{ display: "flex", minWidth: 0, flex: 1, alignItems: "center", gap: 8, overflow: "hidden" }}>
+                <div dir="ltr" style={{ flexShrink: 0, fontSize: 24, fontWeight: 700, color: "#fff" }}>{s.time}</div>
                 <ExperienceThumbnail experience={s.exp} media={s.experienceMedia || s.media} />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: expColor(s.exp) }}>{s.exp}</div>
-                  <div dir="ltr" style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}>{s.screen}</div>
+                <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+                  <div dir="ltr" title={s.exp} style={{ overflow: "hidden", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: expColor(s.exp), textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.exp}</div>
+                  <div dir="ltr" title={s.screen} style={{ overflow: "hidden", fontSize: 11, color: "rgba(255,255,255,.5)", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.screen}</div>
                 </div>
               </div>
-              <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}>{t("showtimes.seats", { count: s.seatsAvailable })}</span>
+              <div style={{ display: "flex", flexShrink: 0, alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,.5)", whiteSpace: "nowrap" }}>{t("showtimes.seats", { count: s.seatsAvailable })}</span>
                 <ChevronRight size={18} color="rgba(255,255,255,.4)" style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />
               </div>
             </button>
@@ -163,7 +164,7 @@ export function SeatMap({ movie, session, plan, selected, onToggle, onConfirm, o
   }, 0);
   return (
     <div>
-      <Header icon={<Armchair size={16} />} title={<span>{movie.title} · <span dir="ltr">{session.time}</span></span>} sub={<span><span dir="ltr">{session.exp} · {session.screen}</span> · {t("seats.tap")}</span>} onBack={onBack} />
+      <Header icon={<Armchair size={16} />} title={<span><bdi dir="auto">{movie.title}</bdi> · <span dir="ltr">{session.time}</span></span>} sub={<span><span dir="ltr">{session.exp} · {session.screen}</span> · {t("seats.tap")}</span>} onBack={onBack} />
       <div dir="ltr" style={{ maxWidth: 420, margin: "0 auto 24px" }}>
         <div style={{ height: 6, borderRadius: 999, background: `linear-gradient(90deg, transparent, ${C.lavender}, transparent)`, boxShadow: "0 0 24px 4px rgba(228,220,240,.35)" }} />
         <div style={{ marginTop: 4, textAlign: "center", fontSize: 10, letterSpacing: 6, textTransform: "uppercase", color: "rgba(255,255,255,.4)" }}>{t("seats.screen")}</div>
@@ -202,7 +203,7 @@ export function SeatMap({ movie, session, plan, selected, onToggle, onConfirm, o
       <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(0,0,0,.25)", padding: "12px 16px" }}>
         <div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,.5)" }}>{selected.length ? <>{t("seats.countLabel", { count: selected.length })} <span dir="ltr">{selected.join(", ")}</span></> : t("seats.none")}</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{formatCurrency(total, "AED")}</div>
+          <div dir="ltr" style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{formatCurrency(total, "AED")}</div>
         </div>
         <button disabled={!selected.length} onClick={() => onConfirm(selected, total)}
           style={{ borderRadius: 8, border: "none", padding: "10px 20px", fontSize: 14, fontWeight: 600, color: "#fff", background: C.magenta, opacity: selected.length ? 1 : 0.3, cursor: selected.length ? "pointer" : "not-allowed" }}>
@@ -216,6 +217,8 @@ export function SeatMap({ movie, session, plan, selected, onToggle, onConfirm, o
 export function BookingCard({ booking, onCancel, cancelled }) {
   const { t, formatCurrency } = useI18n();
   const isCancelled = cancelled ?? booking.cancelled;
+  const [confirmingCancellation, setConfirmingCancellation] = React.useState(false);
+  React.useEffect(() => setConfirmingCancellation(false), [booking.ref, isCancelled]);
   return (
     <div>
       <Header icon={<Ticket size={16} />} title={isCancelled ? t("booking.cancelled") : t("booking.confirmed")} sub={isCancelled ? t("booking.refundStarted") : t("booking.ready")} />
@@ -223,18 +226,28 @@ export function BookingCard({ booking, onCancel, cancelled }) {
         <div style={{ display: "flex", gap: 16, padding: 20 }}>
           <Poster tint={booking.tint || [C.purple, C.magenta]} small />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{booking.movieTitle}</div>
+            <div dir="auto" style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{booking.movieTitle}</div>
             <div dir="ltr" style={{ fontSize: 12, color: "rgba(255,255,255,.6)" }}>{booking.screen} · {booking.showtime}</div>
           </div>
         </div>
         <div style={{ borderTop: "1px dashed rgba(255,255,255,.15)", padding: "12px 20px" }}>
           <Row k={t("booking.seats")} v={<span dir="ltr">{(Array.isArray(booking.seats) ? booking.seats : [booking.seats].filter(Boolean)).join(", ")}</span>} />
           <Row k={t("booking.ref")} v={<span dir="ltr" style={{ fontFamily: "monospace", color: C.lavender }}>{booking.ref}</span>} />
-          <Row k={t("booking.total")} v={formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")} />
+          <Row k={t("booking.total")} v={<span dir="ltr">{formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}</span>} />
         </div>
         <BookingQRCode booking={{ ...booking, cancelled: isCancelled }} />
-        {!isCancelled ? (
-          <button onClick={onCancel} style={{ ...cardFootBtn, color: "rgba(255,255,255,.7)" }}>
+        {!isCancelled && confirmingCancellation ? (
+          <div role="group" aria-label={t("booking.cancelConfirmationLabel")} style={{ borderTop: "1px solid rgba(255,255,255,.12)", padding: 14 }}>
+            <p style={{ margin: 0, color: "rgba(255,255,255,.72)", fontSize: 12, lineHeight: 1.5 }}>
+              {t("booking.cancelQuestion", { ref: booking.ref, amount: formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED") })}
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
+              <button type="button" onClick={() => setConfirmingCancellation(false)} style={{ border: "1px solid rgba(255,255,255,.14)", borderRadius: 8, background: "transparent", padding: "8px 12px", color: "rgba(255,255,255,.72)", cursor: "pointer" }}>{t("common.back")}</button>
+              <button type="button" onClick={onCancel} style={{ border: 0, borderRadius: 8, background: C.magenta, padding: "8px 12px", color: "#fff", fontWeight: 700, cursor: "pointer" }}>{t("booking.confirmCancel")}</button>
+            </div>
+          </div>
+        ) : !isCancelled ? (
+          <button type="button" onClick={() => setConfirmingCancellation(true)} style={{ ...cardFootBtn, color: "rgba(255,255,255,.7)" }}>
             <RotateCcw size={14} /> {t("booking.cancelRefund")}
           </button>
         ) : (
