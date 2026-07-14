@@ -17,6 +17,8 @@ import {
   getSeatPlan,
   getSessions,
   getVistaCapabilities,
+  parseVistaResultCode,
+  parseVistaRefundReference,
   refundBooking,
   reserveSeats,
   searchBooking,
@@ -28,6 +30,17 @@ const vistaSource = await readFile(new URL("../src/vistaClient.js", import.meta.
 assert.doesNotMatch(vistaSource, /VITE_VISTA_API_KEY/, "browser source must not read or emit an upstream Vista API key");
 assert.doesNotMatch(vistaSource, /RESTBooking\.svc\/booking\/refund/, "refund writes must not use a hard-coded Vista route");
 assert.match(vistaSource, /configuredUrl\(ENV\.VITE_VISTA_REFUND_PATH/, "refund writes require an explicit configured proxy path");
+for (const malformed of [null, undefined, "", "   ", false, true, {}, [], "0x0", "0e999", "1e-9999", "0.0", 0.5]) {
+  assert.equal(parseVistaResultCode(malformed), null, `malformed Vista Result ${JSON.stringify(malformed)} must not be interpreted as success`);
+}
+assert.equal(parseVistaResultCode(0), 0);
+assert.equal(parseVistaResultCode("0"), 0);
+assert.equal(parseVistaResultCode(-1), -1);
+for (const malformed of [null, undefined, "", "   ", false, true, {}, []]) {
+  assert.equal(parseVistaRefundReference(malformed), null, `malformed refund reference ${JSON.stringify(malformed)} must not be accepted`);
+}
+assert.equal(parseVistaRefundReference("  RF-123  "), "RF-123");
+assert.equal(parseVistaRefundReference(123), "123");
 
 assert.equal(VISTA_MODE, "snapshot");
 assert.deepEqual(getProgrammingDates({ now: snapshotNow }), DATA_DATES, "fresh snapshot dates remain available");

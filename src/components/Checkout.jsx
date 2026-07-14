@@ -4,6 +4,7 @@ import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 import {
   DEMO_CARD_STORAGE_KEY,
+  DEVICE_SESSION_EPOCH_KEY,
   formatDemoPan,
   isLuhnValid,
   isValidDemoExpiry,
@@ -11,21 +12,30 @@ import {
   toStoredCardMetadata,
 } from "../checkoutSafety.js";
 
-function loadCards() {
+function loadCards(deviceSessionEpoch) {
   try {
-    const parsed = JSON.parse(localStorage.getItem(DEMO_CARD_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.map(sanitizeStoredCardMetadata).filter(Boolean) : [];
+    const parsed = JSON.parse(localStorage.getItem(DEMO_CARD_STORAGE_KEY) || "null");
+    if (!parsed || parsed.epoch !== deviceSessionEpoch || !Array.isArray(parsed.cards)) return [];
+    return parsed.cards.map(sanitizeStoredCardMetadata).filter(Boolean);
   } catch {
     return [];
   }
 }
 
-function saveCards(cards) {
+function saveCards(cards, deviceSessionEpoch) {
   try {
+    if (!deviceSessionEpoch || localStorage.getItem(DEVICE_SESSION_EPOCH_KEY) !== deviceSessionEpoch) return false;
     const metadataOnly = cards.map(sanitizeStoredCardMetadata).filter(Boolean);
-    localStorage.setItem(DEMO_CARD_STORAGE_KEY, JSON.stringify(metadataOnly));
+    const serialized = JSON.stringify({ epoch: deviceSessionEpoch, cards: metadataOnly });
+    localStorage.setItem(DEMO_CARD_STORAGE_KEY, serialized);
+    if (localStorage.getItem(DEVICE_SESSION_EPOCH_KEY) !== deviceSessionEpoch) {
+      if (localStorage.getItem(DEMO_CARD_STORAGE_KEY) === serialized) localStorage.removeItem(DEMO_CARD_STORAGE_KEY);
+      return false;
+    }
+    return localStorage.getItem(DEMO_CARD_STORAGE_KEY) === serialized;
   } catch {
     // The checkout remains usable when storage is unavailable.
+    return false;
   }
 }
 
@@ -41,11 +51,11 @@ function emptyCardForm() {
   return { pan: "", name: "", exp: "", cvv: "" };
 }
 
-export default function Checkout({ order, onPaid, onCancel, onRetry, mode }) {
+export default function Checkout({ order, onPaid, onCancel, onRetry, mode, deviceSessionEpoch }) {
   const { t, dir, formatCurrency } = useI18n();
   const checkoutMode = resolveCheckoutMode(mode);
   const seats = Array.isArray(order?.seats) ? order.seats : [];
-  const [cards, setCards] = useState(loadCards);
+  const [cards, setCards] = useState(() => loadCards(deviceSessionEpoch));
   const [selected, setSelected] = useState(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState(emptyCardForm);
@@ -75,7 +85,7 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode }) {
     setForm(next);
   };
 
-  useEffect(() => saveCards(cards), [cards]);
+  useEffect(() => { saveCards(cards, deviceSessionEpoch); }, [cards, deviceSessionEpoch]);
   useEffect(() => {
     mountedRef.current = true;
     return () => {

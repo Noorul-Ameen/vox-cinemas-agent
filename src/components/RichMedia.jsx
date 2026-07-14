@@ -306,7 +306,13 @@ export function BookingCard({
     final: "final_confirmation",
     in_flight: "processing",
   })[rawCancellationPhase] || rawCancellationPhase;
-  const cancellationActive = isCurrent && !["idle", "success", "cancelled", "declined"].includes(cancellationPhase);
+  const bookingCreatedAt = Date.parse(booking.createdAt || "");
+  const journalStartedAt = Number(cancellation?.journalStartedAt);
+  const cancellationCouldApply = !cancellation?.outcomeUnknown
+    || !Number.isFinite(bookingCreatedAt)
+    || !Number.isFinite(journalStartedAt)
+    || bookingCreatedAt <= journalStartedAt;
+  const cancellationActive = isCurrent && cancellationCouldApply && !["idle", "success", "cancelled", "declined"].includes(cancellationPhase);
   const cancellationDemoOnly = cancellation?.demoOnly ?? isDemo;
   const cancellationBusy = Boolean(cancellation?.inFlight) || ["checking", "processing"].includes(cancellationPhase);
   const cancellationRef = cancellation?.bookingRef || booking.ref;
@@ -335,7 +341,7 @@ export function BookingCard({
   return (
     <div>
       {onBack && (
-        <button type="button" onClick={onBack} style={backToBookingsButton}>
+        <button type="button" onClick={onBack} disabled={cancellationBusy} style={{ ...backToBookingsButton, opacity: cancellationBusy ? 0.45 : 1, cursor: cancellationBusy ? "not-allowed" : "pointer" }}>
           <ChevronRight size={14} style={{ transform: dir === "rtl" ? "none" : "rotate(180deg)" }} />
           {t("history.back")}
         </button>
@@ -369,6 +375,8 @@ export function BookingCard({
             amount={formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}
             error={cancellation?.error}
             message={cancellation?.message}
+            retryAllowed={cancellation?.retryAllowed !== false}
+            dismissAllowed={cancellation?.dismissAllowed !== false}
             onConfirm={onConfirm}
             onDecline={onDecline}
             onRetry={onRequestCancel}
@@ -397,6 +405,8 @@ const CancellationPanel = React.forwardRef(function CancellationPanel({
   amount,
   error,
   message,
+  retryAllowed,
+  dismissAllowed,
   onConfirm,
   onDecline,
   onRetry,
@@ -439,11 +449,11 @@ const CancellationPanel = React.forwardRef(function CancellationPanel({
           <p dir="auto" style={{ margin: "4px 0 0", overflowWrap: "anywhere", color: "rgba(255,255,255,.72)", fontSize: 11, lineHeight: 1.5 }}>{body}</p>
         </div>
       </div>
-      {isInteractive && (
+      {isInteractive && (!isError || retryAllowed || dismissAllowed) && (
         <div style={cancellationActions}>
-          <button type="button" onClick={onDecline} disabled={busy} style={secondaryCancelButton}>{t("booking.keepBooking")}</button>
+          {(!isError || dismissAllowed) && <button type="button" onClick={onDecline} disabled={busy} style={secondaryCancelButton}>{t("booking.keepBooking")}</button>}
           {isError ? (
-            <button type="button" onClick={onRetry} disabled={busy || !onRetry} style={{ ...primaryCancelButton, opacity: onRetry ? 1 : 0.5 }}>{t("common.retry")}</button>
+            retryAllowed ? <button type="button" onClick={onRetry} disabled={busy || !onRetry} style={{ ...primaryCancelButton, opacity: onRetry ? 1 : 0.5 }}>{t("common.retry")}</button> : null
           ) : (
             <button type="button" onClick={onConfirm} disabled={busy || !onConfirm} style={{ ...primaryCancelButton, opacity: onConfirm ? 1 : 0.5 }}>
               {t(phase === "route_confirmation" ? "booking.useWallet" : demoOnly ? "booking.confirmCancelDemo" : "booking.confirmCancel")}

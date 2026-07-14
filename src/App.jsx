@@ -7,17 +7,19 @@ import BookingHistory from "./components/BookingHistory.jsx";
 import Checkout from "./components/Checkout.jsx";
 import HandoverPanel from "./components/HandoverPanel.jsx";
 import OffersPanel from "./components/OffersPanel.jsx";
-import { appendBooking, clearBookings, findBooking, readBookings } from "./bookingStore.js";
-import { DEMO_CARD_STORAGE_KEY } from "./checkoutSafety.js";
+import { appendBooking, BOOKING_STORAGE_KEY, clearBookings, findBooking, readBookings } from "./bookingStore.js";
+import { DEMO_CARD_STORAGE_KEY, DEVICE_SESSION_EPOCH_KEY } from "./checkoutSafety.js";
 import { useI18n } from "./i18n/I18nProvider.jsx";
 import { HANDOVER_TRIGGER, buildHandoverPayload, isClarificationFailureReason } from "./lib/handoverSummary.js";
 import { resolveFilmCandidate } from "./lib/fuzzyResolvers.js";
 import { isCinemaSelectionTurn, isDirectCinemaSelectionUtterance, resolveCinemaCandidate } from "./lib/cinemaRouting.js";
 import { bookingHistoryAgentContext, classifyBookingHistoryRequest, isCurrentBooking, isDirectCancellationRequest, resolveCancellationTarget } from "./lib/cancellationRouting.js";
+import { CANCELLATION_JOURNAL_TTL_MS, classifyRefundFailure, hydrateCancellationJournal, normalizeCancellationJournal, withCancellationMutationLock } from "./lib/cancellationSafety.js";
 import { normalizeElevenLabsMessageEvent } from "./lib/conversationMessage.js";
 import { resolveLanguageSignal } from "./lib/languageSwitch.js";
 import { buildTransportHandoff, createConversationJourney, inferIntent, journeyDynamicVariables, journeyReducer, syncJourney } from "./lib/conversationJourney.js";
-import { resolveProgrammingDateSelection } from "./lib/programmingDateSelection.js";
+import { resolveProgrammingDateSelection, resolveVisibleSelectionProgrammingDate } from "./lib/programmingDateSelection.js";
+import { normalizeSeatIds, resolveSeatSelectionTurn, resolveSeatToolInput } from "./lib/seatRouting.js";
 import { startTransportWithRetirement } from "./lib/transportStart.js";
 import { VOXI_AGENT_PROMPT, VOXI_FIRST_MESSAGES, buildVoxiContext } from "./lib/voxiSession.js";
 import { OFFER_META } from "./offers/offersData.js";
@@ -64,7 +66,145 @@ const localizedOfferReason = (result, locale) => {
 
 const CONVERSATION_IDLE_MS = 15 * 60 * 1000;
 const MAX_TICKETS = 10;
-const IDLE_CANCELLATION_STATE = Object.freeze({ phase: "idle", bookingRef: null, demoOnly: false, refundRoute: null, message: null, error: null });
+const IDLE_CANCELLATION_STATE = Object.freeze({ phase: "idle", bookingRef: null, demoOnly: false, refundRoute: null, message: null, error: null, retryAllowed: true, dismissAllowed: true, outcomeUnknown: false, journalStartedAt: null });
+const sameSeatSelection = (left = [], right = []) => {
+  const a = [...new Set(left.map((seat) => String(seat).toUpperCase()))].sort();
+  const b = [...new Set(right.map((seat) => String(seat).toUpperCase()))].sort();
+  return a.length === b.length && a.every((seat, index) => seat === b[index]);
+};
+const normalizeCinemaAsrForAgent = (text, cinema) => {
+  const value = String(text || "");
+  if (String(cinema?.id || "") !== "0001") return value;
+  return value.replace(/\bcitizen\s+(?:and\s+)?data\b/giu, cinema.name);
+};
+const CANCELLATION_JOURNAL_KEY = "voxi_pending_cancellation_v1";
+const CANCELLATION_JOURNAL_EVENT = "voxi:cancellation-journal-changed";
+const notifyCancellationJournalChanged = (state) => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(CANCELLATION_JOURNAL_EVENT, { detail: { state } }));
+};
+const newDeviceSessionEpoch = (prefix = "session") => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+const isUsableDeviceSessionEpoch = (value) => /^session-[a-z0-9]+-[a-z0-9]+$/i.test(String(value || ""));
+const readDeviceSessionEpoch = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    return String(window.localStorage.getItem(DEVICE_SESSION_EPOCH_KEY) || "").trim() || null;
+  } catch {
+    return null;
+  }
+};
+const initializeDeviceSessionEpoch = () => {
+  const existing = readDeviceSessionEpoch();
+  if (existing) return existing;
+  const created = newDeviceSessionEpoch();
+  try {
+    window.localStorage.setItem(DEVICE_SESSION_EPOCH_KEY, created);
+    return readDeviceSessionEpoch() === created ? created : null;
+  } catch {
+    return null;
+  }
+};
+let inMemoryCancellationJournal = null;
+let cancellationJournalPrivacyFailure = false;
+const readCancellationJournal = () => {
+  const memoryEntry = hydrateCancellationJournal(inMemoryCancellationJournal);
+  if (memoryEntry && inMemoryCancellationJournal?.owned === true) {
+    return { ...memoryEntry, privacySanitizationFailed: cancellationJournalPrivacyFailure };
+  }
+  inMemoryCancellationJournal = null;
+  cancellationJournalPrivacyFailure = false;
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(CANCELLATION_JOURNAL_KEY) || "null");
+    const hydrated = hydrateCancellationJournal(stored);
+    if (hydrated) {
+      const sanitized = normalizeCancellationJournal(stored);
+      inMemoryCancellationJournal = { ...sanitized, owned: false };
+      let privacySanitizationFailed = false;
+      if (stored?.bookingRef || stored?.state !== sanitized.state) {
+        try {
+          window.localStorage.setItem(CANCELLATION_JOURNAL_KEY, JSON.stringify(sanitized));
+          const verified = JSON.parse(window.localStorage.getItem(CANCELLATION_JOURNAL_KEY) || "null");
+          privacySanitizationFailed = Boolean(verified?.bookingRef)
+            || verified?.token !== sanitized.token
+            || Number(verified?.startedAt) !== sanitized.startedAt
+            || verified?.state !== sanitized.state;
+        } catch {
+          privacySanitizationFailed = true;
+        }
+      }
+      cancellationJournalPrivacyFailure = privacySanitizationFailed;
+      return { ...hydrated, privacySanitizationFailed };
+    }
+    window.localStorage.removeItem(CANCELLATION_JOURNAL_KEY);
+  } catch {
+    const unreadableJournal = {
+      token: "unreadable-cancellation-journal",
+      startedAt: Date.now(),
+      state: "reconciliation_required",
+    };
+    inMemoryCancellationJournal = unreadableJournal;
+    cancellationJournalPrivacyFailure = true;
+    return { ...hydrateCancellationJournal(unreadableJournal), privacySanitizationFailed: true };
+  }
+  return null;
+};
+const writeCancellationJournal = () => {
+  const entry = {
+    token: `cancel-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`,
+    startedAt: Date.now(),
+    state: "pending",
+  };
+  inMemoryCancellationJournal = { ...entry, owned: true };
+  cancellationJournalPrivacyFailure = false;
+  let persisted = false;
+  try {
+    window.localStorage.setItem(CANCELLATION_JOURNAL_KEY, JSON.stringify(entry));
+    const saved = JSON.parse(window.localStorage.getItem(CANCELLATION_JOURNAL_KEY) || "null");
+    persisted = saved?.token === entry.token
+      && Number(saved?.startedAt) === entry.startedAt
+      && saved?.state === "pending"
+      && !saved?.bookingRef;
+  } catch {
+    // The caller refuses to send a provider mutation without a durable lock.
+  }
+  notifyCancellationJournalChanged("pending");
+  return { ...entry, persisted };
+};
+const markCancellationJournalForReconciliation = (token) => {
+  const current = normalizeCancellationJournal(inMemoryCancellationJournal);
+  if (!current || current.token !== token) return false;
+  const entry = { ...current, state: "reconciliation_required", owned: true };
+  inMemoryCancellationJournal = entry;
+  try {
+    window.localStorage.setItem(CANCELLATION_JOURNAL_KEY, JSON.stringify(normalizeCancellationJournal(entry)));
+    const saved = JSON.parse(window.localStorage.getItem(CANCELLATION_JOURNAL_KEY) || "null");
+    const persisted = saved?.token === entry.token
+      && Number(saved?.startedAt) === entry.startedAt
+      && saved?.state === "reconciliation_required"
+      && !saved?.bookingRef;
+    notifyCancellationJournalChanged("reconciliation_required");
+    return persisted;
+  } catch {
+    notifyCancellationJournalChanged("reconciliation_required");
+    return false;
+  }
+};
+const clearCancellationJournal = (token) => {
+  if (inMemoryCancellationJournal?.token === token) {
+    inMemoryCancellationJournal = null;
+    cancellationJournalPrivacyFailure = false;
+  }
+  if (typeof window === "undefined") return;
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(CANCELLATION_JOURNAL_KEY) || "null");
+    if (!stored || stored.token === token) window.localStorage.removeItem(CANCELLATION_JOURNAL_KEY);
+  } catch {
+    // Fail closed: an unreadable safety journal must never authorize a retry.
+  } finally {
+    notifyCancellationJournalChanged("cleared");
+  }
+};
 
 const ElevenLabsTransport = forwardRef(function ElevenLabsTransport({
   callbacks,
@@ -244,7 +384,7 @@ export default function App() {
   const [stage, setStage] = useState({ view: "empty" });
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [booking, setBooking] = useState(null);
-  const [bookings, setBookings] = useState(readBookings);
+  const [bookings, setBookings] = useState(() => isUsableDeviceSessionEpoch(readDeviceSessionEpoch()) ? readBookings() : []);
   const [historyFilter, setHistoryFilter] = useState("all");
   const [pendingOrder, setPendingOrder] = useState(null);
   const [cinema, setCinema] = useState(null);
@@ -257,14 +397,22 @@ export default function App() {
   const [transportGeneration, setTransportGeneration] = useState(0);
   const [transportStatus, setTransportStatus] = useState("disconnected");
   const [cancellationState, setCancellationState] = useState(IDLE_CANCELLATION_STATE);
+  const deviceSessionEpochRef = useRef(undefined);
+  if (deviceSessionEpochRef.current === undefined) deviceSessionEpochRef.current = initializeDeviceSessionEpoch();
 
   // Cancellation tools return promptly so the agent can speak each prompt.
   // The ref is the synchronous source for SDK callbacks; cancellationState is
   // its renderable mirror for the shared text, voice, and touch experience.
   const cancelTimerRef = useRef(null);
+  const cancellationJournalTimerRef = useRef(null);
   const cancellationFlowRef = useRef(null);
   const cancellationInFlightRef = useRef(false);
+  const cancellationLockPendingRef = useRef(false);
+  const cancellationLockPromiseRef = useRef(null);
   const cancellationOperationRef = useRef(0);
+  const mountedRef = useRef(true);
+  const seatConfirmationInFlightRef = useRef(new Map());
+  const uiSeatConfirmationKeyRef = useRef(null);
 
   // Voice-resolution caches and non-recursive return-navigation snapshots.
   const filmsRef = useRef([]);
@@ -277,6 +425,7 @@ export default function App() {
   const planContextRef = useRef(null);
   const cinemaReturnRef = useRef(null);
   const historyReturnRef = useRef(null);
+  const historyContextRef = useRef(null);
   const bookingOpenedFromHistoryRef = useRef(false);
   const offersReturnRef = useRef(null);
   const faqReturnRef = useRef(null);
@@ -329,9 +478,18 @@ export default function App() {
       refundRoute: resolved.refundRoute || null,
       message: resolved.message || null,
       error: resolved.error || null,
+      retryAllowed: resolved.retryAllowed !== false,
+      dismissAllowed: resolved.dismissAllowed !== false,
+      outcomeUnknown: Boolean(resolved.outcomeUnknown),
+      journalStartedAt: Number.isFinite(Number(resolved.journalStartedAt)) ? Number(resolved.journalStartedAt) : null,
     } : IDLE_CANCELLATION_STATE);
     return resolved || null;
   }, []);
+
+  const deviceSessionIsCurrent = () => {
+    const storedEpoch = readDeviceSessionEpoch();
+    return Boolean(isUsableDeviceSessionEpoch(deviceSessionEpochRef.current) && storedEpoch === deviceSessionEpochRef.current);
+  };
 
   useEffect(() => { stageRef.current = stage; }, [stage]);
   useEffect(() => { cinemaRef.current = cinema; }, [cinema]);
@@ -436,12 +594,21 @@ export default function App() {
     clarificationFailureLogRef.current = [];
   };
 
-  const dismissPendingCancellation = (reason = "dismissed") => {
+  const dismissPendingCancellation = (reason = "dismissed", { force = false } = {}) => {
+    const journal = readCancellationJournal();
+    const providerMutationActive = cancellationLockPendingRef.current
+      || cancellationInFlightRef.current
+      || cancellationFlowRef.current?.phase === "processing"
+      || Boolean(journal);
+    if (providerMutationActive && !force) return false;
     cancellationOperationRef.current += 1;
+    cancellationLockPendingRef.current = false;
+    cancellationLockPromiseRef.current = null;
     cancellationInFlightRef.current = false;
     window.clearTimeout(cancelTimerRef.current);
     cancelTimerRef.current = null;
     setCancellationFlow(null);
+    return true;
   };
 
   const clearPendingOrder = () => {
@@ -455,6 +622,148 @@ export default function App() {
     stageRef.current = next;
     lastActivityRef.current = Date.now();
     setStage(next);
+  }, []);
+
+  useEffect(() => {
+    const refreshBookingStateFromStorage = ({ clearMissing = false } = {}) => {
+      let refreshedBookings;
+      try {
+        refreshedBookings = readBookings({ strict: true });
+      } catch (error) {
+        console.error("Booking history could not be refreshed after a storage change", error);
+        return;
+      }
+      setBookings(refreshedBookings);
+      const visible = bookingRef.current;
+      if (!visible?.ref) return;
+      const refreshed = refreshedBookings.find((item) => norm(item.ref) === norm(visible.ref));
+      if (refreshed) {
+        bookingRef.current = refreshed;
+        setBooking(refreshed);
+        if (stageRef.current.view === "booking") showStage({ view: "booking", booking: refreshed });
+        if (refreshed.cancelled && norm(cancellationFlowRef.current?.bookingRef) === norm(refreshed.ref)) setCancellationFlow(null);
+      } else if (clearMissing) {
+        bookingRef.current = null;
+        setBooking(null);
+        if (stageRef.current.view === "booking") showStage({ view: "empty" });
+        setCancellationFlow(null);
+      }
+    };
+    const onLocalCancellationJournalChange = () => {
+      syncCancellationJournalUi();
+      refreshBookingStateFromStorage();
+    };
+    const onCrossTabStorage = (event) => {
+      if (event.key === CANCELLATION_JOURNAL_KEY) {
+        if (inMemoryCancellationJournal?.owned !== true) {
+          inMemoryCancellationJournal = null;
+          cancellationJournalPrivacyFailure = false;
+        }
+        syncCancellationJournalUi();
+        refreshBookingStateFromStorage();
+        return;
+      }
+      if (event.key !== BOOKING_STORAGE_KEY && event.key !== null) return;
+      refreshBookingStateFromStorage({ clearMissing: event.newValue === null });
+    };
+    window.addEventListener(CANCELLATION_JOURNAL_EVENT, onLocalCancellationJournalChange);
+    window.addEventListener("storage", onCrossTabStorage);
+    return () => {
+      window.removeEventListener(CANCELLATION_JOURNAL_EVENT, onLocalCancellationJournalChange);
+      window.removeEventListener("storage", onCrossTabStorage);
+    };
+  }, [showStage, setCancellationFlow]);
+
+  const captureHistoryReturn = () => {
+    historyReturnRef.current = stageRef.current;
+    historyContextRef.current = {
+      cinema: cinemaRef.current,
+      booking: bookingRef.current,
+      bookingOpenedFromHistory: bookingOpenedFromHistoryRef.current,
+      scheduleDate: scheduleDateRef.current,
+      selectedSeats: [...seatsRef.current],
+    };
+  };
+
+  const activeCancellationMutation = () => {
+    const flow = cancellationFlowRef.current;
+    const journal = readCancellationJournal();
+    const pendingJournal = journal && !journal.orphaned ? journal : null;
+    if (!cancellationLockPendingRef.current && !cancellationInFlightRef.current && flow?.phase !== "processing" && !pendingJournal) return null;
+    return {
+      found: true,
+      bookingRef: flow?.bookingRef || null,
+      confirmationRequired: false,
+      phase: "processing",
+      refundRoute: flow?.refundRoute || null,
+      simulationOnly: Boolean(flow?.demoOnly),
+      message: flow?.message || (localeRef.current === "ar" ? "جارٍ إتمام طلب الإلغاء الحالي. انتظر حتى يكتمل قبل بدء طلب آخر." : "The current cancellation is still processing. Wait for it to finish before starting another request."),
+    };
+  };
+
+  const cancellationReconciliationRequired = () => {
+    const journal = readCancellationJournal();
+    if (!journal?.orphaned) return null;
+    const result = {
+      found: true,
+      eligible: false,
+      confirmationRequired: false,
+      phase: "reconciliation_required",
+      reason: "provider_reconciliation_required",
+      bookingRef: null,
+      retryAllowed: false,
+      dismissAllowed: false,
+      outcomeUnknown: true,
+      journalStartedAt: journal.startedAt,
+      message: localeRef.current === "ar"
+        ? "تعذر التحقق من نتيجة طلب إلغاء سابق. تم إيقاف جميع طلبات الإلغاء الجديدة على هذا الجهاز ولم يتم إرسال طلب جديد. تحقق من حجوزاتك عبر خدمة إدارة الحجز الرسمية من VOX أو تواصل مع الدعم."
+        : "The result of an earlier cancellation request could not be verified. All new cancellation requests on this device are paused and no new request was sent. Check your bookings in the official VOX Manage Booking service or contact support.",
+    };
+    if (mountedRef.current) {
+      setCancellationFlow({ phase: "error", bookingRef: null, demoOnly: false, refundRoute: null, error: result.reason, message: result.message, retryAllowed: false, dismissAllowed: false, outcomeUnknown: true, journalStartedAt: journal.startedAt });
+    }
+    return result;
+  };
+
+  const syncCancellationJournalUi = () => {
+    window.clearTimeout(cancellationJournalTimerRef.current);
+    cancellationJournalTimerRef.current = null;
+    const journal = readCancellationJournal();
+    if (!journal) {
+      if (cancellationFlowRef.current?.outcomeUnknown) setCancellationFlow(null);
+      return null;
+    }
+    if (journal.orphaned) return cancellationReconciliationRequired();
+    const message = localeRef.current === "ar"
+      ? "طلب إلغاء سابق ما زال بانتظار الحالة النهائية. تم إخفاء رمز الحجز المحتمل تأثره، ولن يتم إرسال طلب إلغاء آخر."
+      : "An earlier cancellation request is still awaiting its final status. The potentially affected booking QR is hidden and no new cancellation request will be sent.";
+    const result = {
+      found: true,
+      confirmed: false,
+      confirmationRequired: false,
+      phase: "processing",
+      reason: "provider_outcome_pending",
+      bookingRef: null,
+      message,
+      retryAllowed: false,
+      dismissAllowed: false,
+      outcomeUnknown: true,
+      journalStartedAt: journal.startedAt,
+    };
+    if (mountedRef.current) setCancellationFlow(result);
+    const remaining = Math.max(0, (journal.startedAt + CANCELLATION_JOURNAL_TTL_MS) - Date.now());
+    cancellationJournalTimerRef.current = window.setTimeout(() => {
+      const latest = readCancellationJournal();
+      if (!latest || latest.token !== journal.token) return syncCancellationJournalUi();
+      markCancellationJournalForReconciliation(journal.token);
+      cancellationReconciliationRequired();
+    }, remaining + 25);
+    return result;
+  };
+
+  useEffect(() => {
+    syncCancellationJournalUi();
+    return () => window.clearTimeout(cancellationJournalTimerRef.current);
   }, []);
 
   const beginAsyncRequest = () => {
@@ -510,6 +819,7 @@ export default function App() {
     setBooking(null);
     setHistoryFilter("all");
     historyReturnRef.current = null;
+    historyContextRef.current = null;
     showStage(canRestoreMovies ? { view: "movies", movies: filmsRef.current } : { view: "empty" });
     return true;
   };
@@ -566,7 +876,15 @@ export default function App() {
     if (cinema?.id) ensureFilms(cinema.id, scheduleDate).catch(() => {});
   }, [cinema?.id, ensureFilms, scheduleDate]);
 
-  useEffect(() => () => dismissPendingCancellation("widget_unmounted"), []);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      window.clearTimeout(cancelTimerRef.current);
+      cancelTimerRef.current = null;
+      if (!readCancellationJournal() && !cancellationLockPendingRef.current) dismissPendingCancellation("widget_unmounted", { force: true });
+    };
+  }, []);
 
   const applyProgrammingDate = (nextDate, reason = "date_changed", availableDates = programmingDatesForCinema(cinemaRef.current)) => {
     if (!availableDates.includes(nextDate) || nextDate === scheduleDateRef.current) return false;
@@ -666,7 +984,8 @@ export default function App() {
     }
     const plan = planRef.current || [];
     const all = plan.flatMap((row) => row.seats);
-    const requested = [...new Set((seatIds || []).map((id) => String(id).toUpperCase()))];
+    const availableSeatIds = all.filter((seat) => seat.status === 0).map((seat) => seat.id);
+    const requested = normalizeSeatIds(seatIds, availableSeatIds);
     const expectedQuantity = Math.max(1, Math.min(MAX_TICKETS, Math.trunc(Number(ticketQuantityRef.current)) || 1));
     if (requested.length > MAX_TICKETS) {
       return { valid: [], total: 0, reason: "ticket_limit", expectedQuantity, requestedQuantity: requested.length };
@@ -675,21 +994,26 @@ export default function App() {
     if (valid.length !== expectedQuantity) {
       return { valid, total: 0, reason: "quantity_mismatch", expectedQuantity, requestedQuantity: requested.length };
     }
+    seatsRef.current = [...valid];
+    setSelectedSeats([...valid]);
     const movie = current.movie;
     const session = current.session;
     const selectedCinema = cinemaRef.current;
     const selectedSeatDetails = valid.map((id) => all.find((item) => item.id === id)).filter(Boolean);
+    const selectionIsCurrent = () => stageRef.current.view === "seatmap"
+      && planContextRef.current === planContext
+      && cinemaRef.current?.id === selectedCinema?.id
+      && String(stageRef.current.session?.sessionId) === String(session?.sessionId)
+      && Number(ticketQuantityRef.current) === expectedQuantity
+      && sameSeatSelection(seatsRef.current, valid);
     let quote;
     try {
       quote = await vista.getPricingQuote(selectedCinema?.id, session?.sessionId, selectedSeatDetails);
     } catch (error) {
+      if (!selectionIsCurrent()) return { valid: [], total: 0, stale: true };
       return { valid, total: 0, reason: "pricing_unavailable", expectedQuantity, detail: error?.message || "Pricing is unavailable." };
     }
-    const stillCurrent = stageRef.current.view === "seatmap"
-      && planContextRef.current === planContext
-      && cinemaRef.current?.id === selectedCinema?.id
-      && String(stageRef.current.session?.sessionId) === String(session?.sessionId);
-    if (!stillCurrent) return { valid: [], total: 0, stale: true };
+    if (!selectionIsCurrent()) return { valid: [], total: 0, stale: true };
     const total = Number(quote?.total);
     if (!Number.isFinite(total)) return { valid, total: 0, reason: "pricing_unavailable", expectedQuantity };
     const planMeta = vista.getResultMeta(plan);
@@ -732,6 +1056,8 @@ export default function App() {
       };
       ticketQuantityRef.current = valid.length;
       setTicketQuantity(valid.length);
+      seatsRef.current = [...valid];
+      setSelectedSeats([...valid]);
       pendingOrderRef.current = order;
       setPendingOrder(order);
       showStage({ ...current, view: "checkout", order, movie, session });
@@ -740,9 +1066,34 @@ export default function App() {
     return { valid, total, expectedQuantity, quote };
   };
 
-  const handlePaid = ({ label, checkoutId }) => {
+  const seatConfirmationKey = (seatIds) => [
+    cinemaRef.current?.id || "",
+    stageRef.current.session?.sessionId || "",
+    Math.max(1, Math.trunc(Number(ticketQuantityRef.current)) || 1),
+    [...(seatIds || [])].sort().join(","),
+  ].join("|");
+
+  const priceSeatSelection = (seatIds) => {
+    const key = seatConfirmationKey(seatIds);
+    const existing = seatConfirmationInFlightRef.current.get(key);
+    if (existing) return existing;
+    let trackedPromise;
+    trackedPromise = Promise.resolve()
+      .then(() => finalizeSeats(seatIds))
+      .finally(() => {
+        if (seatConfirmationInFlightRef.current.get(key) === trackedPromise) {
+          seatConfirmationInFlightRef.current.delete(key);
+        }
+      });
+    seatConfirmationInFlightRef.current.set(key, trackedPromise);
+    return trackedPromise;
+  };
+
+  const handlePaid = async ({ label, checkoutId }) => {
     const order = pendingOrderRef.current;
     if (!order || checkoutId !== order.checkoutId) return;
+    const paymentSessionEpoch = sessionEpochRef.current;
+    const paymentStageRevision = stageRevisionRef.current;
     const ref = `WL${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
     const completed = {
       ...order,
@@ -756,9 +1107,31 @@ export default function App() {
       createdAt: new Date().toISOString(),
       cancelledAt: null,
     };
+    let persistenceFailure = null;
     try {
-      appendBooking(completed);
+      const storageLock = await withCancellationMutationLock(
+        typeof navigator !== "undefined" ? navigator.locks : null,
+        () => {
+          if (!deviceSessionIsCurrent()) return { saved: false, reason: "stale_device_session" };
+          if (sessionEpochRef.current !== paymentSessionEpoch
+            || stageRevisionRef.current !== paymentStageRevision
+            || pendingOrderRef.current?.checkoutId !== checkoutId
+            || stageRef.current.view !== "checkout"
+            || stageRef.current.order?.checkoutId !== checkoutId) {
+            return { saved: false, reason: "stale_checkout" };
+          }
+          appendBooking(completed);
+          return { saved: true, reason: null };
+        },
+      );
+      if (!storageLock.acquired || !storageLock.result?.saved) {
+        persistenceFailure = storageLock.reason || storageLock.result?.reason || "booking_storage_busy";
+      }
     } catch (error) {
+      persistenceFailure = error;
+    }
+    if (persistenceFailure) {
+      if (["stale_checkout", "stale_device_session"].includes(String(persistenceFailure))) return false;
       const retryOrder = { ...order, checkoutId: `checkout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}` };
       pendingOrderRef.current = retryOrder;
       setPendingOrder(retryOrder);
@@ -792,7 +1165,6 @@ export default function App() {
   const clientTools = {
     show_movie_selection: async ({ cinemaId, cinemaName, date, displayDate, scheduleDate: toolDate } = {}) => {
       dismissPendingCancellation("new_journey");
-      clearPendingOrder();
       const requested = resolveCinema(cinemaId) || resolveCinema(cinemaName);
       const target = requested || cinemaRef.current;
       if ((cinemaId || cinemaName) && !requested) {
@@ -800,6 +1172,7 @@ export default function App() {
       }
       if (!target) {
         cinemaReturnRef.current = { view: "empty" };
+        clearPendingOrder();
         showStage({ view: "cinemas" });
         resetClarificationFailures();
         return JSON.stringify({
@@ -818,6 +1191,7 @@ export default function App() {
       if (!requestedDate) {
         return JSON.stringify({ shown: false, cinema: { id: target.id, name: target.name }, availableDates, reason: "No future programming dates are published for this cinema." });
       }
+      clearPendingOrder();
       if (target.id !== cinemaRef.current?.id) {
         cinemaRef.current = target;
         setCinema(target);
@@ -869,7 +1243,6 @@ export default function App() {
 
     show_showtimes: async ({ movieId, movieTitle, date, displayDate, scheduleDate: toolDate } = {}) => {
       dismissPendingCancellation("new_journey");
-      clearPendingOrder();
       if (!cinemaRef.current) {
         showStage({ view: "cinemas" });
         return JSON.stringify({ shown: false, reason: "A VOX Cinemas UAE location must be selected first. The cinema picker is displayed." });
@@ -877,7 +1250,22 @@ export default function App() {
       const cinemaId = cinemaRef.current.id;
       const availableDates = programmingDatesForCinema(cinemaId);
       const requestedDateText = toolDate || displayDate || date;
-      const dateDecision = resolveClientToolProgrammingDate(requestedDateText, availableDates);
+      const hasRequestedMovie = Boolean(movieId || movieTitle);
+      const visibleMovie = resolveFilm(movieId) || resolveFilm(movieTitle);
+      const hasVisibleSelection = Boolean(
+        hasRequestedMovie
+        && visibleMovie
+        && filmsCinemaRef.current === cinemaId
+        && filmsDateRef.current,
+      );
+      const dateDecision = resolveVisibleSelectionProgrammingDate({
+        availableDates,
+        userRequestedDate: userRequestedDateRef.current,
+        toolRequestedDate: requestedDateText,
+        selectedDate: scheduleDateRef.current,
+        visibleDate: filmsDateRef.current,
+        hasVisibleSelection,
+      });
       if (dateDecision.blocked) return JSON.stringify({ shown: false, requestedDate: dateDecision.unavailableDate, availableDates, reason: `No published programming is available for ${dateDecision.unavailableDate} at ${cinemaRef.current.name}. Do not substitute another date; ask the guest to choose one of the published dates.` });
       const requestedDate = dateDecision.date;
       if (!requestedDate) return JSON.stringify({ shown: false, availableDates, reason: "No future programming dates are published for this cinema." });
@@ -890,8 +1278,10 @@ export default function App() {
         return JSON.stringify({ shown: false, reason: error?.message || "Movie results could not be loaded." });
       }
       if (!requestIsCurrent(epoch, revision, cinemaId, requestedDate)) return JSON.stringify({ shown: false, reason: "The cinema, date, or active task changed while showtimes were loading." });
-      const hasRequestedMovie = Boolean(movieId || movieTitle);
-      const movie = resolveFilm(movieId) || resolveFilm(movieTitle) || (!hasRequestedMovie ? filmsRef.current[0] : null);
+      const movie = (hasVisibleSelection && filmsDateRef.current === requestedDate ? visibleMovie : null)
+        || resolveFilm(movieId)
+        || resolveFilm(movieTitle)
+        || (!hasRequestedMovie ? filmsRef.current[0] : null);
       if (!movie) return JSON.stringify({ shown: false, reason: `No matching movie was found for ${movieTitle || movieId}. Ask the guest to choose a title from the displayed movie list.` });
       let sessions;
       try {
@@ -902,6 +1292,7 @@ export default function App() {
       if (!requestIsCurrent(epoch, revision, cinemaId, requestedDate)) return JSON.stringify({ shown: false, reason: "The cinema, date, movie, or active task changed while showtimes were loading." });
       sessionsRef.current = sessions;
       sessionsFilmRef.current = movie.id;
+      clearPendingOrder();
       showStage({ view: "showtimes", movie, sessions });
       resetClarificationFailures();
       return JSON.stringify({
@@ -914,7 +1305,6 @@ export default function App() {
 
     show_seat_map: async ({ movieTitle, sessionId, showtime, ticketQuantity: requestedQuantity, date, displayDate, scheduleDate: toolDate } = {}) => {
       dismissPendingCancellation("new_journey");
-      clearPendingOrder();
       if (!cinemaRef.current) {
         showStage({ view: "cinemas" });
         return JSON.stringify({ shown: false, reason: "A VOX Cinemas UAE location must be selected first. The cinema picker is displayed." });
@@ -922,7 +1312,22 @@ export default function App() {
       const cinemaId = cinemaRef.current.id;
       const availableDates = programmingDatesForCinema(cinemaId);
       const requestedDateText = toolDate || displayDate || date;
-      const dateDecision = resolveClientToolProgrammingDate(requestedDateText, availableDates);
+      const current = stageRef.current;
+      const visibleMovie = resolveFilm(movieTitle) || (!movieTitle ? current.movie : null);
+      const hasVisibleSelection = Boolean(
+        visibleMovie
+        && filmsCinemaRef.current === cinemaId
+        && filmsDateRef.current
+        && ["showtimes", "seatmap"].includes(current.view),
+      );
+      const dateDecision = resolveVisibleSelectionProgrammingDate({
+        availableDates,
+        userRequestedDate: userRequestedDateRef.current,
+        toolRequestedDate: requestedDateText,
+        selectedDate: scheduleDateRef.current,
+        visibleDate: filmsDateRef.current,
+        hasVisibleSelection,
+      });
       if (dateDecision.blocked) return JSON.stringify({ shown: false, requestedDate: dateDecision.unavailableDate, availableDates, reason: `No published programming is available for ${dateDecision.unavailableDate} at ${cinemaRef.current.name}. Do not substitute another date; ask the guest to choose one of the published dates.` });
       const requestedDate = dateDecision.date;
       if (!requestedDate) return JSON.stringify({ shown: false, availableDates, reason: "No future programming dates are published for this cinema." });
@@ -935,9 +1340,9 @@ export default function App() {
         return JSON.stringify({ shown: false, reason: error?.message || "Movie results could not be loaded." });
       }
       if (!requestIsCurrent(epoch, revision, cinemaId, requestedDate)) return JSON.stringify({ shown: false, reason: "The cinema, date, or active task changed while the seat map was loading." });
-      const current = stageRef.current;
-      const resolvedMovie = resolveFilm(movieTitle);
-      const movie = resolvedMovie || (!movieTitle ? current.movie || filmsRef.current[0] : null);
+      const movie = (hasVisibleSelection && filmsDateRef.current === requestedDate ? visibleMovie : null)
+        || resolveFilm(movieTitle)
+        || (!movieTitle ? current.movie || filmsRef.current[0] : null);
       if (!movie) return JSON.stringify({ shown: false, reason: `No matching movie was found for ${movieTitle}. Ask the guest to choose a title from the displayed movie list.` });
       let sessions = sessionsRef.current;
       if (!sessions.length || sessionsFilmRef.current !== movie?.id) {
@@ -977,6 +1382,7 @@ export default function App() {
       const planMeta = vista.getResultMeta(plan);
       planRef.current = plan;
       planContextRef.current = { cinemaId, sessionId: session.sessionId };
+      clearPendingOrder();
       showStage({ view: "seatmap", movie, session, plan, planMeta });
       resetClarificationFailures();
       const available = plan.flatMap((row) => row.seats).filter((seat) => seat.status === 0).map((seat) => seat.id);
@@ -992,10 +1398,62 @@ export default function App() {
     },
 
     select_seats: async ({ seats } = {}) => {
-      const ids = (Array.isArray(seats) ? seats : String(seats || "").split(/[,\s]+/))
-        .map((value) => String(value).toUpperCase().replace(/[^A-Z0-9]/g, ""))
-        .filter(Boolean);
-      const result = await finalizeSeats(ids);
+      const availableSeatIds = (planRef.current || [])
+        .flatMap((row) => row.seats || [])
+        .filter((seat) => seat.status === 0)
+        .map((seat) => seat.id);
+      const seatInput = resolveSeatToolInput(seats, { availableSeatIds, currentSeats: seatsRef.current });
+      const { provided: seatArgumentProvided, seats: ids, invalidSeats } = seatInput;
+      if (invalidSeats.length) {
+        return JSON.stringify({
+          confirmed: false,
+          invalidSeats,
+          reason: `These seats are invalid or unavailable: ${invalidSeats.join(", ")}. Ask the guest to choose only available seats shown on the map.`,
+        });
+      }
+      const activeOrder = pendingOrderRef.current;
+      if (stageRef.current.view === "checkout" && activeOrder?.checkoutId) {
+        const matchesActiveOrder = (!seatArgumentProvided && !ids.length)
+          || sameSeatSelection(ids, activeOrder.seats || []);
+        return JSON.stringify(matchesActiveOrder
+          ? {
+            confirmed: true,
+            alreadyConfirmed: true,
+            seats: activeOrder.seats,
+            total: activeOrder.total,
+            currency: activeOrder.currency || "AED",
+            next: "Checkout is already displayed. Ask the guest to complete payment on screen. Do not call select_seats again.",
+          }
+          : {
+            confirmed: false,
+            reason: "Checkout is already displayed for different seats. Ask the guest to use Back before changing seats.",
+          });
+      }
+      const result = await priceSeatSelection(ids);
+      if (result.stale) {
+        const completedOrder = pendingOrderRef.current;
+        const matchingCheckoutIsVisible = stageRef.current.view === "checkout"
+          && stageRef.current.order?.checkoutId === completedOrder?.checkoutId;
+        if (matchingCheckoutIsVisible && completedOrder?.checkoutId && sameSeatSelection(ids, completedOrder.seats || [])) {
+          return JSON.stringify({
+            confirmed: true,
+            alreadyConfirmed: true,
+            seats: completedOrder.seats,
+            total: completedOrder.total,
+            currency: completedOrder.currency || "AED",
+            next: "Checkout is already displayed. Ask the guest to complete payment on screen. Do not call select_seats again.",
+          });
+        }
+        const currentView = stageRef.current.view;
+        return JSON.stringify({
+          confirmed: false,
+          stale: true,
+          currentView,
+          reason: currentView === "seatmap"
+            ? "The seat selection changed while pricing was loading. Use the seats currently shown in the widget and try again."
+            : `Seat confirmation stopped because the widget moved to ${currentView}. Continue from the panel currently displayed.`,
+        });
+      }
       if (!result.valid.length) {
         const reason = result.reason === "ticket_limit"
           ? `A booking can contain at most ${MAX_TICKETS} tickets.`
@@ -1065,6 +1523,8 @@ export default function App() {
 
     show_booking_for_cancellation: async ({ bookingRef: requestedRef } = {}) => {
       const openedFromHistory = stageRef.current.view === "history" || bookingOpenedFromHistoryRef.current;
+      const processingMutation = activeCancellationMutation();
+      if (processingMutation) return JSON.stringify(processingMutation);
       const storedBookings = readBookings();
       const target = resolveCancellationTarget({
         requestedRef,
@@ -1074,7 +1534,7 @@ export default function App() {
       if (!target.bookingRef) {
         dismissPendingCancellation("target_selection_required");
         const visibleBookings = storedBookings.filter((item) => isCurrentBooking(item));
-        if (stageRef.current.view !== "history") historyReturnRef.current = stageRef.current;
+        if (stageRef.current.view !== "history") captureHistoryReturn();
         setHistoryFilter("active");
         setBookings(visibleBookings);
         showStage({ view: "history" });
@@ -1111,6 +1571,9 @@ export default function App() {
         });
       }
 
+      const reconciliationRequired = cancellationReconciliationRequired(target.bookingRef);
+      if (reconciliationRequired) return JSON.stringify(reconciliationRequired);
+
       const existingFlow = cancellationFlowRef.current;
       if (existingFlow?.bookingRef && norm(existingFlow.bookingRef) === norm(target.bookingRef)
         && ["checking", "route_confirmation", "final_confirmation", "processing"].includes(existingFlow.phase)) {
@@ -1126,7 +1589,6 @@ export default function App() {
       }
 
       dismissPendingCancellation("replaced");
-      clearPendingOrder();
       setCancellationFlow({ phase: "checking", bookingRef: target.bookingRef, message: localeRef.current === "ar" ? "جارٍ التحقق من إمكانية إلغاء الحجز…" : "Checking cancellation eligibility…" });
       const requestRevision = stageRevisionRef.current;
       const cancellationRequestId = cancellationOperationRef.current;
@@ -1164,6 +1626,7 @@ export default function App() {
         cancelled: Boolean(found.cancelled),
         bookingStatus: found.bookingStatus || (found.cancelled ? "cancelled" : "confirmed"),
       };
+      clearPendingOrder();
       bookingRef.current = displayed;
       bookingOpenedFromHistoryRef.current = openedFromHistory;
       setBooking(displayed);
@@ -1367,6 +1830,57 @@ export default function App() {
     },
   };
 
+  const resolveVisibleSeatTurn = (text) => {
+    if (stageRef.current.view !== "seatmap") return Object.freeze({ requested: false, seats: [] });
+    const availableSeatIds = (planRef.current || [])
+      .flatMap((row) => row.seats || [])
+      .filter((seat) => seat.status === 0)
+      .map((seat) => seat.id);
+    return resolveSeatSelectionTurn(text, {
+      availableSeatIds,
+      currentSeats: seatsRef.current,
+    });
+  };
+
+  const routeSeatSelectionTurn = async (text, resolvedTurn = resolveVisibleSeatTurn(text)) => {
+    if (!resolvedTurn?.requested) return null;
+    if (resolvedTurn.invalidSeats?.length) {
+      return {
+        confirmed: false,
+        invalidSeats: resolvedTurn.invalidSeats,
+        reason: localeRef.current === "ar"
+          ? `هذه المقاعد غير متاحة أو غير صحيحة: ${resolvedTurn.invalidSeats.join("، ")}. اختر من المقاعد المتاحة في الخريطة.`
+          : `These seats are invalid or unavailable: ${resolvedTurn.invalidSeats.join(", ")}. Choose from the available seats shown on the map.`,
+      };
+    }
+    if (!resolvedTurn.seats?.length) {
+      return {
+        confirmed: false,
+        reason: localeRef.current === "ar"
+          ? "اختر مقعداً متاحاً واحداً على الأقل، ثم أكّد المقاعد."
+          : "Select at least one available seat, then confirm the seats.",
+      };
+    }
+    const rawResult = await clientTools.select_seats({ seats: resolvedTurn.seats });
+    try {
+      return typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+    } catch {
+      return { confirmed: false, reason: "The seat confirmation returned an unreadable result." };
+    }
+  };
+
+  const seatSelectionResultContext = (result) => {
+    if (result?.confirmed) {
+      return `The widget confirmed seats ${(result.seats || []).join(", ")} and checkout is already displayed. The booking is not confirmed yet and no booking reference exists yet. Tell the guest to complete the on-screen payment step. Do not call select_seats again, invent a reference, or claim that payment, reservation, booking, or QR creation is complete.`;
+    }
+    if (result?.stale) {
+      return result.currentView === "seatmap"
+        ? "The guest changed the seat selection while pricing was loading. The seat map remains visible. Ask them to confirm the seats currently selected; do not claim checkout or booking completion."
+        : `Seat confirmation stopped because the widget now displays ${result.currentView || "another panel"}. Continue from the panel currently shown; do not say the seat map remains visible or claim checkout or booking completion.`;
+    }
+    return `The seat map remains visible and checkout did not start. Reason: ${result?.reason || "seat confirmation was not completed"} State that requirement briefly and never claim a booking or reference was created.`;
+  };
+
   const routeCancellationTurn = async (text) => {
     const storedBookings = readBookings();
     const target = resolveCancellationTarget({
@@ -1435,10 +1949,14 @@ export default function App() {
   };
 
   const clearConversationState = useCallback((reason = "reset") => {
+    if (activeCancellationMutation()) {
+      lastActivityRef.current = Date.now();
+      return false;
+    }
     sessionEpochRef.current += 1;
     cancellationOperationRef.current += 1;
     requestedSessionEpochRef.current = null;
-    dismissPendingCancellation(reason);
+    dismissPendingCancellation(reason, { force: true });
     cancellationInFlightRef.current = false;
     messagesRef.current = [];
     setMessages([]);
@@ -1470,6 +1988,7 @@ export default function App() {
     planContextRef.current = null;
     cinemaReturnRef.current = null;
     historyReturnRef.current = null;
+    historyContextRef.current = null;
     offersReturnRef.current = null;
     faqReturnRef.current = null;
     lastOfferRef.current = null;
@@ -1487,6 +2006,8 @@ export default function App() {
     pendingLanguageSwitchRef.current = null;
     requestEpochRef.current += 1;
     lastActivityRef.current = Date.now();
+    cancellationReconciliationRequired();
+    return true;
   }, []);
 
   /* ========================================================================
@@ -1551,8 +2072,10 @@ export default function App() {
         if (decision !== null) publishCancellationDecision(handleCancellationDecision(decision, { source: "conversation" }));
         const historyRequest = classifyBookingHistoryRequest(safeMessage);
         const visibleHistory = historyRequest.requested
-          ? openHistory({ notifyAgent: false, forceOpen: true, activeOnly: historyRequest.activeOnly })
+          ? openHistory({ notifyAgent: false, forceOpen: true, activeOnly: historyRequest.activeOnly, preserveReturn: bookingOpenedFromHistoryRef.current })
           : null;
+        const seatTurn = decision === null ? resolveVisibleSeatTurn(safeMessage) : { requested: false, seats: [] };
+        const directSeatSelection = Boolean(seatTurn.requested);
         const directCinemaSelection = isDirectCinemaSelectionUtterance({
           text: safeMessage,
           view: stageRef.current.view,
@@ -1562,7 +2085,7 @@ export default function App() {
         const hasBookingContext = ["booking", "history"].includes(stageRef.current.view);
         const directCancellation = decision === null && isDirectCancellationRequest(safeMessage, { hasBookingContext });
         dismissStaleTransactionalView({ text: safeMessage, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
-        const faq = directCinemaSelection || directCancellation ? { matches: [], context: "" } : prepareFaqContext(safeMessage);
+        const faq = directCinemaSelection || directCancellation || directSeatSelection ? { matches: [], context: "" } : prepareFaqContext(safeMessage);
         const details = applyUtteranceBookingDetails(safeMessage, { actionIntent, hasFaq: faq.matches.length > 0 });
         const availableDates = programmingDatesForCinema(cinemaRef.current);
         const bookingContext = !faq.matches.length && (
@@ -1582,7 +2105,8 @@ export default function App() {
           conversation.sendContextualUpdate?.(`The guest requested ${unavailableDate}, but it is not published for the selected cinema. Do not substitute another date. Available dates: ${availableDates.join(", ")}.`);
         }
         if (details.cinema && !unavailableDate) {
-          conversation.sendContextualUpdate?.(`The guest explicitly named ${details.cinema.name}. The widget recognized it and is loading that cinema's movie list now. Do not ask for the cinema again and do not describe movies from another location.`);
+          const normalizedCinemaTurn = normalizeCinemaAsrForAgent(safeMessage, details.cinema);
+          conversation.sendContextualUpdate?.(`The guest explicitly named ${details.cinema.name}. The widget recognized it and is loading that cinema's movie list now. Treat the cinema as confirmed and continue; do not ask whether they meant ${details.cinema.name}, do not ask for the cinema again, and do not describe movies from another location.${normalizedCinemaTurn !== safeMessage ? ` Authoritative speech-recognition correction: “${safeMessage}” means “${normalizedCinemaTurn}”.` : ""}`);
           void routeRecognizedCinema(details.cinema, requestedDate).then((result) => {
             const count = Array.isArray(result?.movies) ? result.movies.length : 0;
             conversation.sendContextualUpdate?.(result?.shown === "movie list"
@@ -1598,6 +2122,14 @@ export default function App() {
           conversation.sendContextualUpdate?.(`The guest explicitly named ${details.cinema.name}. The widget selected that cinema; do not ask for it again.`);
         }
         if (details.ticketQuantity) conversation.sendContextualUpdate?.(`The guest explicitly requested ${details.ticketQuantity} tickets. Preserve that quantity through seat selection.`);
+        if (directSeatSelection) {
+          conversation.sendContextualUpdate?.("The widget is applying the guest's visible seat selection now. Wait for the widget result; do not claim checkout, payment, booking confirmation, a reference, or a QR yet.");
+          void routeSeatSelectionTurn(safeMessage, seatTurn).then((result) => {
+            conversation.sendContextualUpdate?.(seatSelectionResultContext(result));
+          }).catch((error) => {
+            conversation.sendContextualUpdate?.(`The seat confirmation failed: ${error?.message || "unknown error"}. The seat map remains visible; do not claim checkout or booking completion.`);
+          });
+        }
         if (historyRequest.requested) {
           conversation.sendContextualUpdate?.(`${bookingHistoryTurnContext(visibleHistory, { activeOnly: historyRequest.activeOnly })} Do not call another booking-history tool.`);
         }
@@ -1676,6 +2208,13 @@ export default function App() {
   const isConnected = status === "connected";
 
   const restartConversation = useCallback(async (reason = "manual_restart") => {
+    if (activeCancellationMutation()) {
+      lastActivityRef.current = Date.now();
+      say("system", localeRef.current === "ar"
+        ? "جارٍ إتمام طلب الإلغاء الحالي. انتظر حتى يكتمل قبل بدء محادثة جديدة."
+        : "The current cancellation is still processing. Wait for it to finish before starting a new conversation.");
+      return false;
+    }
     suppressDisconnectNoticeRef.current = true;
     disconnectReasonRef.current = reason;
     switchingSessionRef.current = false;
@@ -1692,32 +2231,107 @@ export default function App() {
       suppressDisconnectNoticeRef.current = false;
       disconnectReasonRef.current = "ended";
     }
-  }, [clearConversationState, conversation]);
+    return true;
+  }, [clearConversationState, conversation, say]);
 
   useEffect(() => {
     const onRestart = () => { restartConversation("new_conversation"); };
+    const onCrossTabLogout = async (event) => {
+      if (event.key !== DEVICE_SESSION_EPOCH_KEY && event.key !== null) return;
+      const nextEpoch = event.newValue || newDeviceSessionEpoch("logout-pending-cleared");
+      if (nextEpoch === deviceSessionEpochRef.current) return;
+      deviceSessionEpochRef.current = nextEpoch;
+      cancellationOperationRef.current += 1;
+      cancellationLockPendingRef.current = false;
+      cancellationLockPromiseRef.current = null;
+      cancellationInFlightRef.current = false;
+      setCancellationFlow(null);
+      setBookings([]);
+      await restartConversation("cross_tab_logout");
+    };
     const onLogout = async () => {
-      let bookingClearFailed = false;
-      let cardClearFailed = false;
-      try {
-        clearBookings();
-      } catch (error) {
-        bookingClearFailed = true;
-        console.error("Locally stored bookings could not be cleared during logout", error);
+      if (activeCancellationMutation()) {
+        lastActivityRef.current = Date.now();
+        say("system", localeRef.current === "ar"
+          ? "جارٍ إتمام طلب الإلغاء الحالي. انتظر حتى يكتمل قبل تسجيل الخروج."
+          : "The current cancellation is still processing. Wait for it to finish before logging out.");
+        return;
       }
-      try {
-        window.localStorage.removeItem(DEMO_CARD_STORAGE_KEY);
-        if (window.localStorage.getItem(DEMO_CARD_STORAGE_KEY) !== null) throw new Error("Demo card metadata remained after logout.");
-      } catch (error) {
-        cardClearFailed = true;
-        console.error("Demo card metadata could not be cleared during logout", error);
+      if (readCancellationJournal()?.privacySanitizationFailed) {
+        lastActivityRef.current = Date.now();
+        say("system", localeRef.current === "ar"
+          ? "تعذر تأمين سجل الإلغاء السابق وحماية خصوصيته، لذلك لم يتم تسجيل الخروج. امسح بيانات هذا الموقع من إعدادات المتصفح أو تواصل مع الدعم."
+          : "The previous cancellation safety record could not be secured and sanitized, so logout was stopped. Clear this site's data in browser settings or contact support.");
+        return;
       }
-      try {
-        window.localStorage.removeItem("vox_cards");
-      } catch (error) {
-        cardClearFailed = true;
-        console.error("Legacy card metadata could not be cleared during logout", error);
+      const storageLock = await withCancellationMutationLock(
+        typeof navigator !== "undefined" ? navigator.locks : null,
+        () => {
+          if (activeCancellationMutation()) return { completed: false, reason: "cancellation_processing" };
+          const pendingLogoutEpoch = newDeviceSessionEpoch("logout-pending");
+          try {
+            window.localStorage.setItem(DEVICE_SESSION_EPOCH_KEY, pendingLogoutEpoch);
+            if (readDeviceSessionEpoch() !== pendingLogoutEpoch) throw new Error("Logout invalidation epoch was not retained.");
+          } catch (error) {
+            console.error("Cross-tab logout could not be started", error);
+            return { completed: false, reason: "logout_broadcast_unavailable", privacyResetRequired: false };
+          }
+          let bookingClearFailed = false;
+          let cardClearFailed = false;
+          try {
+            clearBookings();
+          } catch (error) {
+            bookingClearFailed = true;
+            console.error("Locally stored bookings could not be cleared during logout", error);
+          }
+          try {
+            window.localStorage.removeItem(DEMO_CARD_STORAGE_KEY);
+            if (window.localStorage.getItem(DEMO_CARD_STORAGE_KEY) !== null) throw new Error("Demo card metadata remained after logout.");
+          } catch (error) {
+            cardClearFailed = true;
+            console.error("Demo card metadata could not be cleared during logout", error);
+          }
+          try {
+            window.localStorage.removeItem("vox_cards");
+            if (window.localStorage.getItem("vox_cards") !== null) throw new Error("Legacy card metadata remained after logout.");
+          } catch (error) {
+            cardClearFailed = true;
+            console.error("Legacy card metadata could not be cleared during logout", error);
+          }
+          if (bookingClearFailed || cardClearFailed) {
+            return { completed: false, reason: "logout_cleanup_failed", privacyResetRequired: true, bookingClearFailed, cardClearFailed, nextDeviceSessionEpoch: pendingLogoutEpoch };
+          }
+          const nextDeviceSessionEpoch = newDeviceSessionEpoch();
+          try {
+            window.localStorage.setItem(DEVICE_SESSION_EPOCH_KEY, nextDeviceSessionEpoch);
+            if (readDeviceSessionEpoch() !== nextDeviceSessionEpoch) throw new Error("Logout epoch was not retained.");
+          } catch (error) {
+            try { window.localStorage.setItem(DEVICE_SESSION_EPOCH_KEY, pendingLogoutEpoch); } catch {}
+            console.error("Cross-tab logout could not be completed", error);
+            return { completed: false, reason: "logout_broadcast_unavailable", privacyResetRequired: true, bookingClearFailed: false, cardClearFailed: true, nextDeviceSessionEpoch: pendingLogoutEpoch };
+          }
+          return { completed: true, bookingClearFailed: false, cardClearFailed: false, nextDeviceSessionEpoch };
+        },
+      );
+      if (!storageLock.acquired || !storageLock.result?.completed) {
+        const privacyResetRequired = Boolean(storageLock.result?.privacyResetRequired);
+        if (privacyResetRequired) {
+          deviceSessionEpochRef.current = storageLock.result.nextDeviceSessionEpoch || readDeviceSessionEpoch();
+          setBookings([]);
+          await restartConversation("logout_privacy_blocked");
+        }
+        lastActivityRef.current = Date.now();
+        say("system", privacyResetRequired
+          ? (localeRef.current === "ar"
+            ? "تعذر إكمال التنظيف الآمن لبيانات تسجيل الخروج. تم إيقاف هذه الجلسة؛ امسح بيانات الموقع من إعدادات المتصفح قبل استخدام حساب آخر."
+            : "Logout data cleanup could not be verified. This session was stopped; clear this site's data in browser settings before another account is used.")
+          : (localeRef.current === "ar"
+            ? "لم يكتمل تسجيل الخروج، وما زالت الجلسة الحالية مفتوحة. أغلق علامات التبويب الأخرى وحاول مرة أخرى."
+            : "Logout was not completed and the current session remains open. Close other tabs and try again."));
+        return;
       }
+      const { bookingClearFailed, cardClearFailed, nextDeviceSessionEpoch } = storageLock.result;
+      if (readDeviceSessionEpoch() === nextDeviceSessionEpoch) deviceSessionEpochRef.current = nextDeviceSessionEpoch;
       setBookings(bookingClearFailed ? readBookings() : []);
       await restartConversation("logout");
       if (bookingClearFailed || cardClearFailed) {
@@ -1728,9 +2342,11 @@ export default function App() {
     };
     window.addEventListener("voxi:new-conversation", onRestart);
     window.addEventListener("voxi:logout", onLogout);
+    window.addEventListener("storage", onCrossTabLogout);
     return () => {
       window.removeEventListener("voxi:new-conversation", onRestart);
       window.removeEventListener("voxi:logout", onLogout);
+      window.removeEventListener("storage", onCrossTabLogout);
     };
   }, [restartConversation]);
 
@@ -1738,6 +2354,10 @@ export default function App() {
     const interval = window.setInterval(() => {
       const hasTransientState = messagesRef.current.length > 0 || stageRef.current.view !== "empty" || Boolean(sessionModeRef.current);
       if (!hasTransientState || Date.now() - lastActivityRef.current < CONVERSATION_IDLE_MS) return;
+      if (activeCancellationMutation()) {
+        lastActivityRef.current = Date.now();
+        return;
+      }
       disconnectReasonRef.current = "timeout";
       suppressDisconnectNoticeRef.current = false;
       if (sessionModeRef.current) conversation.endSession().catch(() => {
@@ -1774,6 +2394,10 @@ export default function App() {
   }, [retireTransportGeneration]);
 
   const startTextSession = useCallback(async (excludeMessageId = null) => {
+    if (!isUsableDeviceSessionEpoch(deviceSessionEpochRef.current) || readDeviceSessionEpoch() !== deviceSessionEpochRef.current) {
+      say("system", localeRef.current === "ar" ? "امسح بيانات الموقع قبل بدء جلسة جديدة." : "Clear this site's data before starting a new session.");
+      return false;
+    }
     if (sessionModeRef.current) return true;
     const activeStart = sessionStartRef.current;
     if (activeStart) {
@@ -1855,6 +2479,10 @@ export default function App() {
   }, [conversation, say, startTransportWithGuards, t]);
 
   const startVoiceSession = useCallback(async () => {
+    if (!isUsableDeviceSessionEpoch(deviceSessionEpochRef.current) || readDeviceSessionEpoch() !== deviceSessionEpochRef.current) {
+      say("system", localeRef.current === "ar" ? "امسح بيانات الموقع قبل بدء جلسة صوتية جديدة." : "Clear this site's data before starting a new voice session.");
+      return false;
+    }
     if (sessionModeRef.current === "voice") return;
     const activeStart = sessionStartRef.current;
     if (activeStart) await activeStart.promise;
@@ -1979,6 +2607,11 @@ export default function App() {
   const sendText = useCallback(async (text) => {
     const rawValue = (text ?? input).trim();
     if (!rawValue) return;
+    if (!isUsableDeviceSessionEpoch(deviceSessionEpochRef.current) || readDeviceSessionEpoch() !== deviceSessionEpochRef.current) {
+      setInput("");
+      say("system", localeRef.current === "ar" ? "تم إيقاف هذه الجلسة لحماية الخصوصية. امسح بيانات الموقع قبل المتابعة." : "This session is paused for privacy. Clear this site's data before continuing.");
+      return;
+    }
     const sanitized = sanitizeUserText(rawValue);
     const value = sanitized.safeText.trim();
     if (sanitized.sensitive) {
@@ -2000,8 +2633,10 @@ export default function App() {
     if (decision !== null) publishCancellationDecision(handleCancellationDecision(decision, { source: "conversation" }), { promptAlreadyVisible: true });
     const historyRequest = classifyBookingHistoryRequest(value);
     const visibleHistory = historyRequest.requested
-      ? openHistory({ notifyAgent: false, forceOpen: true, activeOnly: historyRequest.activeOnly })
+      ? openHistory({ notifyAgent: false, forceOpen: true, activeOnly: historyRequest.activeOnly, preserveReturn: bookingOpenedFromHistoryRef.current })
       : null;
+    const seatTurn = decision === null ? resolveVisibleSeatTurn(value) : { requested: false, seats: [] };
+    const directSeatSelection = Boolean(seatTurn.requested);
     const directCinemaSelection = isDirectCinemaSelectionUtterance({
       text: value,
       view: stageRef.current.view,
@@ -2011,8 +2646,9 @@ export default function App() {
     const hasBookingContext = ["booking", "history"].includes(stageRef.current.view);
     const directCancellation = decision === null && isDirectCancellationRequest(value, { hasBookingContext });
     dismissStaleTransactionalView({ text: value, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
-    const faq = directCinemaSelection || directCancellation ? { matches: [], context: "" } : prepareFaqContext(value);
+    const faq = directCinemaSelection || directCancellation || directSeatSelection ? { matches: [], context: "" } : prepareFaqContext(value);
     const details = applyUtteranceBookingDetails(value, { actionIntent, hasFaq: faq.matches.length > 0 });
+    const agentFacingValue = normalizeCinemaAsrForAgent(value, details.cinema);
     const bookingContext = !faq.matches.length && (
       actionIntent === "booking"
       || journeyRef.current.intent === "booking"
@@ -2034,13 +2670,14 @@ export default function App() {
     let cinemaRouteResult = null;
     let cinemaPickerDisplayed = false;
     const cancellationRoutePromise = directCancellation ? routeCancellationTurn(value) : null;
+    const seatRoutePromise = directSeatSelection ? routeSeatSelectionTurn(value, seatTurn) : null;
     if (details.cinema) {
       cinemaRouteResult = await routeRecognizedCinema(details.cinema, requestedDate);
     } else if (!cinemaRef.current && actionIntent === "booking" && !faq.matches.length) {
       await clientTools.show_movie_selection({});
       cinemaPickerDisplayed = true;
     }
-    queuePendingEcho(value);
+    queuePendingEcho(agentFacingValue);
     const transition = sessionStartRef.current;
     if (transition) await transition.promise;
     const ready = sessionModeRef.current ? true : await startTextSession(localMessage.id);
@@ -2056,6 +2693,14 @@ export default function App() {
         conversation.sendContextualUpdate?.("Only the VOX Cinemas UAE cinema picker is displayed; no movie list is visible yet. Ask the guest for one cinema and do not say that movies are being shown.");
       }
       if (details.ticketQuantity) conversation.sendContextualUpdate?.(`The guest explicitly requested ${details.ticketQuantity} tickets. Preserve that quantity through seat selection.`);
+      if (seatRoutePromise) {
+        try {
+          const seatResult = await seatRoutePromise;
+          conversation.sendContextualUpdate?.(seatSelectionResultContext(seatResult));
+        } catch (error) {
+          conversation.sendContextualUpdate?.(`The seat confirmation failed: ${error?.message || "unknown error"}. The seat map remains visible; do not claim checkout or booking completion.`);
+        }
+      }
       if (historyRequest.requested) conversation.sendContextualUpdate?.(bookingHistoryTurnContext(visibleHistory, { activeOnly: historyRequest.activeOnly }));
       if (cancellationRoutePromise) {
         try {
@@ -2066,10 +2711,10 @@ export default function App() {
         }
       }
       if (faq.matches.length) conversation.sendContextualUpdate?.(`${faq.context}\nThe guest's current question is: ${value}. Answer from this approved context, use live data only when supplied, and do not restart the conversation.`);
-      conversation.sendUserMessage(value);
+      conversation.sendUserMessage(agentFacingValue);
     }
     else {
-      pendingTypedMessagesRef.current = pendingTypedMessagesRef.current.filter((item) => item.text !== value);
+      pendingTypedMessagesRef.current = pendingTypedMessagesRef.current.filter((item) => item.text !== agentFacingValue);
       lastSentTextRef.current = pendingTypedMessagesRef.current.at(-1) || null;
     }
   }, [conversation, input, prepareFaqContext, say, setLocale, startTextSession, updateIntentFromText]);
@@ -2259,13 +2904,81 @@ export default function App() {
     });
   };
 
+  const restoreHistoryReturn = () => {
+    const target = historyReturnRef.current || { view: "empty" };
+    const context = historyContextRef.current;
+    if (context) {
+      cinemaRef.current = context.cinema || null;
+      setCinema(context.cinema || null);
+      bookingRef.current = context.booking || null;
+      setBooking(context.booking || null);
+      bookingOpenedFromHistoryRef.current = Boolean(context.bookingOpenedFromHistory);
+      if (context.scheduleDate) {
+        scheduleDateRef.current = context.scheduleDate;
+        setScheduleDate(context.scheduleDate);
+      }
+      seatsRef.current = [...(context.selectedSeats || [])];
+      setSelectedSeats([...(context.selectedSeats || [])]);
+    }
+    if (target.view !== "checkout") {
+      showStage(target);
+      return;
+    }
+    const activeOrder = pendingOrderRef.current;
+    if (activeOrder?.checkoutId && activeOrder.checkoutId === target.order?.checkoutId) {
+      showStage(target);
+      return;
+    }
+    const targetCinemaId = target.order?.cinemaId || null;
+    const targetSessionId = target.order?.sessionId || target.session?.sessionId || null;
+    const planContext = planContextRef.current;
+    const canRestoreTargetPlan = target.movie && target.session && planRef.current.length
+      && targetCinemaId
+      && planContext?.cinemaId === targetCinemaId
+      && String(planContext?.sessionId) === String(targetSessionId);
+    if (canRestoreTargetPlan) {
+      const targetCinema = resolveCinema(targetCinemaId)
+        || resolveCinema(target.order?.cinemaName)
+        || { id: targetCinemaId, name: target.order?.cinemaName || targetCinemaId };
+      cinemaRef.current = targetCinema;
+      setCinema(targetCinema);
+      const targetDate = target.order?.programmingDate || target.order?.performanceDate || target.order?.date || null;
+      if (targetDate) {
+        scheduleDateRef.current = targetDate;
+        setScheduleDate(targetDate);
+      }
+      showStage({
+        view: "seatmap",
+        movie: target.movie,
+        session: target.session,
+        plan: planRef.current,
+        planMeta: target.planMeta || vista.getResultMeta(planRef.current),
+      });
+      return;
+    }
+    const canRestoreCurrentMovies = cinemaRef.current && filmsRef.current.length
+      && filmsCinemaRef.current === cinemaRef.current.id
+      && filmsDateRef.current === scheduleDateRef.current;
+    showStage(canRestoreCurrentMovies
+      ? { view: "movies", movies: filmsRef.current }
+      : { view: "empty" });
+  };
+
   const openHistory = ({ notifyAgent = true, forceOpen = false, activeOnly = false, preserveReturn = false } = {}) => {
-    dismissPendingCancellation("history_opened");
-    if (stageRef.current.view === "history" && !forceOpen) {
-      showStage(historyReturnRef.current || { view: "empty" });
+    if (!deviceSessionIsCurrent()) {
+      setBookings([]);
+      showStage({ view: "empty" });
+      say("system", localeRef.current === "ar"
+        ? "تم إيقاف الوصول إلى البيانات المحلية حتى يتم مسح بيانات الموقع بعد تسجيل خروج غير مكتمل."
+        : "Local data access is paused until this site's data is cleared after an incomplete logout.");
       return [];
     }
-    if (!preserveReturn) historyReturnRef.current = stageRef.current;
+    dismissPendingCancellation("history_opened");
+    if (stageRef.current.view === "history" && !forceOpen) {
+      restoreHistoryReturn();
+      return [];
+    }
+    if (!preserveReturn && stageRef.current.view !== "history") captureHistoryReturn();
     const visibleBookings = readBookings().filter((item) => !activeOnly || isCurrentBooking(item));
     setHistoryFilter(activeOnly ? "active" : "all");
     setBookings(visibleBookings);
@@ -2318,6 +3031,10 @@ export default function App() {
 
   const cancelHistoryBooking = async (selected) => {
     const selectedRef = selected?.ref;
+    const processingMutation = activeCancellationMutation();
+    if (processingMutation) return processingMutation;
+    const reconciliationRequired = cancellationReconciliationRequired(selectedRef);
+    if (reconciliationRequired) return reconciliationRequired;
     const existingFlow = cancellationFlowRef.current;
     if (selectedRef && existingFlow?.bookingRef && norm(existingFlow.bookingRef) === norm(selectedRef)
       && ["checking", "route_confirmation", "final_confirmation", "processing"].includes(existingFlow.phase)) {
@@ -2352,7 +3069,16 @@ export default function App() {
   };
 
   const confirmSeats = async (seats) => {
-    const result = await finalizeSeats(seats);
+    const confirmationKey = seatConfirmationKey(seats);
+    if (uiSeatConfirmationKeyRef.current === confirmationKey) return;
+    uiSeatConfirmationKeyRef.current = confirmationKey;
+    let result;
+    try {
+      result = await priceSeatSelection(seats);
+    } finally {
+      if (uiSeatConfirmationKeyRef.current === confirmationKey) uiSeatConfirmationKeyRef.current = null;
+    }
+    if (result.stale) return;
     if (!result.valid.length || ["quantity_mismatch", "pricing_unavailable"].includes(result.reason)) {
       const expected = result.expectedQuantity || ticketQuantityRef.current || 1;
       const message = result.reason === "pricing_unavailable"
@@ -2366,22 +3092,123 @@ export default function App() {
     });
   };
 
-  const completeCancellation = async ({ source = "ui" } = {}) => {
+  const backFromSeatMap = () => {
+    const current = stageRef.current;
+    planContextRef.current = null;
+    uiSeatConfirmationKeyRef.current = null;
+    seatConfirmationInFlightRef.current.clear();
+    const cachedSessionsMatch = current.movie?.id
+      && sessionsFilmRef.current === current.movie.id
+      && sessionsRef.current.some((session) => String(session.sessionId) === String(current.session?.sessionId));
+    if (cachedSessionsMatch) {
+      showStage({ view: "showtimes", movie: current.movie, sessions: sessionsRef.current });
+      conversation.sendContextualUpdate?.(`The guest used Back from the seat map. ${current.movie.title} showtimes are displayed again; no seat confirmation or checkout is active.`);
+      return;
+    }
+    showStage({ view: "loading", label: localeRef.current === "ar" ? "جارٍ تحميل مواعيد العرض…" : "Loading showtimes…" });
+    conversation.sendContextualUpdate?.("The guest used Back from the seat map. Showtime loading is displayed; no seat confirmation or checkout is active.");
+    void clientTools.show_showtimes({ movieId: current.movie?.id, movieTitle: current.movie?.title });
+  };
+
+  const executeCancellationMutation = async ({ source = "ui" } = {}) => {
     const current = bookingRef.current;
     const flow = cancellationFlowRef.current;
+    if (!deviceSessionIsCurrent()) {
+      const reason = "stale_device_session";
+      const message = localeRef.current === "ar"
+        ? "تم تسجيل الخروج في علامة تبويب أخرى، لذلك لم يتم إرسال طلب الإلغاء. ابدأ جلسة جديدة ثم تحقق من الحجز."
+        : "This device was logged out in another tab, so no cancellation request was sent. Start a new session and check the booking again.";
+      if (mountedRef.current) {
+        setCancellationFlow({ phase: "error", bookingRef: null, demoOnly: false, refundRoute: null, error: reason, message });
+        say("system", message);
+      }
+      return { confirmed: false, reason, message };
+    }
+    const existingJournal = readCancellationJournal();
+    const journalBlocksCurrent = Boolean(existingJournal);
+    if (journalBlocksCurrent) {
+      if (!existingJournal.orphaned) markCancellationJournalForReconciliation(existingJournal.token);
+      const reconciliation = cancellationReconciliationRequired();
+      return reconciliation || { confirmed: false, reason: "provider_reconciliation_required" };
+    }
     if (!current || !isCurrentBooking(current) || cancellationInFlightRef.current) return { confirmed: false, reason: "cancellation_unavailable" };
+    let latestStoredBooking;
+    try {
+      latestStoredBooking = findBooking(current.ref, { strict: true });
+    } catch (error) {
+      const reason = error?.code || "booking_storage_unavailable_for_cancellation";
+      const message = localeRef.current === "ar"
+        ? "تعذر التحقق بأمان من حالة الحجز المخزنة، لذلك لم يتم إرسال طلب إلغاء. أصلح تخزين الموقع أو استخدم خدمة إدارة الحجز الرسمية من VOX."
+        : "The stored booking status could not be verified safely, so no cancellation request was sent. Restore site storage or use the official VOX Manage Booking service.";
+      if (mountedRef.current) {
+        setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: Boolean(flow?.demoOnly), refundRoute: flow?.refundRoute || null, error: reason, message, retryAllowed: true, dismissAllowed: true, outcomeUnknown: false });
+        say("system", message);
+      }
+      return { confirmed: false, bookingRef: current.ref, reason, message };
+    }
+    if (latestStoredBooking?.cancelled) {
+      bookingRef.current = latestStoredBooking;
+      window.clearTimeout(cancelTimerRef.current);
+      cancelTimerRef.current = null;
+      setCancellationFlow(null);
+      if (mountedRef.current) {
+        setBooking(latestStoredBooking);
+        setBookings(readBookings());
+        if (stageRef.current.view === "booking") showStage({ view: "booking", booking: latestStoredBooking });
+        say("system", localeRef.current === "ar" ? "هذا الحجز ملغى بالفعل." : "This booking is already cancelled.");
+      }
+      return { confirmed: false, bookingRef: current.ref, reason: "already_cancelled" };
+    }
     if (flow?.bookingRef && norm(flow.bookingRef) !== norm(current.ref)) return { confirmed: false, reason: "booking_context_changed" };
     const operationId = cancellationOperationRef.current + 1;
     cancellationOperationRef.current = operationId;
     const operationSessionEpoch = sessionEpochRef.current;
     const operationBookingRef = norm(current.ref);
+    const cancellationJournal = writeCancellationJournal();
+    if (!cancellationJournal.persisted) {
+      clearCancellationJournal(cancellationJournal.token);
+      const reason = "persistent_mutation_lock_unavailable";
+      const message = localeRef.current === "ar"
+        ? "تعذر تأمين طلب الإلغاء على هذا الجهاز، لذلك لم يتم إرسال أي طلب. حاول مرة أخرى بعد تفعيل التخزين المحلي أو استخدم خدمة إدارة الحجز الرسمية من VOX."
+        : "The cancellation request could not be secured on this device, so no request was sent. Enable local storage and try again, or use the official VOX Manage Booking service.";
+      setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: Boolean(flow?.demoOnly), refundRoute: flow?.refundRoute || null, error: reason, message });
+      say("system", message);
+      return { confirmed: false, bookingRef: current.ref, reason, message };
+    }
     cancellationInFlightRef.current = true;
     setCancellationFlow({ ...flow, bookingRef: current.ref, phase: "processing", message: localeRef.current === "ar" ? "جارٍ معالجة طلب الإلغاء…" : "Processing cancellation…", error: null });
     let refundResult;
+    let refundError = null;
     try {
-      refundResult = await vista.refundBooking(current.ref, { booking: current });
+      refundResult = await vista.refundBooking(current.ref, {
+        booking: current,
+        idempotencyKey: cancellationJournal.token,
+      });
     } catch (error) {
-      refundResult = { Result: -1, ErrorDescription: error?.message || "Refund request failed." };
+      refundError = error;
+    }
+    if (refundError) {
+      const disposition = classifyRefundFailure(refundError);
+      const reconciliationRequired = disposition === "ambiguous";
+      if (reconciliationRequired) markCancellationJournalForReconciliation(cancellationJournal.token);
+      else clearCancellationJournal(cancellationJournal.token);
+      const operationIsCurrent = cancellationOperationRef.current === operationId;
+      if (operationIsCurrent) cancellationInFlightRef.current = false;
+      const reason = refundError?.code || refundError?.message || "refund_failed";
+      const message = reconciliationRequired
+        ? (localeRef.current === "ar"
+          ? "تعذر التحقق من نتيجة طلب الإلغاء، لذلك لن نعيد المحاولة. تحقق من حجوزاتك عبر خدمة إدارة الحجز الرسمية من VOX أو تواصل مع الدعم."
+          : "The cancellation outcome could not be verified, so Voxi will not retry it. Check your bookings in the official VOX Manage Booking service or contact support.")
+        : (localeRef.current === "ar"
+          ? "رفضت خدمة الحجز طلب الإلغاء ولم يتم تطبيق أي استرداد. بقي الحجز نشطاً."
+          : "The booking service rejected the cancellation and no refund was applied. The booking remains active.");
+      window.clearTimeout(cancelTimerRef.current);
+      cancelTimerRef.current = null;
+      if (mountedRef.current) {
+        setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: Boolean(flow?.demoOnly), refundRoute: flow?.refundRoute || null, error: reason, message, retryAllowed: !reconciliationRequired, dismissAllowed: !reconciliationRequired, outcomeUnknown: reconciliationRequired });
+        say("system", message);
+      }
+      return { confirmed: false, bookingRef: current.ref, reason, reconciliationRequired, message };
     }
     const isDemoSimulation = refundResult?.demo === true
       && refundResult?.verified !== true
@@ -2392,8 +3219,9 @@ export default function App() {
       && refundResult?.applied === true
       && Boolean(refundReference);
     const operationIsCurrent = cancellationOperationRef.current === operationId;
-    const sessionIsCurrent = sessionEpochRef.current === operationSessionEpoch
-      && norm(bookingRef.current?.ref) === operationBookingRef;
+    const appSessionIsCurrent = sessionEpochRef.current === operationSessionEpoch;
+    const bookingContextIsCurrent = norm(bookingRef.current?.ref) === operationBookingRef;
+    const bookingPanelIsCurrent = stageRef.current.view === "booking" && bookingContextIsCurrent;
     if (operationIsCurrent) cancellationInFlightRef.current = false;
     const cancelledAt = new Date().toISOString();
     const updated = {
@@ -2405,20 +3233,30 @@ export default function App() {
       refundStatus: isDemoSimulation ? "not_processed_demo" : "processed",
       refundReference: isDemoSimulation ? null : refundReference,
     };
-    if (!operationIsCurrent || !sessionIsCurrent) {
+    if (!operationIsCurrent || !appSessionIsCurrent) {
       // Never repopulate device storage after a reset/logout. A verified live
       // refund remains provider truth, but it must not leak into a new session.
-      if (liveRefundSucceeded) console.warn("A live refund completed after its Voxi session was no longer active", refundReference);
+      if (liveRefundSucceeded) {
+        markCancellationJournalForReconciliation(cancellationJournal.token);
+        console.warn("A live refund completed after its Voxi session was no longer active", refundReference);
+      } else {
+        clearCancellationJournal(cancellationJournal.token);
+      }
       return { confirmed: liveRefundSucceeded, bookingRef: current.ref, reason: liveRefundSucceeded ? null : "session_changed", refundReference };
     }
     if (!isDemoSimulation && !liveRefundSucceeded) {
+      markCancellationJournalForReconciliation(cancellationJournal.token);
       const reason = refundResult?.ErrorDescription || refundResult?.message || "The refund adapter did not confirm cancellation.";
-      const message = localeRef.current === "ar" ? "لم يتم تأكيد الإلغاء. بقي الحجز نشطاً." : "Cancellation could not be confirmed. The booking remains active.";
+      const message = localeRef.current === "ar"
+        ? "تعذر التحقق من نتيجة الإلغاء، لذلك لن نعيد المحاولة. تحقق عبر خدمة إدارة الحجز الرسمية من VOX."
+        : "The cancellation outcome could not be verified, so Voxi will not retry it. Check the official VOX Manage Booking service.";
       window.clearTimeout(cancelTimerRef.current);
       cancelTimerRef.current = null;
-      setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: Boolean(flow?.demoOnly), refundRoute: flow?.refundRoute || null, error: reason, message });
-      say("system", message);
-      return { confirmed: false, bookingRef: current.ref, reason };
+      if (mountedRef.current) {
+        setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: Boolean(flow?.demoOnly), refundRoute: flow?.refundRoute || null, error: reason, message, retryAllowed: false, dismissAllowed: false, outcomeUnknown: true });
+        say("system", message);
+      }
+      return { confirmed: false, bookingRef: current.ref, reason, reconciliationRequired: true };
     }
     let storagePersisted = false;
     let storageError = null;
@@ -2429,25 +3267,52 @@ export default function App() {
       storageError = error;
       console.error("Cancellation result could not be written to local booking history", error);
     }
+    if (storagePersisted) clearCancellationJournal(cancellationJournal.token);
+    else if (liveRefundSucceeded) markCancellationJournalForReconciliation(cancellationJournal.token);
+    else clearCancellationJournal(cancellationJournal.token);
     if (isDemoSimulation && !storagePersisted) {
       window.clearTimeout(cancelTimerRef.current);
       cancelTimerRef.current = null;
       const reason = storageError?.message || "The on-device cancellation could not be saved.";
       const message = localeRef.current === "ar" ? "تعذر حفظ حالة الإلغاء على هذا الجهاز. بقي الحجز نشطاً." : "The cancellation could not be saved on this device. The booking remains active.";
-      setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: true, refundRoute: null, error: reason, message });
-      say("system", localeRef.current === "ar"
-        ? "تعذر تسجيل الإلغاء على هذا الجهاز. بقي سجل الحجز نشطاً، ولم تتم معالجة أي استرداد."
-        : "The cancellation could not be saved on this device. The booking summary remains active and no refund was processed.");
+      if (mountedRef.current) {
+        setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: true, refundRoute: null, error: reason, message });
+        say("system", localeRef.current === "ar"
+          ? "تعذر تسجيل الإلغاء على هذا الجهاز. بقي سجل الحجز نشطاً، ولم تتم معالجة أي استرداد."
+          : "The cancellation could not be saved on this device. The booking summary remains active and no refund was processed.");
+      }
       return { confirmed: false, simulationOnly: true, bookingRef: current.ref, reason };
     }
-    bookingRef.current = updated;
-    setBooking(updated);
+    if (bookingContextIsCurrent) {
+      bookingRef.current = updated;
+      if (mountedRef.current) setBooking(updated);
+    }
+    if (norm(historyReturnRef.current?.booking?.ref) === operationBookingRef) {
+      historyReturnRef.current = { ...historyReturnRef.current, booking: updated };
+    }
+    if (norm(historyContextRef.current?.booking?.ref) === operationBookingRef) {
+      historyContextRef.current = { ...historyContextRef.current, booking: updated };
+    }
+    if (!mountedRef.current) {
+      return {
+        confirmed: true,
+        simulationOnly: isDemoSimulation,
+        localCancellationRecorded: isDemoSimulation,
+        liveRefundConfirmed: liveRefundSucceeded,
+        refundApplied: liveRefundSucceeded,
+        bookingRef: updated.ref,
+        bookingStatus: updated.bookingStatus,
+        refundStatus: updated.refundStatus,
+        refundReference,
+        storagePersisted,
+      };
+    }
     setBookings(storagePersisted
       ? readBookings()
       : (existing) => existing.some((item) => norm(item.ref) === operationBookingRef)
         ? existing.map((item) => norm(item.ref) === operationBookingRef ? updated : item)
         : [...existing, updated]);
-    showStage({ view: "booking", booking: updated });
+    if (bookingPanelIsCurrent) showStage({ view: "booking", booking: updated });
     window.clearTimeout(cancelTimerRef.current);
     cancelTimerRef.current = null;
     setCancellationFlow(null);
@@ -2482,6 +3347,97 @@ export default function App() {
     };
   };
 
+  const completeCancellation = async ({ source = "ui" } = {}) => {
+    if (cancellationLockPromiseRef.current) return cancellationLockPromiseRef.current;
+    const current = bookingRef.current;
+    const flow = cancellationFlowRef.current;
+    const reconciliation = cancellationReconciliationRequired();
+    if (reconciliation) return reconciliation;
+    const pendingJournal = readCancellationJournal();
+    if (pendingJournal) {
+      return syncCancellationJournalUi() || { confirmed: false, reason: "provider_outcome_pending" };
+    }
+    if (!current || !isCurrentBooking(current) || cancellationInFlightRef.current) {
+      return { confirmed: false, reason: "cancellation_unavailable" };
+    }
+    if (flow?.bookingRef && norm(flow.bookingRef) !== norm(current.ref)) {
+      return { confirmed: false, reason: "booking_context_changed" };
+    }
+    cancellationLockPendingRef.current = true;
+    setCancellationFlow({ ...flow, bookingRef: current.ref, phase: "processing", message: localeRef.current === "ar" ? "جارٍ تأمين طلب الإلغاء…" : "Securing cancellation…", error: null });
+    let lockPromise;
+    lockPromise = (async () => {
+      try {
+        const lockResult = await withCancellationMutationLock(
+          typeof navigator !== "undefined" ? navigator.locks : null,
+          () => executeCancellationMutation({ source }),
+        );
+        if (lockResult.acquired) {
+          const result = lockResult.result;
+          if (!result?.confirmed && cancellationFlowRef.current?.phase === "processing" && !cancellationInFlightRef.current) {
+            const journal = readCancellationJournal();
+            const reconciliationResult = cancellationReconciliationRequired();
+            if (!reconciliationResult && !journal) {
+              setCancellationFlow(null);
+            }
+          }
+          return result;
+        }
+        const reason = lockResult.reason;
+        const message = reason === "cross_tab_mutation_in_progress"
+          ? (localeRef.current === "ar"
+            ? "تجري معالجة طلب إلغاء آخر في علامة تبويب أخرى. لم يتم إرسال طلب جديد. انتظر حتى يكتمل ثم حدّث سجل الحجوزات."
+            : "Another cancellation is processing in a different tab. No new request was sent. Wait for it to finish, then refresh booking history.")
+          : (localeRef.current === "ar"
+            ? "تعذر تأمين طلب الإلغاء عبر علامات تبويب المتصفح، لذلك لم يتم إرسال أي طلب. استخدم خدمة إدارة الحجز الرسمية من VOX."
+            : "The cancellation could not be secured across browser tabs, so no request was sent. Use the official VOX Manage Booking service.");
+        if (mountedRef.current) {
+          setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: Boolean(flow?.demoOnly), refundRoute: flow?.refundRoute || null, error: reason, message });
+          say("system", message);
+        }
+        return { confirmed: false, bookingRef: current.ref, reason, message };
+      } catch (error) {
+        // An unexpected executor failure may have happened after a provider call.
+        // Preserve (or create) an opaque reconciliation journal so a retry cannot
+        // accidentally issue a second refund request.
+        cancellationInFlightRef.current = false;
+        window.clearTimeout(cancelTimerRef.current);
+        cancelTimerRef.current = null;
+        let journal = readCancellationJournal();
+        if (!journal) {
+          const emergencyJournal = writeCancellationJournal();
+          journal = emergencyJournal.persisted ? emergencyJournal : null;
+        }
+        if (journal?.token) markCancellationJournalForReconciliation(journal.token);
+        const reason = error?.code || error?.message || "cancellation_outcome_unverified";
+        const message = localeRef.current === "ar"
+          ? "تعذر التحقق من نتيجة طلب الإلغاء. لن يتم إرسال طلب آخر؛ تحقق من الحجز عبر خدمة إدارة الحجز الرسمية من VOX أو تواصل مع الدعم."
+          : "The cancellation outcome could not be verified. No further request will be sent; check the booking in the official VOX Manage Booking service or contact support.";
+        if (mountedRef.current) {
+          setCancellationFlow({
+            phase: "error",
+            bookingRef: null,
+            demoOnly: false,
+            refundRoute: null,
+            error: reason,
+            message,
+            retryAllowed: false,
+            dismissAllowed: false,
+            outcomeUnknown: true,
+            journalStartedAt: journal?.startedAt || Date.now(),
+          });
+          say("system", message);
+        }
+        return { confirmed: false, bookingRef: null, reason, reconciliationRequired: true, message };
+      } finally {
+        cancellationLockPendingRef.current = false;
+        if (cancellationLockPromiseRef.current === lockPromise) cancellationLockPromiseRef.current = null;
+      }
+    })();
+    cancellationLockPromiseRef.current = lockPromise;
+    return lockPromise;
+  };
+
   const handleCancellationDecision = (decision, { source = "conversation" } = {}) => {
     const flow = cancellationFlowRef.current;
     if (!flow) {
@@ -2489,7 +3445,12 @@ export default function App() {
     }
     if (flow.phase === "error" && !decision) {
       const bookingRef = flow.bookingRef;
-      dismissPendingCancellation("error_dismissed");
+      if (flow.dismissAllowed === false || flow.outcomeUnknown) {
+        return { handled: false, confirmed: false, phase: "reconciliation_required", bookingRef: null, reason: "provider_reconciliation_required", message: flow.message };
+      }
+      if (!dismissPendingCancellation("error_dismissed")) {
+        return { handled: false, confirmed: false, phase: "processing", bookingRef, reason: "cancellation_processing" };
+      }
       say("system", localeRef.current === "ar" ? "بقي الحجز من دون تغيير." : "The booking remains unchanged.");
       return { handled: true, confirmed: false, phase: "idle", bookingRef, reason: "error_dismissed" };
     }
@@ -2583,7 +3544,7 @@ export default function App() {
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;
-    if (stageRef.current.view === "empty" || cancellationFlowRef.current) {
+    if (["empty", "booking"].includes(stageRef.current.view) || cancellationFlowRef.current) {
       scroller.scrollTop = scroller.scrollHeight;
     }
   }, [messages, cancellationState.phase, cancellationState.bookingRef]);
@@ -2667,10 +3628,10 @@ export default function App() {
                   setSelectedSeats(next);
                 }
               }} />
-              <SeatMap movie={stage.movie} session={stage.session} plan={stage.plan} selected={selectedSeats} pricing={SEAT_PRICING_PREVIEW} notice={stage.planMeta?.verified === false ? true : stage.planMeta?.warning || false} onToggle={toggleSeat} onConfirm={confirmSeats} onBack={() => clientTools.show_showtimes({ movieId: stage.movie.id, movieTitle: stage.movie.title })} />
+              <SeatMap movie={stage.movie} session={stage.session} plan={stage.plan} selected={selectedSeats} pricing={SEAT_PRICING_PREVIEW} notice={stage.planMeta?.verified === false ? true : stage.planMeta?.warning || false} onToggle={toggleSeat} onConfirm={confirmSeats} onBack={backFromSeatMap} />
             </div>
           )}
-          {stage.view === "checkout" && stage.order && <Checkout key={stage.order.checkoutId} order={stage.order} onPaid={handlePaid} onCancel={() => { clearPendingOrder(); showStage({ view: "seatmap", movie: stage.movie, session: stage.session, plan: planRef.current, planMeta: stage.planMeta || vista.getResultMeta(planRef.current) }); }} />}
+          {stage.view === "checkout" && stage.order && pendingOrder?.checkoutId === stage.order.checkoutId && <Checkout key={stage.order.checkoutId} order={stage.order} deviceSessionEpoch={deviceSessionEpochRef.current} onPaid={handlePaid} onCancel={() => { clearPendingOrder(); showStage({ view: "seatmap", movie: stage.movie, session: stage.session, plan: planRef.current, planMeta: stage.planMeta || vista.getResultMeta(planRef.current) }); }} />}
           {stage.view === "booking" && displayedBooking && <BookingCard
             booking={displayedBooking}
             cancellation={cancellationState.bookingRef && norm(cancellationState.bookingRef) !== norm(displayedBooking.ref) ? IDLE_CANCELLATION_STATE : cancellationState}
@@ -2680,7 +3641,7 @@ export default function App() {
             onBack={bookingOpenedFromHistoryRef.current ? () => { dismissPendingCancellation("back_to_history"); openHistory({ notifyAgent: false, forceOpen: true, activeOnly: historyFilter === "active", preserveReturn: true }); } : undefined}
             cancelled={displayedBooking.cancelled}
           />}
-          {stage.view === "history" && <BookingHistory bookings={bookings} filter={historyFilter} onCancel={cancelHistoryBooking} onSelect={selectHistoryBooking} onBack={() => showStage(historyReturnRef.current || { view: "empty" })} />}
+          {stage.view === "history" && <BookingHistory bookings={bookings} filter={historyFilter} onCancel={cancelHistoryBooking} onSelect={selectHistoryBooking} onBack={restoreHistoryReturn} />}
           {stage.view === "offers" && (
             <div>
               {stage.showtimeRequired && <div role="status" style={{ marginBottom: 10, borderRadius: 10, background: "rgba(217,169,75,.12)", padding: "9px 11px", color: "#EAD19A", fontSize: 10, lineHeight: 1.45 }}>{t("offers.showtimeRequired")}</div>}

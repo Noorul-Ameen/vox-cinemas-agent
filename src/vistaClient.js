@@ -56,6 +56,21 @@ function requireText(value, field) {
   return text;
 }
 
+export function parseVistaResultCode(value) {
+  if (typeof value === "number" && Number.isSafeInteger(value)) return value;
+  if (typeof value === "string" && /^[+-]?\d+$/.test(value.trim())) {
+    const parsed = Number(value.trim());
+    if (Number.isSafeInteger(parsed)) return parsed;
+  }
+  return null;
+}
+
+export function parseVistaRefundReference(value) {
+  if (typeof value === "string") return value.trim() || null;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return null;
+}
+
 function requireDate(value, operation) {
   if (!isIsoCalendarDate(value)) {
     throw new VistaClientError("A valid programming date is required.", {
@@ -89,6 +104,7 @@ async function requestJson(url, {
   operation,
   method = "GET",
   body,
+  headers = {},
   timeoutMs = REQUEST_TIMEOUT_MS,
 } = {}) {
   const controller = new AbortController();
@@ -97,11 +113,15 @@ async function requestJson(url, {
   try {
     response = await fetch(url, {
       method,
-      headers: body === undefined ? HEADERS : { ...HEADERS, "Content-Type": "application/json" },
+      headers: {
+        ...(body === undefined ? HEADERS : { ...HEADERS, "Content-Type": "application/json" }),
+        ...headers,
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: controller.signal,
     });
   } catch (cause) {
+    clearTimeout(timer);
     const timeout = cause?.name === "AbortError";
     throw new VistaClientError(timeout ? "The cinema service timed out." : "The cinema service could not be reached.", {
       code: timeout ? "VISTA_TIMEOUT" : "VISTA_NETWORK_ERROR",
@@ -109,46 +129,49 @@ async function requestJson(url, {
       retryable: true,
       cause,
     });
-  } finally {
-    clearTimeout(timer);
   }
 
-  let text;
   try {
-    text = await response.text();
-  } catch (cause) {
-    throw new VistaClientError("The cinema service response could not be read.", {
-      code: "VISTA_RESPONSE_READ_ERROR",
-      status: response.status,
-      operation,
-      retryable: response.status >= 500,
-      cause,
-    });
-  }
-
-  let payload = null;
-  if (text) {
-    try { payload = JSON.parse(text); }
-    catch (cause) {
-      throw new VistaClientError("The cinema service returned an invalid response.", {
-        code: "VISTA_INVALID_JSON",
+    let text;
+    try {
+      text = await response.text();
+    } catch (cause) {
+      const timeout = controller.signal.aborted || cause?.name === "AbortError";
+      throw new VistaClientError(timeout ? "The cinema service timed out." : "The cinema service response could not be read.", {
+        code: timeout ? "VISTA_TIMEOUT" : "VISTA_RESPONSE_READ_ERROR",
         status: response.status,
         operation,
-        retryable: response.status >= 500,
+        retryable: true,
         cause,
       });
     }
+
+    let payload = null;
+    if (text) {
+      try { payload = JSON.parse(text); }
+      catch (cause) {
+        throw new VistaClientError("The cinema service returned an invalid response.", {
+          code: "VISTA_INVALID_JSON",
+          status: response.status,
+          operation,
+          retryable: response.status >= 500,
+          cause,
+        });
+      }
+    }
+    if (!response.ok) {
+      throw new VistaClientError(`The cinema service rejected ${operation || "the request"}.`, {
+        code: "VISTA_HTTP_ERROR",
+        status: response.status,
+        operation,
+        retryable: response.status === 429 || response.status >= 500,
+        details: payload?.ErrorDescription || payload?.message || null,
+      });
+    }
+    return payload;
+  } finally {
+    clearTimeout(timer);
   }
-  if (!response.ok) {
-    throw new VistaClientError(`The cinema service rejected ${operation || "the request"}.`, {
-      code: "VISTA_HTTP_ERROR",
-      status: response.status,
-      operation,
-      retryable: response.status === 429 || response.status >= 500,
-      details: payload?.ErrorDescription || payload?.message || null,
-    });
-  }
-  return payload;
 }
 
 function payloadArray(payload, operation) {
@@ -687,7 +710,7 @@ export async function searchBooking(ref) {
   return bookingResult(payload.Booking, "live", true);
 }
 
-export async function refundBooking(ref, { booking = null, now = new Date(), requireLocalEligibility = false } = {}) {
+export async function refundBooking(ref, { booking = null, now = new Date(), requireLocalEligibility = false, idempotencyKey = null } = {}) {
   const requestedRef = requireText(ref, "bookingReference");
   const eligibility = booking ? assessCancellationEligibility(booking, { now }) : null;
   const storedBooking = findBooking(requestedRef);
@@ -722,12 +745,24 @@ export async function refundBooking(ref, { booking = null, now = new Date(), req
     operation: "refundBooking",
     method: "POST",
     body: { BookingId: requestedRef },
+    headers: idempotencyKey ? { "Idempotency-Key": String(idempotencyKey) } : {},
   });
-  const success = payload?.Success === true || Number(payload?.Result) === 0;
-  const refundReference = payload?.RefundReference || payload?.RefundId || null;
-  if (!success || !refundReference) {
+  const resultNumber = parseVistaResultCode(payload?.Result);
+  const hasNumericResult = resultNumber !== null;
+  const explicitSuccess = payload?.Success === true || (hasNumericResult && resultNumber === 0);
+  const explicitRejection = payload?.Success === false || (hasNumericResult && resultNumber !== 0);
+  const refundReference = parseVistaRefundReference(payload?.RefundReference)
+    || parseVistaRefundReference(payload?.RefundId);
+  if (explicitRejection && !explicitSuccess) {
     throw new VistaClientError(payload?.ErrorDescription || "The refund was not verified.", {
       code: "REFUND_REJECTED",
+      operation: "refundBooking",
+      details: payload?.Result ?? null,
+    });
+  }
+  if (!explicitSuccess || explicitRejection || !refundReference) {
+    throw new VistaClientError("The refund response did not contain a verifiable outcome.", {
+      code: "REFUND_OUTCOME_UNVERIFIED",
       operation: "refundBooking",
       details: payload?.Result ?? null,
     });

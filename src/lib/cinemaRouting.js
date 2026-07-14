@@ -14,7 +14,8 @@ export const CINEMA_ALIASES = Object.freeze({
   "0013": ["burjuman", "برجمان"],
   "0004": ["city centre ajman", "سيتي سنتر عجمان"],
   "0055": ["city centre al zahia", "سيتي سنتر الزاهية", "الزاهية"],
-  "0001": ["city centre deira", "سيتي سنتر ديرة", "ديرة"],
+  // Observed voice transcription of "City Centre Deira".
+  "0001": ["city centre deira", "citizen and data", "سيتي سنتر ديرة", "ديرة"],
   "0006": ["city centre fujairah", "سيتي سنتر الفجيرة", "الفجيرة"],
   "0005": ["city centre mirdif", "city center mirdif", "سيتي سنتر مردف", "مردف"],
   "0035": ["city centre sharjah", "سيتي سنتر الشارقة"],

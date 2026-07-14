@@ -29,7 +29,7 @@ assert.match(voiceStartup, /agentId:\s*import\.meta\.env\.VITE_AGENT_ID/, "voice
 const typedMessageFlow = sliceBetween(app, "const sendText", "const sendUiTurn", "typed message flow");
 assert.doesNotMatch(typedMessageFlow, /sessionModeRef\.current\s*===\s*["']voice["']\)\s*return/, "typing must not be disabled during an active voice session");
 assert.match(typedMessageFlow, /const ready = sessionModeRef\.current \? true : await startTextSession/, "an existing voice session must be reused for typed messages");
-assert.match(typedMessageFlow, /conversation\.sendUserMessage\(value\)/, "typed messages must be sent through the active voice or text conversation");
+assert.match(typedMessageFlow, /const agentFacingValue = normalizeCinemaAsrForAgent\(value, details\.cinema\)[\s\S]*conversation\.sendUserMessage\(agentFacingValue\)/, "typed messages must be safely normalized and sent through the active voice or text conversation");
 const textComposer = sliceBetween(app, '<section aria-label={t("app.conversation")}', "</section>", "text composer");
 assert.match(textComposer, /<input\b[\s\S]*?onKeyDown=\{\(event\) => event\.key === ["']Enter["'][\s\S]*?sendText\(\)/, "the text composer must remain rendered and submit while voice is active");
 

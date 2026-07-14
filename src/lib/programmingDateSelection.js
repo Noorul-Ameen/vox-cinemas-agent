@@ -56,3 +56,31 @@ export function resolveProgrammingDateSelection({
     blocked: false,
   });
 }
+
+/**
+ * A movie or session chosen from the list already on screen belongs to that
+ * list's date. An agent-generated date must not silently switch the catalog
+ * before the visible selection is resolved. A fresh explicit guest date still
+ * has highest authority.
+ */
+export function resolveVisibleSelectionProgrammingDate({
+  availableDates = [],
+  userRequestedDate = null,
+  toolRequestedDate = null,
+  selectedDate = null,
+  visibleDate = null,
+  hasVisibleSelection = false,
+} = {}) {
+  const dates = normalizedDates(availableDates);
+  const guestDate = String(userRequestedDate || "").trim() || null;
+  const shownDate = String(visibleDate || "").trim() || null;
+  if (!guestDate && hasVisibleSelection && shownDate && dates.includes(shownDate)) {
+    return Object.freeze({ date: shownDate, unavailableDate: null, source: "visible", blocked: false });
+  }
+  return resolveProgrammingDateSelection({
+    availableDates: dates,
+    userRequestedDate: guestDate,
+    toolRequestedDate,
+    selectedDate,
+  });
+}
