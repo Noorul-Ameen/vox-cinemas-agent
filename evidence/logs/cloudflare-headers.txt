@@ -33,3 +33,20 @@ Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
 Server: cloudflare
 CF-RAY: a1b35b9db92d2630-DXB
 alt-svc: h3=":443"; ma=86400
+
+
+POST-PUSH DEPLOYMENT CHECK
+CheckedAt=2026-07-15T09:37:16+04:00
+Commit=426933962e6b96accf84a6de32310c12856f4254
+HostedAsset=index-B6np26pn.js
+LocalBuildAsset=index-B6np26pn.js
+AssetMatch=true
+RootStatus=200
+RootCacheControl=no-cache, no-store, must-revalidate
+AssetStatus=200
+AssetCacheControl=public, max-age=31536000, immutable
+AssetETag="5a0e1fa2aeb9e05e5cd7c49ab35d816f"
+Content-Security-Policy=default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'self' https://voxcinemas.com https://*.voxcinemas.com https://stackblitz.com https://*.stackblitz.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; media-src 'self' data: blob: https:; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
+Strict-Transport-Security=max-age=31536000
+Permissions-Policy=microphone=(self), camera=(), geolocation=(), payment=(), usb=()
+Scope=Artifact and response-header smoke check only; complete hosted UI and human voice acceptance remain pending.

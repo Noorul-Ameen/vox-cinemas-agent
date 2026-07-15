@@ -9,9 +9,9 @@ StackBlitz URL: <https://stackblitz.com/github/Noorul-Ameen/vox-cinemas-agent>
 
 **Production release status: NO-GO.**
 
-The repository now passes the complete automated validation suite and production build, and the current source has been exercised locally at 420 px through filtered discovery, seats, editable checkout return, FAQ interruption, booking/QR rendering, cancellation and Arabic/RTL. The audited Cloudflare site still serves an older bundle and therefore does not represent or validate the current repository revision.
+The repository passes the complete automated validation suite and production build, and the current source has been exercised locally at 420 px through filtered discovery, seats, editable checkout return, FAQ interruption, booking/QR rendering, cancellation and Arabic/RTL. Commit `4269339` is now on `main`, and Cloudflare serves the same tested `assets/index-B6np26pn.js` bundle with the new security and cache headers. This deployment smoke check proves artifact identity, not complete hosted interaction or spoken acceptance.
 
-Even after the current build is deployed, production sales must remain gated until authenticated inventory, reservation, booking, payment, cancellation/refund, official ticket/QR, offer-redemption and customer-service connectors are available. The current browser-side transaction path is suitable for leadership journey review, but it must not be represented as completing a live VOX sale.
+Production sales must remain gated until authenticated inventory, reservation, booking, payment, cancellation/refund, official ticket/QR, offer-redemption and customer-service connectors are available. The current browser-side transaction path is suitable for leadership journey review, but it must not be represented as completing a live VOX sale.
 
 ## Scope and protected integration contract
 
@@ -74,7 +74,7 @@ The command logs, local browser acceptance log and screenshots supporting these 
 
 | Blocker | Owner/dependency | Release impact |
 | --- | --- | --- |
-| Current repository revision is not yet evidenced on Cloudflare | Repository/Cloudflare owner | Hosted acceptance cannot pass against the old build |
+| Complete current-build hosted regression is not yet evidenced | QA/Cloudflare owner | Artifact deployment passed, but hosted interaction acceptance remains incomplete |
 | ElevenLabs dashboard prompt, tools, first message and allowed origins require verification | ElevenLabs agent owner | Voice behavior and continuity are not guaranteed |
 | Production read/write API contracts and server credentials are unavailable | VOX platform/API owners | No live inventory, booking, payment, cancellation or refund |
 | Official FAQ/policy content approval and freshness ownership are unassigned | CX/content/legal owners | Customer answers cannot be treated as production policy |
@@ -153,13 +153,17 @@ Apply these changes to agent `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`. Do not rename
 | Poster rendering and 420 px layout | Pass | Pass locally in English/Arabic; device sign-off pending |
 | Current showtime validation | Pass | Future sessions used locally; deployed expired-session retest pending |
 
-### Audited Cloudflare deployment: old-build mismatch
+### Cloudflare deployment status and pre-deployment baseline
 
-The runtime audit of <https://voxi-ai.pages.dev/> found that the hosted asset predates the current repository changes. It must not be used as evidence that the current implementation passed.
+Post-push verification of <https://voxi-ai.pages.dev/> confirmed:
 
-Observed on that older deployment:
+- GitHub `main` is commit `4269339`, and Cloudflare serves `assets/index-B6np26pn.js`, matching that commit's final local production build.
+- HTML is returned with `no-cache, no-store, must-revalidate`; CSP, HSTS and `Permissions-Policy: microphone=(self)` are active.
+- This is an artifact/header smoke check only. The complete current-build hosted scenario matrix and human microphone run remain release gates.
 
-- The hosted script is `assets/index-BgMP9HrN.js`; the final local build is `assets/index-B6np26pn.js`.
+The earlier runtime audit remains useful as a pre-deployment failure baseline. Observed on that older deployment:
+
+- The hosted script was `assets/index-BgMP9HrN.js`; the final local build is `assets/index-B6np26pn.js`.
 - “Mall of the Emirates tomorrow at 6 PM” displayed all 19 films instead of filtering around 6 PM.
 - In the final spot check, “Actually, July 15 at 6 PM” was misrouted to the 15+/18+/21+ age-rating FAQ and the agent incorrectly said only 16 July could be shown.
 - FAQ interruption and return preserved selected seat A1.
@@ -170,26 +174,29 @@ Observed on that older deployment:
 - Automated microphone control timed out, so no hosted voice pass is claimed.
 - The audited response exposed referrer and MIME-sniffing headers but not the CSP, HSTS or Permissions-Policy now defined in the repository's `public/_headers`. Root and asset caching remained `public, max-age=0, must-revalidate`; the main JavaScript asset was approximately 2.9 MB.
 
-Required hosted sequence after deployment:
+Completed deployment checks:
 
-1. Record the deployed commit and asset hash.
-2. Confirm Cloudflare serves the current `_headers` policy and immutable caching for hashed assets.
-3. Run the complete scenario matrix in English text at 420 px.
-4. Repeat critical discovery, seat, checkout, FAQ and cancellation paths in Arabic/RTL.
-5. Perform human voice checks on an approved desktop and mobile browser with microphone permission.
-6. Test native Back/Forward, refresh during each transactional stage and expired-session behavior.
-7. Capture console/network logs with secrets and customer data excluded.
+1. Recorded deployed commit `4269339` and matching asset `index-B6np26pn.js`.
+2. Confirmed Cloudflare serves the current `_headers` policy for HTML and one-year immutable caching for the hashed asset.
+
+Remaining hosted acceptance:
+
+1. Run the complete scenario matrix in English text at 420 px.
+2. Repeat critical discovery, seat, checkout, FAQ and cancellation paths in Arabic/RTL.
+3. Perform human voice checks on an approved desktop and mobile browser with microphone permission.
+4. Test native Back/Forward, refresh during each transactional stage and expired-session behavior.
+5. Capture console/network logs with secrets and customer data excluded.
 
 ## Screenshot and log evidence manifest
 
-Evidence below is for the current local source unless the filename says `hosted-old`. It does not prove a Cloudflare deployment or a spoken voice pass.
+Evidence below is for the current local source unless the filename says `hosted-old`. The header log proves current deployment identity, but no evidence claims a complete hosted scenario or spoken voice pass.
 
 | Evidence file | Content | Status |
 | --- | --- | --- |
 | `evidence/logs/pnpm-run-validate.txt` | Complete validation output with `EXIT_CODE=0` | Present |
 | `evidence/logs/pnpm-run-build.txt` | Successful Vite build, asset name/size and `EXIT_CODE=0` | Present |
 | `evidence/logs/local-browser-e2e.md` | Detailed local and hosted scenario outcomes, including observed risks | Present |
-| `evidence/logs/cloudflare-headers.txt` | Hosted/local asset hashes and root/asset response headers | Present; confirms old deployment |
+| `evidence/logs/cloudflare-headers.txt` | Pre-deployment baseline and post-push asset/header verification | Present; confirms current asset deployment |
 | `evidence/screenshots/local-filtered-combined-420.png` | English combined cinema/date/time filtering at 420 px | Present |
 | `evidence/screenshots/local-checkout-seat-derived-420.png` | Three-seat checkout, subtotal, fees and total | Present |
 | `evidence/screenshots/local-booking-qr-420.png` | Booking summary, compact poster and reference QR boundary | Present |
@@ -203,7 +210,7 @@ Evidence below is for the current local source unless the filename says `hosted-
 Leadership journey review may proceed only after gates 1–5. A customer production launch requires all gates.
 
 1. Final validation and production build are green with attached logs; the deployment pipeline must still prove its clean `npm ci` install.
-2. The exact tested revision is deployed to Cloudflare and its asset hash/security headers are recorded.
+2. The exact tested revision is deployed to Cloudflare and its asset hash/security headers are recorded. **Passed for commit `4269339`.**
 3. Every requested text scenario passes on the hosted build, including filtered discovery, nearest times, seat-derived pricing, checkout return, cancellation and FAQ restoration.
 4. English/Arabic, 420 px responsive, poster, native Back/Forward, refresh and rendering evidence receives QA/design sign-off.
 5. ElevenLabs dashboard configuration and human voice checks pass on approved desktop and mobile browsers.
