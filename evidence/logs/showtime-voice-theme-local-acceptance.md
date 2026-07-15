@@ -2,7 +2,9 @@
 
 Test date: 15 July 2026 (Asia/Dubai)
 
-Scope: current local revision before Cloudflare deployment
+Historical scope: local revision before Cloudflare deployment
+
+Final hosted acceptance and the subsequent 9,460-session Actions refresh are recorded separately in `hosted-acceptance-2026-07-15.md`. The figures below preserve the initial local extraction evidence.
 
 ## Official VOX UAE refresh
 
@@ -34,11 +36,11 @@ default runner: ubuntu-latest
 approved self-hosted override: repository variable VOX_REFRESH_RUNNER
 ```
 
-This file does not claim that the first GitHub-hosted workflow run has passed.
+[GitHub Actions run 29396366283](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/29396366283) subsequently passed the complete refresh path. [Run 29397059917](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/29397059917) then passed end to end on `checkout@v7`, `setup-node@v7` and `setup-python@v6`, committing the current 9,460-session dataset as `1cf0d56`.
 
 ## Voice diagnosis and fix
 
-Observed hosted root cause: the strict `script-src 'self'` policy blocked the ElevenLabs SDK's generated AudioWorklet `blob:`/`data:` source. The agent ID, WebRTC transport and EU residency setting were not the cause.
+Observed hosted root cause: the original `script-src 'self'` policy blocked an ElevenLabs SDK-generated AudioWorklet source. The agent ID, WebRTC transport and EU residency setting were not the cause.
 
 Implemented and validated locally:
 
@@ -47,10 +49,10 @@ Implemented and validated locally:
 - 45-second microphone-permission bound;
 - 45-second transport-start bound;
 - English/Arabic permission, device, browser-component, service, timeout and generic error messages;
-- strict CSP retained without `blob:` or `data:` in `script-src`;
+- restrictive CSP retained with `blob:` permitted only because ElevenLabs React 0.7.1's secondary WebRTC output-capture worklet ignores `workletPaths`; `data:` remains blocked;
 - WebRTC, `serverLocation: "eu-residency"`, protected client-tool names and `select_seats` unchanged.
 
-This file does not claim a successful microphone session on the not-yet-deployed revision. Hosted desktop/mobile human acceptance remains required.
+Signed-in Chrome subsequently passed hosted voice startup: `Voice chat`, agent greeting and `End voice` were present with zero console warnings/errors. Arabic voice and broader physical mobile acceptance remain required for customer-launch qualification.
 
 ## Local browser acceptance at 420 px
 
@@ -84,8 +86,7 @@ Two related routing fixes were included in this acceptance run: generic movie-di
 
 ## Remaining acceptance gates
 
-- Deploy the exact tested revision to Cloudflare and record the deployed asset identity.
-- Repeat the critical text, Arabic/RTL, Back/Forward, FAQ, media, QR and cancellation checks on the hosted URL.
-- Run English and Arabic voice on approved desktop and mobile browsers with microphone permission, confirming that no CSP AudioWorklet error appears.
-- Manually dispatch the schedule workflow and record the result; confirm the following scheduled run and alerting path.
+- Observe the next naturally scheduled refresh and alerting path; two manual runs passed end to end.
+- Complete Arabic voice and physical desktop/mobile browser coverage; signed-in hosted Chrome voice passed.
+- Complete accessibility, performance and production API/security acceptance.
 - Do not represent preview checkout, local QR or local cancellation as a live sale, official ticket or refund.

@@ -4,11 +4,11 @@ VOXi is a React + Vite mobile experience that combines the real ElevenLabs React
 
 ## Included product flows
 
-- A fresh 16–22 July 2026 VOX UAE schedule with 22 cinemas, 35 scheduled films and 9,479 deduplicated sessions. The 15 July refresh retrieved 14 experience records, 13 session experience codes and 20 live offer-media records.
+- A fresh 16–22 July 2026 VOX UAE schedule with 22 cinemas, 35 scheduled films and 9,460 validated sessions, produced by the latest successful end-to-end GitHub refresh run.
 - Official code-keyed movie posters, experience artwork, and active bank-offer imagery with first-party source attribution and resilient UI fallbacks.
 - Fuzzy cinema/movie/session resolution with the original six ElevenLabs client tools preserved.
 - Text, touch, and voice journeys for movies, showtimes, seats, checkout, confirmation, and cancellation. Typed chat starts without requesting microphone access.
-- CSP-compatible voice startup using locally served ElevenLabs AudioWorklets, bounded microphone/transport startup and bilingual failure guidance. WebRTC, EU residency and protected client-tool contracts remain unchanged.
+- CSP-compatible voice startup using locally served primary ElevenLabs AudioWorklets, the SDK-required `blob:` allowance for its secondary WebRTC output capture, bounded microphone/transport startup and bilingual failure guidance. WebRTC, EU residency and protected client-tool contracts remain unchanged.
 - One unified conversation window where messages and the current relevant cinema/date/movie/showtime/ticket/seat/checkout/FAQ component render inline; previous interactive stages are removed.
 - A logical journey ID, structured booking context and redacted recent turns carried across text WebSocket and voice WebRTC transports.
 - The still-current portion of the seven extracted programming dates is selectable in the booking flow, with cinema-and-date-keyed movie loading and honest empty states when a cinema has no schedule.
@@ -65,6 +65,8 @@ Cloudflare Pages automatically applies SPA fallback behavior when the build has 
 
 No GitHub Actions deployment workflow is included because the existing Pages Git integration already deploys pushes to `main`; running both mechanisms can create duplicate production deployments. If the project is intentionally migrated to Direct Upload later, store a least-privilege Pages deployment token as the GitHub Actions secret `CLOUDFLARE_API_TOKEN` and the account identifier as `CLOUDFLARE_ACCOUNT_ID`, then disable automatic Pages Git deployments before enabling that workflow.
 
+The final acceptance deployment serves `/assets/index-D4Y0PLpS.js` (4,541,586 bytes); its SHA-256 is `D704F5665F3792FE525BFC8DD6E69D84EE7A7E396A3C45D7F6391B106307C6AB`, byte-identical to the tested local production bundle. The root document and both self-hosted worklets return HTTP 200. Signed-in Chrome acceptance reached `Voice chat`, received the greeting, exposed `End voice`, and produced no console warnings or errors. Hosted English/Arabic discovery, Back/Forward, seat-derived checkout, QR confirmation and local-only cancellation also passed at 420 px without overflow or console errors.
+
 ## ElevenLabs client tools
 
 The original names remain unchanged:
@@ -83,13 +85,13 @@ The complete product adds:
 
 The two new declarations and prompt rules must also be present in the ElevenLabs dashboard for the agent to invoke them. See [ELEVENLABS_AGENT_SETUP.md](./ELEVENLABS_AGENT_SETUP.md).
 
-The protected voice connection remains WebRTC with `serverLocation: "eu-residency"`. Text chat uses the SDK's text-only WebSocket path so it does not create an audio context or request microphone access. Voice startup serves the SDK AudioWorklets from `public/elevenlabs/`, which keeps the strict Content Security Policy intact instead of allowing `blob:` or `data:` scripts. Microphone permission and transport startup each have a 45-second bound with localized permission, device, browser-component, service and timeout messages.
+The protected voice connection remains WebRTC with `serverLocation: "eu-residency"`. Text chat uses the SDK's text-only WebSocket path so it does not create an audio context or request microphone access. Voice startup serves the primary SDK AudioWorklets from `public/elevenlabs/`. ElevenLabs React 0.7.1 creates a separate WebRTC output-capture worklet that does not honor `workletPaths`, so the CSP deliberately permits `blob:` in `script-src` while continuing to block `data:`. Microphone permission and transport startup each have a 45-second bound with localized permission, device, browser-component, service and timeout messages.
 
 For an audible text-to-voice continuation without another welcome, configure the dashboard first-message field as `{{voxi_session_opening}}`. The client supplies a localized first welcome or a continuation acknowledgement and then sends the full structured context with `sendContextualUpdate`. See [ELEVENLABS_AGENT_SETUP.md](./ELEVENLABS_AGENT_SETUP.md).
 
 ## Data snapshot and refresh
 
-The shipped dataset was extracted from the official VOX UAE public-site routes at `2026-07-15T06:32:40.092Z`. It covers all advertised programming dates from the next UAE day, 16–22 July 2026: 9,479 deduplicated sessions from 9,518 raw rows, including 1,439 sessions on 16 July, 35 scheduled films, 22 cinemas, 13 session experience codes and 20 live offer-media records. Thirty-nine duplicate source rows were removed deterministically.
+The current dataset was extracted at `2026-07-15T07:21:28.186Z` by the updated Actions workflow. It contains 9,460 deduplicated sessions from 9,499 raw rows, including 1,438 sessions on 16 July, 35 scheduled films, 22 cinemas, 14 experience-media records and 20 offer-media records across every advertised programming date from 16–22 July 2026. Thirty-nine duplicate source rows were removed deterministically.
 
 The extractor does not assume a fixed date window. It unions official per-movie `availableDays` responses for Now Showing and Advance Booking, fetches only advertised movie/date pairs and stops when those dates are exhausted. A 31-day default safety cap prevents an accidentally unbounded crawl.
 
@@ -110,7 +112,7 @@ npm run refresh:data
 
 The refresh writes to staging files, validates freshness, coverage, crawl completeness, media provenance, source-ID uniqueness and drop thresholds, generates and imports the client module, then runs repository validation and the production build. Only after all gates pass are the JSON and generated module promoted. A failed run restores the prior known-good pair.
 
-The repository workflow `.github/workflows/refresh-vox-showtimes.yml` runs every day at 01:30 UTC (05:30 UAE) and again on Thursday at 06:30 UTC (10:30 UAE), with a manual-dispatch option. It commits only changed schedule JSON and generated client data. The workflow defaults to `ubuntu-latest`; if official VOX routes block GitHub datacenter traffic, set repository variable `VOX_REFRESH_RUNNER` to an approved self-hosted runner label on a permitted normal network.
+The repository workflow `.github/workflows/refresh-vox-showtimes.yml` runs every day at 01:30 UTC (05:30 UAE) and again on Thursday at 06:30 UTC (10:30 UAE), with a manual-dispatch option. It commits only changed schedule JSON and generated client data. [Run 29397059917](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/29397059917) completed the updated `checkout@v7`, `setup-node@v7` and `setup-python@v6` extraction, all 24 validators, production build, commit and push path successfully, producing refresh commit `1cf0d56`. The workflow defaults to `ubuntu-latest`; if official VOX routes block GitHub datacenter traffic, set repository variable `VOX_REFRESH_RUNNER` to an approved self-hosted runner label on a permitted normal network.
 
 Low-level regeneration remains available for investigation:
 
@@ -142,6 +144,8 @@ Artwork URLs remain on official VOX/MAF hosts or their campaign CDN and include 
 - mic-free text startup, self-hosted ElevenLabs AudioWorklets, bounded and classified voice startup, protected voice WebRTC/EU residency, tool-name, seat-selection, error-boundary, RTL-seat, branding, and 420 px invariants.
 
 `npm run validate:converter` separately exercises the Python compact/flat conversion compatibility path. `npm run validate:refresh` validates a staged or shipped schedule, while `npm run validate:voice` checks the CSP-safe worklet and protected voice-startup contract.
+
+Final acceptance completed `pnpm run validate` with all 24 validators and `pnpm run build`. The resulting `index-D4Y0PLpS.js` is 4,541,586 bytes and matches the Cloudflare-served asset byte for byte.
 
 ## Main files
 

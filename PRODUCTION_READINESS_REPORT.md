@@ -10,13 +10,15 @@ StackBlitz URL: <https://stackblitz.com/github/Noorul-Ameen/vox-cinemas-agent>
 
 ## Executive decision
 
-**Leadership journey review: READY locally for schedule discovery, seat selection, checkout preview, local booking/QR presentation and local cancellation.**
+**Leadership journey review: READY on the tested local build and matching Cloudflare deployment for schedule discovery, voice startup, seat selection, checkout preview, local booking/QR presentation and local cancellation.**
 
 **Customer production sales: NO-GO until licensed transactional APIs are enabled.**
 
-The current local revision uses a fresh official VOX UAE public-site extraction, a white-and-blue interface, and a CSP-compatible ElevenLabs voice-startup fix. Local browser acceptance passed the requested discovery, seat, checkout, FAQ, QR, cancellation, Arabic/RTL and media scenarios at 420 px. The deterministic parser for generic “What is playing…” requests and the authoritative agent-result context were also corrected and retested.
+The current revision uses a fresh official VOX UAE public-site extraction, a white-and-blue interface, and a CSP-compatible ElevenLabs voice-startup fix. Local acceptance passed FAQ return and the full booking journey. Hosted acceptance passed English/Arabic discovery, Back/Forward, seat-derived checkout, QR confirmation, local-only cancellation, compact media and RTL rendering at 420 px. Hosted signed-in Chrome voice startup also passed without console warnings or errors. The Cloudflare JavaScript is byte-identical to the tested local bundle.
 
-The schedule refresh completed at `2026-07-15T06:32:40.092Z` with 9,479 deduplicated sessions across 16–22 July 2026. A transactional daily refresh workflow is present, but its first GitHub-hosted run and this revision's Cloudflare deployment/hosted voice acceptance are not claimed in this pre-deployment report.
+The latest Actions refresh completed at `2026-07-15T07:21:28.186Z`, committed the generated data as `1cf0d56`, and left 9,460 validated sessions, 35 films and 22 cinemas across 16–22 July 2026. Daily and Thursday schedules are enabled.
+
+Revision evidence on `main` includes application commit `4605dc4`, workflow commit `5a50d39`, voice-CSP fix `46648b5`, workflow Actions-runtime update `5e73c1d`, the first refresh result `76496b7`, and the latest validated refresh `1cf0d56`.
 
 The journey must not be presented as creating a live VOX sale. Reservations, inventory holds, authoritative prices, payments, official tickets, cross-device booking lookup, refunds and offer redemption remain unavailable until licensed server APIs and security controls are provided.
 
@@ -37,21 +39,20 @@ The successful refresh produced:
 
 | Measure | Result |
 | --- | ---: |
-| Extracted at | `2026-07-15T06:32:40.092Z` |
+| Extracted at | `2026-07-15T07:21:28.186Z` |
 | Programming dates | 16–22 July 2026 |
-| Raw session rows | 9,518 |
-| Deduplicated sessions | 9,479 |
+| Raw session rows | 9,499 |
+| Current validated sessions | 9,460 |
 | Duplicate source rows removed | 39 |
-| Sessions on 16 July | 1,439 |
+| Sessions on 16 July | 1,438 |
 | Scheduled films | 35 |
 | Cinemas | 22 |
-| Session experience codes | 13 |
-| Retrieved experience records | 14 |
-| Live offer-media records | 20 |
+| Experience-media records | 14 |
+| Offer-media records | 20 |
 
 `npm run refresh:data` performs extraction into staging files, validates freshness, date coverage, completeness, reconciliation, source identity and media provenance, converts the client dataset, imports the generated module, and runs repository validation plus the production build. Promotion happens only after every gate succeeds; a failure restores the previous known-good JSON/module pair.
 
-`.github/workflows/refresh-vox-showtimes.yml` is scheduled daily at 01:30 UTC (05:30 UAE), with an additional Thursday run at 06:30 UTC (10:30 UAE) and manual dispatch. It commits only changed schedule JSON and generated client data. If official VOX routes reject GitHub datacenter traffic, repository variable `VOX_REFRESH_RUNNER` must point to an approved self-hosted runner on a permitted normal network.
+`.github/workflows/refresh-vox-showtimes.yml` is scheduled daily at 01:30 UTC (05:30 UAE), with an additional Thursday run at 06:30 UTC (10:30 UAE) and manual dispatch. It commits only changed schedule JSON and generated client data. [Actions run 29397059917](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/29397059917) passed the updated `checkout@v7`, `setup-node@v7` and `setup-python@v6` extraction, all 24 validators, production build, commit and push, producing refresh commit `1cf0d56`. The earlier [run 29396366283](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/29396366283) also completed end to end. If official VOX routes reject GitHub datacenter traffic, repository variable `VOX_REFRESH_RUNNER` can point to an approved self-hosted runner on a permitted normal network.
 
 This bridge reflects published public-site programming; it is not a licensed real-time inventory or reservation API. The official route contract can change without notice, so alerting and a named data owner are required.
 
@@ -64,36 +65,36 @@ This bridge reflects published public-site programming; it is not a licensed rea
 - Ticket count, subtotal, fees and checkout total derive only from selected seats. A stated ticket quantity is guidance for the number of seats, not a separate quantity stage.
 - Checkout can return to the editable seat map. Changing an upstream cinema, date, movie or showtime clears incompatible seats and quote state.
 - FAQ interruption returns to the active booking stage without leaving stale interactive components in the transcript.
-- Local booking confirmation renders a compact poster, booking details and a clearly bounded reference QR. Local booking lookup and cancellation update stored status.
+- Local and hosted booking presentation renders a compact poster, booking details and a clearly bounded device-local reference QR. Hosted lookup and two-step cancellation update the stored local-only status and clean up the QR/action state.
 - Typed interaction starts without microphone access. Text and voice transcripts share the same intent router.
 - Explicit English/Arabic selection, Arabic RTL presentation, LTR booking identifiers and the 420 px layout are preserved.
 - Official posters, experience art and live offer imagery render with compact cards and resilient fallbacks.
 - The white-and-blue theme follows only the colour direction of the VOX Kuwait reference while the product, data and behavior remain VOX Cinemas UAE.
-- The repository's strict CSP remains in place. No `blob:` or `data:` exception was added to `script-src`.
+- The repository retains a restrictive CSP. `script-src` permits the minimum `blob:` source required by ElevenLabs React 0.7.1's secondary WebRTC output-capture worklet while continuing to block `data:` scripts.
 
 ## Voice fix and current status
 
-The hosted failure was traced to Content Security Policy, not the public agent ID or microphone choice: ElevenLabs React SDK 0.7.1 attempted to create AudioWorklets from generated `blob:`/`data:` sources while `script-src` correctly allowed only trusted self-hosted scripts.
+The hosted failure was traced to Content Security Policy, not the public agent ID or microphone choice. The primary ElevenLabs AudioWorklets are now self-hosted and passed through `workletPaths`. Further hosted tracing showed that ElevenLabs React 0.7.1 creates a secondary WebRTC output-capture worklet that ignores those paths and still uses a `blob:` URL.
 
-The client now self-hosts both required worklets under `public/elevenlabs/` and passes their paths only when starting voice. Microphone permission and voice-transport startup each have a 45-second bound. Failures are classified into permission, device, browser component, service, timeout and generic cases with English and Arabic messages.
+The client self-hosts the primary worklets under `public/elevenlabs/`, passes their paths only when starting voice, and permits `blob:`—but not `data:`—for the SDK's secondary worklet. Microphone permission and voice-transport startup each have a 45-second bound. Failures are classified into permission, device, browser component, service, timeout and generic cases with English and Arabic messages.
 
-The protected WebRTC transport, EU residency, public agent identifier flow and client-tool names were not changed. Repository validation covers the worklet files, paths, strict CSP, timeouts, error classification and bilingual string parity.
+The protected WebRTC transport, EU residency, public agent identifier flow and client-tool names were not changed. Repository validation covers the worklet files, paths, scoped CSP allowance, timeouts, error classification and bilingual string parity.
 
-**Partially working:** the code-level cause is fixed and locally validated, but this report does not claim a successful spoken session on the newly deployed Cloudflare bundle. A human microphone run on approved desktop and mobile browsers remains required after deployment.
+**Hosted acceptance passed in signed-in Chrome:** the interface entered `Voice chat`, received the agent greeting, showed `End voice`, and logged zero console warnings or errors. Broader Arabic voice and physical mobile-browser acceptance remain customer-launch gates.
 
 ## What is partially working
 
-- **Showtimes:** current published schedules are available and the refresh transaction succeeded. Daily automation is configured, but the first scheduled/manual GitHub workflow run still needs evidence. Public-site routes are a temporary bridge, not a service-level agreement.
-- **Voice:** CSP-safe startup is implemented and statically validated. Hosted WebRTC, origin policy and real microphone/device acceptance remain pending.
+- **Showtimes:** current published schedules are available and two manual GitHub refreshes, including the updated Actions-runtime path, passed end to end. The next naturally scheduled run and its operational alert path still need observation. Public-site routes are a temporary bridge, not a service-level agreement.
+- **Voice:** local contract validation and hosted signed-in Chrome startup passed. Arabic spoken acceptance, mobile devices and a broader browser/device matrix remain pending.
 - **Seats and pricing:** selection, derived count and preview quote behavior work locally. Authoritative seat holds, concurrent conflict handling, official fees and expiry require server APIs.
-- **Checkout and booking:** the local end-to-end presentation works, but it creates only a device-local reference.
-- **Cancellation:** a local stored booking can be found and marked cancelled. No remote booking ownership check, cancellation write or refund is performed.
+- **Checkout and booking:** the local and hosted end-to-end presentation works, but it creates only a device-local reference.
+- **Cancellation:** a stored local-only booking can be found and marked cancelled on the hosted app. No remote booking ownership check, cancellation write or refund is performed.
 - **QR:** the rendered QR contains a local reference and is not a cinema-entry ticket or wallet pass.
 - **Offers:** current media and structured guidance display, but bank validation and redemption are not connected.
 - **Customer Care:** a redacted transfer summary can be prepared, but no Genesys/OneView connection is made.
 - **FAQ:** bilingual deterministic answers exist; production publication approval, freshness ownership and knowledge synchronization are still required.
-- **Navigation:** in-widget Back and FAQ return preserve the intended stage. A full document exit/reload does not preserve every in-memory booking step without an approved persistence design.
-- **Accessibility and device coverage:** local 420 px English/Arabic inspection passed without document-level horizontal overflow. Physical device, screen-reader, keyboard-only and design sign-off remain open.
+- **Navigation:** in-widget Back, FAQ return and hosted browser Back/Forward passed. A full document exit/reload does not preserve every in-memory booking step without an approved persistence design.
+- **Accessibility and device coverage:** local and hosted 420 px English/Arabic inspection passed without document-level horizontal overflow. Physical device, screen-reader, keyboard-only and design sign-off remain open.
 
 ## What does not work as a live operation
 
@@ -112,9 +113,7 @@ The protected WebRTC transport, EU residency, public agent identifier flow and c
 
 | Blocker | Owner/dependency | Impact |
 | --- | --- | --- |
-| Current revision is not yet deployed and fully retested on Cloudflare | Deployment/QA owner | Local and hosted parity is not yet evidenced |
-| First recurring GitHub refresh run is not yet evidenced | Repository/data owner | Automation is configured but not operationally proven |
-| Hosted desktop/mobile microphone acceptance is pending | QA/device lab and ElevenLabs agent owner | Spoken journey is not release-qualified |
+| Arabic spoken and mobile-browser acceptance are pending | QA/device lab and ElevenLabs agent owner | Hosted desktop English voice passed, but the full device matrix is not release-qualified |
 | Licensed transaction and customer API contracts are unavailable | VOX platform/API owners | No live reservation, payment, official ticket, cancellation or refund |
 | Production FAQ/policy approval and freshness ownership are unassigned | CX/content/legal owners | Customer answers cannot yet be treated as approved policy |
 | Physical-device accessibility and performance sign-off is incomplete | QA/design/performance owners | Customer launch sign-off remains open |
@@ -132,9 +131,9 @@ For agent `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`:
 7. Require explicit confirmation before switching English/Arabic; do not switch on language detection alone.
 8. Allow only approved local QA, StackBlitz and final Cloudflare origins for the public agent.
 9. Preserve the prohibition on PAN, expiry, CVV, OTP, PIN and passwords in voice or text.
-10. Complete human English/Arabic voice acceptance after deployment, covering first start, reconnect, text-to-voice continuation, discovery filters, FAQ interruption, seat selection and checkout return.
+10. Retain the passed hosted English Chrome smoke test and complete Arabic voice plus the broader mobile/browser matrix, covering reconnect, text-to-voice continuation, discovery filters, FAQ interruption, seat selection and checkout return.
 
-No dashboard change is needed to weaken CSP; the application now serves the required worklets itself.
+No ElevenLabs dashboard change is needed for CSP. The application self-hosts the primary worklets and scopes the required `blob:` allowance to scripts; `data:` remains blocked.
 
 ## Required API and knowledge-base changes
 
@@ -160,11 +159,11 @@ No dashboard change is needed to weaken CSP; the application now serves the requ
 - Add validated delta sync, link checks, locale parity, rollback and named owners for fast-changing refund, accessibility, age, hours, campaign and contact content.
 - Assign an owner for the temporary public-site schedule bridge, refresh alerts, route-change response and transition to the licensed API.
 
-## Local test results
+## Local and hosted test results
 
 | Scenario | Result | Evidence/notes |
 | --- | --- | --- |
-| Fresh 16 July showtimes | Pass | 1,439 sessions; 16–22 July coverage |
+| Current schedule validation | Pass | 9,460 sessions, 35 films, 22 cinemas and seven dates from 16–22 July; 1,438 sessions on 16 July |
 | Generic “What is playing…” discovery | Pass | Parser routing fix retested |
 | Combined cinema/date/time request | Pass | Existing criteria retained; results narrowed |
 | Exact and nearest-time handling | Pass | Nearest options explicitly identified when exact time absent |
@@ -175,18 +174,31 @@ No dashboard change is needed to weaken CSP; the application now serves the requ
 | Booking confirmation and QR | Pass | Local-reference boundary shown |
 | Current-booking cancellation | Pass | Stored status updated and rendering cleaned up |
 | Arabic/RTL flow | Pass | 420 px visual pass |
+| Hosted Arabic family/near-time query | Pass | RTL results filtered to the supplied family/time criteria without overflow |
+| Hosted Arabic booking | Pass | Toy Story 5 17:45 KIDS; A1/A2/A4 produced 3 tickets and AED 126 |
+| Hosted checkout Back | Pass | All three seats remained selected and editable; checkout then accepted the masked demo card |
+| Hosted booking confirmation | Pass | QR/reference `WLZWP6P` rendered and the seat map was removed |
+| Hosted local-only cancellation | Pass | Two-step confirmation changed the card to cancelled and removed QR/action controls |
+| Hosted Back/Forward | Pass | Navigation returned successfully without rendering overflow |
+| Hosted browser console | Pass | Zero warnings or errors during voice, query, booking and cancellation acceptance |
 | Poster, experience and offer media | Pass | Compact cards/fallback behavior verified |
 | White/blue theme at 420 px | Pass | No document-level horizontal overflow in inspected states |
-| Voice source/CSP contract | Pass | Both self-hosted worklets, strict CSP, paths, timeouts and bilingual errors validated |
-| Local live microphone conversation | Not claimed | Human device acceptance required |
-| Current revision on Cloudflare | Not claimed | Deploy and hosted matrix still required |
-| Recurring GitHub workflow execution | Not claimed | Workflow exists; first run evidence pending |
+| Voice source/CSP contract | Pass | Self-hosted primary worklets, required `blob:`/blocked `data:`, paths, timeouts and bilingual errors validated |
+| Hosted Chrome voice | Pass | `Voice chat`, greeting and `End voice`; zero console warnings/errors |
+| Hosted exact cinema/date/time query | Pass | Mall of the Emirates tomorrow 18:00 returned Toy Story 5 at 17:45 KIDS, The Odyssey at 18:00/18:15 and Match at 18:10 |
+| Hosted poster containment | Pass | Cards measured 104 × 156 px and remained contained |
+| Full validation and build | Pass | `pnpm run validate` passed all 24 validators; `pnpm run build` produced a 4,541,586-byte bundle |
+| Cloudflare artifact parity | Pass | `/assets/index-D4Y0PLpS.js` is byte-identical to local SHA-256 `D704F5665F3792FE525BFC8DD6E69D84EE7A7E396A3C45D7F6391B106307C6AB` |
+| Hosted root and worklet delivery | Pass | Root document and both worklet URLs returned HTTP 200 |
+| Manual GitHub refresh | Pass | Run 29396366283 completed and committed refreshed data |
+| Updated Actions runtime follow-up | Pass | Run 29397059917 passed on v7/v7/v6 and committed `1cf0d56` |
 
 ## Screenshot and log evidence
 
 | Evidence file | Content |
 | --- | --- |
-| `evidence/logs/showtime-voice-theme-local-acceptance.md` | Refresh facts, local scenario matrix, voice root cause/fix and remaining hosted gates |
+| `evidence/logs/hosted-acceptance-2026-07-15.md` | Cloudflare artifact, voice, text, poster and GitHub refresh acceptance facts |
+| `evidence/logs/showtime-voice-theme-local-acceptance.md` | Historical pre-deployment refresh facts, local scenario matrix and voice root cause/fix |
 | `evidence/logs/local-browser-e2e.md` | Earlier detailed local journey and hosted-baseline observations |
 | `evidence/logs/pnpm-run-validate.txt` | Repository validation command output from the preceding tested revision; retain as historical command evidence until refreshed for this revision |
 | `evidence/logs/pnpm-run-build.txt` | Production build output from the preceding tested revision; retain as historical command evidence until refreshed for this revision |
@@ -196,18 +208,22 @@ No dashboard change is needed to weaken CSP; the application now serves the requ
 | `evidence/screenshots/local-booking-qr-white-blue-420.png` | Booking confirmation and local reference QR in the new theme |
 | `evidence/screenshots/local-checkout-seat-derived-420.png` | Seat-derived checkout count and pricing |
 | `evidence/screenshots/local-cancellation-confirmed-420.png` | Local cancellation confirmation and cleanup |
-| `evidence/screenshots/hosted-old-date-misroute-420.png` | Historical hosted failure baseline; not current-revision pass evidence |
+| `evidence/screenshots/hosted-white-blue-july16-420.png` | Hosted English exact cinema/date/time results and compact posters at 420 px |
+| `evidence/screenshots/hosted-arabic-family-july16-420.png` | Hosted Arabic/RTL family and near-time filtering at 420 px |
+| `evidence/screenshots/hosted-booking-qr-arabic-420.png` | Hosted Arabic confirmation with QR/reference and cleaned seat-map state |
+| `evidence/screenshots/hosted-cancelled-booking-arabic-420.png` | Hosted Arabic local cancellation state with QR/action cleanup |
+| `evidence/screenshots/hosted-old-date-misroute-420.png` | Historical hosted failure baseline retained for regression context |
 
 ## Release gates
 
-Leadership review of the current local schedule/display/checkout-preview journey can proceed. Before stating local/web parity, deploy this exact revision and repeat the critical hosted text, Arabic, navigation, media, QR, cancellation and microphone checks.
+Leadership review of the current schedule/display/checkout-preview journey can proceed on Cloudflare. The deployed JavaScript is byte-identical to the locally accepted bundle. Hosted voice startup, English exact-time discovery, Arabic/RTL family filtering, seat-derived checkout, Back/Forward, QR confirmation and local-only cancellation all passed without console warnings/errors or document-level overflow. External-service and device-specific behavior still requires its own production matrix.
 
 A customer production launch additionally requires:
 
 1. A clean install, complete validation and production build for the final revision with archived logs.
-2. Exact tested-revision deployment to Cloudflare with asset identity and security headers recorded.
-3. Successful manual and scheduled refresh runs with alerting, ownership and rollback evidence.
-4. Hosted English/Arabic text acceptance and human voice acceptance on approved desktop and mobile browsers.
+2. Exact tested-revision deployment to Cloudflare with asset identity and security headers recorded. **Passed for `/assets/index-D4Y0PLpS.js`.**
+3. Successful manual and scheduled refresh runs with alerting, ownership and rollback evidence. **Two manual end-to-end runs, including the updated Actions runtime, passed; first natural schedule observation remains.**
+4. Hosted English/Arabic text acceptance and human voice acceptance on approved desktop and mobile browsers. **English and Arabic text passed; English desktop Chrome voice passed; Arabic voice/mobile matrix remains.**
 5. Licensed inventory, hold, quote, payment, booking, official ticket and cancellation/refund services.
 6. Security, privacy, PCI, accessibility, performance and data-licensing approval.
 7. Approved bilingual knowledge and offer content with operational freshness controls.
