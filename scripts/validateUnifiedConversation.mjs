@@ -11,7 +11,8 @@ assert.match(app, /stage\.view !== "empty" && <div ref=\{stageAnchorRef\}/, "the
 assert.match(app, /anchor\.getBoundingClientRect\(\)\.top[\s\S]*scroller\.scrollTop = Math\.max\(0, target\)/, "a new rich panel must open at its beginning instead of its bottom");
 assert.doesNotMatch(app, /scrollTo\(0,\s*scrollRef\.current\.scrollHeight\)[\s\S]{0,100}\[messages,\s*stage\]/, "long movie and booking panels must not auto-scroll to their last item");
 assert.doesNotMatch(app, /maxHeight:\s*200/, "the old detached 200px transcript must be removed");
-assert.match(app, /stage\.view === "faq"/, "FAQ results must render as the current inline stage");
+assert.doesNotMatch(app, /stage\.view === "faq"|function FaqPanel/, "FAQ answers must remain in chat without replacing the active rich stage");
+assert.match(app, /preserveBookingIntent[\s\S]*"seatmap"[\s\S]*"checkout"/, "FAQ interruptions must preserve booking intent and the current rich stage");
 assert.match(app, /<DateStrip\b/, "the extracted date range must render inline");
 assert.doesNotMatch(app, /<TicketQuantityControl\b|function TicketQuantityControl/, "the seat map must not render a separate ticket quantity control");
 assert.match(app, /requestedTarget=\{requestedSeatTarget\}/, "a spoken quantity may remain as non-interactive seat-selection guidance");

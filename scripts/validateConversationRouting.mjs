@@ -225,6 +225,9 @@ assert.match(staleViewHandler, /historyRequested[\s\S]*actionIntent === "booking
 assert.match(staleViewHandler, /cancellationReply[\s\S]*Boolean\(cancellationFlowRef\.current\)/, "pending yes/no cancellation turns must preserve the active booking panel");
 assert.match(staleViewHandler, /clearPendingOrder\(\)[\s\S]*bookingRef\.current\s*=\s*null[\s\S]*setBooking\(null\)/, "abandoning a stale booking/history panel must clear hidden checkout and active-booking context");
 assert.match(staleViewHandler, /showStage\(canRestoreMovies\s*\?[\s\S]*view:\s*"movies"[\s\S]*:\s*\{\s*view:\s*"empty"\s*\}\)/, "an unrelated turn must hide the stale booking/history panel while preserving available movie context");
+assert.match(app, /const isResumeOnlyTurn[\s\S]*continue\|resume\|go on\|carry on/, "the router must identify explicit booking-continuation turns");
+assert.match(app, /bookingContext && !resumeOnlyTurn[\s\S]*routeDiscoveryTurn/, "a continuation turn must not restart movie discovery");
+assert.match(app, /Continue from the currently visible \$\{stageRef\.current\.view\} step[\s\S]*Do not restart discovery/, "text and voice continuation turns must preserve the visible booking panel");
 
 const offersTool = sliceBetween(app, "show_offers: async", "handover_to_agent:", "offers tool");
 assert.match(offersTool, /current\.view === "booking"\s*\?\s*bookingRef\.current\s*:\s*null/, "offers must use a booking's experience only while that booking is visibly active");
@@ -232,7 +235,6 @@ assert.match(offersTool, /current\.view === "checkout"\s*\?\s*pendingOrderRef\.c
 
 const mainRender = sliceBetween(app, "<main ref={scrollRef}", "</main>", "inline stage render");
 const guardedPanels = [
-  ["FaqPanel", "faq"],
   ["CinemaPicker", "cinemas"],
   ["MovieGrid", "movies"],
   ["Showtimes", "showtimes"],
@@ -247,6 +249,10 @@ for (const [component, view] of guardedPanels) {
   assert.equal((mainRender.match(new RegExp(`<${component}\\b`, "g")) || []).length, 1, `${component} must have one render site`);
   assert.match(mainRender, new RegExp(`stage\\.view === ["']${view}["'][\\s\\S]{0,2400}<${component}\\b`), `${component} must be guarded by its exclusive stage.view`);
 }
+assert.doesNotMatch(app, /function FaqPanel|stage\.view === ["']faq["']/, "FAQ answers must stay in chat and must not replace the active booking panel");
+const faqPreparation = sliceBetween(app, "const prepareFaqContext", "useEffect(() =>", "FAQ context preparation");
+assert.doesNotMatch(faqPreparation, /showStage\(/, "FAQ context preparation must preserve the active rich panel");
+assert.match(faqPreparation, /preserveBookingIntent[\s\S]*\["movies", "showtimes", "seatmap", "checkout", "booking", "history"\]/, "FAQ interruptions must preserve the active booking intent");
 assert.match(mainRender, /stage\.view === "booking" && displayedBooking && <BookingCard\b/, "a stored booking must not render unless booking is the active view");
 assert.match(mainRender, /stage\.view === "history" && <BookingHistory\b/, "booking history must not render unless history is the active view");
 assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}cancellation=\{[\s\S]{0,350}\bcancellationState\b/, "BookingCard must render the booking-scoped shared cancellation state used by text, voice, and touch");

@@ -145,6 +145,6 @@ assert.match(showShowtimesTool, /resolveVisibleSelectionProgrammingDate\(\{[\s\S
 assert.ok(showShowtimesTool.indexOf("const visibleMovie") < showShowtimesTool.indexOf("await ensureFilms"), "visible title resolution must happen before any film-list reload");
 const typedMessageFlow = app.slice(app.indexOf("const sendText"), app.indexOf("const sendUiTurn"));
 assert.match(typedMessageFlow, /if \(unavailableDate\) \{[\s\S]*sendContextualUpdate/, "a deterministic unavailable typed request must provide authoritative no-substitution context");
-assert.match(typedMessageFlow, /bookingContext && !unavailableDate/, "an unavailable typed date must not launch fallback discovery while the conversational turn can still be answered");
+assert.match(typedMessageFlow, /bookingContext && !resumeOnlyTurn && !unavailableDate/, "an unavailable typed date must not launch fallback discovery while the conversational turn can still be answered");
 
 console.log("Validated explicit programming-date precedence and no-substitution behavior.");

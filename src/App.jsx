@@ -38,6 +38,7 @@ const SEAT_PRICING_PREVIEW = vista.getSeatPricingPreview();
 const DISCOVERY_MOVIE_CATALOG = vista.getDiscoveryMovieCatalog();
 const stripVox = (name) => String(name || "").replace(/^VOX\s*[\u2014-]\s*/, "");
 const norm = (value) => String(value ?? "").toLowerCase().trim();
+const isResumeOnlyTurn = (value) => /^(?:continue|resume|go on|carry on|متابعة|تابع|اكمل|أكمل)(?:\s+(?:please|من فضلك))?[.!?،]*$/iu.test(String(value || "").trim());
 const localizedValue = (value, locale) => typeof value === "string" ? value : value?.[locale] || value?.en || "";
 const isAgentWelcome = (value) => {
   const text = String(value || "");
@@ -467,7 +468,6 @@ export default function App() {
   const historyContextRef = useRef(null);
   const bookingOpenedFromHistoryRef = useRef(false);
   const offersReturnRef = useRef(null);
-  const faqReturnRef = useRef(null);
 
   // Current-value refs make client-tool calls deterministic even when the SDK
   // invokes a handler between React renders.
@@ -694,8 +694,7 @@ export default function App() {
     setSeatQuote({ seatKey, loading: true, quote: null, error: null });
     try {
       const quote = await vista.getPricingQuote(planContext.cinemaId, planContext.sessionId, selectedSeatDetails);
-      const quoteViewIsCurrent = stageRef.current.view === "seatmap"
-        || (stageRef.current.view === "faq" && faqReturnRef.current?.view === "seatmap");
+      const quoteViewIsCurrent = stageRef.current.view === "seatmap";
       const stillCurrent = requestId === seatQuoteRequestRef.current
         && quoteViewIsCurrent
         && planContextRef.current === planContext
@@ -1274,7 +1273,7 @@ export default function App() {
     return true;
   };
 
-  const prepareFaqContext = useCallback((query, { render = true } = {}) => {
+  const prepareFaqContext = useCallback((query) => {
     const activeLocale = localeRef.current;
     const current = stageRef.current;
     const faq = buildFaqContextForQuery(query, {
@@ -1299,7 +1298,6 @@ export default function App() {
     if (!faq.matches.length) return faq;
     const primary = faq.matches[0];
     const inferred = inferIntent({ view: "empty", text: query, previousIntent: null });
-    const actionIntent = classifyFaqActionIntent(query);
     const faqIntent = primary.topic === "offers"
       ? "offers"
       : ["cancellations_refunds", "booking_refund"].includes(primary.topic)
@@ -1307,15 +1305,13 @@ export default function App() {
         : inferred === "booking"
           ? "booking"
           : "general_enquiry";
-    journeyRef.current = { ...journeyRef.current, intent: faqIntent };
-    dispatchJourney({ type: "intent", intent: faqIntent });
-    const transactionalAction = Boolean(actionIntent) || classifyBookingHistoryRequest(query).requested;
-    if (render && !transactionalAction) {
-      if (current?.view !== "faq") faqReturnRef.current = current || { view: "empty" };
-      showStage({ view: "faq", faq: primary });
+    const preserveBookingIntent = ["movies", "showtimes", "seatmap", "checkout", "booking", "history"].includes(current?.view);
+    if (!preserveBookingIntent) {
+      journeyRef.current = { ...journeyRef.current, intent: faqIntent };
+      dispatchJourney({ type: "intent", intent: faqIntent });
     }
     return faq;
-  }, [showStage]);
+  }, []);
 
   useEffect(() => {
     filmsRef.current = [];
@@ -2487,7 +2483,6 @@ export default function App() {
     historyReturnRef.current = null;
     historyContextRef.current = null;
     offersReturnRef.current = null;
-    faqReturnRef.current = null;
     lastOfferRef.current = null;
     resetClarificationFailures();
     transportConversationIdRef.current = null;
@@ -2574,6 +2569,7 @@ export default function App() {
           : null;
         const seatTurn = decision === null ? resolveVisibleSeatTurn(safeMessage) : { requested: false, seats: [] };
         const directSeatSelection = Boolean(seatTurn.requested);
+        const resumeOnlyTurn = !directSeatSelection && isResumeOnlyTurn(safeMessage);
         const directCinemaSelection = isDirectCinemaSelectionUtterance({
           text: safeMessage,
           view: stageRef.current.view,
@@ -2608,7 +2604,7 @@ export default function App() {
           showUnavailableProgrammingDate(unavailableDate);
           conversation.sendContextualUpdate?.(`The guest requested ${unavailableDate}, but it is not published for the selected cinema. Do not substitute another date. Available dates: ${availableDates.join(", ")}.`);
         }
-        if (bookingContext && !quantityOnlyTurn && !isLanguageControlTurn(safeMessage) && !unavailableDate && !directSeatSelection && !directCancellation && !historyRequest.requested) {
+        if (bookingContext && !resumeOnlyTurn && !quantityOnlyTurn && !isLanguageControlTurn(safeMessage) && !unavailableDate && !directSeatSelection && !directCancellation && !historyRequest.requested) {
           const normalizedCinemaTurn = details.cinema ? normalizeCinemaAsrForAgent(safeMessage, details.cinema) : safeMessage;
           conversation.sendContextualUpdate?.("The widget is applying the guest's retained cinema, date, time, genre, language, experience, movie, and audience criteria now. No movie selection is confirmed by this filter turn. Do not call a discovery or showtime tool concurrently, do not say 'great choice', and do not describe on-screen options until the widget supplies the authoritative outcome.");
           void routeDiscoveryTurn(safeMessage, {
@@ -2624,6 +2620,7 @@ export default function App() {
             conversation.sendContextualUpdate?.(`Filtered discovery could not be completed: ${error?.message || "unknown error"}. Do not claim that movie results are displayed.`);
           });
         }
+        if (resumeOnlyTurn) conversation.sendContextualUpdate?.(`Continue from the currently visible ${stageRef.current.view} step. Preserve the selected movie, cinema, date, showtime, seats, and pricing. Do not restart discovery or replace the active panel.`);
         if (details.requestedSeatTarget) conversation.sendContextualUpdate?.(`The guest would like ${details.requestedSeatTarget} tickets. Treat this only as a target and guide them to select ${details.requestedSeatTarget} seats. The number of selected seats is the actual ticket count and controls pricing.`);
         if (directSeatSelection) {
           conversation.sendContextualUpdate?.("The widget is applying the guest's visible seat selection now. Wait for the widget result; do not claim checkout, payment, booking confirmation, a reference, or a QR yet.");
@@ -3150,6 +3147,7 @@ export default function App() {
       : null;
     const seatTurn = decision === null ? resolveVisibleSeatTurn(value) : { requested: false, seats: [] };
     const directSeatSelection = Boolean(seatTurn.requested);
+    const resumeOnlyTurn = !directSeatSelection && isResumeOnlyTurn(value);
     const directCinemaSelection = isDirectCinemaSelectionUtterance({
       text: value,
       view: stageRef.current.view,
@@ -3188,7 +3186,7 @@ export default function App() {
     let discoveryRouteResult = null;
     const cancellationRoutePromise = directCancellation ? routeCancellationTurn(value) : null;
     const seatRoutePromise = directSeatSelection ? routeSeatSelectionTurn(value, seatTurn) : null;
-    if (bookingContext && !unavailableDate && !quantityOnlyTurn && !languageControlTurn && !directSeatSelection && !directCancellation && !historyRequest.requested) {
+    if (bookingContext && !resumeOnlyTurn && !unavailableDate && !quantityOnlyTurn && !languageControlTurn && !directSeatSelection && !directCancellation && !historyRequest.requested) {
       discoveryRouteResult = await routeDiscoveryTurn(value, {
         cinemaOverride: details.cinema,
         dateOverride: requestedDate,
@@ -3210,6 +3208,7 @@ export default function App() {
         conversation.sendContextualUpdate?.(`The widget applied every supplied discovery criterion. Visible result: ${discoveryRouteResult.shown || "none"}; movie count: ${movieCount}; missing: ${(discoveryRouteResult.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${retained.preferredTime || retained.timeBand || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; movie: ${retained.movieTitle || "not supplied"}. ${buildAuthoritativeDiscoveryContext(discoveryRouteResult)} Ask only the first missing item and do not list unfiltered movies.${discoveryRouteResult.time?.usedNearestFallback ? ` No exact ${discoveryRouteResult.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}`);
       }
       if (details.requestedSeatTarget) conversation.sendContextualUpdate?.(`The guest would like ${details.requestedSeatTarget} tickets. Treat this only as a target and guide them to select ${details.requestedSeatTarget} seats. The number of selected seats is the actual ticket count and controls pricing.`);
+      if (resumeOnlyTurn) conversation.sendContextualUpdate?.(`Continue from the currently visible ${stageRef.current.view} step. Preserve the selected movie, cinema, date, showtime, seats, and pricing. Do not restart discovery or replace the active panel.`);
       if (seatRoutePromise) {
         try {
           const seatResult = await seatRoutePromise;
@@ -4043,12 +4042,6 @@ export default function App() {
     pendingLanguageSwitchRef.current = null;
     localeRef.current = nextLocale;
     setLocale(nextLocale);
-    if (stageRef.current.view === "faq" && stageRef.current.faq?.entry?.answer?.[nextLocale]) {
-      showStage({
-        ...stageRef.current,
-        faq: { ...stageRef.current.faq, locale: nextLocale, answer: stageRef.current.faq.entry.answer[nextLocale] },
-      });
-    }
     const next = nextLocale === "ar" ? "Arabic" : "English";
     if (isConnected && conversation.sendContextualUpdate) {
       conversation.sendContextualUpdate(`The guest explicitly selected ${next}. This visible selector action is confirmed. Preserve the active task and continue in ${next} without repeating the welcome message. ${buildVoxiContext({
@@ -4155,7 +4148,6 @@ export default function App() {
           {cinema && ["discovery", "movies", "showtimes"].includes(stage.view) && <DateStrip dates={displayedProgrammingDates} selected={stage.errorCode === "date_unavailable" || !discoveryPreferences.date ? null : scheduleDate} locale={locale} label={t("dates.label")} onSelect={chooseDate} />}
           {stage.view === "loading" && <LoadingPanel label={stage.label} />}
           {stage.view === "discovery" && <DiscoveryPrompt question={stage.question} preferences={stage.preferences} />}
-          {stage.view === "faq" && stage.faq && <FaqPanel result={stage.faq} label={t("faq.official")} capabilityLabel={t("faq.capability")} liveLabel={t("faq.live")} backLabel={t("common.back")} onBack={() => showStage(faqReturnRef.current || { view: "empty" })} />}
           {stage.view === "cinemas" && <CinemaPicker cinemas={stage.cinemas || CINEMAS} selected={cinema} notice={stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => routeDiscoveryTurn("", { preferencesAlreadyApplied: true }) : undefined} onSelect={chooseCinema} onBack={() => showStage(cinemaReturnRef.current || { view: "empty" })} />}
           {stage.view === "movies" && cinema && <MovieGrid movies={stage.movies} cinemaName={stripVox(cinema.name)} scheduleDate={stage.errorCode === "date_unavailable" ? userRequestedDateRef.current : scheduleDate} notice={stage.notice} onSelect={pickMovie} error={stage.error} onRetry={stage.errorCode === "date_unavailable" ? undefined : () => routeDiscoveryTurn("", { cinemaOverride: cinema, dateOverride: scheduleDate, preferencesAlreadyApplied: true })} />}
           {stage.view === "showtimes" && <Showtimes movie={stage.movie} sessions={stage.sessions} notice={stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => pickMovie(stage.movie) : undefined} onSelect={pickSession} onBack={backFromShowtimes} />}
@@ -4267,20 +4259,6 @@ function DiscoveryPrompt({ question, preferences = {} }) {
         {visibleValues.map((value, index) => <span key={`${value}-${index}`} dir="auto" style={{ borderRadius: 999, background: C.primarySoft, padding: "4px 8px", color: C.primary, fontSize: 10 }}>{value}</span>)}
       </div>}
     </section>
-  );
-}
-
-function FaqPanel({ result, label, capabilityLabel, liveLabel, backLabel, onBack }) {
-  const source = result.metadata?.source?.[0];
-  const heading = result.metadata?.provenance === "product" ? capabilityLabel : label;
-  return (
-    <article style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface, boxShadow: `0 8px 22px ${C.shadow}`, padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.brand, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: .6 }}><Sparkles size={14} />{heading}</div>
-      <p dir="auto" style={{ margin: "11px 0 0", color: C.text, fontSize: 13, lineHeight: 1.55 }}>{result.answer}</p>
-      {result.needsLiveData && <p style={{ margin: "9px 0 0", color: C.muted, fontSize: 10, lineHeight: 1.45 }}>{liveLabel}</p>}
-      {source?.url && <a href={source.url} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 10, color: C.primary, fontSize: 10 }}>{source.title}</a>}
-      {onBack && <button type="button" onClick={onBack} style={{ display: "block", marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 8, background: C.surfaceAlt, padding: "7px 11px", color: C.primary, fontSize: 11, cursor: "pointer" }}>{backLabel}</button>}
-    </article>
   );
 }
 
