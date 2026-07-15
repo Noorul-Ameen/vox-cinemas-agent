@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { addDays, flatten, isIsoDate, parseArgs, uaeToday, validate } from "./extractVoxShowtimes.mjs";
+import { retainMediaOnPartialResponse, retainPreviouslyVerifiedPosters } from "./refreshRetention.mjs";
+import { validateShowtimeRefresh } from "./validateShowtimeRefresh.mjs";
 
 assert.equal(uaeToday(new Date("2026-07-13T20:30:00Z")), "2026-07-14", "Dubai calendar date must not use host or UTC midnight");
 assert.equal(addDays("2026-07-14", 1), "2026-07-15");
@@ -49,5 +51,43 @@ validate({
   offerMedia: [],
   crawl: { startDate: "2026-07-14", complete: true, rawSessionCount: 3, duplicateCount: 1, missingOfficialPosterCodes: ["HO-NO-POSTER"] },
 });
+
+const currentExtraction = JSON.parse(fs.readFileSync(new URL("../data/vox_showtimes_full.json", import.meta.url), "utf8"));
+const allPosterLoss = structuredClone(currentExtraction);
+allPosterLoss.catalog = allPosterLoss.catalog.map((movie) => ({ ...movie, posterUrl: "", posterStatus: "missing_at_source" }));
+allPosterLoss.crawl.missingOfficialPosterCodes = allPosterLoss.catalog.map((movie) => movie.code).sort();
+allPosterLoss.crawl.sourceMissingOfficialPosterCodes = [...allPosterLoss.crawl.missingOfficialPosterCodes];
+allPosterLoss.crawl.retainedMoviePosterCodes = [];
+allPosterLoss.crawl.retainedMoviePosterCount = 0;
+assert.throws(
+  () => validateShowtimeRefresh(allPosterLoss, { previous: currentExtraction, now: new Date(currentExtraction.extractedAt) }),
+  /lost a previously verified official poster/,
+  "a partial upstream response must not erase previously verified movie posters",
+);
+
+const retainedPosterFixture = retainPreviouslyVerifiedPosters(
+  [{ code: "KNOWN", posterUrl: "https://uae.voxcinemas.com/images/known.png", images: { medium: "https://uae.voxcinemas.com/images/known.png" } }],
+  [
+    { code: "KNOWN", posterUrl: "", images: {} },
+    { code: "NEW", posterUrl: "", images: {} },
+  ],
+);
+assert.deepEqual(retainedPosterFixture.retainedCodes, ["KNOWN"]);
+assert.equal(retainedPosterFixture.catalog[0].posterStatus, "retained_official");
+assert.equal(retainedPosterFixture.catalog[0].posterUrl, "https://uae.voxcinemas.com/images/known.png");
+assert.equal(retainedPosterFixture.catalog[1].posterUrl, "", "a genuinely new upstream poster gap remains explicit");
+
+const legitimateOfferRemoval = retainMediaOnPartialResponse(
+  [{ code: "A" }, { code: "B" }, { code: "C" }],
+  [{ code: "A" }, { code: "B" }],
+);
+assert.equal(legitimateOfferRemoval.partialResponse, false, "a normal campaign removal must not retain expired offer media");
+assert.deepEqual(legitimateOfferRemoval.items.map((item) => item.code), ["A", "B"]);
+const partialExperienceResponse = retainMediaOnPartialResponse(
+  [{ code: "A" }, { code: "B" }, { code: "C" }],
+  [{ code: "A" }],
+);
+assert.equal(partialExperienceResponse.partialResponse, true);
+assert.equal(partialExperienceResponse.retainedCount, 2, "a clearly partial media response keeps last-known official assets");
 
 console.log("Validated UAE date calculation, strict date parsing, source-session deduplication, and explicit missing-poster metadata.");

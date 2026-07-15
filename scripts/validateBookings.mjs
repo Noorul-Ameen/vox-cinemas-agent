@@ -30,12 +30,14 @@ const {
 window.localStorage.setItem(BOOKING_STORAGE_KEY, JSON.stringify([{
   ref: "OLD123",
   movieTitle: "Legacy booking",
+  cinemaName: `VOX ${String.fromCodePoint(0x2014)} City Centre Deira`,
   seats: "C5, C6",
   total: 84,
 }]));
 
 assert.equal(readBookings()[0].currency, "AED", "legacy booking gets default currency");
 assert.deepEqual(readBookings()[0].seats, ["C5", "C6"], "legacy seat string normalizes");
+assert.equal(readBookings()[0].cinemaName, "VOX - City Centre Deira", "legacy customer-facing punctuation normalizes on hydration");
 assert.equal(getBookingStorageStatus().legacy, true, "legacy arrays are detected before migration");
 
 appendBooking({ ref: "WLTEST", movieTitle: "New booking", seats: ["E1", "E2"], total: 126, createdAt: "2026-07-12T10:00:00.000Z" });

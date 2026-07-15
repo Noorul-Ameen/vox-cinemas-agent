@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { retainMediaOnPartialResponse, retainPreviouslyVerifiedPosters } from "./refreshRetention.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const stamp = `${Date.now()}-${process.pid}`;
@@ -38,35 +39,35 @@ async function removeTemporaryFiles() {
   await Promise.all([nextJson, nextModule].map((path) => rm(path, { force: true }).catch(() => {})));
 }
 
-const mediaKey = (item) => String(item?.code || item?.slug || item?.name || "").trim().toLowerCase();
-
-function mergeOfficialMedia(previousItems = [], nextItems = []) {
-  const merged = new Map();
-  for (const item of previousItems) {
-    const key = mediaKey(item);
-    if (key) merged.set(key, item);
-  }
-  for (const item of nextItems) {
-    const key = mediaKey(item);
-    if (key) merged.set(key, item);
-  }
-  return [...merged.values()];
-}
-
 async function retainPreviouslyVerifiedMedia() {
   if (!existsSync(currentJson)) return;
   const [previous, next] = await Promise.all([
     readFile(currentJson, "utf8").then(JSON.parse),
     readFile(nextJson, "utf8").then(JSON.parse),
   ]);
-  const freshExperienceKeys = new Set((next.experienceMedia || []).map(mediaKey).filter(Boolean));
-  const freshOfferKeys = new Set((next.offerMedia || []).map(mediaKey).filter(Boolean));
-  next.experienceMedia = mergeOfficialMedia(previous.experienceMedia, next.experienceMedia);
-  next.offerMedia = mergeOfficialMedia(previous.offerMedia, next.offerMedia);
+  const sourceMissingOfficialPosterCodes = [...(next.crawl?.missingOfficialPosterCodes || [])].sort();
+  const posterRetention = retainPreviouslyVerifiedPosters(previous.catalog, next.catalog);
+  const experienceRetention = retainMediaOnPartialResponse(previous.experienceMedia, next.experienceMedia);
+  const offerRetention = retainMediaOnPartialResponse(previous.offerMedia, next.offerMedia);
+  next.catalog = posterRetention.catalog;
+  next.experienceMedia = experienceRetention.items;
+  next.offerMedia = offerRetention.items;
+  const unresolvedMissingOfficialPosterCodes = next.catalog
+    .filter((movie) => !movie.posterUrl)
+    .map((movie) => movie.code)
+    .sort();
   next.crawl = {
     ...next.crawl,
-    retainedExperienceMediaCount: next.experienceMedia.filter((item) => !freshExperienceKeys.has(mediaKey(item))).length,
-    retainedOfferMediaCount: next.offerMedia.filter((item) => !freshOfferKeys.has(mediaKey(item))).length,
+    sourceMissingOfficialPosterCodes,
+    missingOfficialPosterCodes: unresolvedMissingOfficialPosterCodes,
+    retainedMoviePosterCodes: posterRetention.retainedCodes,
+    retainedMoviePosterCount: posterRetention.retainedCodes.length,
+    freshExperienceMediaCount: experienceRetention.freshCount,
+    freshOfferMediaCount: offerRetention.freshCount,
+    experienceMediaPartialResponse: experienceRetention.partialResponse,
+    offerMediaPartialResponse: offerRetention.partialResponse,
+    retainedExperienceMediaCount: experienceRetention.retainedCount,
+    retainedOfferMediaCount: offerRetention.retainedCount,
   };
   await writeFile(nextJson, `${JSON.stringify(next, null, 2)}\n`, "utf8");
 }

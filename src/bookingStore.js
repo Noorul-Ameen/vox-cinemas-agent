@@ -1,3 +1,5 @@
+import { normalizeCustomerFacingText } from "./lib/customerFacingText.js";
+
 export const BOOKING_STORAGE_KEY = "vox_bookings";
 export const BOOKING_STORAGE_VERSION = 2;
 export const BOOKING_STORAGE_NAMESPACE = "voxi";
@@ -5,6 +7,17 @@ export const BOOKING_STORAGE_NAMESPACE = "voxi";
 const own = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
 const refKey = (value) => String(value || "").trim().toUpperCase();
 const scopeValue = (value) => String(value || "").trim();
+const CUSTOMER_TEXT_FIELDS = [
+  "movieTitle",
+  "cinemaName",
+  "experience",
+  "screen",
+  "currency",
+  "status",
+  "transactionWarning",
+  "refundRoute",
+  "refundReference",
+];
 
 export class BookingStorageError extends Error {
   constructor(message, { code = "BOOKING_STORAGE_ERROR", cause } = {}) {
@@ -44,6 +57,22 @@ function normalizeBooking(value, { partial = false } = {}) {
 
   if (own(value, "createdAt")) result.createdAt = value.createdAt || null;
   else if (!partial) result.createdAt = null;
+
+  for (const field of CUSTOMER_TEXT_FIELDS) {
+    if (own(value, field) && typeof value[field] === "string") {
+      result[field] = normalizeCustomerFacingText(value[field]);
+    }
+  }
+  if (own(value, "fees") && Array.isArray(value.fees)) {
+    result.fees = value.fees.map((fee) => fee && typeof fee === "object"
+      ? {
+          ...fee,
+          ...(typeof fee.name === "string" ? { name: normalizeCustomerFacingText(fee.name) } : {}),
+          ...(typeof fee.label === "string" ? { label: normalizeCustomerFacingText(fee.label) } : {}),
+          ...(typeof fee.description === "string" ? { description: normalizeCustomerFacingText(fee.description) } : {}),
+        }
+      : fee);
+  }
 
   if (result.cancelled) {
     if (own(value, "cancelledAt")) result.cancelledAt = value.cancelledAt || null;

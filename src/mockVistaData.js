@@ -78,6 +78,9 @@ export const DATA_STATS = {
     "requestedSessionCalls": 218,
     "rawSessionCount": 10010,
     "duplicateCount": 38,
+    "sourceMissingOfficialPosterCodes": [
+      "HO00015542"
+    ],
     "missingOfficialPosterCodes": [
       "HO00015542"
     ],
@@ -94,6 +97,12 @@ export const DATA_STATS = {
       "2026-07-25": 102,
       "2026-07-26": 98
     },
+    "retainedMoviePosterCodes": [],
+    "retainedMoviePosterCount": 0,
+    "freshExperienceMediaCount": 1,
+    "freshOfferMediaCount": 21,
+    "experienceMediaPartialResponse": true,
+    "offerMediaPartialResponse": false,
     "retainedExperienceMediaCount": 13,
     "retainedOfferMediaCount": 0
   }

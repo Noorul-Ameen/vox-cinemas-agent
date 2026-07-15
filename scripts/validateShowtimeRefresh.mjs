@@ -52,12 +52,36 @@ export function validateShowtimeRefresh(data, { previous = null, now = new Date(
 
   const missingPosterCodes = data.catalog.filter((movie) => !movie.posterUrl).map((movie) => movie.code).sort();
   assert.deepEqual(missingPosterCodes, [...(data.crawl?.missingOfficialPosterCodes || [])].sort(), "upstream movies without official posters must be recorded exactly");
+  const retainedPosterCodes = [...(data.crawl?.retainedMoviePosterCodes || [])].sort();
+  const sourceMissingPosterCodes = [...(data.crawl?.sourceMissingOfficialPosterCodes || data.crawl?.missingOfficialPosterCodes || [])].sort();
+  assert.deepEqual(
+    sourceMissingPosterCodes,
+    [...new Set([...missingPosterCodes, ...retainedPosterCodes])].sort(),
+    "source poster gaps must reconcile with unresolved and retained official posters",
+  );
+  assert.equal(data.crawl?.retainedMoviePosterCount || 0, retainedPosterCodes.length, "retained movie poster count must reconcile");
+  for (const code of retainedPosterCodes) {
+    const movie = data.catalog.find((item) => item.code === code);
+    assert.ok(movie && /^https:\/\//.test(movie.posterUrl || ""), `retained movie ${code} must keep an HTTPS poster`);
+    assert.equal(movie.posterStatus, "retained_official", `retained movie ${code} must declare retained official provenance`);
+  }
   for (const movie of data.catalog.filter((item) => item.posterUrl)) {
     assert.ok(/^https:\/\//.test(movie.posterUrl), `movie ${movie.code} has a non-HTTPS poster URL`);
   }
   for (const item of [...(data.experienceMedia || []), ...(data.offerMedia || [])]) {
     for (const value of [item.imageUrl, item.backdropUrl, item.heroUrl, item.promoUrl, item.mobileUrl].filter(Boolean)) {
       assert.ok(/^https:\/\//.test(value), `media URL must use HTTPS: ${value}`);
+    }
+  }
+  for (const [label, items] of [["Experience", data.experienceMedia || []], ["Offer", data.offerMedia || []]]) {
+    const prefix = label.toLowerCase();
+    const freshCount = data.crawl?.[`fresh${label}MediaCount`];
+    const retainedCount = data.crawl?.[`retained${label}MediaCount`] || 0;
+    const partialResponse = data.crawl?.[`${prefix}MediaPartialResponse`] === true;
+    if (Number.isInteger(freshCount)) {
+      assert.equal(items.length, freshCount + retainedCount, `${prefix} media counts must reconcile`);
+      if (partialResponse) assert.ok(retainedCount > 0, `${prefix} partial response must retain prior official media`);
+      else assert.equal(retainedCount, 0, `${prefix} media must not retain removed items after a complete response`);
     }
   }
 
@@ -68,8 +92,16 @@ export function validateShowtimeRefresh(data, { previous = null, now = new Date(
     assert.ok(data.sessions.length >= minimumSessions, `session count dropped more than 40% (${previous.sessions.length} to ${data.sessions.length})`);
     assert.ok(data.catalog.length >= minimumFilms, `scheduled-film count dropped more than 40% (${previous.catalog.length} to ${data.catalog.length})`);
     assert.ok(Object.keys(data.cinemas).length >= minimumCinemas, "cinema coverage dropped unexpectedly");
-    assert.ok((data.experienceMedia || []).length >= (previous.experienceMedia || []).length, "verified experience media must not be dropped by a partial upstream response");
-    assert.ok((data.offerMedia || []).length >= (previous.offerMedia || []).length, "verified offer media must not be dropped by a partial upstream response");
+    if (data.crawl?.experienceMediaPartialResponse === true) {
+      assert.ok((data.experienceMedia || []).length >= (previous.experienceMedia || []).length, "verified experience media must not be dropped by a partial upstream response");
+    }
+    if (data.crawl?.offerMediaPartialResponse === true) {
+      assert.ok((data.offerMedia || []).length >= (previous.offerMedia || []).length, "verified offer media must not be dropped by a partial upstream response");
+    }
+    const previousPosters = new Map(previous.catalog.map((movie) => [movie.code, movie.posterUrl]));
+    for (const movie of data.catalog.filter((item) => !item.posterUrl)) {
+      assert.ok(!previousPosters.get(movie.code), `movie ${movie.code} lost a previously verified official poster`);
+    }
   }
 
   return {
