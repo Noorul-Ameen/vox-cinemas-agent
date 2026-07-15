@@ -19,9 +19,10 @@ assert.match(concatWorklet, /registerProcessor\("audioConcatProcessor"/);
 assert.match(app, /connectionType:\s*"webrtc"/);
 assert.match(app, /workletPaths:\s*ELEVENLABS_WORKLET_PATHS/);
 assert.match(app, /serverLocation:\s*"eu-residency"/);
-assert.match(headers, /script-src 'self';/);
+assert.match(headers, /script-src 'self' blob:;/);
 const scriptDirective = headers.match(/script-src[^;]+;/)?.[0] || "";
-assert.doesNotMatch(scriptDirective, /(?:blob:|data:)/);
+assert.match(scriptDirective, /blob:/, "ElevenLabs 0.7.1 WebRTC output capture requires a blob AudioWorklet fallback");
+assert.doesNotMatch(scriptDirective, /data:/, "data: scripts must remain blocked");
 
 assert.equal(voiceStartupErrorKey({ name: "NotAllowedError" }), "app.voicePermissionError");
 assert.equal(voiceStartupErrorKey({ name: "NotFoundError" }), "app.voiceDeviceError");
@@ -34,4 +35,4 @@ for (const key of ["voicePermissionError", "voiceDeviceError", "voiceComponentEr
   assert.equal((strings.match(new RegExp(`"app\\.${key}"`, "g")) || []).length, 2, `${key} must exist in English and Arabic`);
 }
 
-console.log("Validated CSP-safe ElevenLabs worklets, bounded voice startup, protected WebRTC/EU residency, and bilingual failure classification.");
+console.log("Validated self-hosted ElevenLabs worklets, the scoped WebRTC blob fallback, bounded voice startup, protected WebRTC/EU residency, and bilingual failure classification.");

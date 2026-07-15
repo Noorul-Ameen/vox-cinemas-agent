@@ -1,5 +1,5 @@
 /*
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'self' https://voxcinemas.com https://*.voxcinemas.com https://stackblitz.com https://*.stackblitz.com; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; media-src 'self' data: blob: https:; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'self' https://voxcinemas.com https://*.voxcinemas.com https://stackblitz.com https://*.stackblitz.com; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https: wss:; media-src 'self' data: blob: https:; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
   Permissions-Policy: microphone=(self), camera=(), geolocation=(), payment=(), usb=()
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000
