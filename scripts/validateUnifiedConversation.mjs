@@ -13,7 +13,8 @@ assert.doesNotMatch(app, /scrollTo\(0,\s*scrollRef\.current\.scrollHeight\)[\s\S
 assert.doesNotMatch(app, /maxHeight:\s*200/, "the old detached 200px transcript must be removed");
 assert.match(app, /stage\.view === "faq"/, "FAQ results must render as the current inline stage");
 assert.match(app, /<DateStrip\b/, "the extracted date range must render inline");
-assert.match(app, /<TicketQuantityControl\b/, "ticket quantity must stay visible beside seat selection");
+assert.doesNotMatch(app, /<TicketQuantityControl\b|function TicketQuantityControl/, "the seat map must not render a separate ticket quantity control");
+assert.match(app, /requestedTarget=\{requestedSeatTarget\}/, "a spoken quantity may remain as non-interactive seat-selection guidance");
 assert.match(app, /voxi:new-conversation/);
 assert.match(app, /voxi:logout/);
 assert.match(app, /CONVERSATION_IDLE_MS/);

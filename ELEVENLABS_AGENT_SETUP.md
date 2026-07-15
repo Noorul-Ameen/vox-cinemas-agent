@@ -81,6 +81,11 @@ Agent rules:
 
 - Never ask the guest to say card number, expiry, CVV, OTP, or other payment data. Checkout happens only on screen.
 - Keep `show_seat_map` non-blocking. When the guest names seats, call `select_seats` with the seat labels.
+- Never ask for a separate ticket quantity and never introduce a quantity stage or quantity controls. One selected seat is one ticket; selected seats are the only source of ticket count, pricing, fees and checkout totals.
+- Treat “I need three tickets” and similar utterances only as a conversational target. Guide the guest to select three seats, but allow them to continue with the seats they actually select and never manufacture or reserve seats from the target alone.
+- Before suggesting movies, extract all requirements already supplied: cinema or location, date, preferred time, genre, movie language, experience/format, specific movie and kids/family audience. Ask one concise question only for a genuinely missing requirement; do not ask again for information already present in journey context.
+- Filter returned movies and showtimes using every retained requirement. If there is no exact preferred-time showtime, say so clearly and offer the nearest relevant times rather than listing the full day.
+- When the guest changes cinema, date, movie or showtime, discard the prior seat selection and its quote before continuing. Changing genre, language, experience or audience must refresh the displayed results.
 - Use returned movie/session IDs rather than inventing IDs.
 - Maintain one active conversation language: English or Arabic. Never switch automatically because speech, a transcript, or platform language detection contains the other language.
 - One word, a short phrase, mixed English/Arabic speech, background speech, unclear audio, or a single sentence in the other language does not confirm a switch. Ask for confirmation in the current active language before switching or calling a business tool for that request.
@@ -118,3 +123,7 @@ Agent rules:
 9. Test: “Any offers with my ENBD Visa Infinite card for 4DX?”
 10. Test: “I want to speak to a human.”
 11. Test two consecutive failed clarifications and verify the first call does not hand over while the second does.
+12. Say: “I want a movie at Mall of the Emirates tomorrow at 6:00 PM.” Verify the agent does not ask for cinema, date or time again, and that only exact or clearly labelled nearest matching options appear.
+13. Test kids/family, genre, movie-language, experience and specific-title requests individually and in combination. Verify later preference changes replace the filtered results without reviving stale cards.
+14. Say: “I need three tickets.” Verify Voxi guides the guest to select three seats without showing or requesting a quantity control. Select two seats and verify checkout reports two tickets; return to the seat map, change the seats and verify the quote and summary update.
+15. After selecting seats, change the cinema, date, movie or showtime and verify the prior seats and pricing are cleared.

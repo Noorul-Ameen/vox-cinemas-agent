@@ -55,6 +55,9 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
   const { t, dir, formatCurrency } = useI18n();
   const checkoutMode = resolveCheckoutMode(mode);
   const seats = Array.isArray(order?.seats) ? order.seats : [];
+  const currency = order?.currency || "AED";
+  const subtotal = order?.subtotal != null && Number.isFinite(Number(order.subtotal)) ? Number(order.subtotal) : null;
+  const feeTotal = order?.feeTotal != null && Number.isFinite(Number(order.feeTotal)) ? Number(order.feeTotal) : null;
   const [cards, setCards] = useState(() => loadCards(deviceSessionEpoch));
   const [selected, setSelected] = useState(null);
   const [adding, setAdding] = useState(false);
@@ -152,8 +155,15 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
         </div>
       </div>
       <div style={summaryCard}>
-        <span style={{ fontSize: 13, color: "rgba(255,255,255,.6)" }}>{t("checkout.seatCountOnly", { count: seats.length })} · <span dir="ltr">{order?.screen}</span></span>
-        <span dir="ltr" style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{formatCurrency(order?.total || 0, order?.currency || "AED")}</span>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <span style={{ fontSize: 13, color: "rgba(255,255,255,.6)" }}>{t("checkout.seatCountOnly", { count: seats.length })} · <span dir="ltr">{order?.screen}</span></span>
+          <span dir="ltr" style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{formatCurrency(order?.total || 0, currency)}</span>
+        </div>
+        {subtotal != null && <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "4px 12px", marginTop: 9, borderTop: "1px solid rgba(255,255,255,.08)", paddingTop: 8, color: "rgba(255,255,255,.5)", fontSize: 10 }}>
+          <span>{t("checkout.subtotal")}</span><span dir="ltr">{formatCurrency(subtotal, currency)}</span>
+          {feeTotal != null && <><span>{t("checkout.fees")}</span><span dir="ltr">{formatCurrency(feeTotal, currency)}</span></>}
+          <strong style={{ color: "rgba(255,255,255,.75)" }}>{t("checkout.total")}</strong><strong dir="ltr" style={{ color: "#fff" }}>{formatCurrency(order?.total || 0, currency)}</strong>
+        </div>}
       </div>
     </>
   );
@@ -262,7 +272,7 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
 }
 
 const backButton = { border: "none", background: "none", color: "rgba(255,255,255,.5)", cursor: "pointer", padding: 4 };
-const summaryCard = { display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, background: "rgba(0,0,0,.25)", padding: "12px 14px", marginBottom: 12 };
+const summaryCard = { border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, background: "rgba(0,0,0,.25)", padding: "12px 14px", marginBottom: 12 };
 const demoNotice = { border: "1px solid rgba(255,207,112,.28)", borderRadius: 10, background: "rgba(255,207,112,.08)", padding: "9px 11px", marginBottom: 12, color: "rgba(255,255,255,.72)", fontSize: 10, lineHeight: 1.45 };
 const unavailableCard = { border: "1px solid rgba(255,207,112,.25)", borderRadius: 14, background: "rgba(255,207,112,.07)", padding: 20, textAlign: "center" };
 const spinner = { width: 26, height: 26, border: "3px solid rgba(255,255,255,.2)", borderTopColor: C.lavender, borderRadius: "50%", animation: "spin 0.9s linear infinite" };

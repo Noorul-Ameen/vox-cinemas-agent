@@ -1,5 +1,6 @@
 const VIEW_PROGRESS = Object.freeze({
   empty: "start",
+  discovery: "requirements_discovery",
   cinemas: "cinema_selection",
   movies: "movie_selection",
   showtimes: "showtime_selection",
@@ -96,9 +97,13 @@ export function syncJourney(current, {
     : view === "seatmap" && !activeOrder && !activeBooking
       ? selectedSeats
     : activeOrder?.seats?.length ? activeOrder.seats : activeBooking?.seats?.length ? activeBooking.seats : selectedSeats?.length ? selectedSeats : current.seats);
-  const explicitQuantity = Number(ticketQuantity || activeOrder?.ticketQuantity || activeBooking?.ticketQuantity || seats.length) || null;
-  const quantity = explicitQuantity
-    || (clearsSession && !activeOrder && !activeBooking ? null : Number(current.ticketQuantity) || null);
+  // Ticket quantity is an output of seat selection, never an independent
+  // booking input. Legacy stored quantities are ignored when seats disagree.
+  const quantity = cloneSeats(activeOrder?.seats?.length
+    ? activeOrder.seats
+    : activeBooking?.seats?.length
+      ? activeBooking.seats
+      : seats).length || null;
   const ticketType = clearsSession && !activeOrder && !activeBooking
     ? null
     : activeOrder?.ticketType || activeBooking?.ticketType || current.ticketType || null;

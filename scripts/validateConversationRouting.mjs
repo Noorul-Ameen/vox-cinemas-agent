@@ -172,29 +172,35 @@ for (const informationQuestion of [
   }), false, `cinema information must remain on the FAQ path: ${informationQuestion}`);
 }
 
-const routeRecognizedCinema = sliceBetween(app, "const routeRecognizedCinema", "const clearConversationState", "recognized cinema router");
-assert.match(routeRecognizedCinema, /clientTools\.show_movie_selection\(\{[\s\S]*cinemaId:\s*matchedCinema\.id/, "recognized cinema routing must load that cinema's movies locally");
-assert.match(routeRecognizedCinema, /scheduleDate:\s*requestedDate\s*\|\|\s*scheduleDateRef\.current/, "recognized cinema routing must preserve the requested or selected programming date");
+assert.doesNotMatch(app, /const routeRecognizedCinema/, "the obsolete direct-cinema router must not bypass the shared retained-criteria filter path");
+const discoveryRouter = sliceBetween(app, "const routeDiscoveryTurn", "const clearConversationState", "shared discovery router");
+const discoveryLoader = sliceBetween(app, "const loadDiscoveryForCinema", "const findAvailableCinemasForMovie", "filtered discovery loader");
+assert.match(discoveryRouter, /discoveryMissingCriteria\(/, "the shared discovery router must ask only for missing requirements");
+assert.match(discoveryRouter, /loadDiscoveryForCinema\(target,\s*preferences\.date,\s*preferences,\s*combinedRawTurn\)/, "the shared discovery router must apply retained cinema, date, and narrowing criteria together");
+assert.match(discoveryRouter, /requestEpochRef\.current\s*!==\s*scanEpoch/, "cross-cinema discovery must suppress obsolete async results");
+assert.match(discoveryLoader, /const unresolvedSignal = extractDiscoveryPreferencePatch\(unresolvedTitleTurn,[\s\S]*cinemas:\s*CINEMAS,[\s\S]*movies,[\s\S]*unresolvedMovieTitleCandidate\(unresolvedTitleTurn,\s*unresolvedSignal\)/, "deferred fuzzy-title resolution must subtract the retained cinema, date, time, and experience before matching the loaded catalog");
 
 const voiceMessageFlow = sliceBetween(app, "onMessage: (message) =>", "onError:", "SDK voice message flow");
 const typedMessageFlow = sliceBetween(app, "const sendText", "const sendUiTurn", "typed message flow");
 assert.match(voiceMessageFlow, /normalizeElevenLabsMessageEvent\(message\)/, "SDK events must be normalized from the documented ElevenLabs onMessage contract");
 for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMessageFlow]]) {
   assert.match(flow, /isDirectCinemaSelectionUtterance\(/, `${label} must identify a direct cinema reply before FAQ rendering`);
-  assert.match(flow, /directCinemaSelection\s*\|\|\s*directCancellation\s*\|\|\s*directSeatSelection\s*\?\s*\{\s*matches:\s*\[\],\s*context:\s*""\s*\}\s*:\s*prepareFaqContext/, `${label} must not let generic FAQ tags swallow direct cinema, seat, or cancellation actions`);
+  assert.match(flow, /directCinemaSelection\s*\|\|\s*directCancellation\s*\|\|\s*directSeatSelection\s*\|\|\s*discoveryFilterTurn\s*\?\s*\{\s*matches:\s*\[\],\s*context:\s*""\s*\}\s*:\s*prepareFaqContext/, `${label} must not let generic FAQ tags swallow direct cinema, seat, cancellation, or filter actions`);
   assert.match(flow, /dismissStaleTransactionalView\(/, `${label} turns must dismiss a stale booking/history panel when the turn is unrelated`);
   assert.ok(flow.indexOf("dismissStaleTransactionalView(") < flow.indexOf("prepareFaqContext("), `${label} turns must clear hidden transactional context before an FAQ panel replaces it`);
   assert.match(flow, /classifyBookingHistoryRequest\(/, `${label} must use the shared bilingual current/history classifier`);
   assert.match(flow, /openHistory\(\{\s*notifyAgent:\s*false,\s*forceOpen:\s*true,\s*activeOnly:\s*historyRequest\.activeOnly,\s*preserveReturn:\s*bookingOpenedFromHistoryRef\.current\s*\}\)/, `${label} must apply active-only scope while preserving the original parent of a history-selected booking`);
   assert.match(flow, /cancellationReply:\s*decision\s*!==\s*null/, `${label} cancellation confirmations must keep the active booking panel`);
+  assert.match(flow, /const bookingContext = decision === null && !faq\.matches\.length/, `${label} yes/no cancellation replies must not fall through into retained movie discovery`);
   assert.match(flow, /isDirectCancellationRequest\(/, `${label} must classify contextual cancellation before stale-view cleanup`);
   assert.ok(flow.indexOf("isDirectCancellationRequest(") < flow.indexOf("dismissStaleTransactionalView("), `${label} must recognize contextual cancellation before stale booking context can be dismissed`);
   assert.match(flow, /actionIntent:\s*directCancellation\s*\?\s*["']cancellation["']\s*:\s*actionIntent/, `${label} must preserve the visible booking while shared cancellation routing begins`);
   assert.match(flow, /routeCancellationTurn\(/, `${label} must initiate cancellation through the shared local router`);
   assert.match(flow, /handleCancellationDecision\(decision,\s*\{\s*source:\s*["']conversation["']\s*\}\)/, `${label} must continue pending yes/no cancellation through the shared decision handler`);
-  assert.match(flow, /routeRecognizedCinema\(details\.cinema,\s*requestedDate\)/, `${label} turns must route a recognized cinema without requiring a picker click`);
-  assert.match(flow, /clientTools\.show_movie_selection\(\{\}\)/, `${label} first-turn movie discovery without a cinema must display the cinema picker`);
-  assert.match(flow, /Only the VOX Cinemas UAE cinema picker is displayed; no movie list is visible yet/, `${label} context must not claim that movies are shown before a cinema is selected`);
+  assert.match(flow, /applyDiscoveryPreferencesFromText\([^,]+,\s*details\.cinema\s*\?\s*\{\s*cinemaId:\s*details\.cinema\.id,\s*cinemaName:\s*details\.cinema\.name\s*\}\s*:\s*\{\}\)/, `${label} must retain a cinema already recognized in the guest's turn`);
+  assert.match(flow, /routeDiscoveryTurn\((?:safeMessage|value),\s*\{\s*cinemaOverride:\s*details\.cinema,\s*dateOverride:\s*requestedDate,\s*preferencesAlreadyApplied:\s*true/, `${label} must use the same all-criteria discovery router for text and speech transcripts`);
+  assert.match(flow, /isDiscoveryRequest\((?:safeMessage|value)\)/, `${label} must recognize progressive discovery replies without requiring an agent tool round-trip`);
+  assert.match(flow, /Ask only the first missing item and do not list unfiltered movies/, `${label} must constrain the agent response to the widget's filtered result`);
 }
 
 const staleViewHandler = sliceBetween(app, "const dismissStaleTransactionalView", "const prepareFaqContext", "stale transactional-view handler");
@@ -246,6 +252,7 @@ assert.ok(cancellationTool.indexOf("if (!isCurrentBooking(displayed))") < cancel
 assert.match(cancellationTool, /cancellationRequestId[\s\S]{0,900}cancellationRequestIsStale\(\)[\s\S]{0,300}staleCancellationResult\(\)/, "an obsolete booking lookup must not restore cancellation state after the guest moves to another task");
 assert.ok(cancellationTool.indexOf("clearPendingOrder()") > cancellationTool.indexOf("await vista.searchBooking"), "a failed cancellation lookup must preserve a visible checkout instead of leaving a blank stage");
 assert.match(app, /const bookingHistoryTurnContext[\s\S]{0,900}no active bookings saved on this device[\s\S]{0,300}Do not ask them to select a booking/, "an empty current-booking result must not ask the guest to select a missing booking");
+assert.match(app, /The guest selected on-device booking summary[\s\S]{0,900}movie \$\{localBooking\.movie[\s\S]{0,900}seats \$\{\(localBooking\.seats \|\| \[\]\)\.join[\s\S]{0,900}Never invent or substitute a time, seat, screen, or amount/, "history selection context must give the agent exact booking fields instead of allowing stale-detail invention");
 assert.match(app, /cancellationFlowRef\.current[\s\S]{0,120}scroller\.scrollTop\s*=\s*scroller\.scrollHeight/, "new conversation messages must keep an active cancellation confirmation in view");
 assert.match(app, /\["empty", "booking"\]\.includes\(stageRef\.current\.view\)[\s\S]{0,120}scroller\.scrollTop\s*=\s*scroller\.scrollHeight/, "booking completion and follow-up copy must keep the QR/footer in view");
 const cancellationDismissHandler = sliceBetween(app, "const dismissPendingCancellation", "const clearPendingOrder", "cancellation dismissal handler");

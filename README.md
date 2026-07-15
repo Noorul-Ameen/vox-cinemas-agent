@@ -47,6 +47,22 @@ The GitHub import URL is:
 
 StackBlitz installs from `package.json` and starts Vite. Text chat needs no microphone permission. Voice WebRTC requires the preview to be opened in a browser context that permits microphone access.
 
+## Cloudflare Pages deployment
+
+The production site uses Cloudflare Pages' Git integration. Configure the Pages project with:
+
+- Git repository: `Noorul-Ameen/vox-cinemas-agent`
+- Production branch: `main`
+- Root directory: `/`
+- Build command: `npm ci && npm run validate && npm run build`
+- Build output directory: `dist`
+
+Snapshot mode needs no secret environment variables. `VITE_AGENT_ID` is an optional public client identifier and `VITE_VISTA_BASE` may contain only a public-safe server proxy URL; every `VITE_*` value is embedded in the browser bundle. Never add an ElevenLabs API key, signed conversation token, Vista credential, payment credential, or Cloudflare token to a `VITE_*` variable.
+
+Cloudflare Pages automatically applies SPA fallback behavior when the build has an `index.html` and no top-level `404.html`, which is the configuration used here. Do not add a blanket `/* /index.html 200` rule to `_redirects`: on Pages, redirect rules run even when a matching static asset exists and that rule can intercept the hashed Vite assets. Security headers and cache policy live in `public/_headers`; Vite copies that file into `dist` during every build. The frame policy permits same-origin, approved VOX domains, and StackBlitz; add any future approved embedding origin there before launch.
+
+No GitHub Actions deployment workflow is included because the existing Pages Git integration already deploys pushes to `main`; running both mechanisms can create duplicate production deployments. If the project is intentionally migrated to Direct Upload later, store a least-privilege Pages deployment token as the GitHub Actions secret `CLOUDFLARE_API_TOKEN` and the account identifier as `CLOUDFLARE_ACCOUNT_ID`, then disable automatic Pages Git deployments before enabling that workflow.
+
 ## ElevenLabs client tools
 
 The original names remain unchanged:

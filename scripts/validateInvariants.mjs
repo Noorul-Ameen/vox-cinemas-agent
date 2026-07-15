@@ -38,7 +38,7 @@ const cinemaPickerSegment = app.slice(app.indexOf("const openCinemaPicker"), app
 const historyPickerSegment = app.slice(app.indexOf("const openHistory"), app.indexOf("const openOffers"));
 assert.doesNotMatch(cinemaPickerSegment, /clearPendingOrder/, "opening the cinema picker must preserve an in-progress checkout");
 assert.doesNotMatch(historyPickerSegment, /clearPendingOrder/, "opening booking history must preserve an in-progress checkout");
-assert.match(app.slice(app.indexOf("const chooseCinema"), app.indexOf("const openHistory")), /clearPendingOrder/, "choosing a new cinema must abandon the previous checkout");
+assert.match(app.slice(app.indexOf("const chooseCinema"), app.indexOf("const openHistory")), /clearSeatSelection/, "choosing a new cinema must abandon the previous seats, quote, and checkout");
 assert.match(app.slice(app.indexOf("const selectHistoryBooking"), app.indexOf("const toggleSeat")), /clearPendingOrder/, "opening a historical booking must abandon the previous checkout");
 assert.match(rich, /dir="ltr"/);
 assert.match(main, /class ErrorBoundary/);

@@ -1,0 +1,35 @@
+﻿CheckedAt=2026-07-15T00:43:08.1965822+04:00
+HostedAsset=index-BgMP9HrN.js
+LocalBuildAsset=index-B6np26pn.js
+
+ROOT https://voxi-ai.pages.dev/
+HTTP/1.1 200 OK
+Date: Tue, 14 Jul 2026 20:43:07 GMT
+Content-Type: text/html; charset=utf-8
+Connection: keep-alive
+Access-Control-Allow-Origin: *
+Cache-Control: public, max-age=0, must-revalidate
+referrer-policy: strict-origin-when-cross-origin
+x-content-type-options: nosniff
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=EhOk%2F%2F2gefWNoMwmizr6Wbh%2FtTDOdnnELUyJ6ntf%2FJaGho28vPazNu%2FFcBd9V%2FvT75N%2FIa5vKY%2FL1yqU8smruq0kqUui3CKhWn5XvE19G0U%2F%2FVaUYECF3K1Xf4%2FKkk332iJMdCPyCij4%2Bsb8mowfpA%3D%3D"}]}
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+Server: cloudflare
+CF-RAY: a1b35b9cbe31d5f6-DXB
+alt-svc: h3=":443"; ma=86400
+
+
+ASSET https://voxi-ai.pages.dev/assets/index-BgMP9HrN.js
+HTTP/1.1 200 OK
+Date: Tue, 14 Jul 2026 20:43:07 GMT
+Content-Type: application/javascript
+Connection: keep-alive
+Access-Control-Allow-Origin: *
+Cache-Control: public, max-age=0, must-revalidate
+ETag: "42270c19ea32a0f085ca1f1d750d887b"
+referrer-policy: strict-origin-when-cross-origin
+x-content-type-options: nosniff
+Report-To: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=8i3bdbBFSgBtxmEP8qSoAW2ltqV%2B9us4j3%2B29Ljp1E2ELIN%2FnSwW1qaWAsrsEIgJqmDWZ6N8kvNYkImAjprAkUGs0Du2lAL7XDGR88X4eVZxJ4W60wawlFx6%2FDyBed%2FS8NsWy6S57e8hjjxlYba3ww%3D%3D"}]}
+Nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+Server: cloudflare
+CF-RAY: a1b35b9db92d2630-DXB
+alt-svc: h3=":443"; ma=86400

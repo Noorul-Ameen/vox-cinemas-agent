@@ -51,8 +51,13 @@ assert.equal(getScheduleStatus({ now: new Date("2026-08-01T00:00:00Z") }).reason
 
 assert.deepEqual(
   getLiveProgrammingDates({ now: new Date("2026-07-13T20:30:00Z"), days: 3 }),
+  ["2026-07-13", "2026-07-14", "2026-07-15"],
+  "before 06:00 UAE, the prior programming day remains available for after-midnight sessions",
+);
+assert.deepEqual(
+  getLiveProgrammingDates({ now: new Date("2026-07-14T03:00:00Z"), days: 3 }),
   ["2026-07-14", "2026-07-15", "2026-07-16"],
-  "live availability windows start from the current UAE calendar date",
+  "after 06:00 UAE, the availability window starts from the current calendar date",
 );
 
 const capabilities = getVistaCapabilities({ now: snapshotNow });

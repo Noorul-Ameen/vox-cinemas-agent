@@ -81,7 +81,7 @@ function InlineState({ title, onRetry, error = false }) {
   );
 }
 
-export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, onRetry }) {
+export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, onRetry, notice }) {
   const { t, dir } = useI18n();
   const [query, setQuery] = React.useState("");
   const key = query.trim().toLowerCase();
@@ -89,6 +89,7 @@ export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, 
   return (
     <div>
       <Header icon={<MapPin size={16} />} title={t("cinema.title")} sub={t("cinema.count", { count: cinemas.length })} onBack={onBack} />
+      {notice && <div role="status" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12, borderRadius: 10, background: "rgba(99,65,141,.2)", padding: "9px 11px", color: C.lavender, fontSize: 11, lineHeight: 1.45 }}><span>{notice}</span>{onRetry && !error && <button type="button" onClick={onRetry} style={{ display: "inline-flex", flexShrink: 0, alignItems: "center", gap: 5, border: "1px solid rgba(255,255,255,.16)", borderRadius: 7, background: "rgba(255,255,255,.07)", padding: "6px 8px", color: "#fff", cursor: "pointer", fontSize: 10 }}><RefreshCw size={12} aria-hidden="true" />{t("common.retry")}</button>}</div>}
       <label style={{ display: "flex", alignItems: "center", gap: 8, borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.04)", padding: "9px 12px", marginBottom: 12 }}>
         <Search size={15} color="rgba(255,255,255,.45)" />
         <input dir="auto" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("cinema.search")} style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: "transparent", color: "#fff", fontSize: 13, textAlign: "start" }} />
@@ -109,11 +110,12 @@ export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, 
   );
 }
 
-export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, error, onRetry }) {
+export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, error, onRetry, notice }) {
   const { t } = useI18n();
   return (
     <div>
       <Header icon={<Film size={16} />} title={t("movies.title")} sub={<span><bdi dir="auto">{cinemaName}</bdi> · <span dir="ltr">{scheduleDate}</span></span>} />
+      {notice && <div role="status" style={{ marginBottom: 12, border: "1px solid rgba(228,220,240,.16)", borderRadius: 10, background: "rgba(99,65,141,.18)", padding: "9px 11px", color: C.lavender, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
       {error ? <InlineState title={typeof error === "string" ? error : t("movies.error")} onRetry={onRetry} error /> : !movies.length ? <InlineState title={t("movies.empty")} onRetry={onRetry} /> : <div style={{ display: "grid", maxWidth: "100%", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 12 }}>
         {movies.map((m) => (
           <button key={m.id} onClick={() => onSelect(m)} style={{ ...btnReset, width: "100%", minWidth: 0, textAlign: "start" }}>
@@ -127,6 +129,9 @@ export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, err
                 m.language || "",
               ].filter(Boolean).join(" · ")}
             </div>
+            {!!m.relevantSessions?.length && <div aria-label={`Relevant showtimes for ${m.title}`} style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+              {m.relevantSessions.slice(0, 3).map((session) => <span key={session.sessionId} dir="ltr" style={{ borderRadius: 999, background: "rgba(87,199,154,.11)", padding: "2px 6px", color: C.green, fontSize: 9, whiteSpace: "nowrap" }}>{session.time} · {session.exp}</span>)}
+            </div>}
             <div dir="auto" style={{ marginTop: 5, fontSize: 10, lineHeight: 1.35, color: "rgba(255,255,255,.42)", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.synopsis}</div>
           </button>
         ))}
@@ -135,12 +140,13 @@ export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, err
   );
 }
 
-export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRetry }) {
+export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRetry, notice }) {
   const { t, dir } = useI18n();
   const expColor = (e) => (["IMAX", "MAX"].includes(e) ? "#C79A4B" : e === "GOLD" ? "#D9A94B" : e === "KIDS" ? C.green : C.lavender);
   return (
     <div>
       <Header icon={<Clock size={16} />} title={movie.title} sub={`${movie.rating} · ${movie.runtime ? t("showtimes.minutes", { count: movie.runtime }) : "—"} · ${t("showtimes.select")}`} onBack={onBack} />
+      {notice && <div role="status" style={{ marginBottom: 12, border: "1px solid rgba(228,220,240,.16)", borderRadius: 10, background: "rgba(99,65,141,.18)", padding: "9px 11px", color: C.lavender, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
       <div style={{ marginBottom: 14, borderRadius: 12, border: "1px solid rgba(255,255,255,.08)", background: "rgba(0,0,0,.18)", padding: "11px 12px" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 7 }}>
           {(movie.genres || [movie.genre]).filter(Boolean).map((genre) => <span key={genre} style={{ borderRadius: 999, background: "rgba(99,65,141,.28)", color: C.lavender, padding: "2px 7px", fontSize: 10 }}>{genre}</span>)}
@@ -173,17 +179,25 @@ export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRet
   );
 }
 
-export function SeatMap({ movie, session, plan = [], selected = [], pricing, onToggle, onConfirm, onBack, error, onRetry, notice }) {
+export function SeatMap({ movie, session, plan = [], selected = [], requestedTarget = null, pricing, quoteState, onToggle, onConfirm, onBack, error, onRetry, notice }) {
   const { t, formatCurrency } = useI18n();
   const standardPrice = Number(pricing?.tiers?.standard);
   const premiumPrice = Number(pricing?.tiers?.premium);
   const hasDemoEstimate = pricing?.demo === true && Number.isFinite(standardPrice) && Number.isFinite(premiumPrice);
   const currency = pricing?.currency || "AED";
   const price = (premium) => (premium ? premiumPrice : standardPrice);
-  const total = hasDemoEstimate ? selected.reduce((sum, id) => {
+  const estimatedTotal = hasDemoEstimate ? selected.reduce((sum, id) => {
     const seat = plan.flatMap((r) => r.seats).find((s) => s.id === id);
     return sum + (seat ? price(seat.premium) : 0);
   }, 0) : null;
+  const selectedKey = [...selected].sort().join(",");
+  const exactQuote = quoteState?.seatKey === selectedKey && !quoteState.loading && quoteState.quote;
+  const quotedTotal = Number(exactQuote?.total);
+  const quotedSubtotal = exactQuote?.subtotal != null ? Number(exactQuote.subtotal) : Number.NaN;
+  const quotedFeeTotal = exactQuote?.feeTotal != null ? Number(exactQuote.feeTotal) : Number.NaN;
+  const total = Number.isFinite(quotedTotal) ? quotedTotal : estimatedTotal;
+  const totalCurrency = exactQuote?.currency || currency;
+  const target = Number.isFinite(Number(requestedTarget)) ? Number(requestedTarget) : null;
   const standardLabel = hasDemoEstimate
     ? t("seats.standardEstimate", { price: formatCurrency(standardPrice, currency) })
     : t("seats.standardQuoteRequired");
@@ -204,6 +218,7 @@ export function SeatMap({ movie, session, plan = [], selected = [], pricing, onT
       {notice && <div role="note" style={{ marginBottom: 16, border: "1px solid rgba(255,207,112,.24)", borderRadius: 10, background: "rgba(255,207,112,.08)", padding: "9px 11px", color: "#FFCF70", fontSize: 10, lineHeight: 1.45 }}>{notice === true ? t("seats.demoNotice") : notice}</div>}
       {!notice && pricing?.demo === true && <div role="note" style={{ marginBottom: 16, border: "1px solid rgba(255,207,112,.24)", borderRadius: 10, background: "rgba(255,207,112,.08)", padding: "9px 11px", color: "#FFCF70", fontSize: 10, lineHeight: 1.45 }}>{t("seats.demoPricingNotice")}</div>}
       {pricing?.mode === "quote_required" && <div role="note" style={{ marginBottom: 16, border: "1px solid rgba(255,255,255,.12)", borderRadius: 10, background: "rgba(255,255,255,.04)", padding: "9px 11px", color: "rgba(255,255,255,.72)", fontSize: 10, lineHeight: 1.45 }}>{t("seats.quoteRequiredNotice")}</div>}
+      {target && <div role="status" style={{ marginBottom: 12, borderRadius: 10, background: selected.length === target ? "rgba(87,199,154,.12)" : "rgba(99,65,141,.2)", padding: "8px 10px", color: selected.length === target ? C.green : C.lavender, fontSize: 10, fontWeight: 700 }}>{t(selected.length === target ? "seats.targetReached" : "seats.targetProgress", { target, count: selected.length })}</div>}
       <div dir="ltr" style={{ maxWidth: 420, margin: "0 auto 24px" }}>
         <div style={{ height: 6, borderRadius: 999, background: `linear-gradient(90deg, transparent, ${C.lavender}, transparent)`, boxShadow: "0 0 24px 4px rgba(228,220,240,.35)" }} />
         <div style={{ marginTop: 4, textAlign: "center", fontSize: 10, letterSpacing: 6, textTransform: "uppercase", color: "rgba(255,255,255,.4)" }}>{t("seats.screen")}</div>
@@ -242,8 +257,10 @@ export function SeatMap({ movie, session, plan = [], selected = [], pricing, onT
       <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(0,0,0,.25)", padding: "12px 16px" }}>
         <div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,.5)" }}>{selected.length ? <>{t("seats.countLabel", { count: selected.length })} <span dir="ltr">{selected.join(", ")}</span></> : t("seats.none")}</div>
-          <div style={{ fontSize: 9, color: "rgba(255,255,255,.55)" }}>{hasDemoEstimate ? t("seats.demoEstimateLabel") : t("seats.quoteRequiredLabel")}</div>
-          {hasDemoEstimate && <div dir="ltr" style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{formatCurrency(total, currency)}</div>}
+          <div role="status" style={{ fontSize: 9, color: "rgba(255,255,255,.55)" }}>{quoteState?.seatKey === selectedKey && quoteState.loading ? t("seats.pricingUpdating") : exactQuote ? t("seats.priceUpdated") : hasDemoEstimate ? t("seats.demoEstimateLabel") : t("seats.quoteRequiredLabel")}</div>
+          {Number.isFinite(total) && <div dir="ltr" style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{formatCurrency(total, totalCurrency)}</div>}
+          {exactQuote && Number.isFinite(quotedSubtotal) && <div style={{ marginTop: 3, color: "rgba(255,255,255,.5)", fontSize: 9 }}>{t("seats.subtotal")}: <span dir="ltr">{formatCurrency(quotedSubtotal, totalCurrency)}</span>{Number.isFinite(quotedFeeTotal) && quotedFeeTotal > 0 ? <> · {t("seats.fees")}: <span dir="ltr">{formatCurrency(quotedFeeTotal, totalCurrency)}</span></> : null}</div>}
+          {quoteState?.seatKey === selectedKey && quoteState.error && <div role="alert" style={{ marginTop: 3, color: "#FF8C9C", fontSize: 9 }}>{quoteState.error}</div>}
         </div>
         <button disabled={!selected.length} onClick={() => onConfirm(selected, total)}
           style={{ borderRadius: 8, border: "none", padding: "10px 20px", fontSize: 14, fontWeight: 600, color: "#fff", background: C.magenta, opacity: selected.length ? 1 : 0.3, cursor: selected.length ? "pointer" : "not-allowed" }}>

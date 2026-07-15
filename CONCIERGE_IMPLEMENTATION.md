@@ -27,7 +27,8 @@ transportConversationId / previousTransportConversationId
 intent and locale
 cinema and movie
 schedule date and session/showtime
-ticket quantity and ticket type
+actual ticket count derived from selected seats and an optional conversational seat target
+ticket type
 experience and selected seats
 food items
 booking progress and booking reference
@@ -41,7 +42,7 @@ The logical `sessionId` remains stable while ElevenLabs transport IDs are record
 `App.jsx` has one `<main>` conversation scroller. It contains:
 
 - the bounded transcript;
-- the one current relevant component (cinemas, dates/movies, showtimes, ticket quantity/seats, checkout, booking, history, offers, FAQ or handover);
+- the one current relevant component (cinemas, dates/movies, showtimes, seats, checkout, booking, history, offers, FAQ or handover);
 - no detached 200 px transcript panel.
 
 Because `stage` is singular, replacing it removes earlier interactive cards. The transcript remains as readable history, but stale cards cannot still be clicked.
@@ -51,11 +52,13 @@ Because `stage` is singular, replacing it removes earlier interactive cards. The
 The current flow is:
 
 ```text
-intent → cinema → date → movie → showtime/experience → ticket quantity
-       → seats/type → checkout → confirmation → persisted history
+intent/requirements → progressively filtered movies → showtime/experience
+                    → seats/type → checkout → confirmation → persisted history
 ```
 
-Seat tier provides the current ticket type. Experience comes from the selected session. Food and beverage guidance is available through the FAQ layer; a transactional F&B step remains dependent on a live menu/order API.
+Cinema, city/location, date, preferred time, genre, language, experience, specific movie and kids/family intent are retained as discovery preferences. Voxi asks only for a missing requirement, applies every available criterion, and presents nearby showtimes when there is no exact preferred-time match. Changing an upstream booking choice invalidates incompatible downstream state.
+
+There is no ticket-quantity stage or plus/minus control. Each selected seat is exactly one ticket, and the selected-seat count is the only source for ticket count, quote, fees and checkout totals. A request such as “three tickets” is retained only as a conversational target so Voxi can guide the guest toward three seat selections; it never gates checkout. Guests can return from checkout to the editable seat map, change seats and receive an updated summary. Seat tier provides the current ticket type, and experience comes from the selected session. Food and beverage guidance is available through the FAQ layer; a transactional F&B step remains dependent on a live menu/order API.
 
 The existing client-tool names and response contracts remain registered, including the non-blocking `show_seat_map` and protected `select_seats` path. Voice and touch call the same handlers.
 
@@ -66,7 +69,7 @@ Before a new transport starts, the app builds a redacted handoff containing:
 - logical session ID and previous ElevenLabs conversation ID;
 - active language and inferred intent;
 - cinema, movie, date, showtime and experience;
-- ticket quantity/type and seats;
+- actual ticket count, optional requested-seat target, ticket type and selected seats;
 - booking progress/reference;
 - the last eight relevant user/assistant turns.
 
@@ -176,22 +179,22 @@ Current first-party sources include:
 
 Automated validation covers extracted data, booking persistence, offers, handover redaction, English/Arabic parity, explicit language switching, protected transport/tool invariants, FAQ schema/resolution, logical journey handoff, lifecycle hooks, unified UI, dates and poster wiring.
 
-Live browser checks covered:
+The final local 420 px browser run covered:
 
 - clean launch and all 22 cinemas;
 - all nine programming dates;
 - movie posters and showtimes;
-- ticket quantity, two-seat selection and checkout;
+- three-seat selection, automatic reduction to two seats, matching quote updates, checkout Back and a changed-seat checkout;
 - completed local booking persistence and confirmation poster rendering;
-- cancellation decline and confirmation;
+- FAQ interruption/return and cancellation confirmation cleanup;
 - manual reset and retained history;
 - live text-only ElevenLabs chat without microphone access;
-- live ElevenLabs voice WebRTC connection and spoken Mall of the Emirates routing into that cinema's movie grid;
 - sourced English and Arabic FAQ answers;
 - explicit English/Arabic RTL/LTR switching;
-- 390 px and 420 px mobile viewports without horizontal overflow or browser runtime errors.
+- combined cinema/date/time, genre, kids/family, experience, exact-title and nearest-time filtering;
+- 420 px English and Arabic layouts without document-level horizontal overflow.
 
-The live voice check used the public `VITE_AGENT_ID`, microphone-gated WebRTC transport and the protected EU-residency configuration. The same cinema-selection route is covered for typed and spoken turns by the automated regression suite.
+The current automated browser voice attempt reached the microphone-permission boundary, timed out and recovered cleanly to text chat. No current-build spoken acceptance is claimed. The public `VITE_AGENT_ID`, microphone-gated WebRTC transport and protected EU-residency configuration remain in place, and the same cinema-selection route is covered for typed and spoken transcripts by the automated regression suite. Human English/Arabic voice acceptance on the deployed origin remains required.
 
 ## Remaining production dependencies and risks
 

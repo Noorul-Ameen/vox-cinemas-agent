@@ -229,7 +229,13 @@ function snapshotDatesForCinema(cinemaId) {
 function activeDates(dates, now = new Date(), includePast = false) {
   if (includePast) return [...dates];
   const today = uaeCalendarDate(now);
-  return dates.filter((date) => date >= today);
+  const hour = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Dubai",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).format(now));
+  const earliestProgrammingDate = hour < PROGRAMMING_DAY_START_HOUR ? addCalendarDays(today, -1) : today;
+  return dates.filter((date) => date >= earliestProgrammingDate);
 }
 
 // Live dates are an availability-query window, not claims copied from the
@@ -241,7 +247,9 @@ export function getLiveProgrammingDates({ now = new Date(), days = LIVE_PROGRAMM
     ? Math.min(31, Math.max(1, requestedDays))
     : DEFAULT_LIVE_PROGRAMMING_DAYS;
   const today = uaeCalendarDate(now);
-  return Array.from({ length: windowDays }, (_, offset) => addCalendarDays(today, offset));
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Dubai", hour: "2-digit", hourCycle: "h23" }).format(now));
+  const firstDate = hour < PROGRAMMING_DAY_START_HOUR ? addCalendarDays(today, -1) : today;
+  return Array.from({ length: windowDays }, (_, offset) => addCalendarDays(firstDate, offset));
 }
 
 export function demoDate(now = new Date()) {
@@ -322,6 +330,13 @@ export function getCinemas({ now = new Date() } = {}) {
       ? snapshotDatesForCinema(cinema.ID)
       : getLiveProgrammingDates({ now }),
   }));
+}
+
+// Snapshot mode can safely expose its normalized title catalog for local
+// intent parsing. Live mode deliberately returns no stale fallback titles;
+// availability is then learned from the selected cinema/date endpoints.
+export function getDiscoveryMovieCatalog() {
+  return USE_MOCK ? uniqueFilms(FILMS).map(normalizeFilm) : [];
 }
 
 function normalizeFilm(film) {
@@ -409,6 +424,9 @@ function normalizeSession(session, displayDate) {
   const sessionId = String(rawField(session, "SessionId", "sessionId") || "");
   return {
     sessionId,
+    cinemaId: String(rawField(session, "CinemaId", "cinemaId") || ""),
+    scheduledFilmId: String(rawField(session, "ScheduledFilmId", "scheduledFilmId") || ""),
+    movieId: String(rawField(session, "ScheduledFilmId", "scheduledFilmId") || ""),
     sessionIds: [sessionId],
     alternateSessionIds: [],
     time: showtime.slice(11, 16),
@@ -592,6 +610,9 @@ function demoPricingQuote(cinemaId, sessionId, requestedSeats) {
     cinemaId,
     sessionId,
     items,
+    subtotal: items.reduce((sum, item) => sum + item.amount, 0),
+    fees: Object.freeze([]),
+    feeTotal: 0,
     total: items.reduce((sum, item) => sum + item.amount, 0),
     currency: DEMO_PRICING.currency,
     demo: true,
@@ -620,7 +641,44 @@ export async function getPricingQuote(cinemaId, sessionId, seats = []) {
   if (!Number.isFinite(total) || !currency) {
     throw new VistaClientError("The pricing response could not be verified.", { code: "PRICING_UNVERIFIED", operation: "getPricingQuote" });
   }
-  return Object.freeze({ ...payload, total, currency, demo: false, verified: true });
+  const rawItems = Array.isArray(payload?.Items) ? payload.Items : Array.isArray(payload?.items) ? payload.items : [];
+  const items = rawItems.map((item) => ({
+    ...item,
+    seatId: item?.SeatId || item?.seatId || item?.Id || item?.id || null,
+    amount: Number(item?.Amount ?? item?.amount ?? item?.Price ?? item?.price),
+  })).filter((item) => Number.isFinite(item.amount));
+  const rawFees = Array.isArray(payload?.Fees) ? payload.Fees : Array.isArray(payload?.fees) ? payload.fees : [];
+  const fees = rawFees.map((fee) => ({
+    ...fee,
+    label: fee?.Description || fee?.Name || fee?.label || fee?.name || "Fee",
+    amount: Number(fee?.Amount ?? fee?.amount ?? fee?.Total ?? fee?.total),
+  })).filter((fee) => Number.isFinite(fee.amount));
+  const suppliedFeeTotal = payload?.FeeTotal ?? payload?.feeTotal ?? payload?.BookingFee ?? payload?.bookingFee ?? payload?.ServiceFee ?? payload?.serviceFee;
+  const parsedFeeTotal = Number(suppliedFeeTotal);
+  const calculatedFeeTotal = fees.length ? fees.reduce((sum, fee) => sum + fee.amount, 0) : null;
+  const suppliedSubtotal = Number(payload?.SubTotal ?? payload?.Subtotal ?? payload?.subtotal);
+  const itemSubtotal = items.length ? items.reduce((sum, item) => sum + item.amount, 0) : null;
+  const initialFeeTotal = Number.isFinite(parsedFeeTotal) ? parsedFeeTotal : calculatedFeeTotal;
+  const subtotal = Number.isFinite(suppliedSubtotal)
+    ? suppliedSubtotal
+    : Number.isFinite(itemSubtotal)
+      ? itemSubtotal
+      : Number.isFinite(initialFeeTotal)
+        ? total - initialFeeTotal
+        : null;
+  const derivedFeeTotal = Number.isFinite(subtotal) && total >= subtotal ? total - subtotal : null;
+  const feeTotal = Number.isFinite(initialFeeTotal) ? initialFeeTotal : derivedFeeTotal;
+  return Object.freeze({
+    ...payload,
+    items: Object.freeze(items),
+    subtotal,
+    fees: Object.freeze(fees),
+    feeTotal,
+    total,
+    currency,
+    demo: false,
+    verified: true,
+  });
 }
 
 export async function reserveSeats({ cinemaId, sessionId, seats = [], quoteId = null } = {}) {

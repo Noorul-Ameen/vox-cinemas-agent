@@ -106,8 +106,10 @@ assert.equal(
   "typed and voice-transcribed guest messages must capture the same explicit date constraint",
 );
 const cinemaSelection = app.slice(app.indexOf("const chooseCinema"), app.indexOf("const chooseDate"));
-assert.match(cinemaSelection, /if \(dateDecision\.blocked\)/, "tapping a cinema must retain an unresolved guest date");
-assert.match(cinemaSelection, /showUnavailableProgrammingDate\(dateDecision\.unavailableDate\)/, "tapping a cinema must not render fallback-date movies when the guest date is unavailable");
+assert.match(cinemaSelection, /const retainedDate = userRequestedDateRef\.current \|\| discoveryPreferencesRef\.current\.date/, "tapping a cinema must retain an unresolved guest date");
+assert.match(cinemaSelection, /routeDiscoveryTurn\("", \{ cinemaOverride: nextCinema, dateOverride: retainedDate/, "cinema taps must delegate retained-date validation to the shared discovery router");
+const discoveryRouter = app.slice(app.indexOf("const routeDiscoveryTurn"), app.indexOf("const clearConversationState"));
+assert.match(discoveryRouter, /!availableDates\.includes\(preferences\.date\)[\s\S]*showUnavailableProgrammingDate\(preferences\.date\)/, "the shared discovery router must block unavailable dates without substitution");
 const unavailablePresentation = app.slice(app.indexOf("const showUnavailableProgrammingDate"), app.indexOf("const resolveClientToolProgrammingDate"));
 assert.match(unavailablePresentation, /view:\s*"movies",\s*movies:\s*\[\],\s*error:/, "an unavailable date must replace stale movie or showtime results with an explicit empty state");
 assert.match(unavailablePresentation, /errorCode:\s*"date_unavailable"/, "the date-unavailable state must remain distinguishable from a provider loading error");
@@ -117,6 +119,7 @@ assert.match(showShowtimesTool, /const visibleMovie = resolveFilm\(movieId\) \|\
 assert.match(showShowtimesTool, /resolveVisibleSelectionProgrammingDate\(\{[\s\S]*visibleDate:\s*filmsDateRef\.current[\s\S]*hasVisibleSelection/, "show_showtimes must retain the displayed movie list date");
 assert.ok(showShowtimesTool.indexOf("const visibleMovie") < showShowtimesTool.indexOf("await ensureFilms"), "visible title resolution must happen before any film-list reload");
 const typedMessageFlow = app.slice(app.indexOf("const sendText"), app.indexOf("const sendUiTurn"));
-assert.match(typedMessageFlow, /if \(unavailableDate\) \{[\s\S]*sendContextualUpdate[\s\S]*return;/, "a deterministic unavailable typed request must stop before an agent can claim fallback movies were shown");
+assert.match(typedMessageFlow, /if \(unavailableDate\) \{[\s\S]*sendContextualUpdate/, "a deterministic unavailable typed request must provide authoritative no-substitution context");
+assert.match(typedMessageFlow, /bookingContext && !unavailableDate/, "an unavailable typed date must not launch fallback discovery while the conversational turn can still be answered");
 
 console.log("Validated explicit programming-date precedence and no-substitution behavior.");
