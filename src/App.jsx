@@ -20,7 +20,7 @@ import { explicitLanguageRequest, resolveLanguageSignal } from "./lib/languageSw
 import { buildTransportHandoff, createConversationJourney, inferIntent, journeyDynamicVariables, journeyReducer, syncJourney } from "./lib/conversationJourney.js";
 import { resolveProgrammingDateSelection, resolveVisibleSelectionProgrammingDate } from "./lib/programmingDateSelection.js";
 import { createDiscoveryPreferences, extractDiscoveryPreferencePatch, filterDiscoveryResults, getMissingDiscoveryCriteria, mergeDiscoveryPreferences, parseAndMergeDiscoveryPreferences, resolveDiscoveryMovieCandidate, shouldTreatAsDiscoveryFilterTurn, unresolvedMovieTitleCandidate } from "./lib/discoveryPreferences.js";
-import { buildAuthoritativeDiscoveryContext } from "./lib/discoveryResultContext.js";
+import { buildAuthoritativeDiscoveryContext, buildMovieSelectionGroundingContext } from "./lib/discoveryResultContext.js";
 import { normalizeSeatIds, resolveSeatSelectionTurn, resolveSeatToolInput } from "./lib/seatRouting.js";
 import { filterBookableSessions } from "./lib/showtimeAvailability.js";
 import { startTransportWithRetirement } from "./lib/transportStart.js";
@@ -267,6 +267,14 @@ const ElevenLabsTransport = forwardRef(function ElevenLabsTransport({
 const pad2 = (value) => String(value).padStart(2, "0");
 const isoDate = (date) => `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 const addDays = (date, days) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days));
+const validCalendarDate = (year, month, day) => {
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  return candidate.getUTCFullYear() === year
+    && candidate.getUTCMonth() + 1 === month
+    && candidate.getUTCDate() === day
+    ? candidate
+    : null;
+};
 const uaeToday = () => {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Dubai",
@@ -299,11 +307,17 @@ function requestedProgrammingDate(text) {
     sept: 9, september: 9, oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
   };
   for (const [name, month] of Object.entries(monthNames)) {
-    const match = raw.match(new RegExp(`(?:\\b(\\d{1,2})\\s+${name}\\b|\\b${name}\\s+(\\d{1,2})\\b)`));
+    const match = raw.match(new RegExp(`(?:\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${name}\\b|\\b${name}\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b)`));
     if (!match) continue;
     const day = Number(match[1] || match[2]);
-    const year = Number(PROGRAMMING_DATES[0]?.slice(0, 4)) || today.getUTCFullYear();
-    return `${year}-${pad2(month)}-${pad2(day)}`;
+    const monthDay = `${pad2(month)}-${pad2(day)}`;
+    const publishedDate = PROGRAMMING_DATES.find((date) => date.slice(5) === monthDay);
+    if (publishedDate) return publishedDate;
+    let year = today.getUTCFullYear();
+    let candidate = validCalendarDate(year, month, day);
+    if (!candidate) return null;
+    if (candidate < today) candidate = validCalendarDate(year += 1, month, day);
+    return candidate ? isoDate(candidate) : null;
   }
 
   const numeric = raw.match(/(?:^|\D)(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?(?:\D|$)/);
@@ -312,6 +326,18 @@ function requestedProgrammingDate(text) {
     const month = Number(numeric[2]);
     const year = Number(numeric[3]) || Number(PROGRAMMING_DATES[0]?.slice(0, 4)) || today.getUTCFullYear();
     return `${year < 100 ? 2000 + year : year}-${pad2(month)}-${pad2(day)}`;
+  }
+
+  const ordinalText = raw.replace(/[,!?;:.]+/g, " ").replace(/\s+/g, " ").trim();
+  const ordinalDay = raw.match(/\bon(?:(?:[\s,.-]+)(?:the|um+|uh+))*[\s,.-]+(\d{1,2})(?:st|nd|rd|th)\b(?=\s*(?:$|[,.!?;:]|\b(?:at|around|in|for|please)\b))/)
+    || ordinalText.match(/^(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)(?:\s+please)?$/);
+  if (ordinalDay) {
+    const day = Number(ordinalDay[1]);
+    for (let monthOffset = 0; monthOffset < 12; monthOffset += 1) {
+      const candidate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + monthOffset, day));
+      if (candidate.getUTCDate() !== day || candidate < today) continue;
+      return isoDate(candidate);
+    }
   }
 
   const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -1694,11 +1720,16 @@ export default function App() {
         return JSON.stringify({ shown: false, reason: error?.message || "Movie results could not be loaded." });
       }
       if (!requestIsCurrent(epoch, revision, cinemaId, requestedDate)) return JSON.stringify({ shown: false, reason: "The cinema, date, or active task changed while showtimes were loading." });
+      const currentSelectedMovie = ["showtimes", "seatmap"].includes(stageRef.current.view)
+        ? stageRef.current.movie
+        : null;
       const movie = (hasVisibleSelection && filmsDateRef.current === requestedDate ? visibleMovie : null)
         || resolveFilm(movieId)
         || resolveFilm(movieTitle)
-        || (!hasRequestedMovie ? filmsRef.current[0] : null);
-      if (!movie) return JSON.stringify({ shown: false, reason: `No matching movie was found for ${movieTitle || movieId}. Ask the guest to choose a title from the displayed movie list.` });
+        || (!hasRequestedMovie ? currentSelectedMovie : null);
+      if (!movie) return JSON.stringify({ shown: false, movieSelected: false, reason: hasRequestedMovie
+        ? `No matching movie was found for ${movieTitle || movieId}. Ask the guest to choose a title from the displayed movie list.`
+        : "No movie has been selected. A generic reference does not identify a title; ask the guest to say or tap one exact displayed movie. Do not claim a choice or showtime." });
       let sessions;
       try {
         sessions = await vista.getSessions(cinemaId, movie.id, requestedDate);
@@ -1781,7 +1812,7 @@ export default function App() {
       if (!requestIsCurrent(epoch, revision, cinemaId, requestedDate)) return JSON.stringify({ shown: false, reason: "The cinema, date, or active task changed while the seat map was loading." });
       const movie = (hasVisibleSelection && filmsDateRef.current === requestedDate ? visibleMovie : null)
         || resolveFilm(movieTitle)
-        || (!movieTitle ? current.movie || filmsRef.current[0] : null);
+        || (!movieTitle ? current.movie : null);
       if (!movie) return JSON.stringify({ shown: false, reason: `No matching movie was found for ${movieTitle}. Ask the guest to choose a title from the displayed movie list.` });
       let sessions = sessionsRef.current;
       if (!sessions.length || sessionsFilmRef.current !== movie?.id) {
@@ -2511,6 +2542,8 @@ export default function App() {
       const sanitized = role === "user" ? sanitizeUserText(eventText) : { safeText: eventText, sensitive: false };
       const safeMessage = sanitized.safeText;
       if (role === "user") {
+        const movieSelectionGrounding = buildMovieSelectionGroundingContext({ text: safeMessage, stage: stageRef.current });
+        if (movieSelectionGrounding) conversation.sendContextualUpdate?.(movieSelectionGrounding);
         if (sanitized.sensitive) say("system", localeRef.current === "ar" ? "تمت إزالة بيانات الدفع الحساسة من المحادثة. استخدم شاشة الدفع الآمنة فقط." : "Sensitive payment details were removed. Use only the secure checkout screen for payment.");
         say("user", safeMessage);
         const decision = cancellationFlowRef.current ? cancellationDecision(safeMessage) : null;
@@ -2557,7 +2590,7 @@ export default function App() {
         }
         if (bookingContext && !quantityOnlyTurn && !isLanguageControlTurn(safeMessage) && !unavailableDate && !directSeatSelection && !directCancellation && !historyRequest.requested) {
           const normalizedCinemaTurn = details.cinema ? normalizeCinemaAsrForAgent(safeMessage, details.cinema) : safeMessage;
-          conversation.sendContextualUpdate?.("The widget is applying the guest's retained cinema, date, time, genre, language, experience, movie, and audience criteria now. Do not call a discovery tool concurrently or describe results until the widget supplies the outcome.");
+          conversation.sendContextualUpdate?.("The widget is applying the guest's retained cinema, date, time, genre, language, experience, movie, and audience criteria now. No movie selection is confirmed by this filter turn. Do not call a discovery or showtime tool concurrently, do not say 'great choice', and do not describe on-screen options until the widget supplies the authoritative outcome.");
           void routeDiscoveryTurn(safeMessage, {
             cinemaOverride: details.cinema,
             dateOverride: requestedDate,
@@ -3070,6 +3103,9 @@ export default function App() {
     }
     const sanitized = sanitizeUserText(rawValue);
     const value = sanitized.safeText.trim();
+    const movieSelectionGrounding = buildMovieSelectionGroundingContext({ text: value, stage: stageRef.current });
+    const retryMovieSelectionGroundingAfterStart = Boolean(movieSelectionGrounding && !isConnected);
+    if (movieSelectionGrounding) conversation.sendContextualUpdate?.(movieSelectionGrounding);
     if (sanitized.sensitive) {
       say("system", localeRef.current === "ar" ? "تمت إزالة بيانات الدفع الحساسة. أدخل معلومات الدفع في شاشة الدفع الآمنة فقط." : "Sensitive payment details were removed. Enter payment information only in the secure checkout screen.");
     }
@@ -3145,6 +3181,7 @@ export default function App() {
     if (transition) await transition.promise;
     const ready = sessionModeRef.current ? true : await startTextSession(localMessage.id);
     if (ready && conversation.sendUserMessage) {
+      if (retryMovieSelectionGroundingAfterStart) conversation.sendContextualUpdate?.(movieSelectionGrounding);
       if (requestedDate) conversation.sendContextualUpdate?.(`The guest explicitly selected programming date ${requestedDate}; the widget retained it with all other criteria. Do not ask for the date again or fall back to another date.`);
       if (unavailableDate) conversation.sendContextualUpdate?.(`The guest requested ${unavailableDate}, but it is not published for the selected cinema. Do not substitute another date. Available dates: ${availableDates.join(", ")}.`);
       if (discoveryRouteResult) {

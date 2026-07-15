@@ -100,6 +100,15 @@ assert.ok(sourceFilm?.Title, "the source session must resolve to its displayed f
 const visibleMovies = await vista.getScheduledFilms(sourceSession.CinemaId, sourceSession.SourceProgrammingDate);
 const visibleFilm = resolveFilmCandidate(visibleMovies, sourceFilm.Title);
 assert.equal(visibleFilm?.id, sourceFilm.ScheduledFilmId, "an exact title must resolve from the currently displayed cinema/date list");
+const sourceKidsSession = SESSIONS.find((session) => (
+  Array.isArray(session.SessionAttributesNames)
+  && session.SessionAttributesNames.some((label) => String(label).toUpperCase() === "KIDS")
+));
+if (sourceKidsSession) {
+  const kidsDateMovies = await vista.getScheduledFilms(sourceKidsSession.CinemaId, sourceKidsSession.SourceProgrammingDate);
+  const kidsFormatMovie = kidsDateMovies.find((movie) => movie.id === sourceKidsSession.ScheduledFilmId);
+  assert.ok(kidsFormatMovie?.experiences?.includes("KIDS"), "scheduled-film metadata must expose its verified KIDS session format for family filtering");
+}
 const visibleSessions = await vista.getSessions(sourceSession.CinemaId, visibleFilm.id, sourceSession.SourceProgrammingDate);
 assert.ok(
   visibleSessions.some((session) => session.sessionIds.includes(String(sourceSession.SessionId))),
@@ -107,6 +116,12 @@ assert.ok(
 );
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const requestedDateParser = app.slice(app.indexOf("function requestedProgrammingDate"), app.indexOf("function programmingDatesForCinema"));
+assert.match(requestedDateParser, /ordinalDay\s*=\s*raw\.match/, "the shared typed/voice date capture must recognize context-bound spoken ordinal dates such as on 17th");
+assert.match(requestedDateParser, /\(\?=\\s\*\(\?:\$\|\[,\.\!\?;:\]/, "an ordinal embedded in a movie, screen, row, seat, or option phrase must not be treated as a date");
+assert.match(requestedDateParser, /ordinalText\.match\(\/\^\(\?:the/, "a standalone ordinal must be accepted only as a complete date reply, not inside a movie or seat choice");
+assert.match(requestedDateParser, /\(\?:st\|nd\|rd\|th\)\?/, "month-name dates must accept an ordinal suffix such as July 17th");
+assert.match(requestedDateParser, /validCalendarDate/, "month-name requests must reject impossible calendar dates");
 assert.match(app, /const userRequestedDateRef = useRef\(null\)/, "the widget must retain an unresolved guest date across client-tool calls");
 assert.equal((app.match(/resolveClientToolProgrammingDate\(/g) || []).length, 1, "movie-list loading must use the guarded general date resolver");
 assert.equal((app.match(/resolveVisibleSelectionProgrammingDate\(/g) || []).length, 2, "movie and session selection must bind to their visible list date");

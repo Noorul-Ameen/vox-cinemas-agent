@@ -201,7 +201,21 @@ for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMes
   assert.match(flow, /routeDiscoveryTurn\((?:safeMessage|value),\s*\{\s*cinemaOverride:\s*details\.cinema,\s*dateOverride:\s*requestedDate,\s*preferencesAlreadyApplied:\s*true/, `${label} must use the same all-criteria discovery router for text and speech transcripts`);
   assert.match(flow, /isDiscoveryRequest\((?:safeMessage|value)\)/, `${label} must recognize progressive discovery replies without requiring an agent tool round-trip`);
   assert.match(flow, /Ask only the first missing item and do not list unfiltered movies/, `${label} must constrain the agent response to the widget's filtered result`);
+  assert.match(flow, /buildMovieSelectionGroundingContext\(/, `${label} must ground ambiguous movie references in the visible selection state`);
+  const groundingIndex = flow.indexOf("buildMovieSelectionGroundingContext(");
+  const groundingUpdateIndex = flow.indexOf("conversation.sendContextualUpdate?.(movieSelectionGrounding)", groundingIndex);
+  const discoveryRouteIndex = flow.indexOf("routeDiscoveryTurn(");
+  const userDeliveryIndex = label === "typed" ? flow.indexOf("conversation.sendUserMessage(") : Number.POSITIVE_INFINITY;
+  assert.ok(groundingUpdateIndex > groundingIndex, `${label} must publish the visible movie-selection state immediately after classification`);
+  assert.ok(discoveryRouteIndex === -1 || groundingUpdateIndex < discoveryRouteIndex, `${label} grounding must precede asynchronous discovery routing`);
+  assert.ok(userDeliveryIndex === -1 || groundingUpdateIndex < userDeliveryIndex, `${label} grounding must precede typed user-message delivery`);
 }
+
+const showShowtimesTool = sliceBetween(app, "show_showtimes: async", "show_seat_map: async", "showtimes tool");
+assert.doesNotMatch(showShowtimesTool, /filmsRef\.current\[0\]/, "show_showtimes must never silently select the first cached film");
+assert.match(showShowtimesTool, /No movie has been selected[\s\S]*generic reference does not identify a title/, "show_showtimes must reject a title-free ambiguous selection");
+const showSeatMapTool = sliceBetween(app, "show_seat_map: async", "select_seats: async", "seat-map tool");
+assert.doesNotMatch(showSeatMapTool, /filmsRef\.current\[0\]/, "show_seat_map must never silently select the first cached film");
 
 const staleViewHandler = sliceBetween(app, "const dismissStaleTransactionalView", "const prepareFaqContext", "stale transactional-view handler");
 assert.match(staleViewHandler, /\["booking",\s*"history"\]\.includes\(current\.view\)/, "only completed booking/history views should be automatically dismissed");

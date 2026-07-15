@@ -10,7 +10,11 @@ import {
   shouldTreatAsDiscoveryFilterTurn,
   unresolvedMovieTitleCandidate,
 } from "../src/lib/discoveryPreferences.js";
-import { buildAuthoritativeDiscoveryContext } from "../src/lib/discoveryResultContext.js";
+import {
+  buildAuthoritativeDiscoveryContext,
+  buildMovieSelectionGroundingContext,
+  isAmbiguousMovieSelectionUtterance,
+} from "../src/lib/discoveryResultContext.js";
 
 const NOW = new Date("2026-07-14T08:00:00Z");
 const cinemas = [
@@ -30,6 +34,7 @@ const sessions = [
   { sessionId: "c2", scheduledFilmId: "laugh", cinemaId: "0002", programmingDate: "2026-07-15", time: "20:00", exp: "STANDARD" },
   { sessionId: "r1", scheduledFilmId: "race", cinemaId: "0002", programmingDate: "2026-07-15", time: "21:30", exp: "4DX" },
   { sessionId: "r2", scheduledFilmId: "race", cinemaId: "0002", programmingDate: "2026-07-16", time: "18:00", exp: "STANDARD" },
+  { sessionId: "r3", scheduledFilmId: "race", cinemaId: "0002", programmingDate: "2026-07-17", time: "19:15", exp: "KIDS" },
 ];
 
 const combined = extractDiscoveryPreferencePatch(
@@ -58,6 +63,25 @@ const voiceResult = parseAndMergeDiscoveryPreferences({}, "Show me kids' movies 
 assert.deepEqual(textResult.preferences, voiceResult.preferences, "text and voice transcripts must share deterministic preference parsing");
 assert.equal(textResult.preferences.audience, "kids_family");
 assert.equal(textResult.preferences.date, "2026-07-15");
+
+for (const datePhrase of ["I want to go on 17th", "I'm looking to go on, um, 17th", "17th", "I want to go on July 17th", "I want to go on 2026-07-17"]) {
+  const parsedDate = extractDiscoveryPreferencePatch(datePhrase, { now: NOW });
+  assert.equal(parsedDate.patch.date, "2026-07-17", `the spoken date must be retained for: ${datePhrase}`);
+  assert.equal(parsedDate.patch.dateSignal, "explicit");
+}
+for (const nonDateOrdinal of [
+  "Show me the 2nd movie",
+  "I want the 1st row",
+  "Select the 3rd seat",
+  "Show me the movie on the 2nd screen",
+  "We want seats on the 3rd row",
+  "Choose the show on the 2nd option",
+]) {
+  assert.equal(extractDiscoveryPreferencePatch(nonDateOrdinal, { now: NOW }).patch.date, undefined, `an ordinal choice must not become a date: ${nonDateOrdinal}`);
+}
+assert.equal(extractDiscoveryPreferencePatch("July 32nd", { now: NOW }).patch.date, undefined, "an impossible month date must be rejected");
+assert.equal(extractDiscoveryPreferencePatch("31st February", { now: NOW }).patch.date, undefined, "an impossible calendar date must be rejected");
+assert.equal(extractDiscoveryPreferencePatch("January 2nd", { now: new Date("2026-12-15T08:00:00Z") }).patch.date, "2027-01-02", "a month-name request after that month has passed must roll into the next year");
 
 assert.equal(unresolvedMovieTitleCandidate("I want to watch a comedy", extractDiscoveryPreferencePatch("I want to watch a comedy", { movies, now: NOW })), null, "a genre request must not be retained as an unknown title");
 assert.equal(unresolvedMovieTitleCandidate("I want to watch a movie tomorrow", extractDiscoveryPreferencePatch("I want to watch a movie tomorrow", { movies, now: NOW })), null, "a broad movie request must not become an unknown title");
@@ -97,8 +121,57 @@ const authoritativeContext = buildAuthoritativeDiscoveryContext({
 });
 assert.match(authoritativeContext, /Mall of the Emirates on 2026-07-15/);
 assert.match(authoritativeContext, /Toy Story 5: 18:00 IMAX/);
-assert.match(authoritativeContext, /Mention only these supplied movie titles and showtimes/);
+assert.match(authoritativeContext, /Recommend or describe only these supplied movie titles and showtimes by name/);
 assert.doesNotMatch(authoritativeContext, /Secret Life of Pets|Rise of Gru/, "agent context must not introduce titles absent from the filtered result");
+assert.match(authoritativeContext, /none is selected unless a separate confirmed-selection update/, "displaying cards must not be mistaken for selecting a movie");
+
+const emptyAuthoritativeContext = buildAuthoritativeDiscoveryContext({
+  cinema: { name: "Mall of the Emirates" },
+  selectedDate: "2026-07-17",
+  preferences: { genre: "Action", audience: "kids_family" },
+  movies: [],
+});
+assert.match(emptyAuthoritativeContext, /ZERO matching movie cards/i);
+assert.match(emptyAuthoritativeContext, /Retained filters: Action, kids\/family/i);
+assert.match(emptyAuthoritativeContext, /Do not say that options, choices, or a movie list are on screen/i);
+assert.match(emptyAuthoritativeContext, /do not call show_showtimes/i);
+const missingPreferenceContext = buildAuthoritativeDiscoveryContext({
+  shown: "discovery question",
+  missing: ["preference"],
+  movies: [],
+});
+assert.match(missingPreferenceContext, /required information is missing \(preference\)/i);
+assert.match(missingPreferenceContext, /Ask only for preference/i);
+assert.equal(isAmbiguousMovieSelectionUtterance("The chosen movies."), true);
+assert.equal(isAmbiguousMovieSelectionUtterance("those options"), true);
+assert.equal(isAmbiguousMovieSelectionUtterance("this one"), true);
+assert.equal(isAmbiguousMovieSelectionUtterance("that one"), true);
+assert.equal(isAmbiguousMovieSelectionUtterance("Toy Story 5"), false, "an exact title must remain eligible for normal fuzzy-title resolution");
+const emptySelectionGrounding = buildMovieSelectionGroundingContext({
+  text: "The chosen movies.",
+  stage: { view: "movies", movies: [], error: "No movies match all of your preferences." },
+});
+assert.match(emptySelectionGrounding, /zero movie cards are visible/i);
+assert.match(emptySelectionGrounding, /do not say 'great choice'/i);
+assert.match(emptySelectionGrounding, /do not ask for a showtime/i);
+const visibleSelectionGrounding = buildMovieSelectionGroundingContext({
+  text: "the shown movies",
+  stage: { view: "movies", movies: [{ title: "Toy Story 5" }, { title: "Desert Race" }] },
+});
+assert.match(visibleSelectionGrounding, /Toy Story 5, Desert Race/);
+assert.match(visibleSelectionGrounding, /no movie is selected/i);
+assert.match(buildMovieSelectionGroundingContext({
+  text: "the chosen movies",
+  stage: { view: "loading" },
+}), /results are still loading/i);
+assert.match(buildMovieSelectionGroundingContext({
+  text: "the chosen movies",
+  stage: { view: "discovery", question: "What kind of movie would you like?" },
+}), /more information is required/i);
+assert.equal(buildMovieSelectionGroundingContext({
+  text: "the shown movies",
+  stage: { view: "showtimes", movie: { title: "Toy Story 5" } },
+}), "", "a confirmed movie stage must not be overwritten by the ambiguity guard");
 assert.equal(unresolvedMovieTitleCandidate("I want Mall of the Emirates tomorrow", extractDiscoveryPreferencePatch("I want Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW })), null, "a cinema/date-only turn must ask for a preference, not treat the cinema as a title");
 assert.equal(unresolvedMovieTitleCandidate("I want Dubai tomorrow", extractDiscoveryPreferencePatch("I want Dubai tomorrow", { cinemas, movies: [], now: NOW })), null, "a city/date-only turn must not become a title");
 assert.equal(unresolvedMovieTitleCandidate("I want Toy Story around 6 PM at Mall of the Emirates tomorrow", extractDiscoveryPreferencePatch("I want Toy Story around 6 PM at Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW })), "Toy Story", "a combined title and preferred-time turn must retain the title");
@@ -187,6 +260,40 @@ const changedExperience = parseAndMergeDiscoveryPreferences(changedGenre.prefere
 assert.equal(changedExperience.preferences.experience, "IMAX");
 assert.equal(changedExperience.preferences.genre, "Action");
 assert.equal(changedExperience.invalidates.pricing, true);
+
+const mallJuly17 = createDiscoveryPreferences({
+  cinemaId: "0002",
+  cinemaName: "Mall of the Emirates",
+  city: "Dubai",
+  date: "2026-07-17",
+});
+const familyEducational = parseAndMergeDiscoveryPreferences(mallJuly17, "For family and education", { movies, now: NOW });
+assert.equal(familyEducational.preferences.audience, "kids_family", "the initial family request must be retained as an audience filter");
+const actionAfterFamily = parseAndMergeDiscoveryPreferences(familyEducational.preferences, "Can you suggest my, uh, action movies?", { movies, now: NOW });
+assert.equal(actionAfterFamily.preferences.genre, "Action");
+assert.equal(actionAfterFamily.preferences.audience, null, "a later genre-only request must replace the stale family audience filter");
+assert.equal(actionAfterFamily.preferences.cinemaId, "0002", "the content-preference change must retain the selected cinema");
+assert.equal(actionAfterFamily.preferences.date, "2026-07-17", "the content-preference change must retain the selected date");
+const actionAfterFamilyResults = filterDiscoveryResults({ movies, sessions, cinemas, preferences: actionAfterFamily.preferences });
+assert.deepEqual(actionAfterFamilyResults.movies.map((movie) => movie.id), ["race"], "the Mall of the Emirates July 17 transition must show action results instead of an empty family/action intersection");
+assert.deepEqual(actionAfterFamilyResults.sessions.map((session) => session.sessionId), ["r3"]);
+
+const familyAfterAction = parseAndMergeDiscoveryPreferences(actionAfterFamily.preferences, "Show me family movies", { movies, now: NOW });
+assert.equal(familyAfterAction.preferences.audience, "kids_family");
+assert.equal(familyAfterAction.preferences.genre, null, "a later family-only request must replace the stale genre filter");
+const explicitFamilyAction = parseAndMergeDiscoveryPreferences(mallJuly17, "Show me family action movies", { movies, now: NOW });
+assert.equal(explicitFamilyAction.preferences.genre, "Action");
+assert.equal(explicitFamilyAction.preferences.audience, "kids_family", "criteria explicitly combined in one turn must remain combined");
+const explicitFamilyActionResults = filterDiscoveryResults({ movies, sessions, cinemas, preferences: explicitFamilyAction.preferences });
+assert.deepEqual(explicitFamilyActionResults.movies.map((movie) => movie.id), ["race"], "a verified KIDS session must satisfy an explicit family/action request");
+assert.deepEqual(explicitFamilyActionResults.sessions.map((session) => session.sessionId), ["r3"]);
+const emptyFamilyComedy = filterDiscoveryResults({
+  movies,
+  sessions,
+  cinemas,
+  preferences: { cinemaId: "0002", date: "2026-07-17", genre: "Comedy", audience: "kids_family" },
+});
+assert.equal(emptyFamilyComedy.noResultsReason, "no_results_for_criteria", "an empty criteria intersection must expose its deterministic reason");
 
 const changedBookingContext = mergeDiscoveryPreferences(
   { cinemaId: "0002", date: "2026-07-15", preferredTime: "18:00" },

@@ -126,6 +126,14 @@ const pad2 = (value) => String(value).padStart(2, "0");
 const isoDate = (date) => `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 const addUtcDays = (date, days) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days));
 
+function validCalendarDate(year, month, day) {
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (candidate.getUTCFullYear() !== year
+    || candidate.getUTCMonth() + 1 !== month
+    || candidate.getUTCDate() !== day) return null;
+  return candidate;
+}
+
 function dateInTimeZone(now, timeZone) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -137,9 +145,11 @@ function dateInTimeZone(now, timeZone) {
   return new Date(`${values.year}-${values.month}-${values.day}T00:00:00Z`);
 }
 
-function canonicalDateSignal(text, { now = new Date(), timeZone = "Asia/Dubai" } = {}) {
+function canonicalDateSignal(input, { now = new Date(), timeZone = "Asia/Dubai" } = {}) {
+  const raw = String(input ?? "").normalize("NFKC").toLowerCase();
+  const text = normalizeText(input);
   const today = dateInTimeZone(now, timeZone);
-  const directIso = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  const directIso = raw.match(/\b(\d{4}-\d{2}-\d{2})\b/);
   if (directIso) return { date: directIso[1], dateSignal: "explicit" };
 
   if (/\bday after tomorrow\b|بعد غد|بعد بكرة/.test(text)) {
@@ -165,10 +175,25 @@ function canonicalDateSignal(text, { now = new Date(), timeZone = "Asia/Dubai" }
     december: 12, dec: 12,
   };
   for (const [monthName, month] of Object.entries(monthAliases)) {
-    const match = text.match(new RegExp(`(?:\\b(\\d{1,2})\\s+${monthName}\\b|\\b${monthName}\\s+(\\d{1,2})\\b)`));
+    const match = text.match(new RegExp(`(?:\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${monthName}\\b|\\b${monthName}\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b)`));
     if (match) {
       const day = Number(match[1] || match[2]);
-      return { date: `${today.getUTCFullYear()}-${pad2(month)}-${pad2(day)}`, dateSignal: "explicit" };
+      let year = today.getUTCFullYear();
+      let candidate = validCalendarDate(year, month, day);
+      if (!candidate) return null;
+      if (candidate < today) candidate = validCalendarDate(year += 1, month, day);
+      return candidate ? { date: isoDate(candidate), dateSignal: "explicit" } : null;
+    }
+  }
+
+  const ordinalDay = raw.match(/\bon(?:(?:[\s,.-]+)(?:the|um+|uh+))*[\s,.-]+(\d{1,2})(?:st|nd|rd|th)\b(?=\s*(?:$|[,.!?;:]|\b(?:at|around|in|for|please)\b))/)
+    || text.match(/^(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)(?:\s+please)?$/);
+  if (ordinalDay) {
+    const day = Number(ordinalDay[1]);
+    for (let monthOffset = 0; monthOffset < 12; monthOffset += 1) {
+      const candidate = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + monthOffset, day));
+      if (candidate.getUTCDate() !== day || candidate < today) continue;
+      return { date: isoDate(candidate), dateSignal: "explicit" };
     }
   }
 
@@ -308,7 +333,7 @@ export function extractDiscoveryPreferencePatch(input, {
     }
   }
 
-  const dateResult = canonicalDateSignal(text, { now, timeZone });
+  const dateResult = canonicalDateSignal(input, { now, timeZone });
   if (dateResult) Object.assign(patch, dateResult);
 
   const timeBand = timeBandFromText(text);
@@ -357,6 +382,14 @@ export function extractDiscoveryPreferencePatch(input, {
     // catalog use the literal Family genre (many suitable titles use Animation).
     if (patch.genre === "Family") delete patch.genre;
   }
+
+  // Genre and audience are two ways guests narrow the same content choice.
+  // A later turn that supplies only one replaces the stale value from the
+  // other dimension ("family movies" -> "action movies"), instead of
+  // accidentally requiring an often-empty intersection. If both are stated
+  // together ("family action movies"), both remain explicit constraints.
+  if (patch.genre && !patch.audience) clear.add("audience");
+  if (patch.audience && !patch.genre) clear.add("genre");
 
   if ((patch.genre || patch.audience) && !patch.movieId && !patch.movieTitle) {
     clear.add("movieId");
@@ -665,7 +698,9 @@ function movieMatchesMetadata(movie, preferences, kidsSessionMovieIds, cinemas, 
   if (preferences.date && directDate && directDate !== preferences.date) return false;
   if (preferences.genre && !valuesMatch(movieGenres(movie), preferences.genre)) return false;
   if (preferences.language && !valuesMatch(movieLanguages(movie), preferences.language)) return false;
-  if (preferences.audience === "kids_family" && !kidsFamilyMovie(movie)) return false;
+  if (preferences.audience === "kids_family"
+    && !kidsFamilyMovie(movie)
+    && !kidsSessionMovieIds.has(movieIdentity(movie))) return false;
   if (!ignoreExperience && preferences.experience && movieExperiences(movie).length && !valuesMatch(movieExperiences(movie), preferences.experience)) return false;
   return true;
 }
@@ -718,6 +753,17 @@ export function filterDiscoveryResults({
   const hasSessionCatalog = Array.isArray(sessions);
   const sessionList = hasSessionCatalog ? sessions : [];
   const kidsSessionMovieIds = new Set(sessionList
+    .filter((session) => {
+      const cinemaId = sessionCinemaId(session);
+      if (criteria.cinemaId && cinemaId !== String(criteria.cinemaId)) return false;
+      if (criteria.cinemaName && !criteria.cinemaId) {
+        const cinema = cinemaList.find((item) => cinemaIdentity(item) === cinemaId);
+        if (!cinema || normalizeKey(cinema.name ?? cinema.Name) !== normalizeKey(criteria.cinemaName)) return false;
+      }
+      if (criteria.city && normalizeKey(cityForCinemaId(cinemaId, cinemaList)) !== normalizeKey(criteria.city)) return false;
+      if (criteria.date && sessionDate(session) !== criteria.date) return false;
+      return true;
+    })
     .filter((session) => valuesMatch(sessionExperience(session), "KIDS"))
     .map(sessionMovieId)
     .filter(Boolean));

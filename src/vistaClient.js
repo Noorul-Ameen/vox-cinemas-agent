@@ -369,6 +369,25 @@ function uniqueFilms(films) {
   });
 }
 
+function experiencesByScheduledFilm(sessions) {
+  const index = new Map();
+  for (const session of sessions || []) {
+    const filmId = String(rawField(session, "ScheduledFilmId", "scheduledFilmId") || "");
+    if (!filmId) continue;
+    const attributes = rawField(session, "SessionAttributesNames", "sessionAttributesNames");
+    const labels = [
+      ...(Array.isArray(attributes) ? attributes : [attributes]),
+      rawField(session, "Experience", "experience"),
+      rawField(session, "ExperienceCode", "experienceCode"),
+      rawField(session, "ScreenName", "screenName"),
+    ].map((value) => String(value || "").trim()).filter(Boolean);
+    const values = index.get(filmId) || new Set();
+    labels.forEach((label) => values.add(label));
+    index.set(filmId, values);
+  }
+  return new Map([...index].map(([filmId, values]) => [filmId, [...values].sort()]));
+}
+
 async function fetchLiveSessions(cinemaId, displayDate) {
   const key = `${cinemaId}:${displayDate}`;
   const cached = liveSessionCache.get(key);
@@ -386,12 +405,14 @@ export async function getScheduledFilms(cinemaId, displayDate = demoDate()) {
   const id = requireText(cinemaId, "cinemaId");
   const requestedDate = requireDate(displayDate, "getScheduledFilms");
   let value = [];
+  let scheduledSessions = [];
   if (USE_MOCK) {
     await delay(200);
     const sourceDate = sourceDateForDemoDate(requestedDate);
     if (sourceDate) {
-      const ids = new Set(SESSIONS
-        .filter((session) => session.CinemaId === id && programmingDateForSession(session) === sourceDate)
+      scheduledSessions = SESSIONS
+        .filter((session) => session.CinemaId === id && programmingDateForSession(session) === sourceDate);
+      const ids = new Set(scheduledSessions
         .map((session) => session.ScheduledFilmId));
       value = FILMS.filter((film) => film.CinemaId === id && ids.has(film.ScheduledFilmId));
     }
@@ -401,11 +422,16 @@ export async function getScheduledFilms(cinemaId, displayDate = demoDate()) {
       fetchLiveSessions(id, requestedDate),
       requestJson(buildODataUrl("ScheduledFilms", filter), { operation: "getScheduledFilms" }),
     ]);
+    scheduledSessions = sessions;
     const ids = new Set(sessions.map((session) => String(rawField(session, "ScheduledFilmId", "scheduledFilmId") || "")));
     value = payloadArray(filmPayload, "getScheduledFilms")
       .filter((film) => ids.has(String(rawField(film, "ScheduledFilmId", "scheduledFilmId", "id") || "")));
   }
-  const result = uniqueFilms(value).map(normalizeFilm);
+  const experienceIndex = experiencesByScheduledFilm(scheduledSessions);
+  const result = uniqueFilms(value).map((film) => {
+    const normalized = normalizeFilm(film);
+    return { ...normalized, experiences: experienceIndex.get(String(normalized.id)) || [] };
+  });
   const status = getScheduleStatus({ cinemaId: id, displayDate: requestedDate });
   return withMeta(result, {
     mode: USE_MOCK ? "snapshot" : "live",

@@ -161,6 +161,14 @@ No ElevenLabs dashboard change is needed for CSP. The application self-hosts the
 
 ## Local and hosted test results
 
+### Family-to-action transcript regression (15 July 2026)
+
+| Check | Result | Evidence/notes |
+| --- | --- | --- |
+| Local 420 px text replay | Pass | Mall of the Emirates and 17 July 2026 were retained from the opening request. After the customer changed from family/educational guidance to action, the earlier audience preference no longer remained as an incompatible filter. The widget returned exactly **Supergirl**, **Moana**, **Sakr w Canaria**, and **Shamshoun w Dalila**. |
+| Ambiguous “The chosen movies.” reply | Pass | No movie was auto-selected. The four cards remained visible and Voxi asked the customer to name the exact title; it did not say “Great choice” or advance to showtimes. |
+| Post-change voice parity | Pending spoken replay | Text and voice use the same deterministic preference, result-grounding, and selection-guard handlers, and the shared routing regressions pass. An actual spoken WebRTC replay of this exact family-to-action sequence has not yet been completed after the change, so this is not recorded as a post-change voice end-to-end pass. |
+
 | Scenario | Result | Evidence/notes |
 | --- | --- | --- |
 | Current schedule validation | Pass | 9,460 sessions, 35 films, 22 cinemas and seven dates from 16–22 July; 1,438 sessions on 16 July |
