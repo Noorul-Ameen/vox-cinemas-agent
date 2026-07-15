@@ -1,4 +1,6 @@
-# Hosted acceptance — 15 July 2026
+# Hosted acceptance: 15 July 2026
+
+Historical evidence only. Superseded by `evidence/logs/hosted-e2e-2026-07-16.md` and `docs/end-to-end-test-report.md`.
 
 Target: <https://voxi-ai.pages.dev/>
 Repository: `Noorul-Ameen/vox-cinemas-agent`
@@ -56,9 +58,9 @@ What is playing at Mall of the Emirates tomorrow at 6 PM?
 
 Observed relevant results:
 
-- Toy Story 5 — 17:45, KIDS;
-- The Odyssey — 18:00 and 18:15;
-- Match — 18:10.
+- Toy Story 5: 17:45, KIDS;
+- The Odyssey: 18:00 and 18:15;
+- Match: 18:10.
 
 The result retained the supplied cinema, date and preferred time instead of listing the full day. Poster cards measured approximately 104 × 156 px and remained contained. Back/Forward navigation passed. The tested local build had the same Cloudflare bundle bytes and passed white/blue styling with no document-level overflow at 420 px.
 
@@ -108,11 +110,11 @@ The run committed refreshed data as `1cf0d56`. The workflow remains scheduled da
 
 ## Screenshot evidence
 
-- `evidence/screenshots/hosted-white-blue-july16-420.png` — English exact cinema/date/time results and contained posters.
-- `evidence/screenshots/hosted-arabic-family-july16-420.png` — Arabic/RTL family and near-time results.
-- `evidence/screenshots/hosted-booking-qr-arabic-420.png` — Arabic confirmation, reference QR and cleaned seat-map state.
-- `evidence/screenshots/hosted-cancelled-booking-arabic-420.png` — cancelled booking card with QR/action cleanup.
+- `evidence/screenshots/hosted-white-blue-july16-420.png`: English exact cinema/date/time results and contained posters.
+- `evidence/screenshots/hosted-arabic-family-july16-420.png`: Arabic/RTL family and near-time results.
+- `evidence/screenshots/hosted-booking-qr-arabic-420.png`: Arabic confirmation, reference QR and cleaned seat-map state.
+- `evidence/screenshots/hosted-cancelled-booking-arabic-420.png`: cancelled booking card with QR/action cleanup.
 
 ## Readiness boundary
 
-The hosted experience is ready for leadership review of schedule discovery, voice startup, seat selection, checkout presentation, QR rendering and local-only cancellation. Reference `WLZWP6P`, the QR, saved demo card and cancellation state are device-local presentation evidence—not official tickets, payments, refunds or booking writes. Live customer sales remain blocked until licensed inventory holds, authoritative quotes, PCI payment, booking/ticket, cross-device lookup, cancellation/refund and redemption APIs are enabled and approved.
+The hosted experience is ready for leadership review of schedule discovery, voice startup, seat selection, checkout presentation, QR rendering and local-only cancellation. Reference `WLZWP6P`, the QR, saved demo card and cancellation state are device-local presentation evidence, not official tickets, payments, refunds or booking writes. Live customer sales remain blocked until licensed inventory holds, authoritative quotes, PCI payment, booking/ticket, cross-device lookup, cancellation/refund and redemption APIs are enabled and approved.

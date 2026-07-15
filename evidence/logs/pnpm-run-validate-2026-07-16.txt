@@ -1,0 +1,32 @@
+Evidence type: Curated command-output summary
+Command: pnpm run validate
+Date: 2026-07-16 UAE
+Exit code: 0
+
+Validated extractor date calculation, strict parsing, deduplication, and missing-poster metadata.
+Validated 22 cinemas, 35 films, 9,972 sessions, 11 dates, and official movie, experience, and offer media.
+Validated persistent discovery preferences, combined filtering, Arabic discovery, and nearest-showtime fallback.
+Validated UAE programming-day expiry filtering.
+Validated versioned booking persistence and cancellation state.
+Validated bilingual cancellation routing and safety.
+Validated deterministic text and voice seat routing and quote-race idempotency.
+Validated honest snapshot capabilities and date-scoped Vista filters.
+Validated 19 VOX UAE offers and 41 card profiles.
+Validated handover redaction.
+Validated safe checkout preview and compact media UX.
+Validated 221 matching English and Arabic UI strings.
+Validated explicit language switching.
+Validated text-first chat and protected WebRTC voice configuration.
+Validated transport recovery and bounded startup.
+Validated self-hosted ElevenLabs worklets and EU residency.
+Validated 17 bilingual FAQ entries across 11 topics.
+Validated 21 bilingual FAQ cases and 16 transactional bypass cases.
+Validated the shared booking journey and seat-derived ticket count.
+Validated unified inline rendering and lifecycle reset.
+Validated programming-date selection.
+Validated text and voice routing parity.
+Validated protected tools, fuzzy resolvers, error boundary, RTL seats, and 420 px layout.
+Validated customer-facing punctuation across 96 repository text files, runtime normalization, bilingual strings, FAQ data, and ElevenLabs prompt guidance.
+Validated fresh schedule coverage from 2026-07-16 to 2026-07-26, including 1,450 sessions today and 1,449 tomorrow.
+
+Result: all 26 validators passed.

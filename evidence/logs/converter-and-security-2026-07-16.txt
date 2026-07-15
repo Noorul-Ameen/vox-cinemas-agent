@@ -1,0 +1,19 @@
+Evidence type: Curated command-output summary
+Date: 2026-07-16 UAE
+
+Converter validation
+Command: python scripts/validate_converter.py
+Exit code: 0
+Output: Validated current official extraction (9,972 sessions / 11 dates) and legacy compact compatibility (6,500 sessions).
+
+Tracked environment-file check
+Command: rg --files -g '.env*' -g '!node_modules' -g '!dist'
+Result: only `.env.example` was present.
+
+Credential-value pattern scan
+Scope: repository text excluding `.git`, `node_modules`, and `dist`.
+Patterns: ElevenLabs API key, Cloudflare API token, Vista key, common private-key headers, and long `sk-` secret values.
+Result: no credential value or private key was found. Expected variable-name references appeared only in documentation and a validator assertion.
+
+Ignore-rule check
+Result: `.gitignore` excludes local `.env` variants, logs, PEM, KEY, P12, PFX, and refresh staging files while retaining `.env.example`.

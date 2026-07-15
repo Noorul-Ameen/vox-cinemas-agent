@@ -1,0 +1,14 @@
+Evidence type: Curated command-output summary
+Command: pnpm run build
+Date: 2026-07-16 UAE
+Exit code: 0
+
+Vite: 5.4.21
+Modules transformed: 1,543
+Output HTML: dist/index.html, 0.90 kB, gzip 0.51 kB
+Output JavaScript: dist/assets/index-CSAd90cI.js, 4,722.22 kB, gzip 498.23 kB
+Exact JavaScript bytes: 4,744,533
+SHA-256: E68AB19B95D15F205DB1F524AAF131331B352EF2D4055A3E28F2E382A1C4EF72
+Build duration: 8.59 seconds
+
+Vite warning: the JavaScript chunk is larger than 500 kB after minification. Production build still completed successfully. Code splitting and a performance budget remain recommended production work.
