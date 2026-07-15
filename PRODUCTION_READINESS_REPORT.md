@@ -165,8 +165,8 @@ No ElevenLabs dashboard change is needed for CSP. The application self-hosts the
 
 | Check | Result | Evidence/notes |
 | --- | --- | --- |
-| Local 420 px text replay | Pass | Mall of the Emirates and 17 July 2026 were retained from the opening request. After the customer changed from family/educational guidance to action, the earlier audience preference no longer remained as an incompatible filter. The widget returned exactly **Supergirl**, **Moana**, **Sakr w Canaria**, and **Shamshoun w Dalila**. |
-| Ambiguous “The chosen movies.” reply | Pass | No movie was auto-selected. The four cards remained visible and Voxi asked the customer to name the exact title; it did not say “Great choice” or advance to showtimes. |
+| Local and hosted 420 px text replay | Pass | Mall of the Emirates and 17 July 2026 were retained from the opening request. After the customer changed from family/educational guidance to action, the earlier audience preference no longer remained as an incompatible filter. Both builds returned exactly **Supergirl**, **Moana**, **Sakr w Canaria**, and **Shamshoun w Dalila**. The hosted replay used `https://voxi-ai.pages.dev/` after Cloudflare served asset `index-DHbvOPpn.js`; no browser warnings or errors were recorded. |
+| Ambiguous “The chosen movies.” reply | Pass | In both local and hosted replays, no movie was auto-selected. The four cards remained visible and Voxi asked the customer to name the exact title; it did not say “Great choice” or advance to showtimes. |
 | Post-change voice parity | Pending spoken replay | Text and voice use the same deterministic preference, result-grounding, and selection-guard handlers, and the shared routing regressions pass. An actual spoken WebRTC replay of this exact family-to-action sequence has not yet been completed after the change, so this is not recorded as a post-change voice end-to-end pass. |
 
 | Scenario | Result | Evidence/notes |
