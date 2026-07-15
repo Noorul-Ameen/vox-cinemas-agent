@@ -115,7 +115,7 @@ const normalizeText = (value) => String(value ?? "")
   .normalize("NFKC")
   .toLowerCase()
   .replace(/[\u064b-\u065f\u0670]/g, "")
-  .replace(/[_–—-]+/g, " ")
+  .replace(/[_\u2013\u2014-]+/g, " ")
   .replace(/[^\p{L}\p{N}:]+/gu, " ")
   .replace(/\s+/g, " ")
   .trim();
@@ -477,7 +477,7 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
     : source;
   for (const knownLocation of [patch.cinemaName, patch.city]) {
     if (!knownLocation) continue;
-    const withoutBrand = String(knownLocation).replace(/^\s*VOX\s*[—–-]?\s*/iu, "");
+    const withoutBrand = String(knownLocation).replace(/^\s*VOX\s*[\u2014\u2013-]?\s*/iu, "");
     candidateSource = removePhrase(candidateSource, knownLocation);
     candidateSource = removePhrase(candidateSource, withoutBrand);
   }

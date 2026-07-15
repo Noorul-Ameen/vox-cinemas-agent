@@ -214,6 +214,8 @@ for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMes
 const showShowtimesTool = sliceBetween(app, "show_showtimes: async", "show_seat_map: async", "showtimes tool");
 assert.doesNotMatch(showShowtimesTool, /filmsRef\.current\[0\]/, "show_showtimes must never silently select the first cached film");
 assert.match(showShowtimesTool, /No movie has been selected[\s\S]*generic reference does not identify a title/, "show_showtimes must reject a title-free ambiguous selection");
+assert.match(showShowtimesTool, /VOXi showtime request failed[\s\S]*operation:\s*"getSessions"[\s\S]*programmingDate:\s*requestedDate/, "showtime failures must log structured, non-secret request context");
+assert.match(showShowtimesTool, /showStage\(\{\s*view:\s*"showtimes"[\s\S]*error:\s*loadingErrorMessage\("showtimes"\)[\s\S]*retryAvailable:\s*true/, "showtime failures must preserve the selected movie in a retryable showtime panel");
 const showSeatMapTool = sliceBetween(app, "show_seat_map: async", "select_seats: async", "seat-map tool");
 assert.doesNotMatch(showSeatMapTool, /filmsRef\.current\[0\]/, "show_seat_map must never silently select the first cached film");
 

@@ -16,6 +16,7 @@ import { isCinemaSelectionTurn, isDirectCinemaSelectionUtterance, resolveCinemaC
 import { bookingHistoryAgentContext, classifyBookingHistoryRequest, isCurrentBooking, isDirectCancellationRequest, resolveCancellationTarget } from "./lib/cancellationRouting.js";
 import { CANCELLATION_JOURNAL_TTL_MS, classifyRefundFailure, hydrateCancellationJournal, normalizeCancellationJournal, withCancellationMutationLock } from "./lib/cancellationSafety.js";
 import { normalizeElevenLabsMessageEvent } from "./lib/conversationMessage.js";
+import { normalizeCustomerFacingText } from "./lib/customerFacingText.js";
 import { explicitLanguageRequest, resolveLanguageSignal } from "./lib/languageSwitch.js";
 import { buildTransportHandoff, createConversationJourney, inferIntent, journeyDynamicVariables, journeyReducer, syncJourney } from "./lib/conversationJourney.js";
 import { resolveProgrammingDateSelection, resolveVisibleSelectionProgrammingDate } from "./lib/programmingDateSelection.js";
@@ -35,7 +36,7 @@ const CINEMAS = vista.getCinemas();
 const PROGRAMMING_DATES = vista.getProgrammingDates();
 const SEAT_PRICING_PREVIEW = vista.getSeatPricingPreview();
 const DISCOVERY_MOVIE_CATALOG = vista.getDiscoveryMovieCatalog();
-const stripVox = (name) => String(name || "").replace(/^VOX\s*[—-]\s*/, "");
+const stripVox = (name) => String(name || "").replace(/^VOX\s*[\u2014-]\s*/, "");
 const norm = (value) => String(value ?? "").toLowerCase().trim();
 const localizedValue = (value, locale) => typeof value === "string" ? value : value?.[locale] || value?.en || "";
 const isAgentWelcome = (value) => {
@@ -571,7 +572,8 @@ export default function App() {
 
   const say = useCallback((role, text) => {
     const at = new Date().toISOString();
-    const message = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, role, text, at };
+    const customerSafeText = role === "user" ? text : normalizeCustomerFacingText(text);
+    const message = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, role, text: customerSafeText, at };
     lastActivityRef.current = Date.now();
     setMessages((current) => {
       const next = [...current, message];
@@ -873,6 +875,14 @@ export default function App() {
         const rows = await vista.getSessions(target.id, movie.id, requestedDate);
         return { movie, rows: rows.map((session) => ({ ...session, cinemaId: target.id, scheduledFilmId: movie.id, movieId: movie.id })), failed: false };
       } catch (error) {
+        console.error("VOXi showtime request failed", {
+          operation: "getSessions",
+          cinemaId: target.id,
+          movieId: movie.id,
+          programmingDate: requestedDate,
+          code: error?.code || null,
+          status: error?.status || null,
+        });
         return { movie, rows: [], failed: true, error };
       }
     }));
@@ -1619,7 +1629,7 @@ export default function App() {
   };
 
   /* ========================================================================
-   * CLIENT TOOLS — the six original names stay unchanged. show_seat_map is
+   * CLIENT TOOLS: the six original names stay unchanged. show_seat_map is
    * non-blocking and select_seats remains the only voice seat-confirmation
    * path. Phase C and D append show_offers and handover_to_agent.
    * ====================================================================== */
@@ -1734,7 +1744,18 @@ export default function App() {
       try {
         sessions = await vista.getSessions(cinemaId, movie.id, requestedDate);
       } catch (error) {
-        return JSON.stringify({ shown: false, reason: error?.message || "Showtimes could not be loaded." });
+        console.error("VOXi showtime request failed", {
+          operation: "getSessions",
+          cinemaId,
+          movieId: movie.id,
+          programmingDate: requestedDate,
+          code: error?.code || null,
+          status: error?.status || null,
+        });
+        if (requestIsCurrent(epoch, revision, cinemaId, requestedDate)) {
+          showStage({ view: "showtimes", movie, sessions: [], error: loadingErrorMessage("showtimes"), retryAvailable: true });
+        }
+        return JSON.stringify({ shown: false, reason: error?.message || "Showtimes could not be loaded.", retryAvailable: true });
       }
       if (!requestIsCurrent(epoch, revision, cinemaId, requestedDate)) return JSON.stringify({ shown: false, reason: "The cinema, date, movie, or active task changed while showtimes were loading." });
       const availability = filterCurrentSessions(sessions.map((session) => ({ ...session, cinemaId, scheduledFilmId: movie.id, movieId: movie.id })));
@@ -2254,7 +2275,7 @@ export default function App() {
         missingFields: result?.missingFields || [],
         reason: localizedReason,
         advisory: localizedAdvisory,
-        answer: `${localizedHeadline} — ${localizedReason}${localizedAdvisory ? ` ${localizedAdvisory}` : ""}`,
+        answer: `${localizedHeadline}: ${localizedReason}${localizedAdvisory ? ` ${localizedAdvisory}` : ""}`,
         context,
         disclaimer,
       });
@@ -2487,7 +2508,7 @@ export default function App() {
   }, []);
 
   /* ========================================================================
-   * REAL ELEVENLABS CONNECTION — do not change the connection type, location,
+   * REAL ELEVENLABS CONNECTION: do not change the connection type, location,
    * or client-tool names. The agent uses the public VITE_AGENT_ID identifier.
    * ====================================================================== */
   let conversation;
@@ -2499,7 +2520,6 @@ export default function App() {
       setSessionMode(connectedMode);
       setStartingMode(null);
       switchingSessionRef.current = false;
-      say("system", t(connectedMode === "text" ? "app.textConnected" : "app.voiceConnected"));
     },
     onDisconnect: () => {
       const switching = switchingSessionRef.current;
@@ -3250,7 +3270,19 @@ export default function App() {
         ? movie.relevantSessions
         : await vista.getSessions(cinemaId, movie.id, requestedDate);
     } catch (error) {
-      if (requestIsCurrent(epoch, revision, cinemaId, requestedDate)) say("system", loadingErrorMessage("showtimes"));
+      console.error("VOXi showtime request failed", {
+        operation: "getSessions",
+        cinemaId,
+        movieId: movie.id,
+        programmingDate: requestedDate,
+        code: error?.code || null,
+        status: error?.status || null,
+      });
+      if (requestIsCurrent(epoch, revision, cinemaId, requestedDate)) {
+        const message = loadingErrorMessage("showtimes");
+        showStage({ view: "showtimes", movie, sessions: [], error: message, retryAvailable: true });
+        say("system", message);
+      }
       return;
     }
     if (!requestIsCurrent(epoch, revision, cinemaId, requestedDate)) return;
@@ -4126,7 +4158,7 @@ export default function App() {
           {stage.view === "faq" && stage.faq && <FaqPanel result={stage.faq} label={t("faq.official")} capabilityLabel={t("faq.capability")} liveLabel={t("faq.live")} backLabel={t("common.back")} onBack={() => showStage(faqReturnRef.current || { view: "empty" })} />}
           {stage.view === "cinemas" && <CinemaPicker cinemas={stage.cinemas || CINEMAS} selected={cinema} notice={stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => routeDiscoveryTurn("", { preferencesAlreadyApplied: true }) : undefined} onSelect={chooseCinema} onBack={() => showStage(cinemaReturnRef.current || { view: "empty" })} />}
           {stage.view === "movies" && cinema && <MovieGrid movies={stage.movies} cinemaName={stripVox(cinema.name)} scheduleDate={stage.errorCode === "date_unavailable" ? userRequestedDateRef.current : scheduleDate} notice={stage.notice} onSelect={pickMovie} error={stage.error} onRetry={stage.errorCode === "date_unavailable" ? undefined : () => routeDiscoveryTurn("", { cinemaOverride: cinema, dateOverride: scheduleDate, preferencesAlreadyApplied: true })} />}
-          {stage.view === "showtimes" && <Showtimes movie={stage.movie} sessions={stage.sessions} notice={stage.notice} onSelect={pickSession} onBack={backFromShowtimes} />}
+          {stage.view === "showtimes" && <Showtimes movie={stage.movie} sessions={stage.sessions} notice={stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => pickMovie(stage.movie) : undefined} onSelect={pickSession} onBack={backFromShowtimes} />}
           {stage.view === "seatmap" && <SeatMap movie={stage.movie} session={stage.session} plan={stage.plan} selected={selectedSeats} requestedTarget={requestedSeatTarget} pricing={SEAT_PRICING_PREVIEW} quoteState={seatQuote} notice={stage.planMeta?.verified === false ? true : stage.planMeta?.warning || false} onToggle={toggleSeat} onConfirm={confirmSeats} onBack={backFromSeatMap} />}
           {stage.view === "checkout" && stage.order && pendingOrder?.checkoutId === stage.order.checkoutId && <Checkout key={stage.order.checkoutId} order={stage.order} deviceSessionEpoch={deviceSessionEpochRef.current} onPaid={handlePaid} onCancel={backToSeatMapFromCheckout} />}
           {stage.view === "booking" && displayedBooking && <BookingCard

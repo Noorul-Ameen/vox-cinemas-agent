@@ -22,7 +22,7 @@ export function Poster({ tint, title, small, posterUrl }) {
       display: "flex", flexShrink: 0, alignItems: "flex-end", boxSizing: "border-box",
     }}>
       {imgOk && imageUrl && (
-        <img src={imageUrl} alt={title ? `${title} — ${t("movies.poster")}` : t("movies.poster")} loading="lazy" decoding="async" onLoad={(event) => { if (!event.currentTarget.naturalWidth || !event.currentTarget.naturalHeight) setImgOk(false); }} onError={() => setImgOk(false)}
+        <img src={imageUrl} alt={title ? `${title}: ${t("movies.poster")}` : t("movies.poster")} loading="lazy" decoding="async" onLoad={(event) => { if (!event.currentTarget.naturalWidth || !event.currentTarget.naturalHeight) setImgOk(false); }} onError={() => setImgOk(false)}
           style={{ position: "absolute", inset: 0, display: "block", width: "100%", maxWidth: "100%", height: "100%", maxHeight: "100%", objectFit: "contain" }} />
       )}
       {!imgOk && <div style={{ position: "absolute", inset: 0, opacity: 0.35, backgroundImage: "radial-gradient(circle at 30% 15%, rgba(255,255,255,.6), transparent 50%)" }} />}
@@ -99,7 +99,7 @@ export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, 
           <button key={cinema.id} onClick={() => onSelect(cinema)} style={{ ...rowBtn, padding: "11px 13px", borderColor: selected?.id === cinema.id ? C.primary : C.border, background: selected?.id === cinema.id ? C.primarySoft : C.surface }}>
             <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
               <MapPin size={15} color={C.primary} />
-              <span dir="auto" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, color: C.text }}>{cinema.name.replace(/^VOX\s*[—-]\s*/, "")}</span>
+              <span dir="auto" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, color: C.text }}>{cinema.name.replace(/^VOX\s*[\u2014-]\s*/, "")}</span>
             </span>
             {selected?.id === cinema.id ? <Check size={15} color={C.green} /> : <ChevronRight size={16} color={C.muted} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />}
           </button>
@@ -145,7 +145,7 @@ export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRet
   const expColor = (e) => (["IMAX", "MAX"].includes(e) ? C.primaryHover : e === "GOLD" ? C.warning : e === "KIDS" ? C.green : C.primary);
   return (
     <div>
-      <Header icon={<Clock size={16} />} title={movie.title} sub={`${movie.rating} · ${movie.runtime ? t("showtimes.minutes", { count: movie.runtime }) : "—"} · ${t("showtimes.select")}`} onBack={onBack} />
+      <Header icon={<Clock size={16} />} title={movie.title} sub={`${movie.rating} · ${movie.runtime ? t("showtimes.minutes", { count: movie.runtime }) : "Not listed"} · ${t("showtimes.select")}`} onBack={onBack} />
       {notice && <div role="status" style={{ marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 10, background: C.primarySoft, padding: "9px 11px", color: C.primary, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
       <div style={{ marginBottom: 14, borderRadius: 12, border: `1px solid ${C.border}`, background: C.surfaceAlt, padding: "11px 12px" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 7 }}>
@@ -168,7 +168,7 @@ export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRet
                 </div>
               </div>
               <div style={{ display: "flex", flexShrink: 0, alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{t("showtimes.seats", { count: s.seatsAvailable })}</span>
+                <span style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{s.availabilityVerified === true ? t("showtimes.seats", { count: s.seatsAvailable }) : t("showtimes.previewAvailability")}</span>
                 <ChevronRight size={18} color={C.muted} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />
               </div>
             </button>

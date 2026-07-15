@@ -71,8 +71,11 @@ assert.match(richMediaSource, /pricing\?\.tiers\?\.standard/, "seat prices must 
 assert.match(richMediaSource, /seats\.demoEstimateLabel/, "estimated seat totals must defer final pricing to checkout");
 assert.match(richMediaSource, /seats\.quoteRequiredLabel/, "live pricing must remain pending until a quote is returned");
 assert.doesNotMatch(richMediaSource, /\?\s*63\s*:\s*42/, "the seat map must not hard-code pre-quote tier prices");
+assert.match(richMediaSource, /s\.availabilityVerified === true[\s\S]*showtimes\.seats[\s\S]*showtimes\.previewAvailability/, "snapshot showtimes must not present generated seat counts as live inventory");
+assert.match(appSource, /<Showtimes[^>]+error=\{stage\.error\}[^>]+onRetry=/, "a failed showtime request must render a scoped retry action");
+assert.doesNotMatch(appSource, /app\.(?:text|voice)Connected/, "transport readiness must not be added to customer chat");
 for (const key of [
-  "common.retry", "movies.empty", "movies.error", "showtimes.empty", "showtimes.error",
+  "common.retry", "movies.empty", "movies.error", "showtimes.empty", "showtimes.error", "showtimes.previewAvailability",
   "seats.empty", "seats.error", "seats.demoNotice", "seats.standardEstimate", "seats.premiumEstimate",
   "seats.standardQuoteRequired", "seats.premiumQuoteRequired", "seats.demoPricingNotice",
   "seats.quoteRequiredNotice", "seats.demoEstimateLabel", "seats.quoteRequiredLabel", "checkout.testOnly", "checkout.liveUnavailable",

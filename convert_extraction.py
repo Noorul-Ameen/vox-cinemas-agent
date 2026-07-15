@@ -43,6 +43,16 @@ def read_json(path: Path):
         return json.load(handle)
 
 
+def normalize_customer_facing_punctuation(value):
+    if isinstance(value, str):
+        return value.replace(chr(0x2013), "-").replace(chr(0x2014), "-")
+    if isinstance(value, list):
+        return [normalize_customer_facing_punctuation(item) for item in value]
+    if isinstance(value, dict):
+        return {key: normalize_customer_facing_punctuation(item) for key, item in value.items()}
+    return value
+
+
 def tint(code: str):
     return PALETTE[int(hashlib.md5(code.encode()).hexdigest(), 16) % len(PALETTE)]
 
@@ -152,9 +162,19 @@ def validate(extraction: dict, metadata: list[dict], rows: list[dict], raw_count
     if catalog_codes != row_codes:
         errors.append(f"catalog/session film mismatch: missing metadata {sorted(row_codes - catalog_codes)}, unscheduled catalog entries {sorted(catalog_codes - row_codes)}")
     if isinstance(extraction.get("sessions"), list) and extraction.get("crawl"):
-        bad_posters = sorted(code for code in catalog_codes if not str(metadata_by_code.get(code, {}).get("posterUrl", "")).startswith("https://"))
-        if bad_posters:
-            errors.append(f"missing official HTTPS poster URLs for {bad_posters}")
+        missing_posters = sorted(code for code in catalog_codes if not metadata_by_code.get(code, {}).get("posterUrl"))
+        recorded_missing_posters = sorted(extraction.get("crawl", {}).get("missingOfficialPosterCodes", []))
+        if missing_posters != recorded_missing_posters:
+            errors.append(
+                f"missing official poster codes do not match crawl metadata: actual {missing_posters}, recorded {recorded_missing_posters}"
+            )
+        invalid_posters = sorted(
+            code for code in catalog_codes
+            if metadata_by_code.get(code, {}).get("posterUrl")
+            and not str(metadata_by_code.get(code, {}).get("posterUrl")).startswith("https://")
+        )
+        if invalid_posters:
+            errors.append(f"official poster URLs must use HTTPS for {invalid_posters}")
     bad_rows = [row for row in rows if not row["time"] or not row["experience"]]
     if bad_rows:
         errors.append(f"{len(bad_rows)} rows have empty time or experience")
@@ -167,7 +187,7 @@ def validate(extraction: dict, metadata: list[dict], rows: list[dict], raw_count
 
 
 def build():
-    extraction = read_json(INPUT)
+    extraction = normalize_customer_facing_punctuation(read_json(INPUT))
     if isinstance(extraction.get("sessions"), list):
         metadata = [{
             "code": item["code"],
@@ -181,6 +201,7 @@ def build():
             "subtitles": item.get("subtitles", []),
             "images": item.get("images", {}),
             "posterUrl": item.get("posterUrl", ""),
+            "posterStatus": item.get("posterStatus", "official" if item.get("posterUrl") else "missing_at_source"),
             "backdropUrl": item.get("backdropUrl", ""),
             "movieUrl": item.get("movieUrl", ""),
             "sourcePageUrl": item.get("sourcePageUrl", ""),
@@ -189,12 +210,12 @@ def build():
             "sourceUrl": item.get("sourceUrl", "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE"),
         } for item in extraction.get("catalog", [])]
     else:
-        metadata = read_json(METADATA)
+        metadata = normalize_customer_facing_punctuation(read_json(METADATA))
     rows, raw_count, duplicate_count = parse_rows(extraction)
     dates, metadata_by_code = validate(extraction, metadata, rows, raw_count)
 
     cinemas = [
-        {"ID": code, "Name": f"VOX — {name}", "City": "UAE", "CurrencyCode": "AED"}
+        {"ID": code, "Name": f"VOX - {name}", "City": "UAE", "CurrencyCode": "AED"}
         for code, name in sorted(extraction["cinemas"].items(), key=lambda item: item[1])
     ]
     film_cinemas = sorted({(row["cinemaCode"], row["code"]) for row in rows})
@@ -214,6 +235,7 @@ def build():
             "Synopsis": meta["synopsis"],
             "Subtitles": meta.get("subtitles", []),
             "posterUrl": meta.get("posterUrl", ""),
+            "PosterStatus": meta.get("posterStatus", "official" if meta.get("posterUrl") else "missing_at_source"),
             "backdropUrl": meta.get("backdropUrl", ""),
             "images": meta.get("images", {}),
             "movieUrl": meta.get("movieUrl", ""),
@@ -278,7 +300,7 @@ def build():
 
     booking_title = metadata[0]["title"]
     output = f'''// ============================================================================
-//  REAL VOX UAE DATA — generated from a validated official VOX extraction
+//  REAL VOX UAE DATA: generated from a validated official VOX extraction
 //  Coverage: {dates[0]} to {dates[-1]} | Cinemas: {len(cinemas)} | Films: {len(metadata)} | Sessions: {len(sessions)}
 //  Regenerate with: python convert_extraction.py
 // ============================================================================

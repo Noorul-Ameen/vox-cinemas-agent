@@ -31,6 +31,10 @@ const cancelled = Object.freeze({
   bookingStatus: "cancelled_demo",
 });
 const dubaiNoon = new Date("2026-07-13T08:00:00.000Z");
+const resolveAtFixtureTime = (input) => resolveCancellationTarget({
+  ...input,
+  now: dubaiNoon,
+});
 const elapsed = Object.freeze({
   ref: "WLELAPSED",
   movieTitle: "Past Show",
@@ -114,7 +118,7 @@ for (const text of [
   );
 }
 
-const explicitRequested = resolveCancellationTarget({
+const explicitRequested = resolveAtFixtureTime({
   requestedRef: "wlactive2",
   text: "Cancel it",
   visibleBooking: activeA,
@@ -125,7 +129,7 @@ assert.equal(explicitRequested.booking, activeB);
 assert.match(explicitRequested.source, /explicit|requested|reference/i);
 assert.equal(explicitRequested.reason, null);
 
-const explicitInText = resolveCancellationTarget({
+const explicitInText = resolveAtFixtureTime({
   text: "Please cancel booking wlactive2",
   visibleBooking: activeA,
   storedBookings: [activeA, activeB, cancelled],
@@ -134,7 +138,7 @@ assert.equal(explicitInText.bookingRef, activeB.ref, "a reference in the utteran
 assert.equal(explicitInText.booking, activeB);
 assert.match(explicitInText.source, /explicit|text|spoken|reference/i);
 
-const visibleSelection = resolveCancellationTarget({
+const visibleSelection = resolveAtFixtureTime({
   text: "Cancel it",
   visibleBooking: activeA,
   storedBookings: [activeA, activeB, cancelled],
@@ -143,7 +147,7 @@ assert.equal(visibleSelection.bookingRef, activeA.ref, "the selected visible boo
 assert.equal(visibleSelection.booking, activeA);
 assert.match(visibleSelection.source, /visible|selected/i);
 
-const visibleCancelledSelection = resolveCancellationTarget({
+const visibleCancelledSelection = resolveAtFixtureTime({
   text: "Cancel it",
   visibleBooking: cancelled,
   storedBookings: [cancelled, activeA],
@@ -153,7 +157,7 @@ assert.equal(visibleCancelledSelection.booking, cancelled);
 assert.equal(visibleCancelledSelection.reason, "already_cancelled");
 assert.match(visibleCancelledSelection.source, /visible|selected/i);
 
-const soleActive = resolveCancellationTarget({
+const soleActive = resolveAtFixtureTime({
   text: "Cancel my current booking",
   storedBookings: [cancelled, activeA],
 });
@@ -162,20 +166,18 @@ assert.equal(soleActive.booking, activeA);
 assert.match(soleActive.source, /sole|single|active/i);
 assert.deepEqual(soleActive.candidates, [activeA.ref], "cancelled records must be excluded from active candidates");
 
-const noActive = resolveCancellationTarget({
+const noActive = resolveAtFixtureTime({
   text: "Cancel my current booking",
   storedBookings: [cancelled],
-  now: dubaiNoon,
 });
 assert.equal(noActive.bookingRef, null);
 assert.equal(noActive.booking, null);
 assert.equal(noActive.reason, "no_active_booking");
 assert.deepEqual(noActive.candidates, [], "a cancelled record must never be offered for cancellation again");
 
-const multipleActive = resolveCancellationTarget({
+const multipleActive = resolveAtFixtureTime({
   text: "Cancel my current booking",
   storedBookings: [cancelled, activeA, activeB],
-  now: dubaiNoon,
 });
 assert.equal(multipleActive.bookingRef, null, "multiple active bookings must never be resolved arbitrarily");
 assert.equal(multipleActive.booking, null);
@@ -186,24 +188,22 @@ assert.deepEqual(
   "selection-required results must expose only active booking candidates",
 );
 
-const elapsedOnly = resolveCancellationTarget({
+const elapsedOnly = resolveAtFixtureTime({
   text: "Cancel my current booking",
   storedBookings: [cancelled, elapsed],
-  now: dubaiNoon,
 });
 assert.equal(elapsedOnly.bookingRef, null, "an elapsed booking must not be auto-selected as the current booking");
 assert.equal(elapsedOnly.reason, "no_active_booking");
 
-const visibleElapsed = resolveCancellationTarget({
+const visibleElapsed = resolveAtFixtureTime({
   text: "Cancel it",
   visibleBooking: elapsed,
   storedBookings: [elapsed, activeA],
-  now: dubaiNoon,
 });
 assert.equal(visibleElapsed.bookingRef, elapsed.ref, "a contextual request must stay attached to the visible elapsed booking");
 assert.equal(visibleElapsed.reason, "not_current_booking", "the visible elapsed booking must be identified without falling through to another record");
 
-const alreadyCancelled = resolveCancellationTarget({
+const alreadyCancelled = resolveAtFixtureTime({
   requestedRef: cancelled.ref,
   visibleBooking: activeA,
   storedBookings: [activeA, cancelled],
@@ -212,7 +212,7 @@ assert.equal(alreadyCancelled.bookingRef, cancelled.ref, "an explicit cancelled 
 assert.equal(alreadyCancelled.booking, cancelled);
 assert.equal(alreadyCancelled.reason, "already_cancelled");
 
-const unknownReference = resolveCancellationTarget({
+const unknownReference = resolveAtFixtureTime({
   requestedRef: "WLMISSING",
   visibleBooking: activeA,
   storedBookings: [activeA],

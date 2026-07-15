@@ -56,7 +56,7 @@ export function serializeFaqContext(results, {
   const activeLocale = locale === "ar" ? "ar" : "en";
   const safeMax = Math.max(500, Number(maxChars) || 6000);
   const header = [
-    "VOX CINEMAS UAE — CURATED GENERAL-ENQUIRY CONTEXT",
+    "VOX CINEMAS UAE: CURATED GENERAL-ENQUIRY CONTEXT",
     `Reply language: ${activeLocale === "ar" ? "Arabic" : "English"}. Do not infer or switch language from the query text.`,
     "Use static facts as written. For API entries, use only supplied live results or the named existing provider.",
     "Do not read provenance URLs aloud unless the guest asks for the source.",

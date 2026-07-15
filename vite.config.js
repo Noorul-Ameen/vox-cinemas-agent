@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
-// Single Vite process. No mock server or proxy needed — the mock data lives
+// Single Vite process. No mock server or proxy is needed. The mock data lives
 // inside the app (src/mockVistaData.js). To go live, set VITE_VISTA_BASE.
 // Agent IDs are public client identifiers. API keys and signed tokens must never
 // be added here; they belong on a server.

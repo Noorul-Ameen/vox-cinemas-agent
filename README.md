@@ -1,10 +1,10 @@
-# VOXi — VOX Cinemas conversational booking experience
+# VOXi: VOX Cinemas conversational booking experience
 
 VOXi is a React + Vite mobile experience that combines the real ElevenLabs React SDK with rich, touch-friendly cinema flows. The current integration uses official schedule content and an on-device transaction sandbox; production payment, Vista write, offer-redemption, and Genesys/OneView connectors remain explicitly gated.
 
 ## Included product flows
 
-- A fresh 16–22 July 2026 VOX UAE schedule with 22 cinemas, 35 scheduled films and 9,460 validated sessions, produced by the latest successful end-to-end GitHub refresh run.
+- A fresh 16-22 July 2026 VOX UAE schedule with 22 cinemas, 35 scheduled films and 9,460 validated sessions, produced by the latest successful end-to-end GitHub refresh run.
 - Official code-keyed movie posters, experience artwork, and active bank-offer imagery with first-party source attribution and resilient UI fallbacks.
 - Fuzzy cinema/movie/session resolution with the original six ElevenLabs client tools preserved.
 - Text, touch, and voice journeys for movies, showtimes, seats, checkout, confirmation, and cancellation. Typed chat starts without requesting microphone access.
@@ -91,7 +91,7 @@ For an audible text-to-voice continuation without another welcome, configure the
 
 ## Data snapshot and refresh
 
-The current dataset was extracted at `2026-07-15T07:21:28.186Z` by the updated Actions workflow. It contains 9,460 deduplicated sessions from 9,499 raw rows, including 1,438 sessions on 16 July, 35 scheduled films, 22 cinemas, 14 experience-media records and 20 offer-media records across every advertised programming date from 16–22 July 2026. Thirty-nine duplicate source rows were removed deterministically.
+The current dataset was extracted at `2026-07-15T07:21:28.186Z` by the updated Actions workflow. It contains 9,460 deduplicated sessions from 9,499 raw rows, including 1,438 sessions on 16 July, 35 scheduled films, 22 cinemas, 14 experience-media records and 20 offer-media records across every advertised programming date from 16-22 July 2026. Thirty-nine duplicate source rows were removed deterministically.
 
 The extractor does not assume a fixed date window. It unions official per-movie `availableDays` responses for Now Showing and Advance Booking, fetches only advertised movie/date pairs and stops when those dates are exhausted. A 31-day default safety cap prevents an accidentally unbounded crawl.
 
@@ -99,9 +99,9 @@ At runtime, a covered UAE date remains exact and past snapshot dates are not pre
 
 Shipped source assets:
 
-- `data/vox_showtimes_full.json` — current flat extraction, crawl metadata, and media provenance
-- `data/vox_sessions_08-15Jul.json.gz` — legacy compact fixture retained for converter regression coverage
-- `data/movie_metadata_08-15Jul.json` — legacy metadata fixture
+- `data/vox_showtimes_full.json`: current flat extraction, crawl metadata, and media provenance
+- `data/vox_sessions_08-15Jul.json.gz`: legacy compact fixture retained for converter regression coverage
+- `data/movie_metadata_08-15Jul.json`: legacy metadata fixture
 - generated `src/mockVistaData.js`
 
 Run the complete transactional refresh:
@@ -149,20 +149,20 @@ Final acceptance completed `pnpm run validate` with all 24 validators and `pnpm 
 
 ## Main files
 
-- `src/App.jsx` — widget state, ElevenLabs connection, eight client tools, and journey orchestration.
-- `src/vistaClient.js` — Vista-shaped read layer and local booking search.
-- `src/mockVistaData.js` — generated, deterministic UAE schedule snapshot.
-- `src/bookingStore.js` — backward-compatible local booking persistence.
-- `src/offers/` — structured offer knowledge and resolver.
-- `src/knowledge/` — sourced bilingual FAQ data, resolver and bounded agent context.
-- `src/lib/conversationJourney.js` — logical session state and redacted text-to-voice handoff.
-- `src/lib/voiceStartup.js` and `public/elevenlabs/` — bounded voice startup, localized error classification and locally served ElevenLabs AudioWorklets.
-- `src/lib/handoverSummary.js` — safe OneView-ready handover payload.
-- `src/lib/voxiSession.js` and `src/lib/languageSwitch.js` — VOXI runtime guidance and strict bilingual switching.
-- `src/i18n/` — English/Arabic locale provider and copy.
-- `src/components/` — cinema, movie, seat, checkout, QR/history, offers, and handover UI.
-- `scripts/refreshVoxData.mjs` and `.github/workflows/refresh-vox-showtimes.yml` — validated transactional refresh and recurring schedule automation.
-- `CONCIERGE_IMPLEMENTATION.md` — root-cause review, state model, ElevenLabs handoff, FAQ migration plan, verification and production dependencies.
+- `src/App.jsx`: widget state, ElevenLabs connection, eight client tools, and journey orchestration.
+- `src/vistaClient.js`: Vista-shaped read layer and local booking search.
+- `src/mockVistaData.js`: generated, deterministic UAE schedule snapshot.
+- `src/bookingStore.js`: backward-compatible local booking persistence.
+- `src/offers/`: structured offer knowledge and resolver.
+- `src/knowledge/`: sourced bilingual FAQ data, resolver and bounded agent context.
+- `src/lib/conversationJourney.js`: logical session state and redacted text-to-voice handoff.
+- `src/lib/voiceStartup.js` and `public/elevenlabs/`: bounded voice startup, localized error classification and locally served ElevenLabs AudioWorklets.
+- `src/lib/handoverSummary.js`: safe OneView-ready handover payload.
+- `src/lib/voxiSession.js` and `src/lib/languageSwitch.js`: VOXI runtime guidance and strict bilingual switching.
+- `src/i18n/`: English/Arabic locale provider and copy.
+- `src/components/`: cinema, movie, seat, checkout, QR/history, offers, and handover UI.
+- `scripts/refreshVoxData.mjs` and `.github/workflows/refresh-vox-showtimes.yml`: validated transactional refresh and recurring schedule automation.
+- `CONCIERGE_IMPLEMENTATION.md`: root-cause review, state model, ElevenLabs handoff, FAQ migration plan, verification and production dependencies.
 
 ## Current integration boundaries
 

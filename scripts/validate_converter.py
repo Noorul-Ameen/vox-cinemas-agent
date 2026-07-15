@@ -44,5 +44,5 @@ assert current["crawl"]["complete"] is True
 assert current["crawl"]["rawSessionCount"] == len(current_rows) + current["crawl"]["duplicateCount"]
 assert current_duplicates == 0
 assert len(current.get("experienceMedia", [])) >= 13
-assert len(current.get("offerMedia", [])) == 19
+assert len(current.get("offerMedia", [])) >= 19
 print(f"Validated current official extraction ({len(current_rows):,} sessions / {len(current_dates)} dates) and legacy compact compatibility (6,500 sessions).")

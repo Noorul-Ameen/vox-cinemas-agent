@@ -15,6 +15,10 @@ const API_HOST = "https://uae-apife.voxcinemas.com";
 const BASE = `${API_HOST}/v1/vox2-0`;
 const AUTH_URL = `${API_HOST}/groups/authToken`;
 const REGION = "UAE";
+const FORBIDDEN_CUSTOMER_DASHES = new RegExp(
+  `[${String.fromCodePoint(0x2013)}${String.fromCodePoint(0x2014)}]`,
+  "gu",
+);
 const DEFAULT_WORKERS = 2;
 const STAGGER_MS = 220;
 const RETRIES = 3;
@@ -30,6 +34,16 @@ const BROWSER_HEADERS = {
 };
 
 const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
+const normalizeCustomerFacingPunctuation = (value) => {
+  if (typeof value === "string") return value.replace(FORBIDDEN_CUSTOMER_DASHES, "-");
+  if (Array.isArray(value)) return value.map(normalizeCustomerFacingPunctuation);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, normalizeCustomerFacingPunctuation(item)]),
+    );
+  }
+  return value;
+};
 const text = (value) => {
   if (value === null || value === undefined) return "";
   if (typeof value === "object") return String(value.title ?? value.name ?? value.label ?? value.code ?? "").trim();
@@ -228,6 +242,7 @@ export async function getCatalog(client) {
       const detail = contentByCode.get(code) || {};
       const existing = byCode.get(code);
       const images = normalizeImages(movie.images, detail.image);
+      const posterUrl = images.medium || images.thumbnail || images.mediumMobile || images.large;
       const language = text(detail.language) || list(movie.languages)[0] || "";
       const categories = [...new Set([...(existing?.categories || []), category])];
       byCode.set(code, {
@@ -248,7 +263,8 @@ export async function getCatalog(client) {
         categories,
         experiences: list(movie.experiences),
         images,
-        posterUrl: images.medium || images.thumbnail || images.mediumMobile || images.large,
+        posterUrl,
+        posterStatus: posterUrl ? "official" : "missing_at_source",
         backdropUrl: images.large || images.largeMobile || images.medium,
       });
     }
@@ -403,7 +419,19 @@ export function validate(data) {
   if (!data.sessions.length) errors.push("no sessions were extracted");
   if (!Object.keys(data.cinemas).length) errors.push("no cinemas were extracted");
   if (data.sessions.some((session) => !catalogCodes.has(session.code) || !session.cinemaCode || !session.sessionId || !session.time || !session.experience)) errors.push("session identifiers or relationships are incomplete");
-  if (data.catalog.some((movie) => !movie.code || !movie.title || !/^https:\/\//.test(movie.posterUrl))) errors.push("scheduled movie metadata or official poster URLs are incomplete");
+  const incompleteMovies = data.catalog
+    .filter((movie) => !movie.code || !movie.title)
+    .map((movie) => `${movie.code || "missing-code"} (${movie.title || "missing title"})`);
+  if (incompleteMovies.length) errors.push(`scheduled movie metadata is incomplete: ${incompleteMovies.join(", ")}`);
+  const invalidPosterCodes = data.catalog
+    .filter((movie) => movie.posterUrl && !/^https:\/\//.test(movie.posterUrl))
+    .map((movie) => movie.code);
+  if (invalidPosterCodes.length) errors.push(`official poster URLs must use HTTPS: ${invalidPosterCodes.join(", ")}`);
+  const missingPosterCodes = data.catalog.filter((movie) => !movie.posterUrl).map((movie) => movie.code).sort();
+  const recordedMissingPosterCodes = [...(data.crawl?.missingOfficialPosterCodes || [])].sort();
+  if (JSON.stringify(missingPosterCodes) !== JSON.stringify(recordedMissingPosterCodes)) {
+    errors.push("missing official poster codes must be recorded exactly in crawl metadata");
+  }
   if (data.sessions.length + data.crawl.duplicateCount !== data.crawl.rawSessionCount) errors.push("raw session and duplicate counts do not reconcile");
   if (data.experienceMedia.some((item) => [item.logoUrl, item.imageUrl, item.backdropUrl].filter(Boolean).some((url) => !/^https:\/\//.test(url)))) errors.push("experience media contains a non-HTTPS URL");
   if (data.offerMedia.some((item) => [item.imageUrl, item.heroUrl, item.promoUrl, item.mobileUrl].filter(Boolean).some((url) => !/^https:\/\//.test(url)))) errors.push("offer media contains a non-HTTPS URL");
@@ -413,7 +441,7 @@ export function validate(data) {
 
 export async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const startDate = args.startDate || addDays(uaeToday(), 1);
+  const startDate = args.startDate || uaeToday();
   if (!isIsoDate(startDate)) throw new Error("--start-date must be a real calendar date using YYYY-MM-DD");
   const client = new VoxClient();
   console.error(`Discovering official VOX UAE availability from ${startDate} (safety cap ${args.maxDays} days, ${args.workers} workers)`);
@@ -428,9 +456,10 @@ export async function main() {
   const { cinemas, sessions, duplicates, rawSessionCount } = flatten(responses);
   const scheduledCodes = new Set(sessions.map((session) => session.code));
   const catalog = catalogCandidates.filter((movie) => scheduledCodes.has(movie.code));
+  const missingOfficialPosterCodes = catalog.filter((movie) => !movie.posterUrl).map((movie) => movie.code).sort();
   const programmingDates = [...new Set(sessions.map((session) => session.programmingDate))].sort();
   const discoveredProgrammingDates = [...new Set([...datesByCode.values()].flat())].sort();
-  const output = {
+  const output = normalizeCustomerFacingPunctuation({
     extractedAt: fetchedAt,
     region: REGION,
     programmingDates,
@@ -451,6 +480,7 @@ export async function main() {
       requestedSessionCalls: responses.length,
       rawSessionCount,
       duplicateCount: duplicates,
+      missingOfficialPosterCodes,
       sessionsByProgrammingDate: Object.fromEntries(programmingDates.map((date) => [date, sessions.filter((session) => session.programmingDate === date).length])),
     },
     provenance: {
@@ -460,7 +490,7 @@ export async function main() {
       offerPageUrl: `${SITE}/offers/bank-deals`,
       note: "Remote artwork remains owned by its respective rights holders and is retained with first-party source attribution.",
     },
-  };
+  });
   validate(output);
   const destination = resolve(args.output);
   const temporary = `${destination}.tmp-${process.pid}`;

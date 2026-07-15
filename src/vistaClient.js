@@ -11,6 +11,7 @@ import { BOOKING, CINEMAS, DATA_DATES, DATA_STATS, FILMS, SESSIONS, seatPlan } f
 import { findBooking } from "./bookingStore.js";
 import { addCalendarDays, isIsoCalendarDate, remapDemoDate, uaeCalendarDate } from "./lib/demoDates.js";
 import { assessCancellationEligibility } from "./lib/cancellationEligibility.js";
+import { normalizeCustomerFacingText } from "./lib/customerFacingText.js";
 
 const ENV = import.meta.env || {};
 const BASE = String(ENV.VITE_VISTA_BASE || "").replace(/\/+$/, "");
@@ -324,7 +325,7 @@ export function getVistaCapabilities({ now = new Date() } = {}) {
 export function getCinemas({ now = new Date() } = {}) {
   return CINEMAS.map((cinema) => ({
     id: cinema.ID,
-    name: cinema.Name,
+    name: normalizeCustomerFacingText(cinema.Name),
     currency: cinema.CurrencyCode || "AED",
     availableDates: USE_MOCK
       ? snapshotDatesForCinema(cinema.ID)
@@ -340,20 +341,23 @@ export function getDiscoveryMovieCatalog() {
 }
 
 function normalizeFilm(film) {
+  const rawGenres = rawField(film, "Genres", "genres");
+  const rawSubtitles = rawField(film, "Subtitles", "subtitles");
   return {
     id: rawField(film, "ScheduledFilmId", "scheduledFilmId", "id"),
-    title: rawField(film, "Title", "title") || "",
-    rating: rawField(film, "Rating", "rating") || "",
+    title: normalizeCustomerFacingText(rawField(film, "Title", "title")),
+    rating: normalizeCustomerFacingText(rawField(film, "Rating", "rating")),
     runtime: Number(rawField(film, "RunTime", "runtime")) || 0,
-    genre: rawField(film, "genre", "Genre") || "",
-    language: rawField(film, "Language", "language") || "",
-    languageName: rawField(film, "LanguageName", "languageName") || "",
-    synopsis: rawField(film, "Synopsis", "synopsis") || "",
-    genres: Array.isArray(rawField(film, "Genres", "genres")) && rawField(film, "Genres", "genres").length
-      ? rawField(film, "Genres", "genres")
-      : [rawField(film, "genre", "Genre") || "Film"],
-    subtitles: Array.isArray(rawField(film, "Subtitles", "subtitles")) ? rawField(film, "Subtitles", "subtitles") : [],
+    genre: normalizeCustomerFacingText(rawField(film, "genre", "Genre")),
+    language: normalizeCustomerFacingText(rawField(film, "Language", "language")),
+    languageName: normalizeCustomerFacingText(rawField(film, "LanguageName", "languageName")),
+    synopsis: normalizeCustomerFacingText(rawField(film, "Synopsis", "synopsis")),
+    genres: Array.isArray(rawGenres) && rawGenres.length
+      ? rawGenres.map(normalizeCustomerFacingText)
+      : [normalizeCustomerFacingText(rawField(film, "genre", "Genre") || "Film")],
+    subtitles: Array.isArray(rawSubtitles) ? rawSubtitles.map(normalizeCustomerFacingText) : [],
     posterUrl: rawField(film, "posterUrl", "PosterUrl") || null,
+    posterStatus: rawField(film, "PosterStatus", "posterStatus") || (rawField(film, "posterUrl", "PosterUrl") ? "official" : "missing_at_source"),
     tint: rawField(film, "tint", "Tint") || ["#63418D", "#B6186C"],
     dataMode: USE_MOCK ? "snapshot" : "live",
   };
@@ -380,7 +384,7 @@ function experiencesByScheduledFilm(sessions) {
       rawField(session, "Experience", "experience"),
       rawField(session, "ExperienceCode", "experienceCode"),
       rawField(session, "ScreenName", "screenName"),
-    ].map((value) => String(value || "").trim()).filter(Boolean);
+    ].map((value) => normalizeCustomerFacingText(value).trim()).filter(Boolean);
     const values = index.get(filmId) || new Set();
     labels.forEach((label) => values.add(label));
     index.set(filmId, values);
@@ -456,15 +460,15 @@ function normalizeSession(session, displayDate) {
     sessionIds: [sessionId],
     alternateSessionIds: [],
     time: showtime.slice(11, 16),
-    screen: rawField(session, "ScreenName", "screenName") || "",
-    exp: (Array.isArray(attributes) && attributes[0]) || rawField(session, "Experience", "experience") || "2D",
+    screen: normalizeCustomerFacingText(rawField(session, "ScreenName", "screenName")),
+    exp: normalizeCustomerFacingText((Array.isArray(attributes) && attributes[0]) || rawField(session, "Experience", "experience") || "2D"),
     seatsAvailable: Number(rawField(session, "SeatsAvailable", "seatsAvailable")) || 0,
     date: displayDate,
     sourceDate: showtime.slice(0, 10),
     programmingDate: programmingDateForSession(session),
     showtimeAt: showtime || null,
-    timeSlot: rawField(session, "TimeSlot", "timeSlot") || "",
-    status: rawField(session, "Status", "status") || "",
+    timeSlot: normalizeCustomerFacingText(rawField(session, "TimeSlot", "timeSlot")),
+    status: normalizeCustomerFacingText(rawField(session, "Status", "status")),
     isAvailableForOffer: rawField(session, "IsAvailableForOffer", "isAvailableForOffer") !== false,
     availabilityVerified: !USE_MOCK,
     dataMode: USE_MOCK ? "snapshot" : "live",

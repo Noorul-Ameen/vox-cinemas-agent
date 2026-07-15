@@ -40,4 +40,14 @@ validate({
   crawl: { startDate: "2026-07-14", complete: true, rawSessionCount: 3, duplicateCount: 1 },
 });
 
-console.log("Validated UAE tomorrow calculation, strict date parsing, and source-session deduplication.");
+validate({
+  programmingDates: ["2026-07-14"],
+  catalog: [{ code: "HO-NO-POSTER", title: "Upstream Poster Pending", posterUrl: "", posterStatus: "missing_at_source" }],
+  cinemas: flattened.cinemas,
+  sessions: flattened.sessions.map((item) => ({ ...item, code: "HO-NO-POSTER" })),
+  experienceMedia: [],
+  offerMedia: [],
+  crawl: { startDate: "2026-07-14", complete: true, rawSessionCount: 3, duplicateCount: 1, missingOfficialPosterCodes: ["HO-NO-POSTER"] },
+});
+
+console.log("Validated UAE date calculation, strict date parsing, source-session deduplication, and explicit missing-poster metadata.");

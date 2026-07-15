@@ -15,7 +15,10 @@ assert.deepEqual([...new Set(SESSIONS.map((session) => session.SessionAttributes
 assert.ok(FILMS.every((film) => film.Title && film.Rating && film.Genres?.length), "all scheduled movie metadata must include title, rating, and genres");
 assert.ok(FILMS.every((film) => film.LanguageName), "all movie language names must be explicit");
 assert.ok(FILMS.every((film) => Array.isArray(film.Subtitles)), "subtitle metadata must retain its source shape");
-assert.ok(FILMS.every((film) => /^https:\/\//.test(film.posterUrl)), "every scheduled film must use an official HTTPS poster URL");
+const missingPosterFilmIds = [...new Set(FILMS.filter((film) => !film.posterUrl).map((film) => film.ScheduledFilmId))].sort();
+assert.deepEqual(missingPosterFilmIds, [...(DATA_STATS.crawl?.missingOfficialPosterCodes || [])].sort(), "movies without an upstream poster must be recorded exactly");
+assert.ok(FILMS.filter((film) => film.posterUrl).every((film) => /^https:\/\//.test(film.posterUrl)), "every supplied movie poster must use an official HTTPS URL");
+assert.ok(FILMS.filter((film) => !film.posterUrl).every((film) => film.PosterStatus === "missing_at_source"), "an absent upstream poster must use the explicit placeholder state");
 
 const keys = SESSIONS.map((session) => [
   session.ScheduledFilmId,

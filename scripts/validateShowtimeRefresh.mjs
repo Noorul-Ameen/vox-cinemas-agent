@@ -10,12 +10,14 @@ const HOUR_MS = 60 * 60 * 1000;
 
 export function validateShowtimeRefresh(data, { previous = null, now = new Date() } = {}) {
   validateExtraction(data);
+  const today = uaeToday(now);
   const tomorrow = addDays(uaeToday(now), 1);
   const extractedAt = new Date(data.extractedAt);
   assert.ok(Number.isFinite(extractedAt.valueOf()), "extractedAt must be a valid timestamp");
   const ageHours = (now.valueOf() - extractedAt.valueOf()) / HOUR_MS;
   assert.ok(ageHours >= -0.25 && ageHours <= 30, `extraction must be less than 30 hours old; age is ${ageHours.toFixed(1)} hours`);
-  assert.equal(data.crawl?.startDate, tomorrow, `crawl must start tomorrow in UAE (${tomorrow})`);
+  assert.equal(data.crawl?.startDate, today, `crawl must start today in UAE (${today})`);
+  assert.ok(data.programmingDates.includes(today), `today ${today} must contain published sessions`);
   assert.ok(data.programmingDates.includes(tomorrow), `tomorrow ${tomorrow} must contain published sessions`);
   assert.equal(data.crawl?.lastAvailableDate, data.programmingDates.at(-1), "lastAvailableDate must match the latest extracted programming date");
   assert.deepEqual(data.crawl?.discoveredProgrammingDates, [...data.crawl.discoveredProgrammingDates].sort(), "discovered programming dates must be sorted");
@@ -27,6 +29,7 @@ export function validateShowtimeRefresh(data, { previous = null, now = new Date(
 
   const catalogCodes = new Set(data.catalog.map((movie) => movie.code));
   const keys = new Set();
+  let todaySessions = 0;
   let tomorrowSessions = 0;
   let afterMidnightSessions = 0;
   for (const session of data.sessions) {
@@ -39,14 +42,18 @@ export function validateShowtimeRefresh(data, { previous = null, now = new Date(
     const key = [session.code, session.cinemaCode, session.sessionId, session.showtime].join("\u001f");
     assert.ok(!keys.has(key), `duplicate official session key: ${key}`);
     keys.add(key);
+    if (session.programmingDate === today) todaySessions += 1;
     if (session.programmingDate === tomorrow) tomorrowSessions += 1;
     if (session.programmingDate !== session.date) afterMidnightSessions += 1;
   }
+  assert.ok(todaySessions > 0, `today ${today} must have sessions`);
   assert.ok(tomorrowSessions > 0, `tomorrow ${tomorrow} must have sessions`);
   assert.ok(afterMidnightSessions >= 0, "after-midnight programming-date accounting must remain valid");
 
-  for (const movie of data.catalog) {
-    assert.ok(/^https:\/\//.test(movie.posterUrl || ""), `movie ${movie.code} is missing an official HTTPS poster`);
+  const missingPosterCodes = data.catalog.filter((movie) => !movie.posterUrl).map((movie) => movie.code).sort();
+  assert.deepEqual(missingPosterCodes, [...(data.crawl?.missingOfficialPosterCodes || [])].sort(), "upstream movies without official posters must be recorded exactly");
+  for (const movie of data.catalog.filter((item) => item.posterUrl)) {
+    assert.ok(/^https:\/\//.test(movie.posterUrl), `movie ${movie.code} has a non-HTTPS poster URL`);
   }
   for (const item of [...(data.experienceMedia || []), ...(data.offerMedia || [])]) {
     for (const value of [item.imageUrl, item.backdropUrl, item.heroUrl, item.promoUrl, item.mobileUrl].filter(Boolean)) {
@@ -61,10 +68,14 @@ export function validateShowtimeRefresh(data, { previous = null, now = new Date(
     assert.ok(data.sessions.length >= minimumSessions, `session count dropped more than 40% (${previous.sessions.length} to ${data.sessions.length})`);
     assert.ok(data.catalog.length >= minimumFilms, `scheduled-film count dropped more than 40% (${previous.catalog.length} to ${data.catalog.length})`);
     assert.ok(Object.keys(data.cinemas).length >= minimumCinemas, "cinema coverage dropped unexpectedly");
+    assert.ok((data.experienceMedia || []).length >= (previous.experienceMedia || []).length, "verified experience media must not be dropped by a partial upstream response");
+    assert.ok((data.offerMedia || []).length >= (previous.offerMedia || []).length, "verified offer media must not be dropped by a partial upstream response");
   }
 
   return {
+    today,
     tomorrow,
+    todaySessions,
     tomorrowSessions,
     firstDate: data.programmingDates[0],
     lastDate: data.programmingDates.at(-1),
@@ -82,7 +93,7 @@ async function main() {
   const previous = previousPath && existsSync(previousPath) ? JSON.parse(await readFile(previousPath, "utf8")) : null;
   const now = process.env.VOX_REFRESH_NOW ? new Date(process.env.VOX_REFRESH_NOW) : new Date();
   const result = validateShowtimeRefresh(data, { previous, now });
-  console.log(`Validated fresh VOX UAE schedule: ${result.sessions} sessions, ${result.films} films, ${result.cinemas} cinemas, ${result.firstDate}..${result.lastDate}; tomorrow ${result.tomorrow} has ${result.tomorrowSessions} sessions.`);
+  console.log(`Validated fresh VOX UAE schedule: ${result.sessions} sessions, ${result.films} films, ${result.cinemas} cinemas, ${result.firstDate}..${result.lastDate}; today ${result.today} has ${result.todaySessions} sessions and tomorrow ${result.tomorrow} has ${result.tomorrowSessions} sessions.`);
 }
 
 if (resolve(process.argv[1] || "") === resolve(fileURLToPath(import.meta.url))) {

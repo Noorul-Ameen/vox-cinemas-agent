@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { rename, rm } from "node:fs/promises";
+import { readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -38,6 +38,39 @@ async function removeTemporaryFiles() {
   await Promise.all([nextJson, nextModule].map((path) => rm(path, { force: true }).catch(() => {})));
 }
 
+const mediaKey = (item) => String(item?.code || item?.slug || item?.name || "").trim().toLowerCase();
+
+function mergeOfficialMedia(previousItems = [], nextItems = []) {
+  const merged = new Map();
+  for (const item of previousItems) {
+    const key = mediaKey(item);
+    if (key) merged.set(key, item);
+  }
+  for (const item of nextItems) {
+    const key = mediaKey(item);
+    if (key) merged.set(key, item);
+  }
+  return [...merged.values()];
+}
+
+async function retainPreviouslyVerifiedMedia() {
+  if (!existsSync(currentJson)) return;
+  const [previous, next] = await Promise.all([
+    readFile(currentJson, "utf8").then(JSON.parse),
+    readFile(nextJson, "utf8").then(JSON.parse),
+  ]);
+  const freshExperienceKeys = new Set((next.experienceMedia || []).map(mediaKey).filter(Boolean));
+  const freshOfferKeys = new Set((next.offerMedia || []).map(mediaKey).filter(Boolean));
+  next.experienceMedia = mergeOfficialMedia(previous.experienceMedia, next.experienceMedia);
+  next.offerMedia = mergeOfficialMedia(previous.offerMedia, next.offerMedia);
+  next.crawl = {
+    ...next.crawl,
+    retainedExperienceMediaCount: next.experienceMedia.filter((item) => !freshExperienceKeys.has(mediaKey(item))).length,
+    retainedOfferMediaCount: next.offerMedia.filter((item) => !freshOfferKeys.has(mediaKey(item))).length,
+  };
+  await writeFile(nextJson, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+}
+
 async function restoreBackups() {
   await rm(currentJson, { force: true }).catch(() => {});
   await rm(currentModule, { force: true }).catch(() => {});
@@ -54,6 +87,7 @@ try {
     "--workers", process.env.VOX_REFRESH_WORKERS || "2",
   ];
   await run(process.execPath, extractorArgs, "extract official VOX UAE schedule");
+  await retainPreviouslyVerifiedMedia();
   await run(process.execPath, [resolve(root, "scripts/validateShowtimeRefresh.mjs"), nextJson, currentJson], "validate freshness and completeness");
   await run(python, [resolve(root, "convert_extraction.py"), nextJson, nextModule], "generate Vista-shaped browser data");
 

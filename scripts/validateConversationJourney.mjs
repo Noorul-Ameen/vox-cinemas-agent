@@ -12,7 +12,7 @@ const logicalId = "voxi-logical-1";
 let state = createConversationJourney(logicalId);
 state = syncJourney(state, {
   locale: "en",
-  cinema: { id: "c1", name: "VOX — Test" },
+  cinema: { id: "c1", name: "VOX - Test" },
   scheduleDate: "2026-07-14",
   stage: {
     view: "seatmap",
@@ -30,7 +30,7 @@ assert.deepEqual(state.seats, ["A1", "A2"]);
 assert.equal(state.bookingProgress, "seat_selection");
 
 const movieBrowseState = syncJourney(state, {
-  cinema: { id: "c1", name: "VOX — Test" },
+  cinema: { id: "c1", name: "VOX - Test" },
   scheduleDate: "2026-07-14",
   stage: { view: "movies", movies: [] },
   selectedSeats: [],
