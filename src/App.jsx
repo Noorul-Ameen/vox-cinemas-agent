@@ -16,7 +16,7 @@ import { isCinemaSelectionTurn, isDirectCinemaSelectionUtterance, resolveCinemaC
 import { bookingHistoryAgentContext, classifyBookingHistoryRequest, isCurrentBooking, isDirectCancellationRequest, resolveCancellationTarget } from "./lib/cancellationRouting.js";
 import { CANCELLATION_JOURNAL_TTL_MS, classifyRefundFailure, hydrateCancellationJournal, normalizeCancellationJournal, withCancellationMutationLock } from "./lib/cancellationSafety.js";
 import { normalizeElevenLabsMessageEvent } from "./lib/conversationMessage.js";
-import { normalizeCustomerFacingText } from "./lib/customerFacingText.js";
+import { normalizeCustomerFacingFields, normalizeCustomerFacingText } from "./lib/customerFacingText.js";
 import { explicitLanguageRequest, resolveLanguageSignal } from "./lib/languageSwitch.js";
 import { buildTransportHandoff, createConversationJourney, inferIntent, journeyDynamicVariables, journeyReducer, syncJourney } from "./lib/conversationJourney.js";
 import { resolveProgrammingDateSelection, resolveVisibleSelectionProgrammingDate } from "./lib/programmingDateSelection.js";
@@ -511,20 +511,21 @@ export default function App() {
 
   const setCancellationFlow = useCallback((nextFlow) => {
     const resolved = typeof nextFlow === "function" ? nextFlow(cancellationFlowRef.current) : nextFlow;
-    cancellationFlowRef.current = resolved || null;
-    setCancellationState(resolved ? {
-      phase: resolved.phase || "idle",
-      bookingRef: resolved.bookingRef || null,
-      demoOnly: Boolean(resolved.demoOnly),
-      refundRoute: resolved.refundRoute || null,
-      message: resolved.message || null,
-      error: resolved.error || null,
-      retryAllowed: resolved.retryAllowed !== false,
-      dismissAllowed: resolved.dismissAllowed !== false,
-      outcomeUnknown: Boolean(resolved.outcomeUnknown),
-      journalStartedAt: Number.isFinite(Number(resolved.journalStartedAt)) ? Number(resolved.journalStartedAt) : null,
+    const customerSafe = normalizeCustomerFacingFields(resolved, ["refundRoute", "message", "error"]);
+    cancellationFlowRef.current = customerSafe || null;
+    setCancellationState(customerSafe ? {
+      phase: customerSafe.phase || "idle",
+      bookingRef: customerSafe.bookingRef || null,
+      demoOnly: Boolean(customerSafe.demoOnly),
+      refundRoute: customerSafe.refundRoute || null,
+      message: customerSafe.message || null,
+      error: customerSafe.error || null,
+      retryAllowed: customerSafe.retryAllowed !== false,
+      dismissAllowed: customerSafe.dismissAllowed !== false,
+      outcomeUnknown: Boolean(customerSafe.outcomeUnknown),
+      journalStartedAt: Number.isFinite(Number(customerSafe.journalStartedAt)) ? Number(customerSafe.journalStartedAt) : null,
     } : IDLE_CANCELLATION_STATE);
-    return resolved || null;
+    return customerSafe || null;
   }, []);
 
   const deviceSessionIsCurrent = () => {
@@ -704,13 +705,13 @@ export default function App() {
       return quote;
     } catch (error) {
       if (requestId !== seatQuoteRequestRef.current || !sameSeatSelection(seatsRef.current, normalizedSeats)) return null;
-      setSeatQuote({ seatKey, loading: false, quote: null, error: error?.message || "Pricing is unavailable." });
+      setSeatQuote({ seatKey, loading: false, quote: null, error: normalizeCustomerFacingText(error?.message || "Pricing is unavailable.") });
       return null;
     }
   };
 
   const showStage = useCallback((nextStage) => {
-    const next = nextStage || { view: "empty" };
+    const next = normalizeCustomerFacingFields(nextStage || { view: "empty" }, ["label", "notice", "error", "question", "reason"]);
     stageRevisionRef.current += 1;
     stageRef.current = next;
     lastActivityRef.current = Date.now();

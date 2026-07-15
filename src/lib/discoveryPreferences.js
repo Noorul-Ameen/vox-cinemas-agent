@@ -454,6 +454,7 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
   const patch = signal.patch || {};
   const clear = new Set(signal.clear || []);
   if (!value || patch.movieTitle || patch.movieId || clear.has("movieTitle") || clear.has("movieId")) return null;
+  if (/^\s*(?:ما|ماذا|أي|اي)\s+(?:(?:هي|هو)\s+)?(?:الأفلام|الافلام|أفلام|افلام)(?:\s|$)/iu.test(value)) return null;
   if (/^(?:أريد|اريد)\s+فيلم(?:ا[\u064b-\u065f]*)?\s+(?:في|حوالي)(?:\s|$)/iu.test(value)) return null;
 
   const direct = value.match(/\b(?:movie|film)\s+(?:called|named)\s+(.+)/iu)

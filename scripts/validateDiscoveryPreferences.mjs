@@ -64,6 +64,28 @@ assert.deepEqual(textResult.preferences, voiceResult.preferences, "text and voic
 assert.equal(textResult.preferences.audience, "kids_family");
 assert.equal(textResult.preferences.date, "2026-07-15");
 
+const arabicDiscoveryQuery = "ما هي الأفلام العربية في مول الإمارات غداً؟";
+const arabicDiscoverySignal = extractDiscoveryPreferencePatch(arabicDiscoveryQuery, { cinemas, movies, now: NOW });
+assert.deepEqual(arabicDiscoverySignal.patch, {
+  cinemaId: "0002",
+  cinemaName: "Mall of the Emirates",
+  city: "Dubai",
+  date: "2026-07-15",
+  dateSignal: "tomorrow",
+  language: "Arabic",
+}, "an Arabic discovery question must retain its supplied cinema, date, and language");
+assert.equal(
+  unresolvedMovieTitleCandidate(arabicDiscoveryQuery, arabicDiscoverySignal),
+  null,
+  "an Arabic discovery question must not become an unresolved movie title",
+);
+const arabicDiscoveryPreferences = parseAndMergeDiscoveryPreferences({}, arabicDiscoveryQuery, { cinemas, movies, now: NOW }).preferences;
+assert.equal(arabicDiscoveryPreferences.movieId, null);
+assert.equal(arabicDiscoveryPreferences.movieTitle, null);
+const arabicDiscoveryResults = filterDiscoveryResults({ movies, sessions, cinemas, preferences: arabicDiscoveryPreferences });
+assert.deepEqual(arabicDiscoveryResults.movies.map((movie) => movie.id), ["laugh"], "Arabic discovery must return only Arabic-language movies");
+assert.ok(arabicDiscoveryResults.sessions.every((session) => session.scheduledFilmId === "laugh" && session.cinemaId === "0002" && session.programmingDate === "2026-07-15"));
+
 for (const datePhrase of ["I want to go on 17th", "I'm looking to go on, um, 17th", "17th", "I want to go on July 17th", "I want to go on 2026-07-17"]) {
   const parsedDate = extractDiscoveryPreferencePatch(datePhrase, { now: NOW });
   assert.equal(parsedDate.patch.date, "2026-07-17", `the spoken date must be retained for: ${datePhrase}`);

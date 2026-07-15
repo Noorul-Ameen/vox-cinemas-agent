@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   hasForbiddenCustomerFacingDash,
+  normalizeCustomerFacingFields,
   normalizeCustomerFacingText,
 } from "../src/lib/customerFacingText.js";
 import { STRINGS } from "../src/i18n/strings.js";
@@ -63,6 +64,14 @@ const forbiddenSample = `before${String.fromCodePoint(0x2013)}middle${String.fro
 assert.equal(normalizeCustomerFacingText(forbiddenSample), "before-middle-after");
 assert.equal(hasForbiddenCustomerFacingDash(forbiddenSample), true);
 assert.equal(hasForbiddenCustomerFacingDash(normalizeCustomerFacingText(forbiddenSample)), false);
+assert.deepEqual(
+  normalizeCustomerFacingFields(
+    { error: forbiddenSample, message: forbiddenSample, untouched: forbiddenSample },
+    ["error", "message"],
+  ),
+  { error: "before-middle-after", message: "before-middle-after", untouched: forbiddenSample },
+  "dynamic customer-facing response fields must be normalized at their state boundary",
+);
 
 for (const [surface, value] of Object.entries({
   translations: STRINGS,
