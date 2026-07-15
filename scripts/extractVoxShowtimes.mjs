@@ -98,10 +98,25 @@ async function fetchWithTimeout(url, options = {}) {
   finally { clearTimeout(timeout); }
 }
 
+async function fetchPublicResource(url, options, label) {
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(url, options);
+      if (response.ok || (response.status < 500 && response.status !== 429)) return response;
+      lastError = new Error(`${label}: HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt < 2) await sleep(BACKOFF_MS * 2 ** attempt + Math.floor(Math.random() * 250));
+  }
+  throw new Error(`${label} failed after 3 attempts: ${lastError?.message || "unknown error"}`);
+}
+
 async function discoverPublicApiKey() {
   if (process.env.VOX_PUBLIC_API_KEY) return process.env.VOX_PUBLIC_API_KEY;
   const pageUrl = `${SITE}/movies/whatson`;
-  const response = await fetchWithTimeout(pageUrl, { headers: { ...BROWSER_HEADERS, accept: "text/html" } });
+  const response = await fetchPublicResource(pageUrl, { headers: { ...BROWSER_HEADERS, accept: "text/html" } }, "API bootstrap page");
   if (!response.ok) throw new Error(`API bootstrap page: HTTP ${response.status}`);
   const html = await response.text();
   const direct = html.match(/apiKey\s*:\s*["']([A-Za-z0-9_-]{24,})["']/)?.[1];
@@ -115,11 +130,15 @@ async function discoverPublicApiKey() {
     while (!discovered && cursor < scriptUrls.length) {
       const url = scriptUrls[cursor];
       cursor += 1;
-      const scriptResponse = await fetchWithTimeout(url, { headers: { ...BROWSER_HEADERS, accept: "*/*" } });
-      if (!scriptResponse.ok) continue;
-      const script = await scriptResponse.text();
-      const match = script.match(/apiKey\s*:\s*["']([A-Za-z0-9_-]{24,})["']/);
-      if (match) discovered = match[1];
+      try {
+        const scriptResponse = await fetchWithTimeout(url, { headers: { ...BROWSER_HEADERS, accept: "*/*" } });
+        if (!scriptResponse.ok) continue;
+        const script = await scriptResponse.text();
+        const match = script.match(/apiKey\s*:\s*["']([A-Za-z0-9_-]{24,})["']/);
+        if (match) discovered = match[1];
+      } catch {
+        // A single nonessential bundle failure must not abort key discovery.
+      }
     }
   }
   await Promise.all(Array.from({ length: 3 }, () => worker()));

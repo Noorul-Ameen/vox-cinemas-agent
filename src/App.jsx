@@ -20,9 +20,11 @@ import { explicitLanguageRequest, resolveLanguageSignal } from "./lib/languageSw
 import { buildTransportHandoff, createConversationJourney, inferIntent, journeyDynamicVariables, journeyReducer, syncJourney } from "./lib/conversationJourney.js";
 import { resolveProgrammingDateSelection, resolveVisibleSelectionProgrammingDate } from "./lib/programmingDateSelection.js";
 import { createDiscoveryPreferences, extractDiscoveryPreferencePatch, filterDiscoveryResults, getMissingDiscoveryCriteria, mergeDiscoveryPreferences, parseAndMergeDiscoveryPreferences, resolveDiscoveryMovieCandidate, shouldTreatAsDiscoveryFilterTurn, unresolvedMovieTitleCandidate } from "./lib/discoveryPreferences.js";
+import { buildAuthoritativeDiscoveryContext } from "./lib/discoveryResultContext.js";
 import { normalizeSeatIds, resolveSeatSelectionTurn, resolveSeatToolInput } from "./lib/seatRouting.js";
 import { filterBookableSessions } from "./lib/showtimeAvailability.js";
 import { startTransportWithRetirement } from "./lib/transportStart.js";
+import { ELEVENLABS_WORKLET_PATHS, VOICE_MIC_PERMISSION_TIMEOUT_MS, VOICE_TRANSPORT_START_TIMEOUT_MS, voiceStartupErrorKey } from "./lib/voiceStartup.js";
 import { VOXI_AGENT_PROMPT, VOXI_FIRST_MESSAGES, buildVoxiContext } from "./lib/voxiSession.js";
 import { OFFER_META } from "./offers/offersData.js";
 import { resolveOffer, resolveOfferForBankAndCard } from "./offers/offerResolver.js";
@@ -2564,7 +2566,7 @@ export default function App() {
             if (result?.stale) return;
             const count = Array.isArray(result?.movies) ? result.movies.length : 0;
             const retained = discoveryPreferencesRef.current;
-            conversation.sendContextualUpdate?.(`The widget applied all supplied discovery criteria. Visible result: ${result?.shown || "none"}; movie count: ${count}; missing: ${(result?.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${retained.preferredTime || retained.timeBand || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; movie: ${retained.movieTitle || "not supplied"}. Ask only the first missing item and do not list unfiltered movies.${normalizedCinemaTurn !== safeMessage ? ` Authoritative speech-recognition correction: “${safeMessage}” means “${normalizedCinemaTurn}”.` : ""}${result?.time?.usedNearestFallback ? ` No exact ${result.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}`);
+            conversation.sendContextualUpdate?.(`The widget applied all supplied discovery criteria. Visible result: ${result?.shown || "none"}; movie count: ${count}; missing: ${(result?.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${retained.preferredTime || retained.timeBand || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; movie: ${retained.movieTitle || "not supplied"}. ${buildAuthoritativeDiscoveryContext(result)} Ask only the first missing item and do not list unfiltered movies.${normalizedCinemaTurn !== safeMessage ? ` Authoritative speech-recognition correction: “${safeMessage}” means “${normalizedCinemaTurn}”.` : ""}${result?.time?.usedNearestFallback ? ` No exact ${result.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}`);
           }).catch((error) => {
             conversation.sendContextualUpdate?.(`Filtered discovery could not be completed: ${error?.message || "unknown error"}. Do not claim that movie results are displayed.`);
           });
@@ -2820,7 +2822,7 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, [clearConversationState, conversation, say, t]);
 
-  const startTransportWithGuards = useCallback(async (options, epoch) => {
+  const startTransportWithGuards = useCallback(async (options, epoch, timeoutMs) => {
     const generation = transportGenerationRef.current;
     const transport = transportRef.current;
     if (!transport) throw new Error("Conversation transport is restarting");
@@ -2831,6 +2833,7 @@ export default function App() {
         if (sessionEpochRef.current === epoch) sessionEpochRef.current += 1;
         retireTransportGeneration(generation);
       },
+      timeoutMs,
     });
     if (epoch !== sessionEpochRef.current || generation !== transportGenerationRef.current) {
       switchingSessionRef.current = true;
@@ -2953,7 +2956,7 @@ export default function App() {
           permissionStream = await Promise.race([
             permissionRequest,
             new Promise((_, reject) => {
-              permissionTimer = window.setTimeout(() => reject(new Error("Microphone permission timed out")), 10000);
+              permissionTimer = window.setTimeout(() => reject(new Error("Microphone permission timed out")), VOICE_MIC_PERMISSION_TIMEOUT_MS);
             }),
           ]);
         } catch (error) {
@@ -2980,13 +2983,14 @@ export default function App() {
           agentId: import.meta.env.VITE_AGENT_ID,
           connectionType: "webrtc",
           textOnly: false,
+          workletPaths: ELEVENLABS_WORKLET_PATHS,
           dynamicVariables: {
             ...journeyDynamicVariables(handoffJourney, { continuation }),
             voxi_session_opening: continuation
               ? (activeLocale === "ar" ? "نكمل من حيث توقفنا في طلبك الحالي." : "Let’s continue from your current booking or enquiry step.")
               : VOXI_FIRST_MESSAGES[activeLocale],
           },
-        }, epoch);
+        }, epoch, VOICE_TRANSPORT_START_TIMEOUT_MS);
         if (!startedConversationId || epoch !== sessionEpochRef.current) return false;
         hasStartedConversationRef.current = true;
         const nextTransportId = startedConversationId === "connected" ? conversation.getId?.() || null : startedConversationId;
@@ -3029,7 +3033,7 @@ export default function App() {
           sessionModeRef.current = null;
           setSessionMode(null);
         }
-        say("system", t("app.voiceStartError"));
+        say("system", t(voiceStartupErrorKey(error)));
       }
     })();
     const entry = { mode: "voice", promise: start };
@@ -3146,7 +3150,7 @@ export default function App() {
       if (discoveryRouteResult) {
         const retained = discoveryPreferencesRef.current;
         const movieCount = Array.isArray(discoveryRouteResult.movies) ? discoveryRouteResult.movies.length : 0;
-        conversation.sendContextualUpdate?.(`The widget applied every supplied discovery criterion. Visible result: ${discoveryRouteResult.shown || "none"}; movie count: ${movieCount}; missing: ${(discoveryRouteResult.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${retained.preferredTime || retained.timeBand || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; movie: ${retained.movieTitle || "not supplied"}. Ask only the first missing item and do not list unfiltered movies.${discoveryRouteResult.time?.usedNearestFallback ? ` No exact ${discoveryRouteResult.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}`);
+        conversation.sendContextualUpdate?.(`The widget applied every supplied discovery criterion. Visible result: ${discoveryRouteResult.shown || "none"}; movie count: ${movieCount}; missing: ${(discoveryRouteResult.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${retained.preferredTime || retained.timeBand || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; movie: ${retained.movieTitle || "not supplied"}. ${buildAuthoritativeDiscoveryContext(discoveryRouteResult)} Ask only the first missing item and do not list unfiltered movies.${discoveryRouteResult.time?.usedNearestFallback ? ` No exact ${discoveryRouteResult.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}`);
       }
       if (details.requestedSeatTarget) conversation.sendContextualUpdate?.(`The guest would like ${details.requestedSeatTarget} tickets. Treat this only as a target and guide them to select ${details.requestedSeatTarget} seats. The number of selected seats is the actual ticket count and controls pricing.`);
       if (seatRoutePromise) {
@@ -4037,14 +4041,14 @@ export default function App() {
         isActive={isTransportGenerationActive}
         onStatus={updateTransportStatus}
       />
-      <style>{`.voxi-chip-row::-webkit-scrollbar{display:none}.voxi-widget :is(button,input,select,summary):focus-visible{outline:2px solid ${C.lavender}!important;outline-offset:2px;box-shadow:0 0 0 4px rgba(228,220,240,.16)}`}</style>
-      <div className="voxi-widget" style={{ width: "100%", maxWidth: 420, height: "min(860px, 96vh)", display: "flex", flexDirection: "column", borderRadius: 28, overflow: "hidden", boxShadow: "0 20px 60px rgba(0,0,0,.55)", background: C.ink, border: "1px solid rgba(255,255,255,.06)" }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, borderBottom: "1px solid rgba(255,255,255,.08)", padding: "11px 12px", flexShrink: 0 }}>
+      <style>{`.voxi-chip-row::-webkit-scrollbar{display:none}.voxi-widget :is(button,input,select,summary):focus-visible{outline:2px solid ${C.focus}!important;outline-offset:2px;box-shadow:0 0 0 4px rgba(0,157,219,.18)}`}</style>
+      <div className="voxi-widget" style={{ width: "100%", maxWidth: 420, height: "min(860px, 96vh)", display: "flex", flexDirection: "column", borderRadius: 28, overflow: "hidden", boxShadow: `0 20px 60px ${C.shadow}`, background: C.surface, border: `1px solid ${C.border}` }}>
+        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, borderBottom: `1px solid ${C.border}`, padding: "11px 12px", flexShrink: 0, background: C.surface }}>
           <div style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 9 }}>
-            <div style={{ display: "flex", height: 32, width: 32, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 8, fontWeight: 900, color: "#fff", background: C.magenta }}>V</div>
+            <div style={{ display: "flex", height: 32, width: 32, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 8, fontWeight: 900, color: C.onPrimary, background: C.primary }}>V</div>
               <div style={{ minWidth: 0 }}>
-                <div style={{ overflow: "hidden", fontSize: 14, fontWeight: 700, color: "#fff", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("app.title")}</div>
-                <div dir="ltr" style={{ overflow: "hidden", maxWidth: 128, color: "rgba(255,255,255,.48)", fontSize: 10, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("app.brand")}</div>
+                <div style={{ overflow: "hidden", fontSize: 14, fontWeight: 700, color: C.text, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("app.title")}</div>
+                <div dir="ltr" style={{ overflow: "hidden", maxWidth: 128, color: C.muted, fontSize: 10, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t("app.brand")}</div>
               </div>
             </div>
             <div style={{ display: "flex", flexShrink: 0, alignItems: "center", gap: 4 }}>
@@ -4053,29 +4057,29 @@ export default function App() {
               <TopButton label={t("app.history")} onClick={openHistory}><History size={14} /></TopButton>
               <TopButton label={t("app.restart")} onClick={() => restartConversation("manual_restart")}><RotateCcw size={14} /></TopButton>
               <LanguageSelector locale={locale} label={t("app.language")} onSelect={changeLanguage} />
-            <span role="status" aria-live="polite" title={statusLabel} aria-label={statusLabel} style={{ display: "flex", width: 18, height: 28, alignItems: "center", justifyContent: "center", color: "rgba(255,255,255,.52)" }}>
-              <span style={{ height: 7, width: 7, borderRadius: 999, background: isConnected ? C.green : status === "connecting" ? "#D9A94B" : "#777" }} />
+            <span role="status" aria-live="polite" title={statusLabel} aria-label={statusLabel} style={{ display: "flex", width: 18, height: 28, alignItems: "center", justifyContent: "center", color: C.muted }}>
+              <span style={{ height: 7, width: 7, borderRadius: 999, background: isConnected ? C.green : status === "connecting" ? C.warning : C.muted }} />
               <span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)" }}>{statusLabel}</span>
             </span>
           </div>
         </header>
 
-        <main ref={scrollRef} aria-label={t("app.conversation")} style={{ flex: 1, minHeight: 0, overflowX: "hidden", overflowY: "auto", padding: 16, background: `radial-gradient(120% 60% at 50% -10%, ${C.screen}, ${C.ink})` }}>
+        <main ref={scrollRef} aria-label={t("app.conversation")} style={{ flex: 1, minHeight: 0, overflowX: "hidden", overflowY: "auto", padding: 16, background: `linear-gradient(180deg, ${C.canvas}, ${C.primarySoft})` }}>
           {!!messages.length && (
             <div role="log" aria-live="polite" aria-relevant="additions text" style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: stage.view === "empty" ? 0 : 14 }}>
               {messages.map((message, index) => (
                 <div key={message.id || `${message.at}-${index}`} style={{ display: "flex", justifyContent: message.role === "user" ? "flex-end" : "flex-start" }}>
-                  <div dir="auto" style={{ maxWidth: "85%", borderRadius: 16, padding: "9px 13px", fontSize: 13, lineHeight: 1.35, overflowWrap: "anywhere", background: message.role === "user" ? C.purple : message.role === "system" ? "rgba(255,255,255,.03)" : "rgba(255,255,255,.06)", color: message.role === "system" ? "rgba(255,255,255,.5)" : message.role === "user" ? "#fff" : "rgba(255,255,255,.9)", fontStyle: message.role === "system" ? "italic" : "normal" }}>{message.text}</div>
+                  <div dir="auto" style={{ maxWidth: "85%", borderRadius: 16, border: message.role === "user" ? 0 : `1px solid ${C.border}`, padding: "9px 13px", fontSize: 13, lineHeight: 1.35, overflowWrap: "anywhere", background: message.role === "user" ? C.primary : message.role === "system" ? C.surfaceAlt : C.surface, color: message.role === "system" ? C.muted : message.role === "user" ? C.onPrimary : C.text, boxShadow: message.role === "assistant" ? `0 4px 14px ${C.shadow}` : "none", fontStyle: message.role === "system" ? "italic" : "normal" }}>{message.text}</div>
                 </div>
               ))}
             </div>
           )}
           {stage.view === "empty" && (!messages.length || messages.every((message) => message.role === "system")) && (
             <div style={{ display: "flex", height: "100%", minHeight: 240, flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-              <div style={{ display: "flex", height: 56, width: 56, alignItems: "center", justifyContent: "center", borderRadius: 16, background: "rgba(182,24,108,.15)", marginBottom: 16 }}><Sparkles color={C.lavender} size={26} /></div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#fff" }}>{t("app.emptyTitle")}</div>
-              <p style={{ maxWidth: 280, marginTop: 8, fontSize: 13, lineHeight: 1.5, color: "rgba(255,255,255,.5)" }}>{t("app.emptyBody")}</p>
-              {!cinema && <button type="button" onClick={openCinemaPicker} style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 12, border: 0, borderRadius: 999, background: C.magenta, padding: "9px 15px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}><MapPin size={14} />{t("app.chooseCinema")}</button>}
+              <div style={{ display: "flex", height: 56, width: 56, alignItems: "center", justifyContent: "center", borderRadius: 16, background: C.primarySoft, marginBottom: 16 }}><Sparkles color={C.brand} size={26} /></div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>{t("app.emptyTitle")}</div>
+              <p style={{ maxWidth: 280, marginTop: 8, fontSize: 13, lineHeight: 1.5, color: C.muted }}>{t("app.emptyBody")}</p>
+              {!cinema && <button type="button" onClick={openCinemaPicker} style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 12, border: 0, borderRadius: 999, background: C.primary, padding: "9px 15px", color: C.onPrimary, fontSize: 12, fontWeight: 700, cursor: "pointer" }}><MapPin size={14} />{t("app.chooseCinema")}</button>}
             </div>
           )}
           {stage.view !== "empty" && <div ref={stageAnchorRef} aria-hidden="true" />}
@@ -4100,7 +4104,7 @@ export default function App() {
           {stage.view === "history" && <BookingHistory bookings={bookings} filter={historyFilter} onCancel={cancelHistoryBooking} onSelect={selectHistoryBooking} onBack={restoreHistoryReturn} />}
           {stage.view === "offers" && (
             <div>
-              {stage.showtimeRequired && <div role="status" style={{ marginBottom: 10, borderRadius: 10, background: "rgba(217,169,75,.12)", padding: "9px 11px", color: "#EAD19A", fontSize: 10, lineHeight: 1.45 }}>{t("offers.showtimeRequired")}</div>}
+              {stage.showtimeRequired && <div role="status" style={{ marginBottom: 10, borderRadius: 10, background: C.warningSoft, padding: "9px 11px", color: C.warning, fontSize: 10, lineHeight: 1.45 }}>{t("offers.showtimeRequired")}</div>}
               <OffersPanel
                 locale={locale}
                 context={stage.context}
@@ -4127,14 +4131,14 @@ export default function App() {
           }} />}
         </main>
 
-        <section aria-label={t("app.conversation")} style={{ display: "flex", flexDirection: "column", borderTop: "1px solid rgba(255,255,255,.08)", background: C.ink2, flexShrink: 0 }}>
+        <section aria-label={t("app.conversation")} style={{ display: "flex", flexDirection: "column", borderTop: `1px solid ${C.border}`, background: C.surface, flexShrink: 0 }}>
           <div className="voxi-chip-row" style={{ display: "flex", gap: 6, overflowX: "auto", padding: "0 16px 8px", scrollbarWidth: "none" }}>
-            {chips.map((chip) => <button key={chip} onClick={() => sendText(chip)} style={{ flexShrink: 0, borderRadius: 999, border: "1px solid rgba(255,255,255,.15)", background: "none", padding: "5px 11px", color: "rgba(255,255,255,.7)", fontSize: 11, whiteSpace: "nowrap", cursor: "pointer" }}>{chip}</button>)}
+            {chips.map((chip) => <button key={chip} onClick={() => sendText(chip)} style={{ flexShrink: 0, borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, padding: "5px 11px", color: C.primary, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer" }}>{chip}</button>)}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, borderTop: "1px solid rgba(255,255,255,.08)", padding: 12 }}>
-            <button onClick={isConnected && sessionMode === "voice" ? endVoiceSession : startVoiceSession} disabled={startingMode === "voice"} title={isConnected && sessionMode === "voice" ? t("app.endVoice") : t("app.enableVoice")} aria-label={isConnected && sessionMode === "voice" ? t("app.endVoice") : t("app.enableVoice")} style={{ display: "flex", height: 40, width: 40, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 999, border: "none", cursor: startingMode === "voice" ? "progress" : "pointer", color: "#fff", opacity: startingMode === "voice" ? 0.65 : 1, background: isConnected && sessionMode === "voice" ? "#8D2E3A" : `radial-gradient(circle at 35% 30%, ${C.lavender}, ${C.purple})` }}>{isConnected && sessionMode === "voice" ? <MicOff size={17} /> : <Mic size={17} />}</button>
-            <input dir="auto" value={input} onChange={(event) => { lastActivityRef.current = Date.now(); setInput(event.target.value); if (isConnected && conversation.sendUserActivity) conversation.sendUserActivity(); }} onKeyDown={(event) => event.key === "Enter" && !event.nativeEvent.isComposing && sendText()} placeholder={t("app.inputPlaceholder")} aria-label={t("app.inputPlaceholder")} style={{ minWidth: 0, flex: 1, border: "none", borderRadius: 999, outline: "none", background: "rgba(255,255,255,.05)", padding: "10px 14px", color: "#fff", fontSize: 14, textAlign: "start" }} />
-            <button onClick={() => sendText()} disabled={!input.trim()} aria-label={t("app.send")} style={{ display: "flex", height: 36, width: 36, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 999, border: "none", cursor: "pointer", color: "#fff", background: C.magenta, opacity: input.trim() ? 1 : 0.3 }}><Send size={16} /></button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}`, padding: 12 }}>
+            <button onClick={isConnected && sessionMode === "voice" ? endVoiceSession : startVoiceSession} disabled={startingMode === "voice"} title={isConnected && sessionMode === "voice" ? t("app.endVoice") : t("app.enableVoice")} aria-label={isConnected && sessionMode === "voice" ? t("app.endVoice") : t("app.enableVoice")} style={{ display: "flex", height: 40, width: 40, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 999, border: "none", cursor: startingMode === "voice" ? "progress" : "pointer", color: C.onPrimary, opacity: startingMode === "voice" ? 0.65 : 1, background: isConnected && sessionMode === "voice" ? C.danger : C.primary }}>{isConnected && sessionMode === "voice" ? <MicOff size={17} /> : <Mic size={17} />}</button>
+            <input dir="auto" value={input} onChange={(event) => { lastActivityRef.current = Date.now(); setInput(event.target.value); if (isConnected && conversation.sendUserActivity) conversation.sendUserActivity(); }} onKeyDown={(event) => event.key === "Enter" && !event.nativeEvent.isComposing && sendText()} placeholder={t("app.inputPlaceholder")} aria-label={t("app.inputPlaceholder")} style={{ minWidth: 0, flex: 1, border: `1px solid ${C.border}`, borderRadius: 999, outline: "none", background: C.surfaceAlt, padding: "10px 14px", color: C.text, fontSize: 14, textAlign: "start" }} />
+            <button onClick={() => sendText()} disabled={!input.trim()} aria-label={t("app.send")} style={{ display: "flex", height: 36, width: 36, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 999, border: "none", cursor: "pointer", color: C.onPrimary, background: C.primary, opacity: input.trim() ? 1 : 0.3 }}><Send size={16} /></button>
           </div>
         </section>
       </div>
@@ -4143,7 +4147,7 @@ export default function App() {
 }
 
 function TopButton({ label, onClick, children }) {
-  return <button type="button" title={label} aria-label={label} onClick={onClick} style={{ display: "grid", width: 28, height: 28, flexShrink: 0, placeItems: "center", border: 0, borderRadius: 8, background: "rgba(255,255,255,.05)", color: "rgba(255,255,255,.62)", cursor: "pointer" }}>{children}</button>;
+  return <button type="button" title={label} aria-label={label} onClick={onClick} style={{ display: "grid", width: 28, height: 28, flexShrink: 0, placeItems: "center", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surfaceAlt, color: C.primary, cursor: "pointer" }}>{children}</button>;
 }
 
 function DateStrip({ dates, selected, locale, label, onSelect }) {
@@ -4156,7 +4160,7 @@ function DateStrip({ dates, selected, locale, label, onSelect }) {
   return (
     <div role="group" aria-label={label} className="voxi-chip-row" style={{ display: "flex", gap: 6, overflowX: "auto", marginBottom: 14, paddingBottom: 2, scrollbarWidth: "none" }}>
       {dates.map((date) => (
-        <button key={date} type="button" aria-pressed={date === selected} onClick={() => onSelect(date)} style={{ flexShrink: 0, border: date === selected ? `1px solid ${C.magenta}` : "1px solid rgba(255,255,255,.12)", borderRadius: 10, background: date === selected ? "rgba(182,24,108,.18)" : "rgba(255,255,255,.035)", padding: "7px 10px", color: date === selected ? "#fff" : "rgba(255,255,255,.62)", fontSize: 10, fontWeight: date === selected ? 700 : 500, cursor: "pointer" }}>
+        <button key={date} type="button" aria-pressed={date === selected} onClick={() => onSelect(date)} style={{ flexShrink: 0, border: `1px solid ${date === selected ? C.primary : C.border}`, borderRadius: 10, background: date === selected ? C.primary : C.surface, padding: "7px 10px", color: date === selected ? C.onPrimary : C.muted, fontSize: 10, fontWeight: date === selected ? 700 : 500, cursor: "pointer" }}>
           <span dir="auto">{format.format(new Date(`${date}T12:00:00+04:00`))}</span>
         </button>
       ))}
@@ -4166,8 +4170,8 @@ function DateStrip({ dates, selected, locale, label, onSelect }) {
 
 function LoadingPanel({ label }) {
   return (
-    <div role="status" aria-live="polite" style={{ display: "flex", minHeight: 220, flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: "rgba(255,255,255,.62)", textAlign: "center" }}>
-      <span aria-hidden="true" style={{ display: "block", width: 24, height: 24, border: "3px solid rgba(255,255,255,.14)", borderTopColor: C.lavender, borderRadius: "50%", animation: "voxi-spin .9s linear infinite" }} />
+    <div role="status" aria-live="polite" style={{ display: "flex", minHeight: 220, flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: C.muted, textAlign: "center" }}>
+      <span aria-hidden="true" style={{ display: "block", width: 24, height: 24, border: `3px solid ${C.border}`, borderTopColor: C.brand, borderRadius: "50%", animation: "voxi-spin .9s linear infinite" }} />
       <style>{`@keyframes voxi-spin{to{transform:rotate(360deg)}}`}</style>
       <span style={{ fontSize: 12 }}>{label}</span>
     </div>
@@ -4188,10 +4192,10 @@ function DiscoveryPrompt({ question, preferences = {} }) {
     preferences.audience === "kids_family" ? (locale === "ar" ? "أطفال وعائلات" : "Kids & family") : null,
   ].filter(Boolean);
   return (
-    <section role="status" aria-live="polite" style={{ border: "1px solid rgba(228,220,240,.14)", borderRadius: 16, background: "linear-gradient(145deg, rgba(99,65,141,.24), rgba(30,23,40,.68))", padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.lavender }}><Sparkles size={16} /><strong dir="auto" style={{ color: "#fff", fontSize: 14 }}>{question}</strong></div>
+    <section role="status" aria-live="polite" style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface, boxShadow: `0 8px 22px ${C.shadow}`, padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.brand }}><Sparkles size={16} /><strong dir="auto" style={{ color: C.text, fontSize: 14 }}>{question}</strong></div>
       {!!visibleValues.length && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
-        {visibleValues.map((value, index) => <span key={`${value}-${index}`} dir="auto" style={{ borderRadius: 999, background: "rgba(255,255,255,.07)", padding: "4px 8px", color: "rgba(255,255,255,.68)", fontSize: 10 }}>{value}</span>)}
+        {visibleValues.map((value, index) => <span key={`${value}-${index}`} dir="auto" style={{ borderRadius: 999, background: C.primarySoft, padding: "4px 8px", color: C.primary, fontSize: 10 }}>{value}</span>)}
       </div>}
     </section>
   );
@@ -4201,21 +4205,21 @@ function FaqPanel({ result, label, capabilityLabel, liveLabel, backLabel, onBack
   const source = result.metadata?.source?.[0];
   const heading = result.metadata?.provenance === "product" ? capabilityLabel : label;
   return (
-    <article style={{ border: "1px solid rgba(255,255,255,.1)", borderRadius: 16, background: "linear-gradient(145deg, rgba(99,65,141,.25), rgba(30,23,40,.62))", padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.lavender, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: .6 }}><Sparkles size={14} />{heading}</div>
-      <p dir="auto" style={{ margin: "11px 0 0", color: "rgba(255,255,255,.86)", fontSize: 13, lineHeight: 1.55 }}>{result.answer}</p>
-      {result.needsLiveData && <p style={{ margin: "9px 0 0", color: "rgba(255,255,255,.48)", fontSize: 10, lineHeight: 1.45 }}>{liveLabel}</p>}
-      {source?.url && <a href={source.url} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 10, color: C.lavender, fontSize: 10 }}>{source.title}</a>}
-      {onBack && <button type="button" onClick={onBack} style={{ display: "block", marginTop: 14, border: "1px solid rgba(255,255,255,.14)", borderRadius: 8, background: "rgba(255,255,255,.04)", padding: "7px 11px", color: "rgba(255,255,255,.76)", fontSize: 11, cursor: "pointer" }}>{backLabel}</button>}
+    <article style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface, boxShadow: `0 8px 22px ${C.shadow}`, padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.brand, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: .6 }}><Sparkles size={14} />{heading}</div>
+      <p dir="auto" style={{ margin: "11px 0 0", color: C.text, fontSize: 13, lineHeight: 1.55 }}>{result.answer}</p>
+      {result.needsLiveData && <p style={{ margin: "9px 0 0", color: C.muted, fontSize: 10, lineHeight: 1.45 }}>{liveLabel}</p>}
+      {source?.url && <a href={source.url} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 10, color: C.primary, fontSize: 10 }}>{source.title}</a>}
+      {onBack && <button type="button" onClick={onBack} style={{ display: "block", marginTop: 14, border: `1px solid ${C.border}`, borderRadius: 8, background: C.surfaceAlt, padding: "7px 11px", color: C.primary, fontSize: 11, cursor: "pointer" }}>{backLabel}</button>}
     </article>
   );
 }
 
 function LanguageSelector({ locale, label, onSelect }) {
   return (
-    <div role="group" aria-label={label} title={label} style={{ display: "flex", height: 28, flexShrink: 0, alignItems: "center", gap: 1, borderRadius: 8, background: "rgba(255,255,255,.05)", padding: 2 }}>
+    <div role="group" aria-label={label} title={label} style={{ display: "flex", height: 28, flexShrink: 0, alignItems: "center", gap: 1, borderRadius: 8, background: C.surfaceAlt, padding: 2 }}>
       {[{ code: "en", label: "English" }, { code: "ar", label: "العربية" }].map((item) => (
-        <button key={item.code} type="button" aria-pressed={locale === item.code} aria-label={item.code === "en" ? "English" : "العربية"} onClick={() => onSelect(item.code)} style={{ minWidth: item.code === "en" ? 43 : 47, height: 22, border: 0, borderRadius: 6, paddingInline: 5, background: locale === item.code ? C.magenta : "transparent", color: locale === item.code ? "#fff" : "rgba(255,255,255,.55)", fontSize: 9, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{item.label}</button>
+        <button key={item.code} type="button" aria-pressed={locale === item.code} aria-label={item.code === "en" ? "English" : "العربية"} onClick={() => onSelect(item.code)} style={{ minWidth: item.code === "en" ? 43 : 47, height: 22, border: 0, borderRadius: 6, paddingInline: 5, background: locale === item.code ? C.primary : "transparent", color: locale === item.code ? C.onPrimary : C.muted, fontSize: 9, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>{item.label}</button>
       ))}
     </div>
   );

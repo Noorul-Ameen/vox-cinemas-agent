@@ -10,6 +10,7 @@ import {
   shouldTreatAsDiscoveryFilterTurn,
   unresolvedMovieTitleCandidate,
 } from "../src/lib/discoveryPreferences.js";
+import { buildAuthoritativeDiscoveryContext } from "../src/lib/discoveryResultContext.js";
 
 const NOW = new Date("2026-07-14T08:00:00Z");
 const cinemas = [
@@ -66,6 +67,38 @@ assert.equal(unresolvedMovieTitleCandidate("Toy Storey 5 at Mall of the Emirates
 assert.equal(unresolvedMovieTitleCandidate("I need three tickets at Mall of the Emirates tomorrow", extractDiscoveryPreferencePatch("I need three tickets at Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW })), null, "ticket targets must never be mistaken for a movie title");
 assert.equal(unresolvedMovieTitleCandidate("Show me movies tomorrow", extractDiscoveryPreferencePatch("Show me movies tomorrow", { cinemas, movies: [], now: NOW })), null, "plural generic movie requests must remain broad discovery requests");
 assert.equal(unresolvedMovieTitleCandidate("I want films at Mall of the Emirates tomorrow", extractDiscoveryPreferencePatch("I want films at Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW })), null, "generic film requests must ask for a preference instead of showing an unknown-title error");
+const genericPlayingQuery = "What is playing at Mall of the Emirates tomorrow at 6 PM?";
+const genericPlayingSignal = extractDiscoveryPreferencePatch(genericPlayingQuery, { cinemas, movies: [], now: NOW });
+assert.deepEqual(genericPlayingSignal.patch, {
+  cinemaId: "0002",
+  cinemaName: "Mall of the Emirates",
+  city: "Dubai",
+  date: "2026-07-15",
+  dateSignal: "tomorrow",
+  preferredTime: "18:00",
+}, "a generic playing question must retain its supplied cinema, date, and time");
+assert.equal(unresolvedMovieTitleCandidate(genericPlayingQuery, genericPlayingSignal), null, "`What is playing` must remain generic discovery instead of becoming an unknown movie title");
+const genericPlayingPreferences = mergeDiscoveryPreferences({}, genericPlayingSignal).preferences;
+assert.equal(genericPlayingPreferences.movieTitle, null, "generic discovery must not set movieTitle");
+const genericPlayingResults = filterDiscoveryResults({ movies, sessions, cinemas, preferences: genericPlayingPreferences });
+assert.equal(genericPlayingResults.time.exactTimeMatch, true, "the supplied 6 PM must drive showtime filtering");
+assert.ok(genericPlayingResults.sessions.some((session) => session.sessionId === "t2"), "the exact 6 PM Mall of the Emirates session must be returned");
+assert.ok(genericPlayingResults.sessions.every((session) => session.cinemaId === "0002" && session.programmingDate === "2026-07-15"), "all nearby options must retain the supplied cinema and date");
+assert.ok(genericPlayingResults.sessions.every((session) => !["c2", "r1", "r2"].includes(session.sessionId)), "distant, wrong-date, and unrelated-time sessions must stay filtered out");
+const authoritativeContext = buildAuthoritativeDiscoveryContext({
+  cinema: { name: "Mall of the Emirates" },
+  selectedDate: "2026-07-15",
+  movies: genericPlayingResults.movies.map((movie) => ({
+    title: movie.title,
+    showtimes: genericPlayingResults.sessions
+      .filter((session) => session.scheduledFilmId === movie.id)
+      .map((session) => ({ time: session.time, experience: session.exp })),
+  })),
+});
+assert.match(authoritativeContext, /Mall of the Emirates on 2026-07-15/);
+assert.match(authoritativeContext, /Toy Story 5: 18:00 IMAX/);
+assert.match(authoritativeContext, /Mention only these supplied movie titles and showtimes/);
+assert.doesNotMatch(authoritativeContext, /Secret Life of Pets|Rise of Gru/, "agent context must not introduce titles absent from the filtered result");
 assert.equal(unresolvedMovieTitleCandidate("I want Mall of the Emirates tomorrow", extractDiscoveryPreferencePatch("I want Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW })), null, "a cinema/date-only turn must ask for a preference, not treat the cinema as a title");
 assert.equal(unresolvedMovieTitleCandidate("I want Dubai tomorrow", extractDiscoveryPreferencePatch("I want Dubai tomorrow", { cinemas, movies: [], now: NOW })), null, "a city/date-only turn must not become a title");
 assert.equal(unresolvedMovieTitleCandidate("I want Toy Story around 6 PM at Mall of the Emirates tomorrow", extractDiscoveryPreferencePatch("I want Toy Story around 6 PM at Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW })), "Toy Story", "a combined title and preferred-time turn must retain the title");

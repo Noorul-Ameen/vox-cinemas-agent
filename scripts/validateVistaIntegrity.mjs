@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { CINEMAS, DATA_DATES } from "../src/mockVistaData.js";
+import { CINEMAS, DATA_DATES, SESSIONS } from "../src/mockVistaData.js";
 import { assessCancellationEligibility } from "../src/lib/cancellationEligibility.js";
+import { addCalendarDays } from "../src/lib/demoDates.js";
 import {
   VISTA_MODE,
   VistaClientError,
   buildSeatPricingPreview,
   buildProgrammingDateFilter,
+  deduplicateSessionPresentation,
   demoDate,
   getPricingQuote,
   getLiveProgrammingDates,
@@ -25,7 +27,9 @@ import {
   sourceDateForDemoDate,
 } from "../src/vistaClient.js";
 
-const snapshotNow = new Date("2026-07-13T12:00:00Z");
+const snapshotNow = new Date(`${addCalendarDays(DATA_DATES[0], -1)}T12:00:00Z`);
+const expiredDate = addCalendarDays(DATA_DATES.at(-1), 1);
+const expiredNow = new Date(`${expiredDate}T12:00:00Z`);
 const vistaSource = await readFile(new URL("../src/vistaClient.js", import.meta.url), "utf8");
 assert.doesNotMatch(vistaSource, /VITE_VISTA_API_KEY/, "browser source must not read or emit an upstream Vista API key");
 assert.doesNotMatch(vistaSource, /RESTBooking\.svc\/booking\/refund/, "refund writes must not use a hard-coded Vista route");
@@ -44,10 +48,10 @@ assert.equal(parseVistaRefundReference(123), "123");
 
 assert.equal(VISTA_MODE, "snapshot");
 assert.deepEqual(getProgrammingDates({ now: snapshotNow }), DATA_DATES, "fresh snapshot dates remain available");
-assert.deepEqual(getProgrammingDates({ now: new Date("2026-08-01T00:00:00Z") }), [], "expired snapshot dates are not presented as current");
-assert.equal(demoDate(new Date("2026-08-01T00:00:00Z")), "2026-08-01", "expired demo date stays honest instead of cycling into the past");
-assert.equal(sourceDateForDemoDate("2026-08-01"), null);
-assert.equal(getScheduleStatus({ now: new Date("2026-08-01T00:00:00Z") }).reason, "snapshot_expired");
+assert.deepEqual(getProgrammingDates({ now: expiredNow }), [], "expired snapshot dates are not presented as current");
+assert.equal(demoDate(expiredNow), expiredDate, "expired demo date stays honest instead of cycling into the past");
+assert.equal(sourceDateForDemoDate(expiredDate), null);
+assert.equal(getScheduleStatus({ now: expiredNow }).reason, "snapshot_expired");
 
 assert.deepEqual(
   getLiveProgrammingDates({ now: new Date("2026-07-13T20:30:00Z"), days: 3 }),
@@ -85,33 +89,53 @@ assert.match(filter, /CinemaId eq '00''1'/, "OData string values are escaped");
 assert.match(filter, /2026-07-14T06:00:00Z/);
 assert.match(filter, /2026-07-15T06:00:00Z/);
 
-const shindagha = CINEMAS.find((cinema) => /Shindagha/i.test(cinema.Name));
-assert.ok(shindagha);
-const noFilms = await getScheduledFilms(shindagha.ID, "2026-07-16");
+const fixtureCinema = CINEMAS.find((cinema) => SESSIONS.some((session) => session.CinemaId === cinema.ID));
+assert.ok(fixtureCinema, "the snapshot needs at least one cinema with sessions");
+const unpublishedDate = addCalendarDays(DATA_DATES.at(-1), 1);
+const noFilms = await getScheduledFilms(fixtureCinema.ID, unpublishedDate);
 assert.deepEqual(noFilms, []);
 assert.equal(getResultMeta(noFilms).empty, true);
 assert.equal(getResultMeta(noFilms).reason, "date_not_published");
-assert.ok(getProgrammingDates({ cinemaId: shindagha.ID, now: snapshotNow }).length < DATA_DATES.length, "per-cinema dates omit empty programming days");
+const expectedCinemaDates = DATA_DATES.filter((date) => SESSIONS.some((session) => (
+  session.CinemaId === fixtureCinema.ID && session.SourceProgrammingDate === date
+)));
+assert.deepEqual(
+  getProgrammingDates({ cinemaId: fixtureCinema.ID, now: snapshotNow, includePast: true }),
+  expectedCinemaDates,
+  "per-cinema dates exactly match the cinema's published programming days",
+);
 
-const duplicateGroup = await getSessions("0002", "HO00016314", "2026-07-14");
+const sourceSession = SESSIONS[0];
+assert.ok(sourceSession, "the snapshot needs at least one source session");
+const sessionGroup = await getSessions(sourceSession.CinemaId, sourceSession.ScheduledFilmId, sourceSession.SourceProgrammingDate);
+const selectableSession = sessionGroup.find((session) => session.sessionIds.includes(String(sourceSession.SessionId)));
+assert.ok(selectableSession, "a source session remains selectable after presentation grouping");
+assert.equal(selectableSession.isAvailableForOffer, sourceSession.IsAvailableForOffer !== false, "session-level offer availability is retained");
+const syntheticAlternate = {
+  ...selectableSession,
+  sessionId: `${selectableSession.sessionId}-alternate`,
+  sessionIds: [`${selectableSession.sessionId}-alternate`],
+  alternateSessionIds: [],
+  duplicateCount: 0,
+};
+const duplicateGroup = deduplicateSessionPresentation([selectableSession, syntheticAlternate]);
 assert.equal(duplicateGroup.length, 1, "indistinguishable presentation rows are grouped");
-assert.deepEqual(duplicateGroup[0].sessionIds, ["618294", "618340", "618712", "618843"], "every authoritative source ID remains available");
-assert.equal(duplicateGroup[0].sessionId, "618294", "the stable first source ID remains the selectable ID");
-assert.equal(duplicateGroup[0].isAvailableForOffer, false, "session-level offer availability is retained");
-assert.equal(getResultMeta(duplicateGroup).deduplicatedCount, 3);
+assert.deepEqual(duplicateGroup[0].sessionIds, [selectableSession.sessionId, syntheticAlternate.sessionId], "every authoritative source ID remains available");
+assert.equal(duplicateGroup[0].sessionId, selectableSession.sessionId, "the stable first source ID remains the selectable ID");
+assert.equal(duplicateGroup[0].duplicateCount, 1);
 
-const plan = await getSeatPlan("0002", duplicateGroup[0].sessionId);
+const plan = await getSeatPlan(sourceSession.CinemaId, selectableSession.sessionId);
 assert.ok(plan.length > 0);
 assert.equal(getResultMeta(plan).mode, "generated_demo");
 assert.equal(getResultMeta(plan).verified, false);
 assert.match(getResultMeta(plan).warning, /not reserved/i);
 
-const quote = await getPricingQuote("0002", duplicateGroup[0].sessionId, [{ id: "A1" }, { id: "G1", premium: true }]);
+const quote = await getPricingQuote(sourceSession.CinemaId, selectableSession.sessionId, [{ id: "A1" }, { id: "G1", premium: true }]);
 assert.equal(quote.total, 105);
 assert.equal(quote.demo, true);
 assert.equal(quote.verified, false);
 
-const reservation = await reserveSeats({ cinemaId: "0002", sessionId: duplicateGroup[0].sessionId, seats: ["A1", "A2"] });
+const reservation = await reserveSeats({ cinemaId: sourceSession.CinemaId, sessionId: selectableSession.sessionId, seats: ["A1", "A2"] });
 assert.equal(reservation.reserved, false);
 assert.equal(reservation.applied, false);
 assert.equal(reservation.reason, "demo_inventory_not_reserved");

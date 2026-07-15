@@ -336,7 +336,8 @@ export const BOOKING = {{
 }};
 '''
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(output, encoding="utf-8")
+    # Generated artifacts must be byte-stable across Windows and Linux runners.
+    OUTPUT.write_text(output, encoding="utf-8", newline="\n")
     print(
         f"Wrote {OUTPUT}: {len(cinemas)} cinemas, {len(metadata)} films, "
         f"{len(sessions)} sessions ({source_duplicate_count} source duplicates removed), dates {dates[0]}..{dates[-1]}"

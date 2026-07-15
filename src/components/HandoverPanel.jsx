@@ -61,9 +61,9 @@ export function HandoverPanel({
         margin: "0 auto",
         overflow: "hidden",
         borderRadius: 16,
-        border: `1px solid ${isReady ? "rgba(87,199,154,.34)" : "rgba(228,220,240,.18)"}`,
-        background: "linear-gradient(155deg, rgba(99,65,141,.34), rgba(20,16,27,.88))",
-        boxShadow: "0 18px 48px rgba(0,0,0,.22)",
+        border: `1px solid ${isReady ? "#B9DFD0" : C.border}`,
+        background: `linear-gradient(155deg, ${C.primarySoft}, ${C.surface})`,
+        boxShadow: `0 18px 48px ${C.shadow}`,
       }}
     >
       <div style={{ padding: "20px 18px 17px" }}>
@@ -75,43 +75,43 @@ export function HandoverPanel({
             flexShrink: 0,
             placeItems: "center",
             borderRadius: 13,
-            background: isReady ? "rgba(87,199,154,.16)" : "rgba(182,24,108,.2)",
-            color: isReady ? C.green : C.lavender,
+            background: isReady ? C.successSoft : C.primarySoft,
+            color: isReady ? C.green : C.primary,
           }}>
             {isReady ? <ShieldCheck size={21} /> : <LoaderCircle size={21} />}
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 8px" }}>
-              <h2 style={{ margin: 0, fontSize: 16, lineHeight: 1.25, color: "#fff" }}>{title}</h2>
+              <h2 style={{ margin: 0, fontSize: 16, lineHeight: 1.25, color: C.text }}>{title}</h2>
               <span style={{
                 borderRadius: 999,
-                background: "rgba(255,255,255,.07)",
+                background: C.surfaceAlt,
                 padding: "3px 7px",
                 fontSize: 9,
                 fontWeight: 700,
                 letterSpacing: ".06em",
                 textTransform: "uppercase",
-                color: "rgba(255,255,255,.48)",
+                color: C.muted,
               }}>{labels.simulation}</span>
             </div>
-            <p style={{ margin: "6px 0 0", fontSize: 12, lineHeight: 1.5, color: "rgba(255,255,255,.62)" }}>{body}</p>
+            <p style={{ margin: "6px 0 0", fontSize: 12, lineHeight: 1.5, color: C.muted }}>{body}</p>
           </div>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", alignItems: "center", gap: 7, marginTop: 18 }}>
           <ProgressStep active complete={isReady} icon={<Check size={12} />} label={labels.summaryStep} />
-          <span aria-hidden="true" style={{ height: 1, background: isReady ? C.green : "rgba(228,220,240,.2)" }} />
+          <span aria-hidden="true" style={{ height: 1, background: isReady ? C.green : C.border }} />
           <ProgressStep active={isReady} icon={isReady ? <Check size={12} /> : <ShieldCheck size={12} />} label={isReady ? labels.queueReadyStep : labels.connectingStep} />
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, borderTop: "1px solid rgba(255,255,255,.09)", padding: "10px 18px", fontSize: 10, color: "rgba(255,255,255,.5)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}`, padding: "10px 18px", fontSize: 10, color: C.muted }}>
         <ShieldCheck size={13} color={C.green} />
         {labels.safeContext}
       </div>
 
       {showDebug && (
-        <details open={debugOpenByDefault} style={{ borderTop: "1px solid rgba(255,255,255,.09)", background: "rgba(0,0,0,.19)" }}>
+        <details open={debugOpenByDefault} style={{ borderTop: `1px solid ${C.border}`, background: C.surfaceAlt }}>
           <summary style={{
             display: "flex",
             alignItems: "center",
@@ -120,11 +120,11 @@ export function HandoverPanel({
             padding: "12px 18px",
             cursor: "pointer",
             listStyle: "none",
-            color: C.lavender,
+            color: C.primary,
           }}>
             <span style={{ minWidth: 0 }}>
               <span style={{ display: "block", fontSize: 12, fontWeight: 700 }}>{labels.debugTitle}</span>
-              <span style={{ display: "block", marginTop: 2, fontSize: 9, lineHeight: 1.35, color: "rgba(255,255,255,.42)" }}>{labels.debugHint}</span>
+              <span style={{ display: "block", marginTop: 2, fontSize: 9, lineHeight: 1.35, color: C.muted }}>{labels.debugHint}</span>
             </span>
             <ChevronDown size={15} style={{ flexShrink: 0 }} />
           </summary>
@@ -135,7 +135,7 @@ export function HandoverPanel({
               maxHeight: 250,
               margin: 0,
               overflow: "auto",
-              borderTop: "1px solid rgba(255,255,255,.07)",
+              borderTop: `1px solid ${C.border}`,
               padding: "13px 16px 16px",
               whiteSpace: "pre-wrap",
               overflowWrap: "anywhere",
@@ -143,7 +143,7 @@ export function HandoverPanel({
               fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
               fontSize: 9,
               lineHeight: 1.55,
-              color: "rgba(228,220,240,.72)",
+              color: C.text,
             }}
           >{JSON.stringify(safePayload, null, 2)}</pre>
         </details>
@@ -154,7 +154,7 @@ export function HandoverPanel({
 
 function ProgressStep({ active, complete, icon, label }) {
   return (
-    <span style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6, fontSize: 10, color: active ? "#fff" : "rgba(255,255,255,.34)" }}>
+    <span style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6, fontSize: 10, color: active ? C.text : C.muted }}>
       <span style={{
         display: "grid",
         width: 20,
@@ -162,8 +162,8 @@ function ProgressStep({ active, complete, icon, label }) {
         flexShrink: 0,
         placeItems: "center",
         borderRadius: 999,
-        background: complete ? C.green : active ? C.magenta : "rgba(255,255,255,.08)",
-        color: complete || active ? "#fff" : "rgba(255,255,255,.35)",
+        background: complete ? C.green : active ? C.primary : C.surfaceAlt,
+        color: complete || active ? C.onPrimary : C.muted,
       }}>{icon}</span>
       <span style={{ overflowWrap: "anywhere", lineHeight: 1.25 }}>{label}</span>
     </span>

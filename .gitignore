@@ -16,3 +16,9 @@ coverage/
 .DS_Store
 __pycache__/
 *.py[cod]
+
+# Transactional showtime-refresh work files.
+data/.vox_showtimes_full.next-*.json
+data/.vox_showtimes_full.backup-*.json
+src/.mockVistaData.next-*.js
+src/.mockVistaData.backup-*.js

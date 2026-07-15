@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { resolveFilmCandidate } from "../src/lib/fuzzyResolvers.js";
 import { resolveProgrammingDateSelection, resolveVisibleSelectionProgrammingDate } from "../src/lib/programmingDateSelection.js";
+import { FILMS, SESSIONS } from "../src/mockVistaData.js";
 import * as vista from "../src/vistaClient.js";
 
 const published = ["2026-07-14", "2026-07-15"];
@@ -90,11 +91,20 @@ assert.equal(
   "a fresh explicit guest date must remain stronger than the old visible list",
 );
 
-const deiraTomorrowMovies = await vista.getScheduledFilms("0001", "2026-07-15");
-const visibleToyStory = resolveFilmCandidate(deiraTomorrowMovies, "Toy Story 5");
-assert.equal(visibleToyStory?.id, "HO00015756", "Toy Story 5 must resolve from the displayed City Centre Deira tomorrow list");
-const toyStorySessions = await vista.getSessions("0001", visibleToyStory.id, "2026-07-15");
-assert.deepEqual(toyStorySessions.map((session) => session.time), ["12:00", "14:10", "16:15", "18:30"], "the displayed Toy Story 5 fixture must retain its real tomorrow sessions");
+const sourceSession = SESSIONS[0];
+assert.ok(sourceSession, "the refreshed snapshot needs a selectable source session");
+const sourceFilm = FILMS.find((film) => (
+  film.CinemaId === sourceSession.CinemaId && film.ScheduledFilmId === sourceSession.ScheduledFilmId
+));
+assert.ok(sourceFilm?.Title, "the source session must resolve to its displayed film metadata");
+const visibleMovies = await vista.getScheduledFilms(sourceSession.CinemaId, sourceSession.SourceProgrammingDate);
+const visibleFilm = resolveFilmCandidate(visibleMovies, sourceFilm.Title);
+assert.equal(visibleFilm?.id, sourceFilm.ScheduledFilmId, "an exact title must resolve from the currently displayed cinema/date list");
+const visibleSessions = await vista.getSessions(sourceSession.CinemaId, visibleFilm.id, sourceSession.SourceProgrammingDate);
+assert.ok(
+  visibleSessions.some((session) => session.sessionIds.includes(String(sourceSession.SessionId))),
+  "the selected film must retain its authoritative source session on the visible programming date",
+);
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 assert.match(app, /const userRequestedDateRef = useRef\(null\)/, "the widget must retain an unresolved guest date across client-tool calls");

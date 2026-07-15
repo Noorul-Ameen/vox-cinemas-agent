@@ -377,6 +377,8 @@ const DISCOVERY_ACTION_PATTERN = /\b(?:book|booking|i want|i need|show me|find m
 const INFORMATION_QUESTION_PATTERN = /^\s*(?:what\s+(?:is|are|does|do|can)|is|are|does|do|can|could|would|how|where|why|when|tell me|explain|ما|هل|كيف|أين|اين|متى|اشرح|أخبرني)/iu;
 const INFORMATION_TOPIC_PATTERN = /\b(?:accessible|accessibility|wheelchair|parking|park|food|snacks?|menu|policy|refund|age limit|rating|facilit(?:y|ies)|opening hours?|close|closing|open|loyalty|gift card|prayer room|toilet|restroom)\b|(?:ذوي الإعاقة|كرسي متحرك|مواقف|طعام|وجبات|سياسة|استرداد|تصنيف عمري|مرافق|ساعات العمل|يفتح|يغلق|ولاء|بطاقة هدايا|دورة مياه)/iu;
 
+const GENERIC_DISCOVERY_TITLE_RESIDUAL = /^(?:(?:what(?:\s+(?:is|are|s))?|what\s+(?:movies?|films?)|which\s+(?:movies?|films?)|movies?|films?)\s+)?(?:(?:is|are)\s+)?(?:now\s+)?(?:playing|showing|available|on)(?:\s+now)?$/iu;
+
 /**
  * Decide whether a transcript is a booking-filter turn rather than an FAQ.
  * Criteria words inside policy/accessibility questions must not mutate an
@@ -470,6 +472,7 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
   const candidate = candidateSource;
   if (!candidate) return null;
   const normalized = normalizeText(candidate);
+  if (GENERIC_DISCOVERY_TITLE_RESIDUAL.test(normalized)) return null;
   if (!normalized || /^(?:a|an|the|this|that|movies?|films?|showtimes?|options?|choices?|something|anything|one|tickets?|seats?|أفلام|افلام|فيلم|خيارات|شيء|أي شيء|تذاكر|مقاعد)$/iu.test(normalized)) return null;
   if (/\b(?:tickets?|seats?)\b|(?:تذاكر|مقاعد)/iu.test(normalized)) return null;
   return candidate;

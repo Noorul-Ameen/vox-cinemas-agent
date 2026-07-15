@@ -148,21 +148,21 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
           <ChevronLeft size={18} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />
         </button>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{t("checkout.title")}</div>
-          <div style={{ overflow: "hidden", fontSize: 11, color: "rgba(255,255,255,.5)", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{t("checkout.title")}</div>
+          <div style={{ overflow: "hidden", fontSize: 11, color: C.muted, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             <bdi dir="auto">{order?.movieTitle}</bdi> · <span dir="ltr">{order?.showtime}</span> · {t("checkout.seatsLabel")} <span dir="ltr">{seats.join(", ")}</span>
           </div>
         </div>
       </div>
       <div style={summaryCard}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ fontSize: 13, color: "rgba(255,255,255,.6)" }}>{t("checkout.seatCountOnly", { count: seats.length })} · <span dir="ltr">{order?.screen}</span></span>
-          <span dir="ltr" style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{formatCurrency(order?.total || 0, currency)}</span>
+          <span style={{ fontSize: 13, color: C.muted }}>{t("checkout.seatCountOnly", { count: seats.length })} · <span dir="ltr">{order?.screen}</span></span>
+          <span dir="ltr" style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{formatCurrency(order?.total || 0, currency)}</span>
         </div>
-        {subtotal != null && <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "4px 12px", marginTop: 9, borderTop: "1px solid rgba(255,255,255,.08)", paddingTop: 8, color: "rgba(255,255,255,.5)", fontSize: 10 }}>
+        {subtotal != null && <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "4px 12px", marginTop: 9, borderTop: `1px solid ${C.border}`, paddingTop: 8, color: C.muted, fontSize: 10 }}>
           <span>{t("checkout.subtotal")}</span><span dir="ltr">{formatCurrency(subtotal, currency)}</span>
           {feeTotal != null && <><span>{t("checkout.fees")}</span><span dir="ltr">{formatCurrency(feeTotal, currency)}</span></>}
-          <strong style={{ color: "rgba(255,255,255,.75)" }}>{t("checkout.total")}</strong><strong dir="ltr" style={{ color: "#fff" }}>{formatCurrency(order?.total || 0, currency)}</strong>
+          <strong style={{ color: C.text }}>{t("checkout.total")}</strong><strong dir="ltr" style={{ color: C.text }}>{formatCurrency(order?.total || 0, currency)}</strong>
         </div>}
       </div>
     </>
@@ -173,10 +173,10 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
       <div>
         {header}
         <div role="alert" style={unavailableCard}>
-          <AlertTriangle size={26} color="#FFCF70" aria-hidden="true" />
-          <div style={{ marginTop: 10, color: "#fff", fontSize: 15, fontWeight: 800 }}>{t("checkout.liveUnavailable")}</div>
-          <p style={{ margin: "6px 0 0", color: "rgba(255,255,255,.62)", fontSize: 12, lineHeight: 1.5 }}>{t("checkout.liveUnavailableBody")}</p>
-          {onRetry && <button type="button" onClick={onRetry} style={{ ...actionButton, marginTop: 12, background: C.purple }}>{t("error.retry")}</button>}
+          <AlertTriangle size={26} color={C.warning} aria-hidden="true" />
+          <div style={{ marginTop: 10, color: C.text, fontSize: 15, fontWeight: 800 }}>{t("checkout.liveUnavailable")}</div>
+          <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.5 }}>{t("checkout.liveUnavailableBody")}</p>
+          {onRetry && <button type="button" onClick={onRetry} style={{ ...actionButton, marginTop: 12, background: C.primary }}>{t("error.retry")}</button>}
         </div>
       </div>
     );
@@ -186,14 +186,14 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
     const label = paying === "apple" ? t("checkout.applePay") : paying === "samsung" ? t("checkout.samsungPay") : t("checkout.cardPayment");
     return (
       <div style={{ display: "flex", minHeight: 320, flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-        <div style={{ marginBottom: 10, borderRadius: 999, background: "rgba(255,207,112,.14)", padding: "4px 9px", color: "#FFCF70", fontSize: 10, fontWeight: 900, letterSpacing: ".08em" }}>{t("checkout.testOnly")}</div>
-        <div style={{ display: "flex", width: 64, height: 64, alignItems: "center", justifyContent: "center", borderRadius: 20, background: done ? "rgba(87,199,154,.15)" : "rgba(228,220,240,.1)", marginBottom: 18 }}>
+        <div style={{ marginBottom: 10, borderRadius: 999, background: C.warningSoft, padding: "4px 9px", color: C.warning, fontSize: 10, fontWeight: 900, letterSpacing: ".08em" }}>{t("checkout.testOnly")}</div>
+        <div style={{ display: "flex", width: 64, height: 64, alignItems: "center", justifyContent: "center", borderRadius: 20, background: done ? C.successSoft : C.primarySoft, marginBottom: 18 }}>
           {done ? <Check size={30} color={C.green} /> : <div style={spinner} />}
         </div>
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>{done ? t("checkout.approved") : t("checkout.authorizing", { method: label })}</div>
-        <div style={{ marginTop: 6, color: "rgba(255,255,255,.5)", fontSize: 12 }}>{done ? t("checkout.confirming") : t("checkout.demoAuth")}</div>
-        <div dir="ltr" style={{ marginTop: 14, color: "#fff", fontSize: 22, fontWeight: 800 }}>{formatCurrency(order?.total || 0, order?.currency || "AED")}</div>
+        <div style={{ color: C.text, fontSize: 16, fontWeight: 700 }}>{done ? t("checkout.approved") : t("checkout.authorizing", { method: label })}</div>
+        <div style={{ marginTop: 6, color: C.muted, fontSize: 12 }}>{done ? t("checkout.confirming") : t("checkout.demoAuth")}</div>
+        <div dir="ltr" style={{ marginTop: 14, color: C.text, fontSize: 22, fontWeight: 800 }}>{formatCurrency(order?.total || 0, order?.currency || "AED")}</div>
       </div>
     );
   }
@@ -209,7 +209,7 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
         <button type="button" aria-describedby="checkout-safety-notice" onClick={() => pay("apple", "Apple Pay")} style={{ ...walletButton, background: "#000", border: "1px solid rgba(255,255,255,.25)" }}>{t("checkout.applePay")}</button>
         <button type="button" aria-describedby="checkout-safety-notice" onClick={() => pay("samsung", "Samsung Pay")} style={{ ...walletButton, background: "#1428A0" }}><Smartphone size={15} aria-hidden="true" style={{ marginInlineEnd: 6 }} /> {t("checkout.samsungPay")}</button>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 12px", color: "rgba(255,255,255,.35)", fontSize: 11 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 12px", color: C.muted, fontSize: 11 }}>
         <div style={divider} /> {t("checkout.orCard")} <div style={divider} />
       </div>
 
@@ -222,14 +222,14 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
               type="button"
               onClick={() => setSelected(card.id)}
               aria-pressed={selected === card.id}
-              style={{ ...storedCardButton, border: selected === card.id ? `1.5px solid ${C.magenta}` : "1px solid rgba(255,255,255,.12)", background: selected === card.id ? "rgba(182,24,108,.12)" : "rgba(255,255,255,.03)" }}
+              style={{ ...storedCardButton, border: selected === card.id ? `1.5px solid ${C.primary}` : `1px solid ${C.border}`, background: selected === card.id ? C.primarySoft : C.surface }}
             >
-              <CreditCard size={18} color={C.lavender} aria-hidden="true" />
+              <CreditCard size={18} color={C.primary} aria-hidden="true" />
               <div dir="ltr" style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ color: "#fff", fontSize: 13, fontWeight: 700 }}>{card.brand} •••• {card.last4}</div>
-                <div style={{ overflow: "hidden", color: "rgba(255,255,255,.45)", fontSize: 11, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.name} · {card.exp}</div>
+                <div style={{ color: C.text, fontSize: 13, fontWeight: 700 }}>{card.brand} •••• {card.last4}</div>
+                <div style={{ overflow: "hidden", color: C.muted, fontSize: 11, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{card.name} · {card.exp}</div>
               </div>
-              {selected === card.id && <Check size={16} color={C.magenta} aria-hidden="true" />}
+              {selected === card.id && <Check size={16} color={C.primary} aria-hidden="true" />}
             </button>
           ))}
           <button type="button" onClick={() => { setAdding(true); setError(""); }} style={addCardButton}><Plus size={15} aria-hidden="true" /> {t("checkout.addCard")}</button>
@@ -244,10 +244,10 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
             <label><span style={fieldLabel}>{t("checkout.expiryLabel")}</span><input dir="ltr" autoComplete="off" value={form.exp} onChange={(event) => updateFormField("exp", event.target.value.replace(/[^\d/]/g, "").slice(0, 5))} placeholder={t("checkout.expiry")} style={inputStyle} inputMode="numeric" /></label>
             <label><span style={fieldLabel}>{t("checkout.cvvLabel")}</span><input dir="ltr" autoComplete="off" value={form.cvv} onChange={(event) => updateFormField("cvv", event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder={t("checkout.cvv")} style={inputStyle} inputMode="numeric" type="password" /></label>
           </div>
-          {error && <div role="alert" aria-live="assertive" style={{ color: "#FF8C9C", fontSize: 12 }}>{error}</div>}
+          {error && <div role="alert" aria-live="assertive" style={{ color: C.danger, fontSize: 12 }}>{error}</div>}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button type="button" onClick={() => { setAdding(false); setError(""); clearSensitiveForm(); }} style={{ ...actionButton, background: "rgba(255,255,255,.08)" }}>{t("common.cancel")}</button>
-            <button type="button" onClick={addCard} style={{ ...actionButton, background: C.purple }}>{t("checkout.saveCard")}</button>
+            <button type="button" onClick={() => { setAdding(false); setError(""); clearSensitiveForm(); }} style={{ ...actionButton, border: `1px solid ${C.border}`, background: C.surfaceAlt, color: C.text }}>{t("common.cancel")}</button>
+            <button type="button" onClick={addCard} style={{ ...actionButton, background: C.primary }}>{t("checkout.saveCard")}</button>
           </div>
         </div>
       )}
@@ -260,27 +260,27 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
             const card = cards.find((item) => item.id === selected);
             if (card) pay("card", `${card.brand} •••• ${card.last4}`);
           }}
-          style={{ ...actionButton, display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14, background: C.magenta, opacity: selected ? 1 : 0.4 }}
+          style={{ ...actionButton, display: "flex", width: "100%", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 14, background: C.primary, opacity: selected ? 1 : 0.4 }}
         >
           <Lock size={14} aria-hidden="true" /> {t("checkout.pay", { amount: formatCurrency(order?.total || 0, order?.currency || "AED") })}
         </button>
       )}
 
-      <div style={{ marginTop: 10, color: "rgba(255,255,255,.35)", fontSize: 10, textAlign: "center" }}>{t("checkout.demoDisclaimer")}</div>
+      <div style={{ marginTop: 10, color: C.muted, fontSize: 10, textAlign: "center" }}>{t("checkout.demoDisclaimer")}</div>
     </div>
   );
 }
 
-const backButton = { border: "none", background: "none", color: "rgba(255,255,255,.5)", cursor: "pointer", padding: 4 };
-const summaryCard = { border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, background: "rgba(0,0,0,.25)", padding: "12px 14px", marginBottom: 12 };
-const demoNotice = { border: "1px solid rgba(255,207,112,.28)", borderRadius: 10, background: "rgba(255,207,112,.08)", padding: "9px 11px", marginBottom: 12, color: "rgba(255,255,255,.72)", fontSize: 10, lineHeight: 1.45 };
-const unavailableCard = { border: "1px solid rgba(255,207,112,.25)", borderRadius: 14, background: "rgba(255,207,112,.07)", padding: 20, textAlign: "center" };
-const spinner = { width: 26, height: 26, border: "3px solid rgba(255,255,255,.2)", borderTopColor: C.lavender, borderRadius: "50%", animation: "spin 0.9s linear infinite" };
+const backButton = { border: "none", background: "none", color: C.primary, cursor: "pointer", padding: 4 };
+const summaryCard = { border: `1px solid ${C.border}`, borderRadius: 12, background: C.surfaceAlt, padding: "12px 14px", marginBottom: 12 };
+const demoNotice = { border: `1px solid ${C.warning}`, borderRadius: 10, background: C.warningSoft, padding: "9px 11px", marginBottom: 12, color: C.text, fontSize: 10, lineHeight: 1.45 };
+const unavailableCard = { border: `1px solid ${C.warning}`, borderRadius: 14, background: C.warningSoft, padding: 20, textAlign: "center" };
+const spinner = { width: 26, height: 26, border: `3px solid ${C.border}`, borderTopColor: C.primary, borderRadius: "50%", animation: "spin 0.9s linear infinite" };
 const walletButton = { display: "flex", alignItems: "center", justifyContent: "center", border: "none", borderRadius: 12, padding: 12, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700 };
-const divider = { flex: 1, height: 1, background: "rgba(255,255,255,.12)" };
-const emptyCard = { border: "1px dashed rgba(255,255,255,.15)", borderRadius: 11, padding: 12, color: "rgba(255,255,255,.5)", fontSize: 11, textAlign: "center" };
+const divider = { flex: 1, height: 1, background: C.border };
+const emptyCard = { border: `1px dashed ${C.border}`, borderRadius: 11, background: C.surfaceAlt, padding: 12, color: C.muted, fontSize: 11, textAlign: "center" };
 const storedCardButton = { display: "flex", alignItems: "center", gap: 12, borderRadius: 12, padding: "12px 14px", cursor: "pointer", textAlign: "start" };
-const addCardButton = { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: "1px dashed rgba(255,255,255,.25)", borderRadius: 12, background: "none", padding: 11, color: "rgba(255,255,255,.6)", cursor: "pointer", fontSize: 13 };
-const inputStyle = { width: "100%", boxSizing: "border-box", border: "1px solid rgba(255,255,255,.12)", borderRadius: 10, background: "rgba(255,255,255,.06)", padding: "11px 13px", color: "#fff", fontSize: 13 };
-const fieldLabel = { display: "block", margin: "0 2px 4px", color: "rgba(255,255,255,.5)", fontSize: 10, fontWeight: 700 };
-const actionButton = { border: "none", borderRadius: 10, padding: 12, color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 700 };
+const addCardButton = { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, border: `1px dashed ${C.primary}`, borderRadius: 12, background: C.surface, padding: 11, color: C.primary, cursor: "pointer", fontSize: 13 };
+const inputStyle = { width: "100%", boxSizing: "border-box", border: `1px solid ${C.border}`, borderRadius: 10, background: C.surface, padding: "11px 13px", color: C.text, fontSize: 13 };
+const fieldLabel = { display: "block", margin: "0 2px 4px", color: C.muted, fontSize: 10, fontWeight: 700 };
+const actionButton = { border: "none", borderRadius: 10, padding: 12, color: C.onPrimary, cursor: "pointer", fontSize: 14, fontWeight: 700 };

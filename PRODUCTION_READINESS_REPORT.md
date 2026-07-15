@@ -1,222 +1,216 @@
 # VOXi production-readiness report
 
 Report date: 15 July 2026 (Asia/Dubai)
+
 Repository: `Noorul-Ameen/vox-cinemas-agent`
-Cloudflare URL audited: <https://voxi-ai.pages.dev/>
+
+Cloudflare URL: <https://voxi-ai.pages.dev/>
+
 StackBlitz URL: <https://stackblitz.com/github/Noorul-Ameen/vox-cinemas-agent>
 
 ## Executive decision
 
-**Production release status: NO-GO.**
+**Leadership journey review: READY locally for schedule discovery, seat selection, checkout preview, local booking/QR presentation and local cancellation.**
 
-The repository passes the complete automated validation suite and production build, and the current source has been exercised locally at 420 px through filtered discovery, seats, editable checkout return, FAQ interruption, booking/QR rendering, cancellation and Arabic/RTL. Commit `4269339` is now on `main`, and Cloudflare serves the same tested `assets/index-B6np26pn.js` bundle with the new security and cache headers. This deployment smoke check proves artifact identity, not complete hosted interaction or spoken acceptance.
+**Customer production sales: NO-GO until licensed transactional APIs are enabled.**
 
-Production sales must remain gated until authenticated inventory, reservation, booking, payment, cancellation/refund, official ticket/QR, offer-redemption and customer-service connectors are available. The current browser-side transaction path is suitable for leadership journey review, but it must not be represented as completing a live VOX sale.
+The current local revision uses a fresh official VOX UAE public-site extraction, a white-and-blue interface, and a CSP-compatible ElevenLabs voice-startup fix. Local browser acceptance passed the requested discovery, seat, checkout, FAQ, QR, cancellation, Arabic/RTL and media scenarios at 420 px. The deterministic parser for generic “What is playing…” requests and the authoritative agent-result context were also corrected and retested.
 
-## Scope and protected integration contract
+The schedule refresh completed at `2026-07-15T06:32:40.092Z` with 9,479 deduplicated sessions across 16–22 July 2026. A transactional daily refresh workflow is present, but its first GitHub-hosted run and this revision's Cloudflare deployment/hosted voice acceptance are not claimed in this pre-deployment report.
 
-The following are intentional constraints and must remain unchanged during readiness work:
+The journey must not be presented as creating a live VOX sale. Reservations, inventory holds, authoritative prices, payments, official tickets, cross-device booking lookup, refunds and offer redemption remain unavailable until licensed server APIs and security controls are provided.
 
-- ElevenLabs voice transport uses WebRTC with `serverLocation: "eu-residency"`.
-- The existing client-tool names remain unchanged: `show_movie_selection`, `show_showtimes`, `show_seat_map`, `select_seats`, `show_booking_summary`, and `show_booking_for_cancellation`.
-- `show_seat_map` remains non-blocking.
-- The protected `select_seats` contract and fuzzy movie/session resolvers remain intact.
-- The 420 px mobile layout remains a supported layout target.
-- Real secrets must never be placed in a `VITE_*` value or committed to the repository.
+## Protected integration contract
 
-## Current repository status
+The following constraints remain unchanged:
 
-### What works in the implementation
+- ElevenLabs voice uses WebRTC with `serverLocation: "eu-residency"`.
+- The original client-tool names remain `show_movie_selection`, `show_showtimes`, `show_seat_map`, `select_seats`, `show_booking_summary`, and `show_booking_for_cancellation`.
+- `show_seat_map` remains non-blocking and `select_seats` retains its protected contract.
+- Fuzzy movie and session resolvers remain in place.
+- The 420 px mobile layout remains supported.
+- No ElevenLabs key, rotating VOX public-site token, Vista credential, payment secret or other real secret is stored in the repository or a `VITE_*` value.
 
-- Movie discovery retains supplied cinema/location, date, preferred time, genre, movie language, experience/format, specific title and kids/family intent. It asks only for missing information and routes text and voice transcripts through the same discovery logic.
-- Filtered results apply retained criteria. Preferred-time requests support a clearly labelled closest-time fallback when there is no exact match.
-- Current availability is filtered using UAE time and the cinema programming-day boundary, including after-midnight sessions.
-- There is no separate ticket-quantity stage, selector or plus/minus control. Each selected seat is one ticket.
-- A spoken or typed quantity is stored only as a target for seat guidance. It does not create tickets, determine price or block checkout.
-- Seat add/remove actions invalidate the prior checkout order and refresh the quote. Checkout count, subtotal, fees and total are derived from the selected seats and returned quote.
-- Checkout can return to the same editable seat map. Changing an upstream cinema, date, movie or showtime clears incompatible seats and pricing.
-- The unified conversation renders one current interactive stage, preventing old movie, showtime, seat or checkout controls from remaining actionable in the transcript.
-- Text startup has a microphone-free path. Voice starts only from the microphone action and retains the protected WebRTC/EU-residency configuration.
-- Explicit English/Arabic selection, RTL presentation, journey continuity, cancellation confirmation cleanup, booking persistence and local booking status updates are implemented.
-- Movie posters and experience imagery have compact layouts and fallback handling. Completed local bookings persist a poster reference when one is available.
-- `public/_headers` defines CSP, permissions, referrer, HSTS, MIME-sniffing and immutable hashed-asset cache policies for a future Cloudflare deployment of this revision.
+## Current official schedule bridge
 
-The command logs, local browser acceptance log and screenshots supporting these statements are listed below. Spoken acceptance and current-build hosted acceptance remain open gates.
+The successful refresh produced:
 
-### Partially working
+| Measure | Result |
+| --- | ---: |
+| Extracted at | `2026-07-15T06:32:40.092Z` |
+| Programming dates | 16–22 July 2026 |
+| Raw session rows | 9,518 |
+| Deduplicated sessions | 9,479 |
+| Duplicate source rows removed | 39 |
+| Sessions on 16 July | 1,439 |
+| Scheduled films | 35 |
+| Cinemas | 22 |
+| Session experience codes | 13 |
+| Retrieved experience records | 14 |
+| Live offer-media records | 20 |
 
-- **Voice:** the client connection and shared routing are implemented, but production behavior depends on the target ElevenLabs agent configuration, origin allow-list, microphone permission, browser/device WebRTC behavior and the dashboard prompt/tool schemas. Automated browser control could not complete a microphone session, so this report does not claim current-build spoken acceptance.
-- **Showtimes:** the shipped snapshot is internally structured and date-aware, but it covers a finite extraction window. It cannot provide ongoing live inventory after the snapshot expires.
-- **Seat plan and pricing:** browser behavior and quote normalization exist, but production-grade inventory locks, concurrent-seat conflict handling, authoritative fees and expiry are unavailable without server APIs.
-- **Checkout and booking:** the full UI journey, local reference and local history work on one browser/device. No authoritative VOX booking is created.
-- **Cancellation:** local stored bookings can be found and marked cancelled. Remote booking verification, eligibility, refund initiation and status require authenticated services.
-- **QR:** the rendered reference QR represents the local booking reference. It is not an official cinema-entry ticket or wallet pass.
-- **Offers:** structured rules and imagery can guide the guest, but eligibility is provisional and redemption is not connected.
-- **Customer Care handover:** a redacted summary can be prepared, but no Genesys/OneView transfer is performed.
-- **FAQ:** deterministic bilingual answers exist, but publication governance, customer approval, source freshness and a production knowledge-sync process are still required.
-- **Native browser Back/Forward:** in-widget FAQ and checkout Back actions preserve their parent state. Native browser Back leaves the single-page document and Forward reloads it successfully, retaining locale but not the in-memory journey; preserving an unfinished transaction across a full document navigation would require an approved persistence design.
-- **Visual quality:** current local English and Arabic 420 px sweeps show compact posters and no document-level horizontal overflow. Physical target-device, assistive-technology and design sign-off remain outstanding.
-- **Agent response grounding:** the deterministic widget results are authoritative, but one text run produced a “no kids movies” sentence while the widget correctly displayed two filtered family titles. Selected-booking grounding was strengthened and retested, but ElevenLabs dashboard prompt/tool-response acceptance is still required before leadership or production voice sign-off.
+`npm run refresh:data` performs extraction into staging files, validates freshness, date coverage, completeness, reconciliation, source identity and media provenance, converts the client dataset, imports the generated module, and runs repository validation plus the production build. Promotion happens only after every gate succeeds; a failure restores the previous known-good JSON/module pair.
 
-### What does not work as a live production operation
+`.github/workflows/refresh-vox-showtimes.yml` is scheduled daily at 01:30 UTC (05:30 UAE), with an additional Thursday run at 06:30 UTC (10:30 UAE) and manual dispatch. It commits only changed schedule JSON and generated client data. If official VOX routes reject GitHub datacenter traffic, repository variable `VOX_REFRESH_RUNNER` must point to an approved self-hosted runner on a permitted normal network.
 
-- Authoritative seat reservation or lock against VOX inventory.
-- Hosted/PCI payment authorization, capture, reversal or wallet payment.
-- Creation of an official booking or cinema-entry QR/ticket.
-- Authenticated lookup of a customer's bookings across devices.
-- Server-side cancellation/refund execution and refund status tracking.
-- Real-time offer redemption or bank-side validation.
+This bridge reflects published public-site programming; it is not a licensed real-time inventory or reservation API. The official route contract can change without notice, so alerting and a named data owner are required.
+
+## What works
+
+- Progressive discovery retains supplied cinema/location, date, preferred time, genre, language, experience, specific title and family/kids intent, then asks only for missing information.
+- Results apply all available criteria. Exact-time filtering and explicit nearest-time fallback work, including combined cinema/date/time queries and specific-title requests such as Moana.
+- A generic “What is playing…” request now enters movie discovery correctly instead of falling through to unrelated conversation handling.
+- Deterministic widget results are sent back as authoritative agent context, reducing contradictions between the assistant sentence and displayed movie/showtime cards.
+- Ticket count, subtotal, fees and checkout total derive only from selected seats. A stated ticket quantity is guidance for the number of seats, not a separate quantity stage.
+- Checkout can return to the editable seat map. Changing an upstream cinema, date, movie or showtime clears incompatible seats and quote state.
+- FAQ interruption returns to the active booking stage without leaving stale interactive components in the transcript.
+- Local booking confirmation renders a compact poster, booking details and a clearly bounded reference QR. Local booking lookup and cancellation update stored status.
+- Typed interaction starts without microphone access. Text and voice transcripts share the same intent router.
+- Explicit English/Arabic selection, Arabic RTL presentation, LTR booking identifiers and the 420 px layout are preserved.
+- Official posters, experience art and live offer imagery render with compact cards and resilient fallbacks.
+- The white-and-blue theme follows only the colour direction of the VOX Kuwait reference while the product, data and behavior remain VOX Cinemas UAE.
+- The repository's strict CSP remains in place. No `blob:` or `data:` exception was added to `script-src`.
+
+## Voice fix and current status
+
+The hosted failure was traced to Content Security Policy, not the public agent ID or microphone choice: ElevenLabs React SDK 0.7.1 attempted to create AudioWorklets from generated `blob:`/`data:` sources while `script-src` correctly allowed only trusted self-hosted scripts.
+
+The client now self-hosts both required worklets under `public/elevenlabs/` and passes their paths only when starting voice. Microphone permission and voice-transport startup each have a 45-second bound. Failures are classified into permission, device, browser component, service, timeout and generic cases with English and Arabic messages.
+
+The protected WebRTC transport, EU residency, public agent identifier flow and client-tool names were not changed. Repository validation covers the worklet files, paths, strict CSP, timeouts, error classification and bilingual string parity.
+
+**Partially working:** the code-level cause is fixed and locally validated, but this report does not claim a successful spoken session on the newly deployed Cloudflare bundle. A human microphone run on approved desktop and mobile browsers remains required after deployment.
+
+## What is partially working
+
+- **Showtimes:** current published schedules are available and the refresh transaction succeeded. Daily automation is configured, but the first scheduled/manual GitHub workflow run still needs evidence. Public-site routes are a temporary bridge, not a service-level agreement.
+- **Voice:** CSP-safe startup is implemented and statically validated. Hosted WebRTC, origin policy and real microphone/device acceptance remain pending.
+- **Seats and pricing:** selection, derived count and preview quote behavior work locally. Authoritative seat holds, concurrent conflict handling, official fees and expiry require server APIs.
+- **Checkout and booking:** the local end-to-end presentation works, but it creates only a device-local reference.
+- **Cancellation:** a local stored booking can be found and marked cancelled. No remote booking ownership check, cancellation write or refund is performed.
+- **QR:** the rendered QR contains a local reference and is not a cinema-entry ticket or wallet pass.
+- **Offers:** current media and structured guidance display, but bank validation and redemption are not connected.
+- **Customer Care:** a redacted transfer summary can be prepared, but no Genesys/OneView connection is made.
+- **FAQ:** bilingual deterministic answers exist; production publication approval, freshness ownership and knowledge synchronization are still required.
+- **Navigation:** in-widget Back and FAQ return preserve the intended stage. A full document exit/reload does not preserve every in-memory booking step without an approved persistence design.
+- **Accessibility and device coverage:** local 420 px English/Arabic inspection passed without document-level horizontal overflow. Physical device, screen-reader, keyboard-only and design sign-off remain open.
+
+## What does not work as a live operation
+
+- Authoritative seat reservation or inventory lock.
+- Server-authoritative prices, taxes, fees, discounts or quote expiry.
+- PCI-compliant card/wallet authorization, capture, reversal, 3DS or reconciliation.
+- Creation or delivery of an official booking, cinema-entry QR or wallet ticket.
+- Authenticated cross-device booking history.
+- Server-side cancellation, refund initiation or refund tracking.
+- Offer application/redemption or bank-side eligibility validation.
 - Transactional food-and-beverage ordering.
-- Genesys transfer or OneView write.
-- Guaranteed current schedules once the shipped snapshot is outside its published date range.
+- Live Genesys transfer or OneView write.
+- Guaranteed schedules if the public-site extraction contract changes or every approved refresh runner is unavailable.
 
-### Blocked items
+## Blocked items
 
-| Blocker | Owner/dependency | Release impact |
+| Blocker | Owner/dependency | Impact |
 | --- | --- | --- |
-| Complete current-build hosted regression is not yet evidenced | QA/Cloudflare owner | Artifact deployment passed, but hosted interaction acceptance remains incomplete |
-| ElevenLabs dashboard prompt, tools, first message and allowed origins require verification | ElevenLabs agent owner | Voice behavior and continuity are not guaranteed |
-| Production read/write API contracts and server credentials are unavailable | VOX platform/API owners | No live inventory, booking, payment, cancellation or refund |
-| Official FAQ/policy content approval and freshness ownership are unassigned | CX/content/legal owners | Customer answers cannot be treated as production policy |
-| Target-device microphone/WebRTC acceptance is incomplete | QA/device lab | Spoken journey is not release-qualified |
-| Physical-device responsive/RTL/accessibility sign-off is incomplete | QA/product design | Release visual and accessibility sign-off is incomplete |
-| The production bundle is 2,948.10 kB minified (423.12 kB gzip) | Web performance owner | Code/data splitting and performance budgets require review |
+| Current revision is not yet deployed and fully retested on Cloudflare | Deployment/QA owner | Local and hosted parity is not yet evidenced |
+| First recurring GitHub refresh run is not yet evidenced | Repository/data owner | Automation is configured but not operationally proven |
+| Hosted desktop/mobile microphone acceptance is pending | QA/device lab and ElevenLabs agent owner | Spoken journey is not release-qualified |
+| Licensed transaction and customer API contracts are unavailable | VOX platform/API owners | No live reservation, payment, official ticket, cancellation or refund |
+| Production FAQ/policy approval and freshness ownership are unassigned | CX/content/legal owners | Customer answers cannot yet be treated as approved policy |
+| Physical-device accessibility and performance sign-off is incomplete | QA/design/performance owners | Customer launch sign-off remains open |
 
-## Required ElevenLabs dashboard changes
+## Required ElevenLabs changes and checks
 
-Apply these changes to agent `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`. Do not rename the protected tools, change `select_seats`, or change the EU-residency connection.
+For agent `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`:
 
-1. Confirm all eight client tools are enabled with schemas matching the web client. The original six names stay unchanged; `show_offers` and `handover_to_agent` must be present for those features.
-2. Add the progressive-discovery rules from `ELEVENLABS_AGENT_SETUP.md`: extract supplied criteria, ask only for missing information, preserve preferences, filter with all criteria, and state when nearest times are shown.
-3. Remove any prompt instruction that asks for ticket quantity as a separate step. The prompt must state that selected seats are the only ticket-count and pricing source; a quantity utterance is only a seat-selection target.
-4. Require upstream changes to discard incompatible seat and quote context before another checkout.
-5. Configure the first-message field as `{{voxi_session_opening}}`. Keep `voxi_is_continuation`, `voxi_session_id`, `voxi_previous_conversation_id`, `voxi_intent`, `voxi_movie`, `voxi_cinema`, and `voxi_booking_progress` available to the prompt.
-6. Preserve strict language selection: do not switch language from detection alone; explicit user confirmation or a visible language-control action is required.
-7. Allow WebRTC/public-agent access only from approved production, StackBlitz and local QA origins. Verify the final Cloudflare origin explicitly.
-8. Retain the payment-data prohibition. The agent must never request spoken/typed PAN, expiry, CVV, OTP, PIN or password.
-9. Perform human voice acceptance in English and Arabic, including text-to-voice continuation, no repeated welcome, FAQ interruption during booking, target seat count, seat-label selection and return from checkout.
+1. Keep WebRTC, `serverLocation: "eu-residency"`, `select_seats` and every protected original tool name unchanged.
+2. Confirm all eight client tools use schemas matching the web client. `show_offers` and `handover_to_agent` must be present in addition to the original six.
+3. Apply the progressive-discovery rules from `ELEVENLABS_AGENT_SETUP.md`: extract supplied criteria, ask only for missing information, retain preferences and clearly label nearest-time results.
+4. Remove any separate ticket-quantity instruction. Selected seats are the only count/pricing source; a quantity utterance is only a selection target.
+5. Treat the deterministic widget result/context update as authoritative for availability and selected booking details.
+6. Configure the first message as `{{voxi_session_opening}}` and retain the documented continuation variables.
+7. Require explicit confirmation before switching English/Arabic; do not switch on language detection alone.
+8. Allow only approved local QA, StackBlitz and final Cloudflare origins for the public agent.
+9. Preserve the prohibition on PAN, expiry, CVV, OTP, PIN and passwords in voice or text.
+10. Complete human English/Arabic voice acceptance after deployment, covering first start, reconnect, text-to-voice continuation, discovery filters, FAQ interruption, seat selection and checkout return.
+
+No dashboard change is needed to weaken CSP; the application now serves the required worklets itself.
 
 ## Required API and knowledge-base changes
 
-### Transaction and customer APIs
+### Transaction and customer services
 
-- **Schedule/inventory gateway:** authenticated, server-side cinema/film/session reads with UAE programming-date semantics, session status, experience, language, auditorium and freshness metadata.
-- **Seat inventory/reservation:** authoritative seat map, accessibility metadata, hold creation, hold expiry, conflict response, release and idempotency keys.
-- **Quote service:** server-authoritative ticket types, taxes, fees, discounts, offer application, currency and quote expiry tied to the seat hold.
-- **Hosted payment service:** PCI-compliant hosted fields/redirect, 3DS, authorization/capture, retry, decline, timeout, reversal and webhook reconciliation. No payment secrets may pass through Vite or ElevenLabs.
-- **Booking service:** idempotent order creation, official booking reference, ticket/QR payload, email/SMS delivery and durable status.
-- **Booking lookup/account:** authenticated cross-device booking history, VOX Wallet/Credit and loyalty balance where approved.
-- **Cancellation/refund:** booking ownership verification, policy/eligibility decision, cancellation write, refund route/reference/status and audit trail.
-- **Offers:** current campaign/card terms, eligibility inputs, usage limits, application and redemption confirmation.
-- **Food and beverage:** venue/session menu, availability, basket pricing and fulfilment if transactional F&B remains in product scope.
-- **Customer Care:** Genesys/OneView connector with consent, transfer state, correlation ID and a response that distinguishes “summary prepared” from “agent connected.”
-- **Observability:** privacy-safe event IDs, API latency/error telemetry, tool invocation outcomes, abandonment stages and correlation across client, ElevenLabs and server services. Do not log transcripts or payment data without approved policy.
+- Authenticated schedule and inventory gateway with UAE programming-day semantics, status, language, experience and freshness metadata.
+- Seat map and hold service with accessibility metadata, conflict handling, expiry, release and idempotency.
+- Authoritative quote service tied to the seat hold.
+- PCI-compliant hosted payment with 3DS, webhooks, reconciliation and safe retries.
+- Idempotent booking creation and official ticket/QR delivery.
+- Authenticated booking lookup across devices and approved account/loyalty data.
+- Cancellation/refund eligibility, execution, reference, status and audit trail.
+- Offer terms, eligibility, application and redemption confirmation.
+- Optional venue/session F&B menu, basket and fulfillment APIs.
+- Genesys/OneView connector with consent, transfer state and correlation ID.
+- Privacy-safe telemetry across client, ElevenLabs and server services without unapproved transcript or payment logging.
 
-### Knowledge-base governance
+### Knowledge and data governance
 
-- Move customer-approved policy/editorial answers to a versioned CMS or ElevenLabs knowledge base; keep inventory, prices, showtimes, offers, bookings and balances API-driven.
-- Require stable article ID, English and Arabic content, source URL, content owner, reviewer, approval date, expiry/review cadence and customer/internal audience classification.
-- Separate customer-facing answers from internal SOP and escalation material.
-- Implement validated delta sync, link checking, schema checks, locale-completeness checks and rollback to the last approved version.
-- Assign owners for fast-changing topics such as refunds, accessibility, age rules, cinema hours, card campaigns and contact channels.
+- Move approved policy/editorial answers to a versioned CMS or ElevenLabs knowledge base; keep showtimes, inventory, prices, offers, bookings and balances API-driven.
+- Require stable article ID, English/Arabic content, source URL, owner, reviewer, approval date and review/expiry cadence.
+- Separate customer content from internal SOP and escalation guidance.
+- Add validated delta sync, link checks, locale parity, rollback and named owners for fast-changing refund, accessibility, age, hours, campaign and contact content.
+- Assign an owner for the temporary public-site schedule bridge, refresh alerts, route-change response and transition to the licensed API.
 
-## Test evidence for the final local revision
+## Local test results
 
-### Repository command evidence
-
-- `pnpm run validate` completed with `EXIT_CODE=0`. All 24 validator programs passed, covering 22 cinemas, 42 films, 4,344 sessions, nine programming dates, discovery filters, nearest-time fallback, UAE expiry, seat-derived ticketing, cancellation safety, text/voice routing parity, bilingual strings and protected invariants.
-- `pnpm run build` completed with `EXIT_CODE=0`. Vite transformed 1,540 modules and produced `dist/assets/index-B6np26pn.js` at 2,948.10 kB minified / 423.12 kB gzip.
-- The bundle-size warning remains open. The 2.08 MB schedule snapshot is the largest source payload; code/data splitting and an explicit performance budget are recommended.
-- This workspace supplied dependencies through the Codex bundled runtime and did not rerun `npm ci`. Cloudflare's documented clean-build command remains `npm ci && npm run validate && npm run build`.
-
-### Scenario matrix
-
-| Scenario | Automated coverage | Current local browser evidence |
+| Scenario | Result | Evidence/notes |
 | --- | --- | --- |
-| Cinema already provided is not asked again | Pass | Pass |
-| Date already provided is not asked again | Pass | Pass |
-| Preferred time filters results | Pass | Pass |
-| Genre filtering | Pass | Pass: three Comedy titles around 20:00 |
-| Kids/family filtering | Pass | Widget pass; one contradictory ElevenLabs sentence observed and recorded as a grounding risk |
-| Experience filtering | Pass | Pass: IMAX-only sessions |
-| Specific movie filtering | Pass, including guarded fuzzy resolution | Pass: Toy Story 5 only |
-| Combined cinema/date/time | Pass | Pass at 420 px in English and Arabic |
-| No exact time shows nearest options | Pass | Pass with explicit closest-time notices |
-| Changing genre/experience refreshes results | Pass | Pass |
-| Changing cinema/date/time clears incompatible state | Pass | Pass from a selected-seat state |
-| Ticket count comes only from selected seats | Pass | Pass: 3/AED 126, then 2/AED 84 |
-| Checkout Back restores editable seats | Pass | Pass; A4 was replaced by A5 and checkout regenerated |
-| Text and voice consistency | Same transcript router passes | Spoken run blocked by microphone permission; no live voice pass claimed |
-| FAQ interruption during booking | Pass | Pass; three seats and quote restored |
-| Cancellation confirmation rendering | Pass | Pass after runtime fall-through fix |
-| Browser Back/Forward | In-widget state paths pass | Native Back/Forward reload pass; in-memory journey does not survive document exit |
-| Poster rendering and 420 px layout | Pass | Pass locally in English/Arabic; device sign-off pending |
-| Current showtime validation | Pass | Future sessions used locally; deployed expired-session retest pending |
+| Fresh 16 July showtimes | Pass | 1,439 sessions; 16–22 July coverage |
+| Generic “What is playing…” discovery | Pass | Parser routing fix retested |
+| Combined cinema/date/time request | Pass | Existing criteria retained; results narrowed |
+| Exact and nearest-time handling | Pass | Nearest options explicitly identified when exact time absent |
+| Specific Moana request | Pass | Relevant title/cinema/showtimes only |
+| Seat-derived count and pricing | Pass | Add/remove seat updates count, subtotal, fees and total |
+| Checkout Back to seat map | Pass | Seat map restored and editable |
+| FAQ interruption and return | Pass | Active booking context restored |
+| Booking confirmation and QR | Pass | Local-reference boundary shown |
+| Current-booking cancellation | Pass | Stored status updated and rendering cleaned up |
+| Arabic/RTL flow | Pass | 420 px visual pass |
+| Poster, experience and offer media | Pass | Compact cards/fallback behavior verified |
+| White/blue theme at 420 px | Pass | No document-level horizontal overflow in inspected states |
+| Voice source/CSP contract | Pass | Both self-hosted worklets, strict CSP, paths, timeouts and bilingual errors validated |
+| Local live microphone conversation | Not claimed | Human device acceptance required |
+| Current revision on Cloudflare | Not claimed | Deploy and hosted matrix still required |
+| Recurring GitHub workflow execution | Not claimed | Workflow exists; first run evidence pending |
 
-### Cloudflare deployment status and pre-deployment baseline
+## Screenshot and log evidence
 
-Post-push verification of <https://voxi-ai.pages.dev/> confirmed:
+| Evidence file | Content |
+| --- | --- |
+| `evidence/logs/showtime-voice-theme-local-acceptance.md` | Refresh facts, local scenario matrix, voice root cause/fix and remaining hosted gates |
+| `evidence/logs/local-browser-e2e.md` | Earlier detailed local journey and hosted-baseline observations |
+| `evidence/logs/pnpm-run-validate.txt` | Repository validation command output from the preceding tested revision; retain as historical command evidence until refreshed for this revision |
+| `evidence/logs/pnpm-run-build.txt` | Production build output from the preceding tested revision; retain as historical command evidence until refreshed for this revision |
+| `evidence/screenshots/local-white-blue-july16-420.png` | White/blue current-date result at 420 px |
+| `evidence/screenshots/local-generic-filtered-july16-420.png` | Generic discovery routing and filtered July 16 results |
+| `evidence/screenshots/local-arabic-white-blue-july16-420.png` | Arabic/RTL white-and-blue state at 420 px |
+| `evidence/screenshots/local-booking-qr-white-blue-420.png` | Booking confirmation and local reference QR in the new theme |
+| `evidence/screenshots/local-checkout-seat-derived-420.png` | Seat-derived checkout count and pricing |
+| `evidence/screenshots/local-cancellation-confirmed-420.png` | Local cancellation confirmation and cleanup |
+| `evidence/screenshots/hosted-old-date-misroute-420.png` | Historical hosted failure baseline; not current-revision pass evidence |
 
-- GitHub `main` is commit `4269339`, and Cloudflare serves `assets/index-B6np26pn.js`, matching that commit's final local production build.
-- HTML is returned with `no-cache, no-store, must-revalidate`; CSP, HSTS and `Permissions-Policy: microphone=(self)` are active.
-- This is an artifact/header smoke check only. The complete current-build hosted scenario matrix and human microphone run remain release gates.
+## Release gates
 
-The earlier runtime audit remains useful as a pre-deployment failure baseline. Observed on that older deployment:
+Leadership review of the current local schedule/display/checkout-preview journey can proceed. Before stating local/web parity, deploy this exact revision and repeat the critical hosted text, Arabic, navigation, media, QR, cancellation and microphone checks.
 
-- The hosted script was `assets/index-BgMP9HrN.js`; the final local build is `assets/index-B6np26pn.js`.
-- “Mall of the Emirates tomorrow at 6 PM” displayed all 19 films instead of filtering around 6 PM.
-- In the final spot check, “Actually, July 15 at 6 PM” was misrouted to the 15+/18+/21+ age-rating FAQ and the agent incorrectly said only 16 July could be shown.
-- FAQ interruption and return preserved selected seat A1.
-- Checkout Back returned to the seat map.
-- All 19 tested poster requests loaded; cards rendered at approximately 104 × 156 px with no horizontal page overflow.
-- Header/date-chip/showtime-experience truncation was visible and needs comparison against the current revision.
-- An expired same-day session could progress to checkout; the current repository contains an expiry guard that still requires deployed verification.
-- Automated microphone control timed out, so no hosted voice pass is claimed.
-- The audited response exposed referrer and MIME-sniffing headers but not the CSP, HSTS or Permissions-Policy now defined in the repository's `public/_headers`. Root and asset caching remained `public, max-age=0, must-revalidate`; the main JavaScript asset was approximately 2.9 MB.
+A customer production launch additionally requires:
 
-Completed deployment checks:
+1. A clean install, complete validation and production build for the final revision with archived logs.
+2. Exact tested-revision deployment to Cloudflare with asset identity and security headers recorded.
+3. Successful manual and scheduled refresh runs with alerting, ownership and rollback evidence.
+4. Hosted English/Arabic text acceptance and human voice acceptance on approved desktop and mobile browsers.
+5. Licensed inventory, hold, quote, payment, booking, official ticket and cancellation/refund services.
+6. Security, privacy, PCI, accessibility, performance and data-licensing approval.
+7. Approved bilingual knowledge and offer content with operational freshness controls.
+8. Monitoring, incident ownership, support handover and rollback readiness.
 
-1. Recorded deployed commit `4269339` and matching asset `index-B6np26pn.js`.
-2. Confirmed Cloudflare serves the current `_headers` policy for HTML and one-year immutable caching for the hashed asset.
-
-Remaining hosted acceptance:
-
-1. Run the complete scenario matrix in English text at 420 px.
-2. Repeat critical discovery, seat, checkout, FAQ and cancellation paths in Arabic/RTL.
-3. Perform human voice checks on an approved desktop and mobile browser with microphone permission.
-4. Test native Back/Forward, refresh during each transactional stage and expired-session behavior.
-5. Capture console/network logs with secrets and customer data excluded.
-
-## Screenshot and log evidence manifest
-
-Evidence below is for the current local source unless the filename says `hosted-old`. The header log proves current deployment identity, but no evidence claims a complete hosted scenario or spoken voice pass.
-
-| Evidence file | Content | Status |
-| --- | --- | --- |
-| `evidence/logs/pnpm-run-validate.txt` | Complete validation output with `EXIT_CODE=0` | Present |
-| `evidence/logs/pnpm-run-build.txt` | Successful Vite build, asset name/size and `EXIT_CODE=0` | Present |
-| `evidence/logs/local-browser-e2e.md` | Detailed local and hosted scenario outcomes, including observed risks | Present |
-| `evidence/logs/cloudflare-headers.txt` | Pre-deployment baseline and post-push asset/header verification | Present; confirms current asset deployment |
-| `evidence/screenshots/local-filtered-combined-420.png` | English combined cinema/date/time filtering at 420 px | Present |
-| `evidence/screenshots/local-checkout-seat-derived-420.png` | Three-seat checkout, subtotal, fees and total | Present |
-| `evidence/screenshots/local-booking-qr-420.png` | Booking summary, compact poster and reference QR boundary | Present |
-| `evidence/screenshots/local-cancellation-confirmed-420.png` | Device-only cancellation status and no-refund wording | Present |
-| `evidence/screenshots/local-arabic-filtered-420.png` | Arabic/RTL combined filtering at 420 px | Present |
-| `evidence/screenshots/hosted-old-date-misroute-420.png` | Old hosted build misrouting a date/time turn to age-rating FAQ | Present; failure evidence |
-| Browser console/network export | The in-app browser did not expose an event export; no pass is claimed | Blocked by test surface |
-
-## Release acceptance gates
-
-Leadership journey review may proceed only after gates 1–5. A customer production launch requires all gates.
-
-1. Final validation and production build are green with attached logs; the deployment pipeline must still prove its clean `npm ci` install.
-2. The exact tested revision is deployed to Cloudflare and its asset hash/security headers are recorded. **Passed for commit `4269339`.**
-3. Every requested text scenario passes on the hosted build, including filtered discovery, nearest times, seat-derived pricing, checkout return, cancellation and FAQ restoration.
-4. English/Arabic, 420 px responsive, poster, native Back/Forward, refresh and rendering evidence receives QA/design sign-off.
-5. ElevenLabs dashboard configuration and human voice checks pass on approved desktop and mobile browsers.
-6. Production APIs provide authenticated inventory, holds, quotes, hosted payment, booking, official tickets, cancellation/refund and idempotency.
-7. Security/privacy review approves CSP/origins, secret handling, data retention, logging, PCI boundary and accessibility.
-8. Customer-facing knowledge content and offer rules have named owners, bilingual approval and freshness controls.
-9. Monitoring, alerting, rollback, incident ownership and support handover are operational.
-
-Until the applicable gates close, the release decision remains **NO-GO**.
+Until customer transaction services and these launch gates are complete, production sales remain **NO-GO**.

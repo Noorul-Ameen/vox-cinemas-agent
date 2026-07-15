@@ -10,7 +10,7 @@ export function Poster({ tint, title, small, posterUrl }) {
   const { t } = useI18n();
   const imageUrl = getSupportedImageUrl(posterUrl);
   const [imgOk, setImgOk] = React.useState(!!imageUrl);
-  const palette = tint && tint.length === 2 ? tint : [C.purple, C.magenta];
+  const palette = tint && tint.length === 2 ? tint : [C.primaryHover, C.brand];
   React.useEffect(() => setImgOk(!!imageUrl), [imageUrl]);
   return (
     <div style={{
@@ -43,7 +43,7 @@ function ExperienceThumbnail({ experience, media }) {
   React.useEffect(() => setImgOk(!!imageUrl), [imageUrl]);
 
   return (
-    <span aria-hidden="true" style={{ display: "grid", width: 24, height: 24, flexShrink: 0, overflow: "hidden", placeItems: "center", borderRadius: 6, background: "rgba(99,65,141,.28)", color: C.lavender }}>
+    <span aria-hidden="true" style={{ display: "grid", width: 24, height: 24, flexShrink: 0, overflow: "hidden", placeItems: "center", borderRadius: 6, background: C.primarySoft, color: C.primary }}>
       {imgOk && imageUrl
         ? <img src={imageUrl} alt="" loading="lazy" decoding="async" onError={() => setImgOk(false)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         : <Film size={12} />}
@@ -60,10 +60,10 @@ function Header({ icon, title, sub, onBack }) {
           <ChevronRight size={18} style={{ transform: dir === "rtl" ? "none" : "rotate(180deg)" }} />
         </button>
       )}
-      <div style={{ display: "flex", height: 32, width: 32, alignItems: "center", justifyContent: "center", borderRadius: 8, background: "rgba(182,24,108,.2)", color: C.lavender }}>{icon}</div>
+      <div style={{ display: "flex", height: 32, width: 32, alignItems: "center", justifyContent: "center", borderRadius: 8, background: C.primarySoft, color: C.primary }}>{icon}</div>
       <div>
-        <div dir="auto" style={{ fontSize: 16, fontWeight: 700, color: "#fff", lineHeight: 1.1 }}>{title}</div>
-        <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)" }}>{sub}</div>
+        <div dir="auto" style={{ fontSize: 16, fontWeight: 700, color: C.text, lineHeight: 1.1 }}>{title}</div>
+        <div style={{ fontSize: 11, color: C.muted }}>{sub}</div>
       </div>
     </div>
   );
@@ -73,10 +73,10 @@ function InlineState({ title, onRetry, error = false }) {
   const { t } = useI18n();
   const Icon = error ? AlertTriangle : Film;
   return (
-    <div role={error ? "alert" : "status"} style={{ display: "flex", minHeight: 150, flexDirection: "column", alignItems: "center", justifyContent: "center", border: "1px dashed rgba(255,255,255,.15)", borderRadius: 13, padding: 20, color: "rgba(255,255,255,.55)", textAlign: "center" }}>
-      <Icon size={25} color={error ? "#FFCF70" : C.lavender} aria-hidden="true" />
+    <div role={error ? "alert" : "status"} style={{ display: "flex", minHeight: 150, flexDirection: "column", alignItems: "center", justifyContent: "center", border: `1px dashed ${error ? C.warning : C.border}`, borderRadius: 13, background: error ? C.warningSoft : C.surfaceAlt, padding: 20, color: C.muted, textAlign: "center" }}>
+      <Icon size={25} color={error ? C.warning : C.primary} aria-hidden="true" />
       <div style={{ marginTop: 9, fontSize: 12, lineHeight: 1.45 }}>{title}</div>
-      {onRetry && <button type="button" onClick={onRetry} style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 11, border: "1px solid rgba(255,255,255,.16)", borderRadius: 8, background: "rgba(255,255,255,.07)", padding: "8px 11px", color: "#fff", cursor: "pointer", fontSize: 11 }}><RefreshCw size={13} aria-hidden="true" />{t("common.retry")}</button>}
+      {onRetry && <button type="button" onClick={onRetry} style={{ display: "inline-flex", alignItems: "center", gap: 6, marginTop: 11, border: 0, borderRadius: 8, background: C.primary, padding: "8px 11px", color: C.onPrimary, cursor: "pointer", fontSize: 11 }}><RefreshCw size={13} aria-hidden="true" />{t("common.retry")}</button>}
     </div>
   );
 }
@@ -89,22 +89,22 @@ export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, 
   return (
     <div>
       <Header icon={<MapPin size={16} />} title={t("cinema.title")} sub={t("cinema.count", { count: cinemas.length })} onBack={onBack} />
-      {notice && <div role="status" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12, borderRadius: 10, background: "rgba(99,65,141,.2)", padding: "9px 11px", color: C.lavender, fontSize: 11, lineHeight: 1.45 }}><span>{notice}</span>{onRetry && !error && <button type="button" onClick={onRetry} style={{ display: "inline-flex", flexShrink: 0, alignItems: "center", gap: 5, border: "1px solid rgba(255,255,255,.16)", borderRadius: 7, background: "rgba(255,255,255,.07)", padding: "6px 8px", color: "#fff", cursor: "pointer", fontSize: 10 }}><RefreshCw size={12} aria-hidden="true" />{t("common.retry")}</button>}</div>}
-      <label style={{ display: "flex", alignItems: "center", gap: 8, borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.04)", padding: "9px 12px", marginBottom: 12 }}>
-        <Search size={15} color="rgba(255,255,255,.45)" />
-        <input dir="auto" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("cinema.search")} style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: "transparent", color: "#fff", fontSize: 13, textAlign: "start" }} />
+      {notice && <div role="status" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 12, borderRadius: 10, background: C.primarySoft, padding: "9px 11px", color: C.primary, fontSize: 11, lineHeight: 1.45 }}><span>{notice}</span>{onRetry && !error && <button type="button" onClick={onRetry} style={{ display: "inline-flex", flexShrink: 0, alignItems: "center", gap: 5, border: `1px solid ${C.primary}`, borderRadius: 7, background: C.surface, padding: "6px 8px", color: C.primary, cursor: "pointer", fontSize: 10 }}><RefreshCw size={12} aria-hidden="true" />{t("common.retry")}</button>}</div>}
+      <label style={{ display: "flex", alignItems: "center", gap: 8, borderRadius: 12, border: `1px solid ${C.border}`, background: C.surface, padding: "9px 12px", marginBottom: 12 }}>
+        <Search size={15} color={C.muted} />
+        <input dir="auto" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("cinema.search")} style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: "transparent", color: C.text, fontSize: 13, textAlign: "start" }} />
       </label>
       {error ? <InlineState title={t("cinema.error")} onRetry={onRetry} error /> : <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         {visible.map((cinema) => (
-          <button key={cinema.id} onClick={() => onSelect(cinema)} style={{ ...rowBtn, padding: "11px 13px", borderColor: selected?.id === cinema.id ? C.magenta : "rgba(255,255,255,.12)" }}>
+          <button key={cinema.id} onClick={() => onSelect(cinema)} style={{ ...rowBtn, padding: "11px 13px", borderColor: selected?.id === cinema.id ? C.primary : C.border, background: selected?.id === cinema.id ? C.primarySoft : C.surface }}>
             <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <MapPin size={15} color={selected?.id === cinema.id ? C.magenta : C.lavender} />
-              <span dir="auto" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, color: "#fff" }}>{cinema.name.replace(/^VOX\s*[—-]\s*/, "")}</span>
+              <MapPin size={15} color={C.primary} />
+              <span dir="auto" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, color: C.text }}>{cinema.name.replace(/^VOX\s*[—-]\s*/, "")}</span>
             </span>
-            {selected?.id === cinema.id ? <Check size={15} color={C.green} /> : <ChevronRight size={16} color="rgba(255,255,255,.35)" style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />}
+            {selected?.id === cinema.id ? <Check size={15} color={C.green} /> : <ChevronRight size={16} color={C.muted} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />}
           </button>
         ))}
-        {!visible.length && <div style={{ padding: 18, textAlign: "center", fontSize: 12, color: "rgba(255,255,255,.45)" }}>{t("cinema.none")}</div>}
+        {!visible.length && <div style={{ padding: 18, textAlign: "center", fontSize: 12, color: C.muted }}>{t("cinema.none")}</div>}
       </div>}
     </div>
   );
@@ -115,14 +115,14 @@ export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, err
   return (
     <div>
       <Header icon={<Film size={16} />} title={t("movies.title")} sub={<span><bdi dir="auto">{cinemaName}</bdi> · <span dir="ltr">{scheduleDate}</span></span>} />
-      {notice && <div role="status" style={{ marginBottom: 12, border: "1px solid rgba(228,220,240,.16)", borderRadius: 10, background: "rgba(99,65,141,.18)", padding: "9px 11px", color: C.lavender, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
+      {notice && <div role="status" style={{ marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 10, background: C.primarySoft, padding: "9px 11px", color: C.primary, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
       {error ? <InlineState title={typeof error === "string" ? error : t("movies.error")} onRetry={onRetry} error /> : !movies.length ? <InlineState title={t("movies.empty")} onRetry={onRetry} /> : <div style={{ display: "grid", maxWidth: "100%", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 12 }}>
         {movies.map((m) => (
           <button key={m.id} onClick={() => onSelect(m)} style={{ ...btnReset, width: "100%", minWidth: 0, textAlign: "start" }}>
             <Poster tint={m.tint} title={m.title} posterUrl={m.posterUrl} />
-            <div dir="auto" style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: "#fff", lineHeight: 1.15 }}>{m.title}</div>
-            <div style={{ marginTop: 2, fontSize: 11, color: "rgba(255,255,255,.5)" }}>
-              <span style={{ background: "rgba(182,24,108,.25)", color: C.lavender, borderRadius: 3, padding: "0 4px", marginInlineEnd: 6 }}>{m.rating}</span>
+            <div dir="auto" style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: C.text, lineHeight: 1.15 }}>{m.title}</div>
+            <div style={{ marginTop: 2, fontSize: 11, color: C.muted }}>
+              <span style={{ background: C.primarySoft, color: C.primary, borderRadius: 3, padding: "0 4px", marginInlineEnd: 6 }}>{m.rating}</span>
               {[
                 ...(m.genres || [m.genre]).filter(Boolean).slice(0, 2),
                 m.runtime ? t("showtimes.minutes", { count: m.runtime }) : "",
@@ -132,7 +132,7 @@ export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, err
             {!!m.relevantSessions?.length && <div aria-label={`Relevant showtimes for ${m.title}`} style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
               {m.relevantSessions.slice(0, 3).map((session) => <span key={session.sessionId} dir="ltr" style={{ borderRadius: 999, background: "rgba(87,199,154,.11)", padding: "2px 6px", color: C.green, fontSize: 9, whiteSpace: "nowrap" }}>{session.time} · {session.exp}</span>)}
             </div>}
-            <div dir="auto" style={{ marginTop: 5, fontSize: 10, lineHeight: 1.35, color: "rgba(255,255,255,.42)", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.synopsis}</div>
+            <div dir="auto" style={{ marginTop: 5, fontSize: 10, lineHeight: 1.35, color: C.muted, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.synopsis}</div>
           </button>
         ))}
       </div>}
@@ -142,17 +142,17 @@ export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, err
 
 export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRetry, notice }) {
   const { t, dir } = useI18n();
-  const expColor = (e) => (["IMAX", "MAX"].includes(e) ? "#C79A4B" : e === "GOLD" ? "#D9A94B" : e === "KIDS" ? C.green : C.lavender);
+  const expColor = (e) => (["IMAX", "MAX"].includes(e) ? C.primaryHover : e === "GOLD" ? C.warning : e === "KIDS" ? C.green : C.primary);
   return (
     <div>
       <Header icon={<Clock size={16} />} title={movie.title} sub={`${movie.rating} · ${movie.runtime ? t("showtimes.minutes", { count: movie.runtime }) : "—"} · ${t("showtimes.select")}`} onBack={onBack} />
-      {notice && <div role="status" style={{ marginBottom: 12, border: "1px solid rgba(228,220,240,.16)", borderRadius: 10, background: "rgba(99,65,141,.18)", padding: "9px 11px", color: C.lavender, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
-      <div style={{ marginBottom: 14, borderRadius: 12, border: "1px solid rgba(255,255,255,.08)", background: "rgba(0,0,0,.18)", padding: "11px 12px" }}>
+      {notice && <div role="status" style={{ marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 10, background: C.primarySoft, padding: "9px 11px", color: C.primary, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
+      <div style={{ marginBottom: 14, borderRadius: 12, border: `1px solid ${C.border}`, background: C.surfaceAlt, padding: "11px 12px" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 7 }}>
-          {(movie.genres || [movie.genre]).filter(Boolean).map((genre) => <span key={genre} style={{ borderRadius: 999, background: "rgba(99,65,141,.28)", color: C.lavender, padding: "2px 7px", fontSize: 10 }}>{genre}</span>)}
-          {movie.language && <span style={{ borderRadius: 999, background: "rgba(255,255,255,.07)", color: "rgba(255,255,255,.6)", padding: "2px 7px", fontSize: 10 }}>{movie.language}</span>}
+          {(movie.genres || [movie.genre]).filter(Boolean).map((genre) => <span key={genre} style={{ borderRadius: 999, background: C.primarySoft, color: C.primary, padding: "2px 7px", fontSize: 10 }}>{genre}</span>)}
+          {movie.language && <span style={{ borderRadius: 999, background: C.surface, color: C.muted, padding: "2px 7px", fontSize: 10 }}>{movie.language}</span>}
         </div>
-        <p dir="auto" style={{ margin: 0, fontSize: 11, lineHeight: 1.45, color: "rgba(255,255,255,.58)" }}>{movie.synopsis}</p>
+        <p dir="auto" style={{ margin: 0, fontSize: 11, lineHeight: 1.45, color: C.muted }}>{movie.synopsis}</p>
       </div>
       <div style={{ display: "flex", width: "100%", maxWidth: "100%", minWidth: 0, gap: 12, alignItems: "flex-start" }}>
         <div style={{ width: 72, maxWidth: "22%", flexShrink: 0 }}><Poster tint={movie.tint} title={movie.title} posterUrl={movie.posterUrl} /></div>
@@ -160,16 +160,16 @@ export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRet
           {error ? <InlineState title={typeof error === "string" ? error : t("showtimes.error")} onRetry={onRetry} error /> : !sessions.length ? <InlineState title={t("showtimes.empty")} onRetry={onRetry} /> : sessions.map((s) => (
             <button key={s.sessionId} onClick={() => onSelect(s)} style={{ ...rowBtn, minWidth: 0, gap: 8 }}>
               <div style={{ display: "flex", minWidth: 0, flex: 1, alignItems: "center", gap: 8, overflow: "hidden" }}>
-                <div dir="ltr" style={{ flexShrink: 0, fontSize: 24, fontWeight: 700, color: "#fff" }}>{s.time}</div>
+                <div dir="ltr" style={{ flexShrink: 0, fontSize: 24, fontWeight: 700, color: C.text }}>{s.time}</div>
                 <ExperienceThumbnail experience={s.exp} media={s.experienceMedia || s.media} />
                 <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
                   <div dir="ltr" title={s.exp} style={{ overflow: "hidden", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: expColor(s.exp), textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.exp}</div>
-                  <div dir="ltr" title={s.screen} style={{ overflow: "hidden", fontSize: 11, color: "rgba(255,255,255,.5)", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.screen}</div>
+                  <div dir="ltr" title={s.screen} style={{ overflow: "hidden", fontSize: 11, color: C.muted, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.screen}</div>
                 </div>
               </div>
               <div style={{ display: "flex", flexShrink: 0, alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,.5)", whiteSpace: "nowrap" }}>{t("showtimes.seats", { count: s.seatsAvailable })}</span>
-                <ChevronRight size={18} color="rgba(255,255,255,.4)" style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />
+                <span style={{ fontSize: 11, color: C.muted, whiteSpace: "nowrap" }}>{t("showtimes.seats", { count: s.seatsAvailable })}</span>
+                <ChevronRight size={18} color={C.muted} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />
               </div>
             </button>
           ))}
@@ -215,18 +215,18 @@ export function SeatMap({ movie, session, plan = [], selected = [], requestedTar
   return (
     <div>
       <Header icon={<Armchair size={16} />} title={<span><bdi dir="auto">{movie.title}</bdi> · <span dir="ltr">{session.time}</span></span>} sub={<span><span dir="ltr">{session.exp} · {session.screen}</span> · {t("seats.tap")}</span>} onBack={onBack} />
-      {notice && <div role="note" style={{ marginBottom: 16, border: "1px solid rgba(255,207,112,.24)", borderRadius: 10, background: "rgba(255,207,112,.08)", padding: "9px 11px", color: "#FFCF70", fontSize: 10, lineHeight: 1.45 }}>{notice === true ? t("seats.demoNotice") : notice}</div>}
-      {!notice && pricing?.demo === true && <div role="note" style={{ marginBottom: 16, border: "1px solid rgba(255,207,112,.24)", borderRadius: 10, background: "rgba(255,207,112,.08)", padding: "9px 11px", color: "#FFCF70", fontSize: 10, lineHeight: 1.45 }}>{t("seats.demoPricingNotice")}</div>}
-      {pricing?.mode === "quote_required" && <div role="note" style={{ marginBottom: 16, border: "1px solid rgba(255,255,255,.12)", borderRadius: 10, background: "rgba(255,255,255,.04)", padding: "9px 11px", color: "rgba(255,255,255,.72)", fontSize: 10, lineHeight: 1.45 }}>{t("seats.quoteRequiredNotice")}</div>}
-      {target && <div role="status" style={{ marginBottom: 12, borderRadius: 10, background: selected.length === target ? "rgba(87,199,154,.12)" : "rgba(99,65,141,.2)", padding: "8px 10px", color: selected.length === target ? C.green : C.lavender, fontSize: 10, fontWeight: 700 }}>{t(selected.length === target ? "seats.targetReached" : "seats.targetProgress", { target, count: selected.length })}</div>}
+      {notice && <div role="note" style={{ marginBottom: 16, border: `1px solid ${C.warning}`, borderRadius: 10, background: C.warningSoft, padding: "9px 11px", color: C.warning, fontSize: 10, lineHeight: 1.45 }}>{notice === true ? t("seats.demoNotice") : notice}</div>}
+      {!notice && pricing?.demo === true && <div role="note" style={{ marginBottom: 16, border: `1px solid ${C.warning}`, borderRadius: 10, background: C.warningSoft, padding: "9px 11px", color: C.warning, fontSize: 10, lineHeight: 1.45 }}>{t("seats.demoPricingNotice")}</div>}
+      {pricing?.mode === "quote_required" && <div role="note" style={{ marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 10, background: C.surfaceAlt, padding: "9px 11px", color: C.text, fontSize: 10, lineHeight: 1.45 }}>{t("seats.quoteRequiredNotice")}</div>}
+      {target && <div role="status" style={{ marginBottom: 12, borderRadius: 10, background: selected.length === target ? C.successSoft : C.primarySoft, padding: "8px 10px", color: selected.length === target ? C.green : C.primary, fontSize: 10, fontWeight: 700 }}>{t(selected.length === target ? "seats.targetReached" : "seats.targetProgress", { target, count: selected.length })}</div>}
       <div dir="ltr" style={{ maxWidth: 420, margin: "0 auto 24px" }}>
-        <div style={{ height: 6, borderRadius: 999, background: `linear-gradient(90deg, transparent, ${C.lavender}, transparent)`, boxShadow: "0 0 24px 4px rgba(228,220,240,.35)" }} />
-        <div style={{ marginTop: 4, textAlign: "center", fontSize: 10, letterSpacing: 6, textTransform: "uppercase", color: "rgba(255,255,255,.4)" }}>{t("seats.screen")}</div>
+        <div style={{ height: 6, borderRadius: 999, background: `linear-gradient(90deg, transparent, ${C.brand}, transparent)`, boxShadow: "0 0 24px 4px rgba(0,157,219,.24)" }} />
+        <div style={{ marginTop: 4, textAlign: "center", fontSize: 10, letterSpacing: 6, textTransform: "uppercase", color: C.muted }}>{t("seats.screen")}</div>
       </div>
       <div dir="ltr" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {plan.map((r) => (
           <div key={r.row} style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "clamp(2px, .8vw, 4px)" }}>
-            <span style={{ width: 14, textAlign: "center", fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,.4)" }}>{r.row}</span>
+            <span style={{ width: 14, textAlign: "center", fontSize: 10, fontWeight: 700, color: C.muted }}>{r.row}</span>
             {r.seats.map((s, i) => {
               const isSel = selected.includes(s.id);
               const sold = s.status !== 0;
@@ -236,9 +236,9 @@ export function SeatMap({ movie, session, plan = [], selected = [], requestedTar
                   <button disabled={sold} onClick={() => onToggle(s)} aria-pressed={isSel} aria-label={sold ? t("seats.soldLabel", { seat: s.id }) : t("seats.availableLabel", { seat: s.id, tier: s.premium ? t("seats.premiumWord") : t("seats.standardWord") })} title={s.id}
                     style={{
                       height: "clamp(18px, 5.2vw, 22px)", width: "clamp(18px, 5.2vw, 22px)", borderRadius: 5, border: "none", padding: 0, fontSize: 8, fontWeight: 700,
-                      background: sold ? "rgba(255,255,255,.06)" : isSel ? C.magenta : s.premium ? "rgba(199,154,75,.25)" : "rgba(228,220,240,.14)",
-                      color: sold ? "rgba(255,255,255,.2)" : isSel ? "#fff" : "rgba(255,255,255,.7)",
-                      cursor: sold ? "not-allowed" : "pointer", outline: isSel ? "1px solid #fff" : "none",
+                      background: sold ? "#E6ECEF" : isSel ? C.primary : s.premium ? C.warningSoft : "#DDEEF4",
+                      color: sold ? "#7A8D98" : isSel ? C.onPrimary : s.premium ? C.warning : C.text,
+                      cursor: sold ? "not-allowed" : "pointer", outline: isSel ? `2px solid ${C.focus}` : "none",
                     }}>
                     {s.colIndex + 1}
                   </button>
@@ -248,22 +248,22 @@ export function SeatMap({ movie, session, plan = [], selected = [], requestedTar
           </div>
         ))}
       </div>
-      <div style={{ marginTop: 20, display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 16, fontSize: 10, color: "rgba(255,255,255,.5)" }}>
-        <Legend swatch="rgba(228,220,240,.14)" label={standardLabel} />
-        <Legend swatch="rgba(199,154,75,.25)" label={premiumLabel} />
-        <Legend swatch={C.magenta} label={t("seats.selected")} />
-        <Legend swatch="rgba(255,255,255,.06)" label={t("seats.sold")} />
+      <div style={{ marginTop: 20, display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 16, fontSize: 10, color: C.muted }}>
+        <Legend swatch="#DDEEF4" label={standardLabel} />
+        <Legend swatch={C.warningSoft} label={premiumLabel} />
+        <Legend swatch={C.primary} label={t("seats.selected")} />
+        <Legend swatch="#E6ECEF" label={t("seats.sold")} />
       </div>
-      <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(0,0,0,.25)", padding: "12px 16px" }}>
+      <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: 12, border: `1px solid ${C.border}`, background: C.surfaceAlt, padding: "12px 16px" }}>
         <div>
-          <div style={{ fontSize: 12, color: "rgba(255,255,255,.5)" }}>{selected.length ? <>{t("seats.countLabel", { count: selected.length })} <span dir="ltr">{selected.join(", ")}</span></> : t("seats.none")}</div>
-          <div role="status" style={{ fontSize: 9, color: "rgba(255,255,255,.55)" }}>{quoteState?.seatKey === selectedKey && quoteState.loading ? t("seats.pricingUpdating") : exactQuote ? t("seats.priceUpdated") : hasDemoEstimate ? t("seats.demoEstimateLabel") : t("seats.quoteRequiredLabel")}</div>
-          {Number.isFinite(total) && <div dir="ltr" style={{ fontSize: 18, fontWeight: 700, color: "#fff" }}>{formatCurrency(total, totalCurrency)}</div>}
-          {exactQuote && Number.isFinite(quotedSubtotal) && <div style={{ marginTop: 3, color: "rgba(255,255,255,.5)", fontSize: 9 }}>{t("seats.subtotal")}: <span dir="ltr">{formatCurrency(quotedSubtotal, totalCurrency)}</span>{Number.isFinite(quotedFeeTotal) && quotedFeeTotal > 0 ? <> · {t("seats.fees")}: <span dir="ltr">{formatCurrency(quotedFeeTotal, totalCurrency)}</span></> : null}</div>}
-          {quoteState?.seatKey === selectedKey && quoteState.error && <div role="alert" style={{ marginTop: 3, color: "#FF8C9C", fontSize: 9 }}>{quoteState.error}</div>}
+          <div style={{ fontSize: 12, color: C.muted }}>{selected.length ? <>{t("seats.countLabel", { count: selected.length })} <span dir="ltr">{selected.join(", ")}</span></> : t("seats.none")}</div>
+          <div role="status" style={{ fontSize: 9, color: C.muted }}>{quoteState?.seatKey === selectedKey && quoteState.loading ? t("seats.pricingUpdating") : exactQuote ? t("seats.priceUpdated") : hasDemoEstimate ? t("seats.demoEstimateLabel") : t("seats.quoteRequiredLabel")}</div>
+          {Number.isFinite(total) && <div dir="ltr" style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{formatCurrency(total, totalCurrency)}</div>}
+          {exactQuote && Number.isFinite(quotedSubtotal) && <div style={{ marginTop: 3, color: C.muted, fontSize: 9 }}>{t("seats.subtotal")}: <span dir="ltr">{formatCurrency(quotedSubtotal, totalCurrency)}</span>{Number.isFinite(quotedFeeTotal) && quotedFeeTotal > 0 ? <> · {t("seats.fees")}: <span dir="ltr">{formatCurrency(quotedFeeTotal, totalCurrency)}</span></> : null}</div>}
+          {quoteState?.seatKey === selectedKey && quoteState.error && <div role="alert" style={{ marginTop: 3, color: C.danger, fontSize: 9 }}>{quoteState.error}</div>}
         </div>
         <button disabled={!selected.length} onClick={() => onConfirm(selected, total)}
-          style={{ borderRadius: 8, border: "none", padding: "10px 20px", fontSize: 14, fontWeight: 600, color: "#fff", background: C.magenta, opacity: selected.length ? 1 : 0.3, cursor: selected.length ? "pointer" : "not-allowed" }}>
+          style={{ borderRadius: 8, border: "none", padding: "10px 20px", fontSize: 14, fontWeight: 600, color: C.onPrimary, background: C.primary, opacity: selected.length ? 1 : 0.3, cursor: selected.length ? "pointer" : "not-allowed" }}>
           {t("seats.confirm")}
         </button>
       </div>
@@ -364,23 +364,23 @@ export function BookingCard({
         </button>
       )}
       <Header icon={<Ticket size={16} />} title={headerTitle} sub={headerSubtitle} />
-      <div aria-busy={cancellationBusy || undefined} style={{ maxWidth: 420, margin: "0 auto", overflow: "hidden", borderRadius: 16, border: "1px solid rgba(255,255,255,.12)", background: "linear-gradient(160deg, rgba(99,65,141,.35), rgba(30,23,40,.6))" }}>
+      <div aria-busy={cancellationBusy || undefined} style={{ maxWidth: 420, margin: "0 auto", overflow: "hidden", borderRadius: 16, border: `1px solid ${C.border}`, background: `linear-gradient(160deg, ${C.primarySoft}, ${C.surface})` }}>
         <div style={{ display: "flex", gap: 14, padding: "16px 18px" }}>
-          <Poster tint={booking.tint || [C.purple, C.magenta]} title={booking.movieTitle} posterUrl={posterUrl} small />
+          <Poster tint={booking.tint || [C.primaryHover, C.brand]} title={booking.movieTitle} posterUrl={posterUrl} small />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div dir="auto" style={{ overflowWrap: "anywhere", fontSize: 16, fontWeight: 700, color: "#fff" }}>{booking.movieTitle}</div>
-            <div dir="ltr" style={{ overflowWrap: "anywhere", fontSize: 12, color: "rgba(255,255,255,.6)" }}>{sessionSummary}</div>
+            <div dir="auto" style={{ overflowWrap: "anywhere", fontSize: 16, fontWeight: 700, color: C.text }}>{booking.movieTitle}</div>
+            <div dir="ltr" style={{ overflowWrap: "anywhere", fontSize: 12, color: C.muted }}>{sessionSummary}</div>
           </div>
         </div>
-        <div style={{ borderTop: "1px dashed rgba(255,255,255,.15)", padding: "11px 18px" }}>
+        <div style={{ borderTop: `1px dashed ${C.border}`, padding: "11px 18px" }}>
           <Row k={t("booking.seats")} v={<span dir="ltr">{(Array.isArray(booking.seats) ? booking.seats : [booking.seats].filter(Boolean)).join(", ")}</span>} />
           <Row k={t("booking.cinema")} v={<bdi dir="auto">{cinemaName}</bdi>} />
           <Row k={t("booking.performance")} v={<span><span>{performanceDate}</span>{booking.showtime && <> · <span dir="ltr">{booking.showtime}</span></>}</span>} />
           <Row k={t("booking.status")} v={statusLabel} />
-          <Row k={t("booking.ref")} v={<span dir="ltr" style={{ fontFamily: "monospace", color: C.lavender }}>{booking.ref}</span>} />
+          <Row k={t("booking.ref")} v={<span dir="ltr" style={{ fontFamily: "monospace", color: C.primary }}>{booking.ref}</span>} />
           <Row k={t("booking.total")} v={<span dir="ltr">{formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}</span>} />
           {isCancelled && !isDemoCancellation && booking.refundRoute && <Row k={t("booking.refundRoute")} v={<bdi dir="auto">{booking.refundRoute}</bdi>} />}
-          {isCancelled && !isDemoCancellation && booking.refundReference && <Row k={t("booking.refundReference")} v={<span dir="ltr" style={{ fontFamily: "monospace", color: C.lavender }}>{booking.refundReference}</span>} />}
+          {isCancelled && !isDemoCancellation && booking.refundReference && <Row k={t("booking.refundReference")} v={<span dir="ltr" style={{ fontFamily: "monospace", color: C.primary }}>{booking.refundReference}</span>} />}
         </div>
         {cancellationActive && (
           <CancellationPanel
@@ -401,11 +401,11 @@ export function BookingCard({
         )}
         {!cancellationActive && <BookingQRCode booking={{ ...booking, cancelled: isCancelled }} />}
         {isCurrent && !cancellationActive ? (
-          <button type="button" onClick={onRequestCancel} disabled={!onRequestCancel} style={{ ...cardFootBtn, color: "rgba(255,255,255,.7)", opacity: onRequestCancel ? 1 : 0.45, cursor: onRequestCancel ? "pointer" : "not-allowed" }}>
+          <button type="button" onClick={onRequestCancel} disabled={!onRequestCancel} style={{ ...cardFootBtn, color: C.danger, opacity: onRequestCancel ? 1 : 0.45, cursor: onRequestCancel ? "pointer" : "not-allowed" }}>
             <RotateCcw size={14} /> {t(isDemo ? "booking.cancelDemo" : "booking.cancelRefund")}
           </button>
         ) : isCancelled ? (
-          <div style={{ ...cardFootBtn, color: isDemoCancellation ? "#FFCF70" : C.green, cursor: "default" }}>
+          <div style={{ ...cardFootBtn, color: isDemoCancellation ? C.warning : C.green, cursor: "default" }}>
             <Check size={14} /> {isDemoCancellation ? t("booking.noRefundProcessed") : t("booking.refundAmount", { amount: formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED") })}
           </div>
         ) : null}
@@ -455,15 +455,15 @@ const CancellationPanel = React.forwardRef(function CancellationPanel({
       aria-live={isError ? "assertive" : isInteractive ? "off" : "polite"}
       aria-label={title}
       tabIndex={isInteractive ? -1 : undefined}
-      style={{ borderTop: "1px solid rgba(255,255,255,.12)", background: isError ? "rgba(190,62,89,.10)" : "rgba(11,8,18,.26)", padding: 14, outline: "none" }}
+      style={{ borderTop: `1px solid ${C.border}`, background: isError ? C.dangerSoft : C.surfaceAlt, padding: 14, outline: "none" }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
-        <span aria-hidden="true" style={{ display: "grid", width: 26, height: 26, flexShrink: 0, placeItems: "center", borderRadius: 8, background: isError ? "rgba(255,116,139,.13)" : "rgba(228,220,240,.10)", color: isError ? "#FF8EA3" : C.lavender }}>
+        <span aria-hidden="true" style={{ display: "grid", width: 26, height: 26, flexShrink: 0, placeItems: "center", borderRadius: 8, background: isError ? C.dangerSoft : C.primarySoft, color: isError ? C.danger : C.primary }}>
           {busy ? <RefreshCw size={14} /> : isError ? <AlertTriangle size={14} /> : <RotateCcw size={14} />}
         </span>
         <div style={{ minWidth: 0 }}>
-          <div style={{ color: "#fff", fontSize: 12, fontWeight: 800 }}>{title}</div>
-          <p dir="auto" style={{ margin: "4px 0 0", overflowWrap: "anywhere", color: "rgba(255,255,255,.72)", fontSize: 11, lineHeight: 1.5 }}>{body}</p>
+          <div style={{ color: C.text, fontSize: 12, fontWeight: 800 }}>{title}</div>
+          <p dir="auto" style={{ margin: "4px 0 0", overflowWrap: "anywhere", color: C.text, fontSize: 11, lineHeight: 1.5 }}>{body}</p>
         </div>
       </div>
       {isInteractive && (!isError || retryAllowed || dismissAllowed) && (
@@ -485,8 +485,8 @@ const CancellationPanel = React.forwardRef(function CancellationPanel({
 function Row({ k, v }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 14, fontSize: 13, marginTop: 5 }}>
-      <span style={{ flexShrink: 0, color: "rgba(255,255,255,.6)" }}>{k}</span>
-      <span style={{ minWidth: 0, overflowWrap: "anywhere", fontWeight: 600, color: "#fff", textAlign: "end" }}>{v}</span>
+      <span style={{ flexShrink: 0, color: C.muted }}>{k}</span>
+      <span style={{ minWidth: 0, overflowWrap: "anywhere", fontWeight: 600, color: C.text, textAlign: "end" }}>{v}</span>
     </div>
   );
 }
@@ -495,10 +495,10 @@ function Legend({ swatch, label }) {
 }
 
 const btnReset = { background: "none", border: "none", padding: 0, cursor: "pointer", color: "inherit" };
-const btnGhost = { ...btnReset, borderRadius: 8, padding: 6, color: "rgba(255,255,255,.5)" };
-const rowBtn = { display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", borderRadius: 12, border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.03)", padding: "12px 16px", textAlign: "start", cursor: "pointer" };
-const backToBookingsButton = { display: "inline-flex", alignItems: "center", gap: 5, margin: "0 0 10px", border: 0, borderRadius: 8, background: "rgba(255,255,255,.05)", padding: "6px 9px", color: "rgba(255,255,255,.72)", fontSize: 10, fontWeight: 700, cursor: "pointer" };
-const cardFootBtn = { display: "flex", width: "100%", boxSizing: "border-box", alignItems: "center", justifyContent: "center", gap: 8, border: "none", borderTop: "1px solid rgba(255,255,255,.12)", padding: "12px 10px", fontSize: 14, fontWeight: 500, background: "none", cursor: "pointer" };
+const btnGhost = { ...btnReset, borderRadius: 8, padding: 6, color: C.primary };
+const rowBtn = { display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", borderRadius: 12, border: `1px solid ${C.border}`, background: C.surface, padding: "12px 16px", color: C.text, textAlign: "start", cursor: "pointer" };
+const backToBookingsButton = { display: "inline-flex", alignItems: "center", gap: 5, margin: "0 0 10px", border: `1px solid ${C.border}`, borderRadius: 8, background: C.surfaceAlt, padding: "6px 9px", color: C.primary, fontSize: 10, fontWeight: 700, cursor: "pointer" };
+const cardFootBtn = { display: "flex", width: "100%", boxSizing: "border-box", alignItems: "center", justifyContent: "center", gap: 8, border: "none", borderTop: `1px solid ${C.border}`, padding: "12px 10px", fontSize: 14, fontWeight: 500, background: C.surface, cursor: "pointer" };
 const cancellationActions = { display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 8, marginTop: 12 };
-const secondaryCancelButton = { flex: "1 1 120px", minHeight: 38, border: "1px solid rgba(255,255,255,.14)", borderRadius: 8, background: "transparent", padding: "8px 12px", color: "rgba(255,255,255,.78)", fontSize: 11, fontWeight: 700, cursor: "pointer" };
-const primaryCancelButton = { flex: "1 1 140px", minHeight: 38, border: 0, borderRadius: 8, background: C.magenta, padding: "8px 12px", color: "#fff", fontSize: 11, fontWeight: 800, cursor: "pointer" };
+const secondaryCancelButton = { flex: "1 1 120px", minHeight: 38, border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, padding: "8px 12px", color: C.text, fontSize: 11, fontWeight: 700, cursor: "pointer" };
+const primaryCancelButton = { flex: "1 1 140px", minHeight: 38, border: 0, borderRadius: 8, background: C.danger, padding: "8px 12px", color: C.onPrimary, fontSize: 11, fontWeight: 800, cursor: "pointer" };

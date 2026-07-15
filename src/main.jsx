@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import { I18nProvider, useI18n } from "./i18n/I18nProvider.jsx";
+import { C } from "./theme.js";
 
 // Safety net: if any render error occurs, show a small message instead of a
 // blank screen, so the widget never fully disappears.
@@ -12,11 +13,11 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.err) {
       return (
-        <div dir={this.props.dir} style={{ padding: 24, color: "#fff", fontFamily: "system-ui", maxWidth: 420, margin: "40px auto" }}>
-          <h3 style={{ color: "#B6186C" }}>{this.props.t("error.title")}</h3>
-          <p dir="auto" style={{ opacity: 0.7, fontSize: 14 }}>{String(this.state.err?.message || this.state.err)}</p>
+        <div dir={this.props.dir} style={{ maxWidth: 420, margin: "40px auto", border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface, boxShadow: `0 18px 48px ${C.shadow}`, padding: 24, color: C.text, fontFamily: "system-ui" }}>
+          <h3 style={{ color: C.danger }}>{this.props.t("error.title")}</h3>
+          <p dir="auto" style={{ color: C.muted, fontSize: 14 }}>{String(this.state.err?.message || this.state.err)}</p>
           <button onClick={() => this.setState({ err: null })}
-            style={{ marginTop: 12, background: "#63418D", color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer" }}>
+            style={{ marginTop: 12, background: C.primary, color: C.onPrimary, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer" }}>
             {this.props.t("error.retry")}
           </button>
         </div>
