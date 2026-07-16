@@ -51,7 +51,7 @@ function emptyCardForm() {
   return { pan: "", name: "", exp: "", cvv: "" };
 }
 
-export default function Checkout({ order, onPaid, onCancel, onRetry, mode, deviceSessionEpoch }) {
+export default function Checkout({ order, onPaid, onCancel, onRetry, onPaymentStateChange, mode, deviceSessionEpoch }) {
   const { t, dir, formatCurrency } = useI18n();
   const checkoutMode = resolveCheckoutMode(mode);
   const seats = Array.isArray(order?.seats) ? order.seats : [];
@@ -94,13 +94,15 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
     return () => {
       mountedRef.current = false;
       paymentStartedRef.current = true;
+      onPaymentStateChange?.(false);
       clearTimers();
       clearSensitiveForm(false);
     };
-  }, []);
+  }, [onPaymentStateChange]);
 
   const cancelCheckout = () => {
     paymentStartedRef.current = true;
+    onPaymentStateChange?.(false);
     clearTimers();
     clearSensitiveForm();
     setError("");
@@ -110,6 +112,7 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
   const pay = (method, label) => {
     if (checkoutMode !== "demo" || paymentStartedRef.current) return;
     paymentStartedRef.current = true;
+    onPaymentStateChange?.(true);
     setPaying(method);
     const checkoutId = order?.checkoutId;
     const authorizationTimer = window.setTimeout(() => {
@@ -144,8 +147,9 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
   const header = (
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-        <button type="button" aria-label={t("common.back")} onClick={cancelCheckout} style={backButton}>
+        <button type="button" aria-label={t("checkout.editSeats")} onClick={cancelCheckout} style={backButton}>
           <ChevronLeft size={18} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />
+          <span>{t("checkout.editSeats")}</span>
         </button>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{t("checkout.title")}</div>
@@ -271,7 +275,7 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, mode, devic
   );
 }
 
-const backButton = { border: "none", background: "none", color: C.primary, cursor: "pointer", padding: 4 };
+const backButton = { display: "inline-flex", minHeight: 44, flexShrink: 0, alignItems: "center", gap: 3, border: "none", background: "none", color: C.primary, cursor: "pointer", padding: "4px 2px", fontSize: 11, fontWeight: 700 };
 const summaryCard = { border: `1px solid ${C.border}`, borderRadius: 12, background: C.surfaceAlt, padding: "12px 14px", marginBottom: 12 };
 const demoNotice = { border: `1px solid ${C.warning}`, borderRadius: 10, background: C.warningSoft, padding: "9px 11px", marginBottom: 12, color: C.text, fontSize: 10, lineHeight: 1.45 };
 const unavailableCard = { border: `1px solid ${C.warning}`, borderRadius: 14, background: C.warningSoft, padding: 20, textAlign: "center" };

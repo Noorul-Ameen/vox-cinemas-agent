@@ -10,10 +10,24 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const stamp = `${Date.now()}-${process.pid}`;
 const currentJson = resolve(root, "data/vox_showtimes_full.json");
 const currentModule = resolve(root, "src/mockVistaData.js");
+const currentManifest = resolve(root, "src/generated/voxSnapshotManifest.js");
+const currentShardRoot = resolve(root, "public/data/vox-snapshot");
 const nextJson = resolve(root, `data/.vox_showtimes_full.next-${stamp}.json`);
 const nextModule = resolve(root, `src/.mockVistaData.next-${stamp}.js`);
+const nextManifest = resolve(root, `src/generated/.voxSnapshotManifest.next-${stamp}.js`);
+const nextShardRoot = resolve(root, `public/data/.vox-snapshot.next-${stamp}`);
 const backupJson = resolve(root, `data/.vox_showtimes_full.backup-${stamp}.json`);
 const backupModule = resolve(root, `src/.mockVistaData.backup-${stamp}.js`);
+const backupManifest = resolve(root, `src/generated/.voxSnapshotManifest.backup-${stamp}.js`);
+const backupShardRoot = resolve(root, `public/data/.vox-snapshot.backup-${stamp}`);
+const assetPairs = [
+  [currentJson, nextJson, backupJson],
+  [currentModule, nextModule, backupModule],
+  [currentManifest, nextManifest, backupManifest],
+  [currentShardRoot, nextShardRoot, backupShardRoot],
+];
+const backedUpPaths = new Set();
+const installedPaths = new Set();
 const python = process.env.PYTHON || (process.platform === "win32" ? "python" : "python3");
 const packageManager = process.env.npm_execpath
   ? { command: process.execPath, prefix: [process.env.npm_execpath] }
@@ -36,7 +50,12 @@ async function runPackageScript(name) {
 }
 
 async function removeTemporaryFiles() {
-  await Promise.all([nextJson, nextModule].map((path) => rm(path, { force: true }).catch(() => {})));
+  await Promise.all([
+    rm(nextJson, { force: true }),
+    rm(nextModule, { force: true }),
+    rm(nextManifest, { force: true }),
+    rm(nextShardRoot, { recursive: true, force: true }),
+  ].map((operation) => operation.catch(() => {})));
 }
 
 async function retainPreviouslyVerifiedMedia() {
@@ -73,12 +92,31 @@ async function retainPreviouslyVerifiedMedia() {
 }
 
 async function restoreBackups() {
-  await rm(currentJson, { force: true }).catch(() => {});
-  await rm(currentModule, { force: true }).catch(() => {});
-  if (existsSync(backupJson)) await rename(backupJson, currentJson);
-  if (existsSync(backupModule)) await rename(backupModule, currentModule);
+  await Promise.all([...installedPaths].map((path) => rm(path, { recursive: true, force: true }).catch(() => {})));
+  for (const [currentPath, , backupPath] of assetPairs) {
+    if (!backedUpPaths.has(currentPath)) continue;
+    await rm(currentPath, { recursive: true, force: true }).catch(() => {});
+    if (existsSync(backupPath)) await rename(backupPath, currentPath);
+  }
 }
 
+const backupPaths = [backupJson, backupModule, backupManifest, backupShardRoot];
+async function removeBackups() {
+  await Promise.all(backupPaths.map((path) => rm(path, { recursive: true, force: true }).catch(() => {})));
+}
+
+async function backUpCurrent(currentPath, backupPath) {
+  if (!existsSync(currentPath)) return;
+  await rename(currentPath, backupPath);
+  backedUpPaths.add(currentPath);
+}
+
+async function installGenerated(nextPath, currentPath) {
+  await rename(nextPath, currentPath);
+  installedPaths.add(currentPath);
+}
+
+let promotionStarted = false;
 let promoted = false;
 try {
   const extractorArgs = [
@@ -91,29 +129,45 @@ try {
   await retainPreviouslyVerifiedMedia();
   await run(process.execPath, [resolve(root, "scripts/validateShowtimeRefresh.mjs"), nextJson, currentJson], "validate freshness and completeness");
   await run(python, [resolve(root, "convert_extraction.py"), nextJson, nextModule], "generate Vista-shaped browser data");
+  await run(process.execPath, [
+    resolve(root, "scripts/generateSnapshotAssets.mjs"),
+    "--source-module", nextModule,
+    "--manifest", nextManifest,
+    "--output-dir", nextShardRoot,
+    "--public-base", "/data/vox-snapshot",
+  ], "generate versioned browser snapshot assets");
+  await run(process.execPath, [
+    resolve(root, "scripts/validateSnapshotAssets.mjs"),
+    "--source-module", nextModule,
+    "--manifest", nextManifest,
+    "--output-dir", nextShardRoot,
+  ], "validate browser snapshot assets");
 
   const generated = await import(`${pathToFileURL(nextModule).href}?refresh=${stamp}`);
   if (!generated.DATA_DATES?.length || !generated.SESSIONS?.length || !generated.FILMS?.length) {
     throw new Error("generated browser data is incomplete");
   }
+  const generatedManifest = await import(`${pathToFileURL(nextManifest).href}?refresh=${stamp}`);
+  if (!generatedManifest.SNAPSHOT_VERSION || generatedManifest.SNAPSHOT_ASSET_STATS?.sessionCount !== generated.SESSIONS.length) {
+    throw new Error("generated browser snapshot assets are incomplete");
+  }
 
-  await rename(currentJson, backupJson);
-  await rename(currentModule, backupModule);
-  await rename(nextJson, currentJson);
-  await rename(nextModule, currentModule);
+  promotionStarted = true;
+  for (const [currentPath, , backupPath] of assetPairs) await backUpCurrent(currentPath, backupPath);
+  for (const [currentPath, nextPath] of assetPairs) await installGenerated(nextPath, currentPath);
   promoted = true;
 
   await runPackageScript("validate");
   await runPackageScript("build");
-  await Promise.all([backupJson, backupModule].map((path) => rm(path, { force: true })));
+  await removeBackups();
   console.error("\n[refresh] Fresh official VOX schedule validated and promoted successfully.");
 } catch (error) {
-  if (promoted) await restoreBackups();
+  if (promotionStarted) await restoreBackups();
   console.error(`\n[refresh] Refresh was not published: ${error.message}`);
   process.exitCode = 1;
 } finally {
   await removeTemporaryFiles();
   if (!promoted || process.exitCode) {
-    await Promise.all([backupJson, backupModule].map((path) => rm(path, { force: true }).catch(() => {})));
+    await removeBackups();
   }
 }

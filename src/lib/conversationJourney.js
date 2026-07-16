@@ -14,6 +14,25 @@ const VIEW_PROGRESS = Object.freeze({
 });
 
 const cloneSeats = (value) => Array.isArray(value) ? value.map(String) : [];
+const normalizeJourneyBookingStatus = (value) => {
+  const status = String(value || "").trim().toLowerCase();
+  if (!status) return null;
+  if (status === "confirmed_demo" || status === "locally_stored") return "summary_saved";
+  return status;
+};
+const bookingSummaryStatus = (booking) => {
+  if (!booking) return null;
+  if (booking.cancelled || String(booking.bookingStatus || "").startsWith("cancelled")) {
+    return normalizeJourneyBookingStatus(booking.bookingStatus) || "cancelled";
+  }
+  if (booking.verified !== true
+    || booking.demo === true
+    || booking.paymentStatus === "simulated_not_charged"
+    || ["confirmed_demo", "summary_saved", "locally_stored"].includes(String(booking.bookingStatus || ""))) {
+    return "summary_saved";
+  }
+  return normalizeJourneyBookingStatus(booking.bookingStatus) || "confirmed";
+};
 const compactMovie = (movie) => movie ? {
   id: movie.id || movie.movieId || null,
   title: movie.title || movie.movieTitle || null,
@@ -111,10 +130,15 @@ export function syncJourney(current, {
     || (activeOrder?.cinemaId || activeOrder?.cinemaName ? { id: activeOrder.cinemaId, name: activeOrder.cinemaName } : null)
     || (activeBooking?.cinemaId || activeBooking?.cinemaName ? { id: activeBooking.cinemaId, name: activeBooking.cinemaName } : null);
   const bookingStatus = activeBooking
-    ? (activeBooking.bookingStatus || (activeBooking.cancelled ? "cancelled" : "confirmed"))
+    ? bookingSummaryStatus(activeBooking)
     : activeOrder
       ? "payment_pending"
-      : (clearsMovie || clearsSession ? null : current.bookingStatus);
+      : (clearsMovie || clearsSession ? null : normalizeJourneyBookingStatus(current.bookingStatus));
+  const bookingProgress = view === "booking" && bookingStatus === "summary_saved"
+    ? "saved_booking_summary"
+    : view === "booking" && bookingStatus?.startsWith("cancelled")
+      ? "cancelled_booking_summary"
+      : VIEW_PROGRESS[view] || view;
 
   return {
     ...current,
@@ -127,7 +151,7 @@ export function syncJourney(current, {
     ticketType,
     experience: session?.exp || session?.experience || activeOrder?.experience || activeBooking?.experience || (clearsSession ? null : current.experience) || null,
     seats,
-    bookingProgress: VIEW_PROGRESS[view] || view,
+    bookingProgress,
     bookingRef: activeBooking?.ref || activeOrder?.ref || (clearsMovie || clearsSession ? null : current.bookingRef) || null,
     bookingStatus,
     refundRoute: activeBooking?.refundRoute || (bookingStatus?.startsWith("cancelled") ? current.refundRoute : null),
@@ -163,6 +187,7 @@ export function relevantConversationHistory(messages, limit = 8) {
 
 export function buildTransportHandoff(journey, messages) {
   const history = relevantConversationHistory(messages);
+  const safeBookingStatus = normalizeJourneyBookingStatus(journey.bookingStatus);
   const safe = {
     sessionId: journey.sessionId,
     previousConversationId: journey.transportConversationId || journey.previousTransportConversationId || null,
@@ -178,7 +203,7 @@ export function buildTransportHandoff(journey, messages) {
     experience: journey.experience || "not selected",
     bookingProgress: journey.bookingProgress,
     bookingRef: journey.bookingRef || "not confirmed",
-    bookingStatus: journey.bookingStatus || "not confirmed",
+    bookingStatus: safeBookingStatus || "not confirmed",
     refundRoute: journey.refundRoute || "not applicable",
     refundStatus: journey.refundStatus || "not applicable",
     refundReference: journey.refundReference || "not issued",
@@ -193,6 +218,7 @@ export function buildTransportHandoff(journey, messages) {
 }
 
 export function journeyDynamicVariables(journey, { continuation = false } = {}) {
+  const safeBookingStatus = normalizeJourneyBookingStatus(journey.bookingStatus);
   return {
     preferred_language: journey.locale === "ar" ? "Arabic" : "English",
     voxi_session_id: String(journey.sessionId || ""),
@@ -202,7 +228,7 @@ export function journeyDynamicVariables(journey, { continuation = false } = {}) 
     voxi_movie: String(journey.movie?.title || "not_selected"),
     voxi_cinema: String(journey.cinema?.name || "not_selected"),
     voxi_booking_progress: String(journey.bookingProgress || "start"),
-    voxi_booking_status: String(journey.bookingStatus || "not_confirmed"),
+    voxi_booking_status: String(safeBookingStatus || "not_confirmed"),
     voxi_performance_date: String(journey.session?.date || journey.scheduleDate || "not_selected"),
     voxi_refund_status: String(journey.refundStatus || "not_applicable"),
     voxi_refund_reference: String(journey.refundReference || "not_issued"),

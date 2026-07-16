@@ -4,7 +4,14 @@ const FORBIDDEN_DASHES = new RegExp(
 );
 
 export function normalizeCustomerFacingText(value) {
-  return String(value ?? "").replace(FORBIDDEN_DASHES, "-");
+  const normalized = String(value ?? "").replace(FORBIDDEN_DASHES, "-");
+  const searchLimit = Math.min(180, Math.floor(normalized.length / 2));
+  for (let prefixLength = 20; prefixLength <= searchLimit; prefixLength += 1) {
+    const prefix = normalized.slice(0, prefixLength);
+    if (!/[.!?؟]/u.test(prefix)) continue;
+    if (normalized.startsWith(prefix, prefixLength)) return normalized.slice(prefixLength).trimStart();
+  }
+  return normalized;
 }
 
 export function normalizeCustomerFacingFields(value, fields = []) {

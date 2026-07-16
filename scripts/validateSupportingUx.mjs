@@ -94,7 +94,8 @@ for (const locale of ["en", "ar"]) {
     `${locale}: leadership-facing UI must not repeat internal prototype terminology`,
   );
 }
-assert.match(STRINGS.en["checkout.demoDisclaimer"], /No payment or reservation is submitted/, "checkout must keep its transaction-boundary disclosure");
+assert.match(STRINGS.en["checkout.demoDisclaimer"], /does not charge a card or reserve cinema inventory/i, "checkout must keep its transaction-boundary disclosure");
+assert.match(STRINGS.en["checkout.demoDisclaimer"], /Never enter real payment details/i, "checkout must keep its payment-data warning");
 assert.match(STRINGS.en["booking.cancelDemoQuestion"], /Mark booking .* as cancelled on this device/, "device-only cancellation must describe the persisted cancelled state");
 assert.match(STRINGS.en["booking.cancelDemoQuestion"], /will not contact VOX or issue a refund/, "device-only cancellation must keep its transaction-boundary disclosure");
 assert.match(STRINGS.en["booking.cancelledLocal"], /Marked cancelled on this device/, "device-only cancellation must not claim the stored record was removed");

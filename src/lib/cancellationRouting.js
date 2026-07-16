@@ -10,6 +10,7 @@ const normalizeText = (value) => String(value || "")
   .trim();
 
 const refKey = (value) => String(value || "").trim().toUpperCase();
+export const CANCELLATION_TARGET_SELECTION_PURPOSE = "cancellation_target_selection";
 const DUBAI_CLOCK = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Dubai",
   year: "numeric",
@@ -58,7 +59,7 @@ const GENERIC_HISTORY_AR = /(?:اعرض|افتح|طلع|ورني|اظهر).{0,30
 
 const POLICY_EN = /\b(?:policy|rules?|deadline|eligible|eligibility|possible)\b|\b(?:can|could)\s+i\s+(?:cancel|refund|void)\s+(?:a|any)\s+(?:booking|reservation|tickets?)\b|\bhow\s+(?:do|does|can)\b.{0,35}\b(?:cancel|refund|void)\b/;
 const POLICY_AR = /(?:سياسه|شروط|موعد|اهليه|كيف).{0,35}(?:الغاء|الغي|استرداد|استرجاع)|(?:هل|اقدر|يمكنني).{0,20}(?:الغاء|الغي)\s+(?:ال)?(?:حجز|تذكره)(?:\s|$)/;
-const DIRECT_EN = /\b(?:please\s+)?(?:cancel|refund|void)\s+(?:(?:my|the|this)\s+)?(?:(?:current|active|upcoming)\s+)?(?:booking|reservation|tickets?)\b|\b(?:i|we)\s+(?:want|need|would like)\s+to\s+(?:cancel|refund|void)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:cancel|refund|void)\b.{0,50}\b(?:my|our|this|the)\s+(?:(?:current|active|upcoming)\s+)?(?:booking|reservation|tickets?)\b|\b(?:cancel|refund|void)\b.{0,40}\b(?:booking\s+(?:reference|ref)|wl[a-z0-9-]+)\b/;
+const DIRECT_EN = /\b(?:please\s+)?(?:cancel|refund|void)\s+(?:(?:my|the|this|a|an|one)\s+)?(?:(?:current|active|upcoming)\s+)?(?:booking|reservation|tickets?)\b|\b(?:i|we)\s+(?:want|need|would like)\s+to\s+(?:cancel|refund|void)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:cancel|refund|void)\b.{0,50}\b(?:my|our|this|the|a|an|one)\s+(?:(?:current|active|upcoming)\s+)?(?:booking|reservation|tickets?)\b|\b(?:cancel|refund|void)\b.{0,40}\b(?:booking\s+(?:reference|ref)|wl[a-z0-9-]+)\b/;
 const DIRECT_AR = /(?:الغي|الغي|الغاء|لغي|رجع|استرد|استرجع).{0,40}(?:حجزي|الحجز|تذكرتي|تذاكري|التذاكر)|(?:ابي|ابغي|ابغى|عايز|بدي|اريد).{0,25}(?:الغي|الغاء|استرد|استرجع)|(?:هل\s+)?(?:يمكنك|تقدر|تستطيع).{0,20}(?:تلغي|الغاء|ترجع|تسترد).{0,30}(?:حجزي|الحجز|تذكرتي|تذاكري|التذاكر)/;
 const CONTEXTUAL_EN = /^(?:please\s+)?(?:cancel|refund|void)(?:\s+(?:it|this|that))?$/;
 const CONTEXTUAL_AR = /^(?:الغي|الغه|الغيه|الغيها|الغاءه|لغه|رجعه|استرده|نعم\s+الغي(?:ه|ها)?)$/;
@@ -91,6 +92,110 @@ function matchExplicitReference(text, bookings) {
   });
   if (known?.ref) return String(known.ref).trim();
   return String(text || "").match(/\bWL[A-Z0-9][A-Z0-9-]{2,}\b/i)?.[0] || null;
+}
+
+const bookingTitle = (booking) => String(booking?.movieTitle || booking?.movie || "").trim();
+
+const SPOKEN_NUMBER_TOKENS = Object.freeze({
+  zero: "0",
+  one: "1",
+  two: "2",
+  three: "3",
+  four: "4",
+  five: "5",
+  six: "6",
+  seven: "7",
+  eight: "8",
+  nine: "9",
+  ten: "10",
+});
+
+const normalizeCancellationSelector = (value) => normalizeText(value)
+  .replace(/\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten)\b/g, (word) => SPOKEN_NUMBER_TOKENS[word] || word)
+  .replace(/^(?:please\s+)?(?:select|choose|pick|cancel)\s+(?:(?:the|my)\s+)?(?:(?:booking|reservation|tickets?)\s+)?(?:for\s+)?/, "")
+  .replace(/^the\s+/, "")
+  .replace(/\s+(?:booking|reservation|tickets?)$/, "")
+  .trim();
+
+const leavesCancellationTargetSelection = (query) => /^(?:(?:go\s+)?back|never\s*mind|stop|keep\s+(?:it|them|the\s+booking)|do\s+not\s+cancel|dont\s+cancel|start\s+over|new\s+conversation|show|find|browse|book|watch|what|how|why|when|where|which)(?:\s|$)/.test(query)
+  || /^(?:ارجع|رجوع|تراجع|لا\s+تلغ|لا\s+تلغي|ابدأ\s+من\s+جديد|محادثة\s+جديدة|اعرض|أعرض|اظهر|أظهر|ابحث|احجز|ماذا|ما|كيف|لماذا|متى|اين|أين)(?:\s|$)/u.test(query);
+
+export function resolveCancellationContinuation({
+  text = "",
+  stage = null,
+  storedBookings = [],
+} = {}) {
+  const candidateRefs = [...new Set(
+    (Array.isArray(stage?.candidateRefs) ? stage.candidateRefs : [])
+      .map((value) => String(value || "").trim())
+      .filter(Boolean),
+  )];
+  const active = stage?.view === "history"
+    && stage?.purpose === CANCELLATION_TARGET_SELECTION_PURPOSE
+    && candidateRefs.length > 0;
+  if (!active) {
+    return Object.freeze({
+      handled: false,
+      bookingRef: null,
+      reason: "inactive",
+      candidates: [],
+    });
+  }
+
+  const bookings = Array.isArray(storedBookings) ? storedBookings.filter(Boolean) : [];
+  const displayed = candidateRefs
+    .map((candidateRef) => bookings.find((booking) => refKey(booking?.ref) === refKey(candidateRef)))
+    .filter(Boolean);
+  const query = normalizeText(text);
+  if (leavesCancellationTargetSelection(query)) {
+    return Object.freeze({
+      handled: false,
+      bookingRef: null,
+      reason: "explicit_context_change",
+      candidates: displayed.map((booking) => booking.ref),
+    });
+  }
+  const queryTokens = new Set(query.split(" ").filter(Boolean));
+  const referenceMatches = displayed.filter((booking) => {
+    const normalizedRef = normalizeText(booking?.ref);
+    return normalizedRef && (query === normalizedRef || queryTokens.has(normalizedRef));
+  });
+  if (referenceMatches.length === 1) {
+    return Object.freeze({
+      handled: true,
+      bookingRef: referenceMatches[0].ref,
+      reason: "matched_reference",
+      candidates: [referenceMatches[0].ref],
+    });
+  }
+
+  const selector = normalizeCancellationSelector(query);
+  const titleMatches = selector
+    ? displayed.filter((booking) => normalizeCancellationSelector(bookingTitle(booking)) === selector)
+    : [];
+  if (titleMatches.length === 1) {
+    return Object.freeze({
+      handled: true,
+      bookingRef: titleMatches[0].ref,
+      reason: "matched_unique_title",
+      candidates: [titleMatches[0].ref],
+    });
+  }
+  if (titleMatches.length > 1) {
+    return Object.freeze({
+      handled: true,
+      bookingRef: null,
+      reason: "ambiguous_movie_title",
+      candidates: titleMatches.map((booking) => booking.ref),
+    });
+  }
+
+  return Object.freeze({
+    handled: true,
+    bookingRef: null,
+    reason: displayed.length ? "no_displayed_candidate_match" : "displayed_candidates_unavailable",
+    candidates: displayed.map((booking) => booking.ref),
+  });
 }
 
 export function resolveCancellationTarget({

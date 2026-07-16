@@ -84,8 +84,10 @@ function InlineState({ title, onRetry, error = false }) {
 export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, onRetry, notice }) {
   const { t, dir } = useI18n();
   const [query, setQuery] = React.useState("");
+  const [showAll, setShowAll] = React.useState(false);
   const key = query.trim().toLowerCase();
-  const visible = cinemas.filter((cinema) => !key || cinema.name.toLowerCase().includes(key));
+  const matching = cinemas.filter((cinema) => !key || cinema.name.toLowerCase().includes(key));
+  const visible = key || showAll ? matching : matching.slice(0, 6);
   return (
     <div>
       <Header icon={<MapPin size={16} />} title={t("cinema.title")} sub={t("cinema.count", { count: cinemas.length })} onBack={onBack} />
@@ -105,36 +107,49 @@ export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, 
           </button>
         ))}
         {!visible.length && <div style={{ padding: 18, textAlign: "center", fontSize: 12, color: C.muted }}>{t("cinema.none")}</div>}
+        {!key && matching.length > 6 && <button type="button" onClick={() => setShowAll((current) => !current)} aria-expanded={showAll} style={{ ...rowBtn, justifyContent: "center", minHeight: 42, borderStyle: "dashed", color: C.primary, fontSize: 11, fontWeight: 700 }}>
+          {showAll ? t("cinema.showLess") : t("cinema.showAll", { count: matching.length })}
+        </button>}
       </div>}
     </div>
   );
 }
 
 export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, error, onRetry, notice }) {
-  const { t } = useI18n();
+  const { t, dir } = useI18n();
+  const [showAll, setShowAll] = React.useState(false);
+  const movieKey = movies.map((movie) => movie.id).join("|");
+  React.useEffect(() => setShowAll(false), [movieKey, cinemaName, scheduleDate]);
+  const visibleMovies = showAll ? movies : movies.slice(0, 4);
   return (
     <div>
       <Header icon={<Film size={16} />} title={t("movies.title")} sub={<span><bdi dir="auto">{cinemaName}</bdi> · <span dir="ltr">{scheduleDate}</span></span>} />
       {notice && <div role="status" style={{ marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 10, background: C.primarySoft, padding: "9px 11px", color: C.primary, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
-      {error ? <InlineState title={typeof error === "string" ? error : t("movies.error")} onRetry={onRetry} error /> : !movies.length ? <InlineState title={t("movies.empty")} onRetry={onRetry} /> : <div style={{ display: "grid", maxWidth: "100%", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 12 }}>
-        {movies.map((m) => (
-          <button key={m.id} onClick={() => onSelect(m)} style={{ ...btnReset, width: "100%", minWidth: 0, textAlign: "start" }}>
-            <Poster tint={m.tint} title={m.title} posterUrl={m.posterUrl} />
-            <div dir="auto" style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: C.text, lineHeight: 1.15 }}>{m.title}</div>
-            <div style={{ marginTop: 2, fontSize: 11, color: C.muted }}>
-              <span style={{ background: C.primarySoft, color: C.primary, borderRadius: 3, padding: "0 4px", marginInlineEnd: 6 }}>{m.rating}</span>
-              {[
-                ...(m.genres || [m.genre]).filter(Boolean).slice(0, 2),
-                m.runtime ? t("showtimes.minutes", { count: m.runtime }) : "",
-                m.language || "",
-              ].filter(Boolean).join(" · ")}
-            </div>
-            {!!m.relevantSessions?.length && <div aria-label={`Relevant showtimes for ${m.title}`} style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
-              {m.relevantSessions.slice(0, 3).map((session) => <span key={session.sessionId} dir="ltr" style={{ borderRadius: 999, background: "rgba(87,199,154,.11)", padding: "2px 6px", color: C.green, fontSize: 9, whiteSpace: "nowrap" }}>{session.time} · {session.exp}</span>)}
-            </div>}
-            <div dir="auto" style={{ marginTop: 5, fontSize: 10, lineHeight: 1.35, color: C.muted, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{m.synopsis}</div>
+      {error ? <InlineState title={typeof error === "string" ? error : t("movies.error")} onRetry={onRetry} error /> : !movies.length ? <InlineState title={t("movies.empty")} onRetry={onRetry} /> : <div style={{ display: "flex", maxWidth: "100%", flexDirection: "column", gap: 9 }}>
+        {visibleMovies.map((m) => (
+          <button key={m.id} onClick={() => onSelect(m)} style={{ ...btnReset, display: "flex", width: "100%", minWidth: 0, gap: 11, border: `1px solid ${C.border}`, borderRadius: 13, background: C.surface, padding: 9, textAlign: "start" }}>
+            <Poster small tint={m.tint} title={m.title} posterUrl={m.posterUrl} />
+            <span style={{ display: "block", minWidth: 0, flex: 1 }}>
+              <span dir="auto" style={{ display: "block", fontSize: 14, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>{m.title}</span>
+              <span style={{ display: "block", marginTop: 3, fontSize: 10, color: C.muted }}>
+                <span style={{ background: C.primarySoft, color: C.primary, borderRadius: 3, padding: "1px 4px", marginInlineEnd: 5 }}>{m.rating}</span>
+                {[
+                  ...(m.genres || [m.genre]).filter(Boolean).slice(0, 2),
+                  m.runtime ? t("showtimes.minutes", { count: m.runtime }) : "",
+                  m.language || "",
+                ].filter(Boolean).join(" · ")}
+              </span>
+              {!!m.relevantSessions?.length && <span aria-label={`Relevant showtimes for ${m.title}`} style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                {m.relevantSessions.slice(0, 2).map((session) => <span key={session.sessionId} dir="ltr" style={{ borderRadius: 999, background: "rgba(87,199,154,.11)", padding: "2px 6px", color: C.green, fontSize: 9, whiteSpace: "nowrap" }}>{session.time} · {session.exp}</span>)}
+              </span>}
+              <span dir="auto" style={{ display: "-webkit-box", marginTop: 5, overflow: "hidden", color: C.muted, fontSize: 10, lineHeight: 1.35, WebkitBoxOrient: "vertical", WebkitLineClamp: 2 }}>{m.synopsis}</span>
+            </span>
+            <ChevronRight size={16} color={C.muted} style={{ alignSelf: "center", flexShrink: 0, transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />
           </button>
         ))}
+        {movies.length > 4 && <button type="button" onClick={() => setShowAll((current) => !current)} aria-expanded={showAll} style={{ ...rowBtn, justifyContent: "center", minHeight: 42, borderStyle: "dashed", color: C.primary, fontSize: 11, fontWeight: 700 }}>
+          {showAll ? t("movies.showLess") : t("movies.showAll", { count: movies.length })}
+        </button>}
       </div>}
     </div>
   );

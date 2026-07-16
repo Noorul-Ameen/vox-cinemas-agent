@@ -3,6 +3,7 @@ import fs from "node:fs";
 import { startTransportWithRetirement } from "../src/lib/transportStart.js";
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const transport = fs.readFileSync(new URL("../src/components/ElevenLabsTransport.jsx", import.meta.url), "utf8");
 
 let activeGeneration = 0;
 let resolveRetiredStart;
@@ -45,9 +46,9 @@ assert.equal(retiredEndCalls, 1, "a late connection must be closed through its o
 assert.equal(retryEndCalls, 0, "late cleanup must never close the successful retry transport");
 
 assert.match(app, /key=\{transportGeneration\}/, "the SDK hook must remount on transport retirement");
-assert.match(app, /if \(isActive\(generation\)\) callbacks\.onConnect/, "stale connection callbacks must be ignored");
-assert.match(app, /callbacks\.onMessage\?\./, "stale transport messages must be ignored");
-assert.match(app, /reason: "stale_transport"/, "stale client-tool calls must be rejected");
+assert.match(transport, /if \(isActive\(generation\)\) callbacks\.onConnect/, "stale connection callbacks must be ignored");
+assert.match(transport, /callbacks\.onMessage\?\./, "stale transport messages must be ignored");
+assert.match(transport, /reason: "stale_transport"/, "stale client-tool calls must be rejected");
 assert.doesNotMatch(app, /lateSessionCleanupRef/, "retries must not await a potentially never-settling cleanup promise");
 
 console.log("Validated bounded start timeout, fresh-host retry, stale callback/tool invalidation, and targeted late cleanup.");

@@ -219,7 +219,7 @@ The browser must never receive upstream credentials.
 - Verified there is no separate ticket quantity stage.
 - Verified no real secret file is tracked.
 - No live Vista credential or payment value is placed in a Vite environment variable.
-- Remaining engineering debt: the large single JavaScript chunk and the lack of a repeatable external hosted Playwright trace in repository CI.
+- Resolved in the pending cold-start candidate: showtimes and ElevenLabs are split from the initial JavaScript, and build budgets enforce the result. A repeatable external hosted browser trace is still not present in repository CI.
 
 ## Evidence
 
@@ -247,3 +247,33 @@ The browser must never receive upstream credentials.
 | Public customer sales and service | BLOCKED | Live transactional and customer-service provider APIs are not connected. |
 
 The repository-level fixes that could be reproduced safely are complete. The remaining gaps require browser permission, ElevenLabs dashboard or service evidence, approved provider APIs, production knowledge ownership, performance work, or physical-device testing.
+
+## 16 July checkout continuity addendum
+
+The pending local candidate fixes checkout loss after conversational and side-panel interruptions.
+
+- Checkout remained visible for refund and parking questions.
+- Offers and repeated offer refinement retained the correct checkout return target.
+- Booking History and a stored booking detail retained the checkout draft.
+- English and Arabic typed return phrases restored the exact movie, showtime, seats, and total.
+- Voice transcript routing uses the same tested local restoration helper.
+- Edit seats restored the exact seats and recalculated ticket count and pricing after a seat was removed.
+- Payment authorization is protected from panel displacement.
+- Local Arabic voice startup reached Voice chat, and ending voice returned to Text chat without losing the visible booking.
+- Checkout completion rendered the saved booking summary and reference QR.
+- Full validation, build, punctuation scan, 420 px layout inspection, and browser error check passed.
+
+Detailed evidence: [checkout continuity validation](../evidence/logs/checkout-continuity-2026-07-16.md).
+
+## 16 July annotated browser addendum
+
+The latest local candidate supersedes the earlier microphone-timeout result for this environment.
+
+- Voice chat connected successfully with the current agent and EU residency configuration.
+- The exact annotated cinema-picker, DCC, transcript-history, checkout edit, and saved-summary cases passed.
+- Progressive cinema and movie disclosure, combined time filtering, no-exact-time fallback, family-to-action replacement, specific IMAX selection, seat repricing, FAQ continuity, Arabic RTL, persistence, and cancellation continuation were replayed in the mounted browser.
+- The unique cancellation title remained in cancellation. Duplicate movie titles requested the displayed booking reference and did not enter movie discovery.
+- Browser Back left the standalone document and Forward restored it safely, while transient stage restoration remains available through the in-widget controls rather than browser history.
+- The exact final candidate remains local until it is pushed and deployed.
+
+Detailed matrix and evidence: [annotated end-to-end validation](../evidence/logs/annotated-end-to-end-validation-2026-07-16.md).

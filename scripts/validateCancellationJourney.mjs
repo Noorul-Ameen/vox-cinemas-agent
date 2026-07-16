@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import {
+  CANCELLATION_TARGET_SELECTION_PURPOSE,
   bookingHistoryAgentContext,
   classifyBookingHistoryRequest,
   isCurrentBooking,
   isDirectCancellationRequest,
+  resolveCancellationContinuation,
   resolveCancellationTarget,
 } from "../src/lib/cancellationRouting.js";
 
@@ -87,6 +89,8 @@ for (const text of ["What movies are showing?", "What is my current cinema?", "�
 for (const text of [
   "Cancel my booking",
   "Cancel this booking",
+  "Cancel a booking",
+  "Please cancel one reservation",
   "Please cancel booking WLACTIVE1",
   "I want to cancel my reservation",
   "ألغي حجزي",
@@ -222,10 +226,83 @@ assert.equal(unknownReference.booking, null);
 assert.equal(unknownReference.source, "requested_ref");
 assert.equal(unknownReference.reason, null);
 
+const selectionStage = Object.freeze({
+  view: "history",
+  purpose: CANCELLATION_TARGET_SELECTION_PURPOSE,
+  candidateRefs: [activeA.ref, activeB.ref],
+});
+const uniqueTitleContinuation = resolveCancellationContinuation({
+  text: activeB.movieTitle,
+  stage: selectionStage,
+  storedBookings: [activeA, activeB, cancelled],
+});
+assert.equal(uniqueTitleContinuation.handled, true, "a displayed movie title must remain in cancellation routing");
+assert.equal(uniqueTitleContinuation.bookingRef, activeB.ref, "one exact displayed title must resolve its booking reference");
+assert.equal(uniqueTitleContinuation.reason, "matched_unique_title");
+
+const spokenNumberContinuation = resolveCancellationContinuation({
+  text: "Please cancel Active two",
+  stage: selectionStage,
+  storedBookings: [activeA, activeB, cancelled],
+});
+assert.equal(spokenNumberContinuation.bookingRef, activeB.ref, "voice number words and a tightly scoped cancellation prefix must match the displayed title exactly");
+
+const toyStoryBooking = Object.freeze({ ...activeB, ref: "WLTOYSTORY5", movieTitle: "Toy Story 5" });
+const toyStoryVoiceContinuation = resolveCancellationContinuation({
+  text: "Toy Story five",
+  stage: { ...selectionStage, candidateRefs: [activeA.ref, toyStoryBooking.ref] },
+  storedBookings: [activeA, toyStoryBooking],
+});
+assert.equal(toyStoryVoiceContinuation.bookingRef, toyStoryBooking.ref, "Toy Story five from speech recognition must match the displayed Toy Story 5 booking");
+
+const movieFieldBooking = Object.freeze({ ...activeA, ref: "WLMOVIEFIELD", movieTitle: undefined, movie: "Movie Field Title" });
+const movieFieldContinuation = resolveCancellationContinuation({
+  text: "Movie Field Title",
+  stage: { ...selectionStage, candidateRefs: [movieFieldBooking.ref] },
+  storedBookings: [movieFieldBooking],
+});
+assert.equal(movieFieldContinuation.bookingRef, movieFieldBooking.ref, "completed records using the movie field must resolve by displayed title");
+
+const explicitReferenceContinuation = resolveCancellationContinuation({
+  text: `Cancel booking ${activeA.ref}`,
+  stage: selectionStage,
+  storedBookings: [activeA, activeB, cancelled],
+});
+assert.equal(explicitReferenceContinuation.bookingRef, activeA.ref, "an exact displayed reference token must select that booking");
+assert.equal(explicitReferenceContinuation.reason, "matched_reference");
+
+const duplicateTitleA = Object.freeze({ ...activeA, ref: "WLDUPLICATE1", movieTitle: "Same Film" });
+const duplicateTitleB = Object.freeze({ ...activeB, ref: "WLDUPLICATE2", movieTitle: "Same Film" });
+const duplicateTitleContinuation = resolveCancellationContinuation({
+  text: "Same Film",
+  stage: { ...selectionStage, candidateRefs: [duplicateTitleA.ref, duplicateTitleB.ref] },
+  storedBookings: [duplicateTitleA, duplicateTitleB],
+});
+assert.equal(duplicateTitleContinuation.handled, true, "an ambiguous title must stay inside cancellation target selection");
+assert.equal(duplicateTitleContinuation.bookingRef, null, "duplicate titles must never select a booking arbitrarily");
+assert.equal(duplicateTitleContinuation.reason, "ambiguous_movie_title");
+assert.deepEqual(duplicateTitleContinuation.candidates, [duplicateTitleA.ref, duplicateTitleB.ref]);
+
+const unrelatedStage = resolveCancellationContinuation({
+  text: activeA.movieTitle,
+  stage: { view: "movies", purpose: CANCELLATION_TARGET_SELECTION_PURPOSE, candidateRefs: [activeA.ref] },
+  storedBookings: [activeA],
+});
+assert.equal(unrelatedStage.handled, false, "candidate matching must require the explicit cancellation history purpose");
+
+for (const contextChange of ["Go back", "Show me movies", "What is the cancellation policy?"]) {
+  const continuation = resolveCancellationContinuation({
+    text: contextChange,
+    stage: selectionStage,
+    storedBookings: [activeA, activeB],
+  });
+  assert.equal(continuation.handled, false, `${contextChange}: an explicit task change or FAQ must not trap the guest in cancellation target selection`);
+}
+
 const agentContext = bookingHistoryAgentContext([activeA, cancelled]);
 assert.match(agentContext, new RegExp(activeA.ref), "agent history context must include the active reference needed for cancellation");
 assert.match(agentContext, new RegExp(cancelled.ref), "agent history context must include cancelled status for disambiguation");
 assert.match(agentContext, /cancelled/i, "agent history context must label cancellation state explicitly");
 assert.doesNotMatch(agentContext, /guest@example\.com|4111111111111111/, "agent history context must serialize an allowlist, not private booking fields");
 
-console.log("Validated bilingual current-booking detection, direct-vs-policy cancellation, deterministic target precedence, cancelled exclusion, and safe booking-history context.");
+console.log("Validated bilingual cancellation intent, deterministic targets, exact displayed-candidate continuation, duplicate-title safety, and safe booking-history context.");

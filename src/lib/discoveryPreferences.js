@@ -368,15 +368,19 @@ export function extractDiscoveryPreferencePatch(input, {
   ]);
   if (language) patch.language = language;
 
+  const kidsFamilyRequest = /\b(?:kids?|children|childrens|family|families|family friendly)\b|أطفال|اطفال|عائلي|العائلة/.test(text);
+  const explicitKidsExperience = /\b(?:kids?\s+(?:cinema|experience|format)|in\s+kids|kids?\s+(?:at|showtime))\b|(?:سينما|تجربة|صيغة)\s+(?:الأطفال|الاطفال)/.test(text);
   const catalogExperiences = (movies || []).flatMap((item) => item?.experiences || item?.Experiences || []).filter(Boolean);
   const experience = findAliasValue(text, [
     ...dynamicAliasGroups(knownExperiences),
     ...dynamicAliasGroups(catalogExperiences),
     ...EXPERIENCE_ALIASES,
   ]);
-  if (experience) patch.experience = experience;
+  if (experience && !(normalizeKey(experience) === "kids" && kidsFamilyRequest && !explicitKidsExperience)) {
+    patch.experience = experience;
+  }
 
-  if (/\b(?:kids?|children|childrens|family|families|family friendly)\b|أطفال|اطفال|عائلي|العائلة/.test(text)) {
+  if (kidsFamilyRequest) {
     patch.audience = "kids_family";
     // "Family movies" is an audience request, not a demand that the source
     // catalog use the literal Family genre (many suitable titles use Animation).

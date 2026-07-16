@@ -1,4 +1,4 @@
-import * as generatedData from "./mockVistaData.js";
+import { EXPERIENCE_MEDIA as GENERATED_EXPERIENCE_MEDIA, FILMS, OFFER_MEDIA as GENERATED_OFFER_MEDIA } from "./generated/voxSnapshotManifest.js";
 
 const normalizeExperienceKey = (value) => String(value || "")
   .normalize("NFKD")
@@ -36,18 +36,11 @@ function normalizeRegistry(registry) {
   );
 }
 
-// The converter can export EXPERIENCE_MEDIA directly, or include it under MEDIA.
-// Keeping the lookup here avoids duplicating artwork on every showtime session.
-const generatedExports = Object.fromEntries(Object.entries(generatedData));
-const generatedExperienceMedia = generatedExports.EXPERIENCE_MEDIA
-  || generatedExports.MEDIA?.experiences
-  || generatedExports.MEDIA?.experienceMedia
-  || {};
-const generatedOfferMedia = generatedExports.OFFER_MEDIA
-  || generatedExports.MEDIA?.offers
-  || generatedExports.MEDIA?.offerMedia
-  || [];
-const generatedFilms = Array.isArray(generatedExports.FILMS) ? generatedExports.FILMS : [];
+// Keeping media in the compact manifest avoids duplicating artwork on every
+// showtime shard and keeps the full session snapshot out of the entry bundle.
+const generatedExperienceMedia = GENERATED_EXPERIENCE_MEDIA || {};
+const generatedOfferMedia = GENERATED_OFFER_MEDIA || [];
+const generatedFilms = Array.isArray(FILMS) ? FILMS : [];
 
 export const EXPERIENCE_MEDIA = Object.freeze(normalizeRegistry(generatedExperienceMedia));
 export const OFFER_MEDIA = Object.freeze(

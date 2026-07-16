@@ -7,7 +7,17 @@
 // Existing list-returning signatures stay compatible with App.jsx. Additional
 // result metadata is attached non-enumerably and can be read with getResultMeta.
 // ============================================================================
-import { BOOKING, CINEMAS, DATA_DATES, DATA_STATS, FILMS, SESSIONS, seatPlan } from "./mockVistaData.js";
+import {
+  CINEMAS,
+  DATA_DATES,
+  DATA_STATS,
+  DATES_BY_CINEMA,
+  FILMS,
+  FILM_IDS_BY_CINEMA_DATE,
+  SNAPSHOT_BASE_PATH,
+  SNAPSHOT_VERSION,
+} from "./generated/voxSnapshotManifest.js";
+import { BOOKING, seatPlan } from "./mockTransactionData.js";
 import { findBooking } from "./bookingStore.js";
 import { addCalendarDays, isIsoCalendarDate, remapDemoDate, uaeCalendarDate } from "./lib/demoDates.js";
 import { assessCancellationEligibility } from "./lib/cancellationEligibility.js";
@@ -26,6 +36,9 @@ const LIVE_PROGRAMMING_DAYS = Number.isInteger(configuredLiveProgrammingDays)
   ? Math.min(31, Math.max(1, configuredLiveProgrammingDays))
   : DEFAULT_LIVE_PROGRAMMING_DAYS;
 const liveSessionCache = new Map();
+const snapshotShardCache = new Map();
+const snapshotSessionIndex = new Map();
+const snapshotFilmsById = new Map(FILMS.map((film) => [String(film.ScheduledFilmId || ""), film]));
 
 const HEADERS = Object.freeze({
   Accept: "application/json",
@@ -106,6 +119,7 @@ async function requestJson(url, {
   method = "GET",
   body,
   headers = {},
+  cache,
   timeoutMs = REQUEST_TIMEOUT_MS,
 } = {}) {
   const controller = new AbortController();
@@ -119,6 +133,7 @@ async function requestJson(url, {
         ...headers,
       },
       body: body === undefined ? undefined : JSON.stringify(body),
+      cache,
       signal: controller.signal,
     });
   } catch (cause) {
@@ -219,12 +234,106 @@ export function programmingDateForSession(value) {
   return hour < PROGRAMMING_DAY_START_HOUR ? addCalendarDays(calendarDate, -1) : calendarDate;
 }
 
+const EMPTY_SNAPSHOT_ROWS = Object.freeze([]);
+
+// Snapshot discovery used to rescan every session once per displayed movie.
+// Build one immutable lookup instead, while retaining the source ordering that
+// controls film and showtime presentation.
+export function createSnapshotDiscoveryIndex(sessions, films, publishedDates) {
+  const sessionsByCinema = new Map();
+  const filmsByCinema = new Map();
+  let sessionRecordCount = 0;
+  let indexedSessionCount = 0;
+  let filmRecordCount = 0;
+  let dateBucketCount = 0;
+  let filmBucketCount = 0;
+
+  for (const session of sessions || []) {
+    sessionRecordCount += 1;
+    const cinemaId = rawField(session, "CinemaId", "cinemaId");
+    const sourceDate = programmingDateForSession(session);
+    if (!cinemaId || !sourceDate) continue;
+
+    let cinema = sessionsByCinema.get(cinemaId);
+    if (!cinema) {
+      cinema = new Map();
+      sessionsByCinema.set(cinemaId, cinema);
+    }
+    let dateBucket = cinema.get(sourceDate);
+    if (!dateBucket) {
+      dateBucket = { all: [], byFilm: new Map() };
+      cinema.set(sourceDate, dateBucket);
+      dateBucketCount += 1;
+    }
+    dateBucket.all.push(session);
+    indexedSessionCount += 1;
+
+    const filmId = String(rawField(session, "ScheduledFilmId", "scheduledFilmId") || "");
+    if (!filmId) continue;
+    let filmSessions = dateBucket.byFilm.get(filmId);
+    if (!filmSessions) {
+      filmSessions = [];
+      dateBucket.byFilm.set(filmId, filmSessions);
+      filmBucketCount += 1;
+    }
+    filmSessions.push(session);
+  }
+
+  for (const film of films || []) {
+    filmRecordCount += 1;
+    const cinemaId = rawField(film, "CinemaId", "cinemaId");
+    if (!cinemaId) continue;
+    const cinemaFilms = filmsByCinema.get(cinemaId) || [];
+    cinemaFilms.push(film);
+    filmsByCinema.set(cinemaId, cinemaFilms);
+  }
+
+  for (const cinema of sessionsByCinema.values()) {
+    for (const bucket of cinema.values()) {
+      Object.freeze(bucket.all);
+      for (const filmSessions of bucket.byFilm.values()) Object.freeze(filmSessions);
+      Object.freeze(bucket);
+    }
+  }
+  for (const cinemaFilms of filmsByCinema.values()) Object.freeze(cinemaFilms);
+
+  const orderedPublishedDates = Object.freeze([...(publishedDates || [])]);
+  const datesByCinema = new Map([...sessionsByCinema].map(([cinemaId, dates]) => [
+    cinemaId,
+    Object.freeze(orderedPublishedDates.filter((date) => dates.has(date))),
+  ]));
+  const stats = Object.freeze({
+    sessionRecordCount,
+    indexedSessionCount,
+    filmRecordCount,
+    cinemaCount: sessionsByCinema.size,
+    dateBucketCount,
+    filmBucketCount,
+    sessionConstructionPasses: 1,
+    filmConstructionPasses: 1,
+  });
+
+  return Object.freeze({
+    datesForCinema(cinemaId) {
+      return datesByCinema.get(cinemaId) || EMPTY_SNAPSHOT_ROWS;
+    },
+    filmsForCinema(cinemaId) {
+      return filmsByCinema.get(cinemaId) || EMPTY_SNAPSHOT_ROWS;
+    },
+    sessionsForCinemaDate(cinemaId, sourceDate) {
+      return sessionsByCinema.get(cinemaId)?.get(sourceDate)?.all || EMPTY_SNAPSHOT_ROWS;
+    },
+    sessionsForCinemaDateFilm(cinemaId, sourceDate, scheduledFilmId) {
+      return sessionsByCinema.get(cinemaId)?.get(sourceDate)?.byFilm.get(String(scheduledFilmId || "")) || EMPTY_SNAPSHOT_ROWS;
+    },
+    stats,
+  });
+}
+
 function snapshotDatesForCinema(cinemaId) {
   const id = String(cinemaId || "").trim();
   if (!id) return [...DATA_DATES];
-  return DATA_DATES.filter((date) => SESSIONS.some((session) => (
-    session.CinemaId === id && programmingDateForSession(session) === date
-  )));
+  return [...(DATES_BY_CINEMA[id] || EMPTY_SNAPSHOT_ROWS)];
 }
 
 function activeDates(dates, now = new Date(), includePast = false) {
@@ -392,6 +501,70 @@ function experiencesByScheduledFilm(sessions) {
   return new Map([...index].map(([filmId, values]) => [filmId, [...values].sort()]));
 }
 
+function snapshotShardKey(cinemaId, sourceDate) {
+  return `${cinemaId}:${sourceDate}`;
+}
+
+export function buildSnapshotShardUrl(cinemaId, sourceDate) {
+  const id = requireText(cinemaId, "cinemaId");
+  const date = requireDate(sourceDate, "buildSnapshotShardUrl");
+  return `${SNAPSHOT_BASE_PATH}/${encodeURIComponent(id)}/${date}.json`;
+}
+
+function rememberSnapshotSessions(cinemaId, sessions) {
+  for (const session of sessions) {
+    const sessionId = String(rawField(session, "SessionId", "sessionId") || "");
+    if (sessionId) snapshotSessionIndex.set(`${cinemaId}:${sessionId}`, session);
+  }
+}
+
+async function fetchSnapshotSessions(cinemaId, sourceDate) {
+  const key = snapshotShardKey(cinemaId, sourceDate);
+  const cached = snapshotShardCache.get(key);
+  if (cached) return cached;
+
+  const pending = (async () => {
+    const operation = "getSnapshotSessions";
+    const payload = await requestJson(buildSnapshotShardUrl(cinemaId, sourceDate), {
+      operation,
+      cache: "force-cache",
+    });
+    const sessions = payload?.sessions;
+    const validEnvelope = payload?.version === SNAPSHOT_VERSION
+      && String(payload?.cinemaId || "") === cinemaId
+      && payload?.programmingDate === sourceDate
+      && Array.isArray(sessions);
+    if (!validEnvelope) {
+      throw new VistaClientError("The cinema schedule could not be verified.", {
+        code: "SNAPSHOT_INVALID_PAYLOAD",
+        operation,
+        details: { cinemaId, sourceDate },
+      });
+    }
+    const verifiedSessions = sessions.filter((session) => (
+      String(rawField(session, "CinemaId", "cinemaId") || "") === cinemaId
+      && programmingDateForSession(session) === sourceDate
+    ));
+    if (verifiedSessions.length !== sessions.length) {
+      throw new VistaClientError("The cinema schedule contained inconsistent session data.", {
+        code: "SNAPSHOT_INVALID_SESSION",
+        operation,
+        details: { cinemaId, sourceDate },
+      });
+    }
+    rememberSnapshotSessions(cinemaId, verifiedSessions);
+    return Object.freeze(verifiedSessions);
+  })();
+
+  snapshotShardCache.set(key, pending);
+  try {
+    return await pending;
+  } catch (error) {
+    if (snapshotShardCache.get(key) === pending) snapshotShardCache.delete(key);
+    throw error;
+  }
+}
+
 async function fetchLiveSessions(cinemaId, displayDate) {
   const key = `${cinemaId}:${displayDate}`;
   const cached = liveSessionCache.get(key);
@@ -411,14 +584,14 @@ export async function getScheduledFilms(cinemaId, displayDate = demoDate()) {
   let value = [];
   let scheduledSessions = [];
   if (USE_MOCK) {
-    await delay(200);
     const sourceDate = sourceDateForDemoDate(requestedDate);
-    if (sourceDate) {
-      scheduledSessions = SESSIONS
-        .filter((session) => session.CinemaId === id && programmingDateForSession(session) === sourceDate);
-      const ids = new Set(scheduledSessions
-        .map((session) => session.ScheduledFilmId));
-      value = FILMS.filter((film) => film.CinemaId === id && ids.has(film.ScheduledFilmId));
+    if (sourceDate && snapshotDatesForCinema(id).includes(sourceDate)) {
+      scheduledSessions = await fetchSnapshotSessions(id, sourceDate);
+      const shardFilmIds = [...new Set(scheduledSessions
+        .map((session) => String(rawField(session, "ScheduledFilmId", "scheduledFilmId") || ""))
+        .filter(Boolean))];
+      const publishedFilmIds = FILM_IDS_BY_CINEMA_DATE[id]?.[sourceDate] || shardFilmIds;
+      value = publishedFilmIds.map((filmId) => snapshotFilmsById.get(String(filmId))).filter(Boolean);
     }
   } else {
     const filter = `CinemaId eq '${odataString(id)}'`;
@@ -509,17 +682,16 @@ export function deduplicateSessionPresentation(sessions) {
 export async function getSessions(cinemaId, scheduledFilmId, displayDate = demoDate()) {
   const id = requireText(cinemaId, "cinemaId");
   const requestedDate = requireDate(displayDate, "getSessions");
+  const requestedFilm = String(scheduledFilmId || "");
   let value = [];
   if (USE_MOCK) {
-    await delay(200);
     const sourceDate = sourceDateForDemoDate(requestedDate);
-    if (sourceDate) {
-      value = SESSIONS.filter((session) => session.CinemaId === id && programmingDateForSession(session) === sourceDate);
+    if (sourceDate && snapshotDatesForCinema(id).includes(sourceDate)) {
+      value = await fetchSnapshotSessions(id, sourceDate);
     }
   } else {
     value = await fetchLiveSessions(id, requestedDate);
   }
-  const requestedFilm = String(scheduledFilmId || "");
   const mapped = value
     .filter((session) => !requestedFilm || String(rawField(session, "ScheduledFilmId", "scheduledFilmId") || "") === requestedFilm)
     .map((session) => normalizeSession(session, requestedDate))
@@ -547,7 +719,7 @@ export async function getSeatPlan(cinemaId, sessionId) {
   let listedSeatsAvailable = null;
   if (USE_MOCK) {
     await delay(250);
-    const source = SESSIONS.find((session) => session.CinemaId === id && String(session.SessionId) === requestedSessionId);
+    const source = snapshotSessionIndex.get(`${id}:${requestedSessionId}`);
     listedSeatsAvailable = source?.SeatsAvailable ?? null;
     data = seatPlan(Number(requestedSessionId) % 97);
   } else {
@@ -860,6 +1032,8 @@ export async function refundBooking(ref, { booking = null, now = new Date(), req
 
 export function clearVistaSessionCache() {
   liveSessionCache.clear();
+  snapshotShardCache.clear();
+  snapshotSessionIndex.clear();
 }
 
 export const VISTA_MODE = USE_MOCK ? "snapshot" : "live";

@@ -4,6 +4,9 @@ import { resolveFilmCandidate } from "../src/lib/fuzzyResolvers.js";
 import { resolveProgrammingDateSelection, resolveVisibleSelectionProgrammingDate } from "../src/lib/programmingDateSelection.js";
 import { FILMS, SESSIONS } from "../src/mockVistaData.js";
 import * as vista from "../src/vistaClient.js";
+import { installPublicAssetFetch } from "./lib/installPublicAssetFetch.mjs";
+
+installPublicAssetFetch();
 
 const published = ["2026-07-14", "2026-07-15"];
 

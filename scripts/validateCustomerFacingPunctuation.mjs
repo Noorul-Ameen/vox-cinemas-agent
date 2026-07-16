@@ -64,6 +64,11 @@ const forbiddenSample = `before${String.fromCodePoint(0x2013)}middle${String.fro
 assert.equal(normalizeCustomerFacingText(forbiddenSample), "before-middle-after");
 assert.equal(hasForbiddenCustomerFacingDash(forbiddenSample), true);
 assert.equal(hasForbiddenCustomerFacingDash(normalizeCustomerFacingText(forbiddenSample)), false);
+assert.equal(
+  normalizeCustomerFacingText("Great choice! The Odyssey is showingGreat choice! The Odyssey is showing in IMAX."),
+  "Great choice! The Odyssey is showing in IMAX.",
+  "a duplicated transport or model opening must render only once",
+);
 assert.deepEqual(
   normalizeCustomerFacingFields(
     { error: forbiddenSample, message: forbiddenSample, untouched: forbiddenSample },

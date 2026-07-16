@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { CINEMAS, DATA_DATES, SESSIONS } from "../src/mockVistaData.js";
 import { assessCancellationEligibility } from "../src/lib/cancellationEligibility.js";
 import { addCalendarDays } from "../src/lib/demoDates.js";
+import { installPublicAssetFetch } from "./lib/installPublicAssetFetch.mjs";
 import {
   VISTA_MODE,
   VistaClientError,
@@ -26,6 +27,8 @@ import {
   searchBooking,
   sourceDateForDemoDate,
 } from "../src/vistaClient.js";
+
+installPublicAssetFetch();
 
 const snapshotNow = new Date(`${addCalendarDays(DATA_DATES[0], -1)}T12:00:00Z`);
 const expiredDate = addCalendarDays(DATA_DATES.at(-1), 1);

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const transport = fs.readFileSync(new URL("../src/components/ElevenLabsTransport.jsx", import.meta.url), "utf8");
 const rich = fs.readFileSync(new URL("../src/components/RichMedia.jsx", import.meta.url), "utf8");
 const main = fs.readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
 const fuzzy = fs.readFileSync(new URL("../src/lib/fuzzyResolvers.js", import.meta.url), "utf8");
@@ -19,7 +20,7 @@ for (const name of [...originalTools, "show_offers", "handover_to_agent"]) {
   assert.match(app, new RegExp(`^\\s{4}${name}:`, "m"), `${name} must remain registered`);
 }
 
-assert.match(app, /serverLocation:\s*"eu-residency"/);
+assert.match(transport, /serverLocation:\s*"eu-residency"/);
 assert.match(app, /connectionType:\s*"webrtc"/);
 assert.match(app, /agentId:\s*import\.meta\.env\.VITE_AGENT_ID/);
 assert.match(app, /maxWidth:\s*420/);
@@ -39,7 +40,7 @@ const historyPickerSegment = app.slice(app.indexOf("const openHistory"), app.ind
 assert.doesNotMatch(cinemaPickerSegment, /clearPendingOrder/, "opening the cinema picker must preserve an in-progress checkout");
 assert.doesNotMatch(historyPickerSegment, /clearPendingOrder/, "opening booking history must preserve an in-progress checkout");
 assert.match(app.slice(app.indexOf("const chooseCinema"), app.indexOf("const openHistory")), /clearSeatSelection/, "choosing a new cinema must abandon the previous seats, quote, and checkout");
-assert.match(app.slice(app.indexOf("const selectHistoryBooking"), app.indexOf("const toggleSeat")), /clearPendingOrder/, "opening a historical booking must abandon the previous checkout");
+assert.doesNotMatch(app.slice(app.indexOf("const selectHistoryBooking"), app.indexOf("const toggleSeat")), /clearPendingOrder/, "opening a historical booking must preserve a resumable checkout");
 assert.match(rich, /dir="ltr"/);
 assert.match(main, /class ErrorBoundary/);
 assert.match(main, /<I18nProvider>/);

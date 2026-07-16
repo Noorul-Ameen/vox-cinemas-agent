@@ -63,6 +63,11 @@ const voiceResult = parseAndMergeDiscoveryPreferences({}, "Show me kids' movies 
 assert.deepEqual(textResult.preferences, voiceResult.preferences, "text and voice transcripts must share deterministic preference parsing");
 assert.equal(textResult.preferences.audience, "kids_family");
 assert.equal(textResult.preferences.date, "2026-07-15");
+const kidsAudienceOnly = parseAndMergeDiscoveryPreferences({}, "Show me kids and family movies", { cinemas, movies, knownExperiences: ["KIDS", "IMAX"], now: NOW });
+assert.equal(kidsAudienceOnly.preferences.audience, "kids_family", "kids and family movie wording must be treated as an audience preference");
+assert.equal(kidsAudienceOnly.preferences.experience, null, "kids and family movie wording must not silently require the KIDS cinema experience");
+const explicitKidsExperience = parseAndMergeDiscoveryPreferences({}, "Show me movies in the KIDS experience", { cinemas, movies, knownExperiences: ["KIDS", "IMAX"], now: NOW });
+assert.equal(explicitKidsExperience.preferences.experience, "KIDS", "an explicit KIDS experience request must still filter by the KIDS cinema experience");
 
 const arabicDiscoveryQuery = "ما هي الأفلام العربية في مول الإمارات غداً؟";
 const arabicDiscoverySignal = extractDiscoveryPreferencePatch(arabicDiscoveryQuery, { cinemas, movies, now: NOW });

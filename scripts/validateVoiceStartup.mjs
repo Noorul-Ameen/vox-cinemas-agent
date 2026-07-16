@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { ELEVENLABS_WORKLET_PATHS, VOICE_MIC_PERMISSION_TIMEOUT_MS, VOICE_TRANSPORT_START_TIMEOUT_MS, voiceStartupErrorKey } from "../src/lib/voiceStartup.js";
 
-const [app, headers, strings, rawWorklet, concatWorklet] = await Promise.all([
+const [app, transport, headers, strings, rawWorklet, concatWorklet] = await Promise.all([
   readFile(new URL("../src/App.jsx", import.meta.url), "utf8"),
+  readFile(new URL("../src/components/ElevenLabsTransport.jsx", import.meta.url), "utf8"),
   readFile(new URL("../public/_headers", import.meta.url), "utf8"),
   readFile(new URL("../src/i18n/strings.js", import.meta.url), "utf8"),
   readFile(new URL(`../public${ELEVENLABS_WORKLET_PATHS.rawAudioProcessor}`, import.meta.url), "utf8"),
@@ -18,7 +19,7 @@ assert.match(rawWorklet, /registerProcessor\("rawAudioProcessor"/);
 assert.match(concatWorklet, /registerProcessor\("audioConcatProcessor"/);
 assert.match(app, /connectionType:\s*"webrtc"/);
 assert.match(app, /workletPaths:\s*ELEVENLABS_WORKLET_PATHS/);
-assert.match(app, /serverLocation:\s*"eu-residency"/);
+assert.match(transport, /serverLocation:\s*"eu-residency"/);
 assert.match(headers, /script-src 'self' blob:;/);
 const scriptDirective = headers.match(/script-src[^;]+;/)?.[0] || "";
 assert.match(scriptDirective, /blob:/, "ElevenLabs 0.7.1 WebRTC output capture requires a blob AudioWorklet fallback");
