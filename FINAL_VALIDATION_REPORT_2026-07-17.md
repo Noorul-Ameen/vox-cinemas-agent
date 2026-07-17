@@ -4,11 +4,11 @@ Date: 18 July 2026
 
 ## Executive status
 
-The current local release candidate is ready for final online verification. The booking concierge now keeps the logical booking journey while temporarily hiding an unrelated rich screen, restores the correct screen on request, supports contextual booking cancellation, and preserves the same interaction rules for text and voice transport.
+The current release is deployed and passed final online verification. The booking concierge now keeps the logical booking journey while temporarily hiding an unrelated rich screen, restores the correct screen on request, supports contextual booking cancellation, and preserves the same interaction rules for text and voice transport.
 
 No known repository-level functional defect remains in the tested scope. Production ticket sales are still conditional on the external VOX reservation, payment, refund, live seat inventory, and live showtime APIs. The current checkout produces a device-only saved booking summary. It does not charge a card or reserve cinema inventory.
 
-Commit `ac82db5` was deployed to Cloudflare and passed the live end-to-end journey described below. That run exposed one cancellation post-confirmation replay. The repository fix has passed local validation. Publication of the final follow-up commit and its Cloudflare regression test remain pending.
+Commit `2f60d4f` was deployed to Cloudflare and passed the final live end-to-end journey described below. The previously observed cancellation replay and expired paused-confirmation defects did not recur.
 
 ## Root causes and fixes
 
@@ -53,7 +53,7 @@ Root cause: a typed cancellation decision was completed by the widget and then f
 
 Fix: typed confirmation decisions now complete locally and are not forwarded upstream. Voice decisions are held against the active booking reference, monotonic user turn, and confirmation phase, then resolved through the existing `show_booking_for_cancellation` tool. The tool requires the exact booking reference and returns one authoritative result for the agent to speak once. A later user turn, topic pause, timeout, booking or phase change, reset, disconnect, or successful consume invalidates the decision. A retryable spoken error decline uses the same one-time tool response, while a spoken yes during an error cannot authorize a destructive retry.
 
-Local validation of the serialized result path and typed-local path passed. The final deployed Cloudflare regression test is pending.
+Local and deployed validation of the serialized result path and typed-local path passed.
 
 ### A paused cancellation could restore expired controls
 
@@ -204,21 +204,21 @@ The transactional official-source refresh also passed. Snapshot version `2026071
 
 ## Cloudflare deployed end-to-end evidence
 
-Commit `ac82db5` was deployed at `https://voxi-ai.pages.dev/` and exercised as a mounted production page.
+Commit `2f60d4f` was deployed at `https://voxi-ai.pages.dev/` and exercised as a mounted production page. Cloudflare served the expected production asset `index-DYvhRg5r.js`.
 
 Passed scenarios:
 
-- family discovery at Mall of the Emirates for the next day returned three relevant movie cards
-- an FAQ hid the movie results and Continue my booking restored them
-- Toy Story 5 opened its showtimes and the exact 17:00 PREMIER session opened the seat map
-- selecting E1 and E2 produced two tickets and an AED 84 checkout
-- the detailed FAB offer hid checkout and Return to checkout restored E1, E2, and AED 84
-- switching between Arabic and English preserved checkout state
-- ElevenLabs WebRTC reached Voice chat status
-- completing the review flow saved a device-only booking summary, QR code, and reference
-- cancellation by the selected movie targeted the correct stored booking and displayed the complete confirmation
+- current discovery rendered Toy Story 5 at Mall of the Emirates for 18 July 2026 without an empty intermediate panel
+- the live date strip began with Saturday, 18 July, from snapshot `20260717-a97029fceaf39797`
+- selecting a showtime opened the seat map and two selected seats produced two tickets and an AED 84 checkout
+- completing review checkout saved reference `WLH3DQX`, displayed its QR code, and clearly stated that no card was charged and no cinema reservation was submitted
+- cancellation displayed the exact booking details and device-only impact
+- an age-policy FAQ hid cancellation without losing the task
+- Continue cancellation restored a freshly validated confirmation for `WLH3DQX`
+- typing Yes, cancel it marked the booking Cancelled exactly once and displayed the no-refund result once
+- ElevenLabs WebRTC reached Voice chat status on the deployed build
 
-The same run exposed the post-confirmation cancellation replay described in Root causes and fixes. The fix passed local validation but is not represented by `ac82db5`. Final Cloudflare deployment and regression verification of the fix are pending.
+No browser-visible functional defect was found in this final deployed regression run.
 
 ## Mounted browser end-to-end evidence
 
@@ -318,14 +318,12 @@ ElevenLabs should receive the exact prompt contract in `config/elevenlabs-agent-
 
 ## Final readiness decision
 
-Leadership review readiness: local release candidate passed. Final online approval is pending deployment and Cloudflare regression verification of the cancellation replay fix.
+Leadership review readiness: passed on the deployed Cloudflare build.
 
 Repository functional validation: passed.
 
 Local visual validation: passed at the required 420 px layout.
 
-Cloudflare validation for commit `ac82db5`: passed, with the cancellation replay issue identified during the run.
-
-Cloudflare validation for the final follow-up fix: pending deployment.
+Cloudflare validation for commit `2f60d4f`: passed, including the final cancellation continuity and voice regression checks.
 
 Real transaction production readiness: blocked by the VOX booking, payment, refund, identity, and live inventory integrations listed above.
