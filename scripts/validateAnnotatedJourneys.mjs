@@ -85,6 +85,11 @@ assert.match(
   "checkout must never be described as a confirmed booking",
 );
 assert.match(
+  guardAgentStateClaim("Your current booking is confirmed and shown.", { stage: { view: "history" }, locale: "en" }),
+  /on-device booking summaries are shown/i,
+  "a history response must stay grounded in the visible saved summaries instead of falling back to checkout guidance",
+);
+assert.match(
   guardAgentStateClaim("I can't change the seats after the booking is confirmed. You'll need a new booking.", { stage: checkoutStage, pendingOrder, locale: "en" }),
   /can change seats before completing checkout/i,
   "seat editing must not be refused while checkout is pending",

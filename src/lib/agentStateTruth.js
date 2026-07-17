@@ -68,6 +68,12 @@ function cancelledSummaryGuidance(booking, locale) {
   return `The booking summary${title ? ` for ${title}` : ""}${ref ? ` with reference ${ref}` : ""} is marked cancelled on this device. No refund was processed and no cancellation was sent to the cinema.`;
 }
 
+function historyGuidance(locale) {
+  return locale === "ar"
+    ? "ملخصات حجوزاتك المحفوظة على هذا الجهاز ظاهرة الآن. اختر حجزاً لعرض التفاصيل، أو استخدم زر إلغاء الحجز الخاص به."
+    : "Your current on-device booking summaries are shown. Select one to view its details, or use its Cancel booking button.";
+}
+
 function wrongDiscoveryQuestion(value, stage) {
   if (stage?.view !== "discovery" || !stage?.missing?.[0] || !stage.question) return false;
   const asksCinema = /\b(?:which|what)\b[\s\S]{0,30}\b(?:cinema|location)\b|\bwhere\b[\s\S]{0,30}\b(?:watch|cinema|location)\b|(?:أي|اي|ما)\s+(?:سينما|موقع)|وين[\s\S]{0,20}(?:سينما|موقع)/iu.test(value);
@@ -140,6 +146,7 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
     || bookingSummaryDisplayClaim(value)
     || checkoutInstructionClaim(value);
   if (!transactionClaim) return value;
+  if (stage?.view === "history") return historyGuidance(locale);
   if (editableCheckout) return checkoutGuidance(stage, pendingOrder, locale);
   if (editableSeatMap) return seatMapGuidance(locale);
 
