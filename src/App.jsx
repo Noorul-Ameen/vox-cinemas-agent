@@ -12,7 +12,9 @@ import { useI18n } from "./i18n/I18nProvider.jsx";
 import { HANDOVER_TRIGGER, buildHandoverPayload, isClarificationFailureReason, isSupportedHandoverReason, registerClarificationFailureAttempt } from "./lib/handoverSummary.js";
 import { resolveFilmCandidate } from "./lib/fuzzyResolvers.js";
 import { isCinemaSelectionTurn, isDirectCinemaSelectionUtterance, resolveCinemaCandidate } from "./lib/cinemaRouting.js";
-import { CANCELLATION_TARGET_SELECTION_PURPOSE, bookingHistoryAgentContext, classifyBookingHistoryRequest, isCurrentBooking, isDirectCancellationRequest, resolveCancellationContinuation, resolveCancellationTarget } from "./lib/cancellationRouting.js";
+import { CANCELLATION_TARGET_SELECTION_PURPOSE, bookingHistoryAgentContext, classifyBookingHistoryRequest, isCurrentBooking, isDirectCancellationRequest, resolveCancellationContinuation, resolveCancellationTarget, sortBookingsForDisplay } from "./lib/cancellationRouting.js";
+import { resolveCancellationDecision as cancellationDecision } from "./lib/cancellationConfirmation.js";
+import { resolveConversationalCancellation } from "./lib/conversationalCancellationResolver.js";
 import { CANCELLATION_JOURNAL_TTL_MS, classifyRefundFailure, hydrateCancellationJournal, normalizeCancellationJournal, withCancellationMutationLock } from "./lib/cancellationSafety.js";
 import { normalizeElevenLabsMessageEvent } from "./lib/conversationMessage.js";
 import { guardAgentStateClaim } from "./lib/agentStateTruth.js";
@@ -21,6 +23,21 @@ import { normalizeCustomerFacingFields, normalizeCustomerFacingText } from "./li
 import { explicitLanguageRequest, resolveLanguageSignal } from "./lib/languageSwitch.js";
 import { buildTransportHandoff, createConversationJourney, inferIntent, journeyDynamicVariables, journeyReducer, syncJourney } from "./lib/conversationJourney.js";
 import { resolveProgrammingDateSelection, resolveVisibleSelectionProgrammingDate } from "./lib/programmingDateSelection.js";
+import {
+  cancelPausedRichJourney,
+  capturePausedRichStage,
+  completePausedRichJourney,
+  createPausedRichJourney,
+  endPausedRichJourney,
+  expirePausedRichJourney,
+  hidePausedRichStage,
+  invalidatePausedRichStage,
+  replacePausedRichJourney,
+  restorePausedRichStage,
+  richJourneyViewFromStage,
+  selectRestorableRichStage,
+} from "./lib/pausedRichJourney.js";
+import { isResumeCheckoutTurn, isResumeOnlyTurn, pausedResumeTarget } from "./lib/pausedJourneyRouting.js";
 import { createDiscoveryPreferences, extractDiscoveryPreferencePatch, filterDiscoveryResults, getMissingDiscoveryCriteria, mergeDiscoveryPreferences, parseAndMergeDiscoveryPreferences, resolveDiscoveryMovieCandidate, shouldTreatAsDiscoveryFilterTurn, unresolvedMovieTitleCandidate } from "./lib/discoveryPreferences.js";
 import { buildAuthoritativeDiscoveryContext, buildMovieSelectionGroundingContext } from "./lib/discoveryResultContext.js";
 import { normalizeSeatIds, resolveSeatSelectionTurn, resolveSeatToolInput } from "./lib/seatRouting.js";
@@ -44,8 +61,9 @@ const SEAT_PRICING_PREVIEW = vista.getSeatPricingPreview();
 const DISCOVERY_MOVIE_CATALOG = vista.getDiscoveryMovieCatalog();
 const stripVox = (name) => String(name || "").replace(/^VOX\s*[\u2014-]\s*/, "");
 const norm = (value) => String(value ?? "").toLowerCase().trim();
-const isResumeOnlyTurn = (value) => /^(?:continue|resume|go on|carry on|متابعة|تابع|اكمل|أكمل)(?:\s+(?:please|من فضلك))?[.!?،]*$/iu.test(String(value || "").trim());
-const isResumeCheckoutTurn = (value) => /^(?:(?:return|go|take me|back)\s+(?:me\s+)?(?:back\s+)?to\s+(?:the\s+)?(?:checkout|payment)|(?:back|return|resume|continue|complete|finish)\s+(?:the\s+)?(?:checkout|payment)|(?:checkout|payment)\s+(?:again|please)|(?:العودة|ارجع|أرجع|عد)\s+(?:إلى|الى|ل)\s*(?:الدفع|صفحة الدفع)|(?:متابعة|استكمال|اكمال|إكمال)\s+(?:الدفع|عملية الدفع)|(?:الدفع|صفحة الدفع)\s+(?:مرة أخرى|من فضلك))[.!?،]*$/iu.test(String(value || "").trim());
+const hasMeaningfulTurnContent = (value) => /[\p{L}\p{N}]/u.test(String(value || ""));
+const isExplicitJourneyCancellationTurn = (value) => /\b(?:cancel|stop|abandon|end)\s+(?:this|my|the|current)?\s*(?:booking\s+)?(?:journey|process|flow|checkout)\b|(?:ألغ|الغ|أوقف|انه|أنهِ)\s+(?:رحلة|عملية|مسار)\s+(?:الحجز|الدفع)/iu.test(String(value || ""));
+const isExplicitConversationEndTurn = (value) => /^(?:end|close|stop)\s+(?:the\s+)?(?:chat|conversation|session)|^(?:goodbye|bye|that(?:'|’)s all|thank you,? bye)|^(?:انه|أنهِ|اغلق|أغلق)\s+(?:المحادثة|الجلسة)|^(?:مع السلامة|وداعا)[.!?،]*$/iu.test(String(value || "").trim());
 const localizedValue = (value, locale) => typeof value === "string" ? value : value?.[locale] || value?.en || "";
 const isAgentWelcome = (value) => {
   const text = String(value || "");
@@ -419,13 +437,30 @@ function extractTicketQuantity(text) {
   return quantity >= 1 && quantity <= MAX_TICKETS ? quantity : null;
 }
 
-const cancellationDecision = (text) => {
-  const value = norm(text).replace(/[.!?،؟]/g, "").trim();
-  if (/^(yes|yes please|confirm|proceed|go ahead|cancel it|yes cancel it|نعم|ايوه|أيوه|الغ[يه]|الغي الحجز|أكد|تاكيد|تأكيد)$/.test(value)) return true;
-  if (/^yes(?: please)?[, ]+(?:cancel|refund|void)(?: (?:my|this|the))?(?: (?:booking|reservation|tickets?))?(?: wl[a-z0-9-]+)?$/.test(value)) return true;
-  if (/^نعم[, ]+(?:الغ[يه]|الغي|ألغي)(?: (?:حجزي|الحجز))?(?: wl[a-z0-9-]+)?$/.test(value)) return true;
-  if (/^(no|no thanks|do not cancel|dont cancel|keep it|back|لا|لأ|لا تلغ[يه]|احتفظ بالحجز|تراجع)$/.test(value)) return false;
-  return null;
+const cancellationBookingSummary = (booking, locale = "en") => {
+  const movie = booking?.movieTitle || booking?.movie || (locale === "ar" ? "فيلم غير محدد" : "Unknown movie");
+  const cinemaName = booking?.cinemaName || booking?.cinema || (locale === "ar" ? "سينما غير محددة" : "Unknown cinema");
+  const performanceDate = booking?.performanceDate || booking?.sourceDate || booking?.date || (locale === "ar" ? "تاريخ غير محدد" : "Unknown date");
+  const showtime = booking?.showtime || booking?.time || (locale === "ar" ? "وقت غير محدد" : "Unknown time");
+  const reference = booking?.ref || (locale === "ar" ? "غير متوفر" : "Unavailable");
+  return locale === "ar"
+    ? `الفيلم: ${movie}. السينما: ${cinemaName}. التاريخ: ${performanceDate}. الوقت: ${showtime}. مرجع الحجز: ${reference}.`
+    : `Movie: ${movie}. Cinema: ${cinemaName}. Date: ${performanceDate}. Showtime: ${showtime}. Booking reference: ${reference}.`;
+};
+
+const focusedCancellationChoice = (candidates = [], locale = "en") => {
+  const details = candidates.map((candidate, index) => {
+    const position = candidate.position || index + 1;
+    const movie = candidate.movie || (locale === "ar" ? "فيلم غير محدد" : "Unknown movie");
+    const date = candidate.date || (locale === "ar" ? "تاريخ غير محدد" : "Unknown date");
+    const showtime = candidate.showtime || (locale === "ar" ? "وقت غير محدد" : "Unknown time");
+    const cinemaName = candidate.cinema || (locale === "ar" ? "سينما غير محددة" : "Unknown cinema");
+    const reference = candidate.bookingRef || (locale === "ar" ? "غير متوفر" : "Unavailable");
+    return `${position}. ${movie}, ${date}, ${showtime}, ${cinemaName}, ${locale === "ar" ? "المرجع" : "reference"} ${reference}`;
+  });
+  return locale === "ar"
+    ? `وجدت أكثر من حجز مطابق:\n${details.join("\n")}\nأي حجز تريد إلغاءه؟`
+    : `I found more than one matching booking:\n${details.join("\n")}\nWhich one would you like to cancel?`;
 };
 
 function sanitizeUserText(text) {
@@ -449,6 +484,7 @@ export default function App() {
   const [showFullTranscript, setShowFullTranscript] = useState(false);
   const [input, setInput] = useState("");
   const [stage, setStage] = useState({ view: "empty" });
+  const [stageVisible, setStageVisible] = useState(true);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [booking, setBooking] = useState(null);
   const [bookings, setBookings] = useState(() => isUsableDeviceSessionEpoch(readDeviceSessionEpoch()) ? readBookings() : []);
@@ -460,6 +496,10 @@ export default function App() {
   const [scheduleDate, setScheduleDate] = useState(vista.demoDate);
   const appConversationIdRef = useRef(newConversationId());
   const [journey, dispatchJourney] = useReducer(journeyReducer, appConversationIdRef.current, createConversationJourney);
+  const [pausedJourney, setPausedJourney] = useState(() => createPausedRichJourney({
+    sessionId: appConversationIdRef.current,
+    journeyId: appConversationIdRef.current,
+  }));
   // A spoken quantity is only a target that helps the guest choose seats.
   // The actual ticket count is always derived from selectedSeats.length.
   const [requestedSeatTarget, setRequestedSeatTarget] = useState(null);
@@ -506,10 +546,15 @@ export default function App() {
   const offersReturnRef = useRef(null);
   const checkoutStageRef = useRef(null);
   const checkoutPaymentActiveRef = useRef(false);
+  const pausedJourneyRef = useRef(pausedJourney);
+  const cancellationPausedRef = useRef(false);
+  const renderTopicRef = useRef("general_enquiry");
+  const restoredStageToolGuardRef = useRef(null);
 
   // Current-value refs make client-tool calls deterministic even when the SDK
   // invokes a handler between React renders.
   const stageRef = useRef(stage);
+  const stageVisibleRef = useRef(stageVisible);
   const stageRevisionRef = useRef(0);
   const cinemaRef = useRef(cinema);
   const bookingRef = useRef(booking);
@@ -526,6 +571,7 @@ export default function App() {
   const clarificationFailuresRef = useRef(0);
   const clarificationFailureLogRef = useRef([]);
   const conversationIdRef = appConversationIdRef;
+  const bookingJourneyIdRef = useRef(appConversationIdRef.current);
   const transportConversationIdRef = useRef(null);
   const journeyRef = useRef(journey);
   const lastActivityRef = useRef(Date.now());
@@ -572,6 +618,7 @@ export default function App() {
   };
 
   useEffect(() => { stageRef.current = stage; }, [stage]);
+  useEffect(() => { stageVisibleRef.current = stageVisible; }, [stageVisible]);
   useEffect(() => { cinemaRef.current = cinema; }, [cinema]);
   useEffect(() => { bookingRef.current = booking; }, [booking]);
   useEffect(() => { pendingOrderRef.current = pendingOrder; }, [pendingOrder]);
@@ -582,6 +629,7 @@ export default function App() {
   useEffect(() => { requestedSeatTargetRef.current = requestedSeatTarget; }, [requestedSeatTarget]);
   useEffect(() => { discoveryPreferencesRef.current = discoveryPreferences; }, [discoveryPreferences]);
   useEffect(() => { journeyRef.current = journey; }, [journey]);
+  useEffect(() => { pausedJourneyRef.current = pausedJourney; }, [pausedJourney]);
 
   useEffect(() => {
     const next = syncJourney(journeyRef.current, {
@@ -698,6 +746,14 @@ export default function App() {
     pendingOrderRef.current = null;
     checkoutStageRef.current = null;
     setPendingOrder(null);
+    const withoutCheckout = invalidatePausedRichStage(pausedJourneyRef.current, {
+      views: ["checkout"],
+      reason: "pending_checkout_cleared",
+    });
+    if (withoutCheckout !== pausedJourneyRef.current) {
+      pausedJourneyRef.current = withoutCheckout;
+      setPausedJourney(withoutCheckout);
+    }
     return true;
   };
 
@@ -713,6 +769,14 @@ export default function App() {
     if (clearPlan) {
       planRef.current = [];
       planContextRef.current = null;
+      const withoutSeats = invalidatePausedRichStage(pausedJourneyRef.current, {
+        views: ["seatmap", "checkout"],
+        reason: "seat_context_cleared",
+      });
+      if (withoutSeats !== pausedJourneyRef.current) {
+        pausedJourneyRef.current = withoutSeats;
+        setPausedJourney(withoutSeats);
+      }
     }
     if (clearTarget) {
       requestedSeatTargetRef.current = null;
@@ -751,16 +815,110 @@ export default function App() {
     }
   };
 
+  const commitPausedJourney = useCallback((nextModel) => {
+    pausedJourneyRef.current = nextModel;
+    setPausedJourney(nextModel);
+    return nextModel;
+  }, []);
+
+  const pausedSnapshotStage = (nextStage) => {
+    if (!nextStage || typeof nextStage !== "object") return nextStage;
+    const cancellationActive = Boolean(cancellationFlowRef.current?.bookingRef)
+      && ["checking", "route_confirmation", "final_confirmation", "processing", "error"].includes(cancellationFlowRef.current?.phase);
+    const stageWithPurpose = cancellationActive && ["booking", "history"].includes(nextStage.view)
+      ? { ...nextStage, purpose: CANCELLATION_TARGET_SELECTION_PURPOSE }
+      : nextStage;
+    return {
+      ...stageWithPurpose,
+      pausedContext: {
+        cinema: cinemaRef.current,
+        booking: bookingRef.current,
+        scheduleDate: scheduleDateRef.current,
+        selectedSeats: [...seatsRef.current],
+        requestedSeatTarget: requestedSeatTargetRef.current,
+        discoveryPreferences: discoveryPreferencesRef.current,
+        plan: planRef.current,
+        planContext: planContextRef.current,
+        pendingOrder: pendingOrderRef.current,
+        historyFilter,
+      },
+    };
+  };
+
   const showStage = useCallback((nextStage) => {
     const next = normalizeCustomerFacingFields(nextStage || { view: "empty" }, ["label", "notice", "error", "question", "reason"]);
     if (checkoutPaymentActiveRef.current && stageRef.current?.view === "checkout" && next.view !== "checkout") return false;
     if (next.view !== "offers" && lastOfferRef.current) lastOfferRef.current = null;
+    const richView = richJourneyViewFromStage(next);
+    if (richView) {
+      renderTopicRef.current = ["history", "booking", "cancellation"].includes(richView) ? "booking_records" : "booking";
+      const captured = capturePausedRichStage(pausedJourneyRef.current, pausedSnapshotStage(next), {
+        sessionId: appConversationIdRef.current,
+        journeyId: bookingJourneyIdRef.current,
+        contextVersion: stageRevisionRef.current + 1,
+      });
+      commitPausedJourney(captured);
+    } else if (next.view === "offers") {
+      renderTopicRef.current = "offers";
+    }
     stageRevisionRef.current += 1;
     stageRef.current = next;
+    stageVisibleRef.current = true;
     lastActivityRef.current = Date.now();
     setStage(next);
+    setStageVisible(true);
     return true;
-  }, []);
+  }, [commitPausedJourney, historyFilter]);
+
+  const pauseRichRenderingForTopicChange = useCallback((reason = "topic_change", topic = "general_enquiry") => {
+    if (checkoutPaymentActiveRef.current) return { hidden: false, reason: "payment_in_progress", pausedView: null };
+    const current = stageRef.current;
+    const richView = richJourneyViewFromStage(current);
+    let pausedView = null;
+    if (richView) {
+      let model = capturePausedRichStage(pausedJourneyRef.current, pausedSnapshotStage(current), {
+        sessionId: appConversationIdRef.current,
+        journeyId: bookingJourneyIdRef.current,
+        contextVersion: stageRevisionRef.current,
+      });
+      model = hidePausedRichStage(model, { reason });
+      commitPausedJourney(model);
+      pausedView = model.resumeView || richView;
+    }
+    if (cancellationFlowRef.current?.bookingRef) cancellationPausedRef.current = true;
+    renderTopicRef.current = topic;
+    stageVisibleRef.current = false;
+    setStageVisible(false);
+    return { hidden: current.view !== "empty", reason, pausedView };
+  }, [commitPausedJourney, historyFilter]);
+
+  const clearPausedJourneyForLifecycle = useCallback((event, reason) => {
+    const current = pausedJourneyRef.current;
+    const next = event === "completed"
+      ? completePausedRichJourney(current, { reason })
+      : event === "cancelled"
+        ? cancelPausedRichJourney(current, { reason })
+        : event === "expired"
+          ? expirePausedRichJourney(current, { reason })
+          : endPausedRichJourney(current, { reason });
+    cancellationPausedRef.current = false;
+    restoredStageToolGuardRef.current = null;
+    return commitPausedJourney(next);
+  }, [commitPausedJourney]);
+
+  const replacePausedJourneyForNewBooking = useCallback((reason = "new_booking_started") => {
+    const nextJourneyId = newConversationId();
+    bookingJourneyIdRef.current = nextJourneyId;
+    const next = replacePausedRichJourney(pausedJourneyRef.current, {
+      sessionId: appConversationIdRef.current,
+      journeyId: nextJourneyId,
+      reason,
+    });
+    cancellationPausedRef.current = false;
+    restoredStageToolGuardRef.current = null;
+    renderTopicRef.current = "booking";
+    return commitPausedJourney(next);
+  }, [commitPausedJourney]);
 
   const handleCheckoutPaymentState = useCallback((active) => {
     checkoutPaymentActiveRef.current = Boolean(active);
@@ -834,6 +992,16 @@ export default function App() {
   const preserveActiveCheckoutForTool = (toolName) => {
     const checkout = activeCheckoutStage();
     if (!checkout) return null;
+    if (!stageVisibleRef.current) {
+      return JSON.stringify({
+        shown: false,
+        checkoutPreserved: true,
+        checkoutId: checkout.order.checkoutId,
+        blockedTool: toolName,
+        reason: "paused_topic",
+        instruction: "The unpaid checkout is safely paused and hidden while the guest discusses another topic. Do not reopen or replace it unless the guest explicitly asks to continue the booking, return to checkout, or edit seats.",
+      });
+    }
     restoreActiveCheckout();
     return JSON.stringify({
       shown: "checkout",
@@ -843,7 +1011,33 @@ export default function App() {
       total: checkout.order.total,
       currency: checkout.order.currency,
       blockedTool: toolName,
-      instruction: "An unpaid checkout is active and has been restored. Answer the guest without restarting movie, showtime, or seat selection. The guest can use Edit seats or explicitly start a new booking.",
+      instruction: "An unpaid checkout is active. Do not restart movie, showtime, or seat selection unless the guest explicitly starts a replacement booking. The guest can use Edit seats or ask to return to checkout.",
+    });
+  };
+
+  const preservePausedTopicForTool = (toolName) => {
+    const restoredGuard = restoredStageToolGuardRef.current;
+    if (restoredGuard?.journeyId === bookingJourneyIdRef.current) {
+      return JSON.stringify({
+        shown: stageVisibleRef.current ? stageRef.current.view : false,
+        alreadyShown: stageVisibleRef.current,
+        restored: true,
+        restoredView: restoredGuard.view,
+        blockedTool: toolName,
+        reason: "restored_stage_waiting_for_guest_selection",
+        instruction: "The widget has just restored the exact paused step requested by the guest. A delayed reply or tool call from the previous topic must not advance it. Acknowledge the restored panel and wait for the guest to make the next movie, showtime, seat, or checkout choice.",
+      });
+    }
+    if (stageVisibleRef.current || renderTopicRef.current === "booking") return null;
+    const paused = selectRestorableRichStage(pausedJourneyRef.current);
+    if (!paused) return null;
+    return JSON.stringify({
+      shown: false,
+      paused: true,
+      pausedView: paused.view,
+      blockedTool: toolName,
+      reason: "unrelated_topic_active",
+      instruction: "A previous rich booking step is paused and hidden. Answer the current topic without changing booking rendering. Restore it only after an explicit continue or return request.",
     });
   };
 
@@ -856,7 +1050,10 @@ export default function App() {
       reason: "cancellation_in_progress",
       bookingRef: flow.bookingRef,
       phase: flow.phase,
-      instruction: "A cancellation check or confirmation is active. Keep the current panel visible and continue only with that cancellation until the guest confirms, declines, or changes task.",
+      paused: cancellationPausedRef.current,
+      instruction: cancellationPausedRef.current
+        ? "A cancellation check or confirmation is paused while the guest discusses another topic. Keep it hidden and preserve its state until the guest asks to resume cancellation."
+        : "A cancellation check or confirmation is active. Continue only with that cancellation until the guest confirms, declines, or changes topic.",
     });
   };
 
@@ -1407,26 +1604,9 @@ export default function App() {
       || refersToDisplayedBooking;
     if (keepsTransactionalView) return false;
 
-    // A completed booking remains in storage/history, but its large result card
-    // should not sit under every unrelated turn. Dismiss it before a new FAQ or
-    // discovery panel renders, restoring the current movies or a clean home.
-    const canRestoreMovies = cinemaRef.current
-      && filmsRef.current.length
-      && filmsCinemaRef.current === cinemaRef.current.id
-      && filmsDateRef.current === scheduleDateRef.current;
-    // The stored booking remains available from History, but once the guest
-    // moves to an unrelated task it must no longer act as hidden checkout or
-    // offer context.
     const startsNewBooking = actionIntent === "booking" || isDiscoveryRequest(text);
-    if (startsNewBooking) clearSeatSelection({ clearTarget: true });
-    bookingRef.current = null;
-    bookingOpenedFromHistoryRef.current = false;
-    setBooking(null);
-    setHistoryFilter("all");
-    historyReturnRef.current = null;
-    historyContextRef.current = null;
-    if (!startsNewBooking && activeCheckoutStage()) restoreActiveCheckout();
-    else showStage(canRestoreMovies ? { view: "movies", movies: filmsRef.current } : { view: "empty" });
+    if (startsNewBooking) return false;
+    pauseRichRenderingForTopicChange("transactional_topic_changed", "general_enquiry");
     return true;
   };
 
@@ -1469,6 +1649,38 @@ export default function App() {
     }
     return faq;
   }, []);
+
+  const pauseRenderingForUnrelatedTurn = ({
+    decision,
+    historyRequested,
+    directCancellation,
+    directSeatSelection,
+    directCinemaSelection,
+    resumeTarget,
+    languageControlTurn,
+    localOfferTurn,
+    discoveryFilterTurn,
+    actionIntent,
+    faq,
+  } = {}) => {
+    if (!stageVisibleRef.current || !richJourneyViewFromStage(stageRef.current)) return false;
+    const transactional = decision !== null
+      || historyRequested
+      || directCancellation
+      || directSeatSelection
+      || directCinemaSelection
+      || resumeTarget
+      || languageControlTurn
+      || localOfferTurn
+      || discoveryFilterTurn
+      || actionIntent === "booking"
+      || actionIntent === "booking_history"
+      || actionIntent === "cancellation";
+    if (transactional) return false;
+    if (!faq?.matches?.length && actionIntent !== null) return false;
+    pauseRichRenderingForTopicChange(faq?.matches?.length ? "faq_topic_change" : "general_topic_change", "general_enquiry");
+    return true;
+  };
 
   useEffect(() => {
     filmsRef.current = [];
@@ -1685,6 +1897,292 @@ export default function App() {
     return { valid, total, quote };
   };
 
+  const restorePausedSnapshotContext = (snapshot) => {
+    const context = snapshot?.pausedContext;
+    if (!context) return;
+    if (context.cinema !== undefined) {
+      cinemaRef.current = context.cinema || null;
+      setCinema(context.cinema || null);
+    }
+    if (context.booking !== undefined) {
+      bookingRef.current = context.booking || null;
+      setBooking(context.booking || null);
+    }
+    if (context.scheduleDate) {
+      scheduleDateRef.current = context.scheduleDate;
+      setScheduleDate(context.scheduleDate);
+    }
+    if (Array.isArray(context.selectedSeats)) {
+      seatsRef.current = [...context.selectedSeats];
+      setSelectedSeats([...context.selectedSeats]);
+    }
+    if (context.requestedSeatTarget !== undefined) {
+      requestedSeatTargetRef.current = context.requestedSeatTarget || null;
+      setRequestedSeatTarget(context.requestedSeatTarget || null);
+    }
+    if (context.discoveryPreferences) {
+      discoveryPreferencesRef.current = context.discoveryPreferences;
+      setDiscoveryPreferences(context.discoveryPreferences);
+    }
+    if (Array.isArray(context.plan)) planRef.current = context.plan;
+    if (context.planContext) planContextRef.current = context.planContext;
+    if (context.historyFilter) setHistoryFilter(context.historyFilter);
+  };
+
+  const sessionMatchesOrder = (session, order) => [session?.sessionId, ...(session?.sessionIds || [])]
+    .filter(Boolean)
+    .some((id) => String(id) === String(order?.sessionId));
+
+  const revalidatePausedCheckout = async (snapshot) => {
+    const checkout = activeCheckoutStage() || (snapshot?.order?.checkoutId ? { ...snapshot, view: "checkout" } : null);
+    const order = pendingOrderRef.current;
+    if (!checkout || !order?.checkoutId || checkout.order?.checkoutId !== order.checkoutId) {
+      return { restored: false, validation: { session: false, availability: false, pricing: false }, reason: "checkout_identity_changed" };
+    }
+    let currentSessions;
+    try {
+      currentSessions = await vista.getSessions(order.cinemaId, order.movieId, order.programmingDate || order.sourceDate || order.date);
+    } catch (error) {
+      return { restored: false, validation: { session: false }, reason: error?.message || "session_revalidation_failed" };
+    }
+    const session = currentSessions.find((candidate) => sessionMatchesOrder(candidate, order));
+    const sessionCurrent = session && filterCurrentSessions([{ ...session, date: session.date || order.programmingDate || order.date }]).available.length > 0;
+    if (!sessionCurrent) {
+      clearSeatSelection({ clearTarget: false });
+      sessionsRef.current = filterCurrentSessions(currentSessions).available;
+      sessionsFilmRef.current = String(order.movieId || "");
+      const movie = checkout.movie || stageRef.current.movie || resolveFilm(order.movieId) || { id: order.movieId, title: order.movieTitle };
+      showStage({ view: "showtimes", movie, sessions: sessionsRef.current, notice: localeRef.current === "ar" ? "لم يعد موعد العرض السابق متاحاً. اختر موعداً جديداً." : "The previous showtime is no longer available. Choose another showtime." });
+      return { restored: false, validation: { session: false, availability: false, pricing: false }, reason: "showtime_unavailable" };
+    }
+    let plan;
+    try {
+      plan = await vista.getSeatPlan(order.cinemaId, order.sessionId);
+    } catch (error) {
+      return { restored: false, validation: { session: true, availability: false }, reason: error?.message || "seat_revalidation_failed" };
+    }
+    const allSeats = plan.flatMap((row) => row.seats || []);
+    const selectedDetails = (order.seats || []).map((seatId) => allSeats.find((seat) => String(seat.id).toUpperCase() === String(seatId).toUpperCase())).filter(Boolean);
+    const seatsAvailable = selectedDetails.length === (order.seats || []).length && selectedDetails.every((seat) => seat.status === 0);
+    const movie = checkout.movie || stageRef.current.movie || resolveFilm(order.movieId) || { id: order.movieId, title: order.movieTitle };
+    const planContext = { cinemaId: order.cinemaId, sessionId: order.sessionId, movieId: order.movieId, programmingDate: order.programmingDate || order.sourceDate || order.date };
+    planRef.current = plan;
+    planContextRef.current = planContext;
+    if (!seatsAvailable) {
+      clearPendingOrder();
+      seatsRef.current = [];
+      setSelectedSeats([]);
+      setSeatQuote(null);
+      showStage({ view: "seatmap", movie, session, plan, planMeta: vista.getResultMeta(plan) });
+      say("system", localeRef.current === "ar" ? "تغير توفر المقاعد أثناء توقف الحجز. اختر مقاعد متاحة للمتابعة." : "Seat availability changed while the booking was paused. Choose available seats to continue.");
+      return { restored: false, validation: { session: true, availability: false, pricing: false }, reason: "selected_seats_unavailable" };
+    }
+    let quote;
+    try {
+      quote = await vista.getPricingQuote(order.cinemaId, order.sessionId, selectedDetails);
+    } catch (error) {
+      showStage({ view: "seatmap", movie, session, plan, planMeta: vista.getResultMeta(plan) });
+      say("system", localeRef.current === "ar" ? "تعذر تحديث السعر الآن. بقيت المقاعد محددة، فحاول المتابعة مرة أخرى." : "The price could not be refreshed. Your seats remain selected, so please try continuing again.");
+      return { restored: false, validation: { session: true, availability: true, pricing: false }, reason: error?.message || "pricing_revalidation_failed" };
+    }
+    const total = Number(quote?.total);
+    if (!Number.isFinite(total)) return { restored: false, validation: { session: true, availability: true, pricing: false }, reason: "pricing_unverified" };
+    const updatedOrder = {
+      ...order,
+      showtime: session.time || order.showtime,
+      experience: session.exp || order.experience,
+      screen: session.screen || order.screen,
+      seats: selectedDetails.map((seat) => seat.id),
+      ticketQuantity: selectedDetails.length,
+      subtotal: Number.isFinite(Number(quote.subtotal)) ? Number(quote.subtotal) : null,
+      fees: Array.isArray(quote.fees) ? quote.fees : [],
+      feeTotal: Number.isFinite(Number(quote.feeTotal)) ? Number(quote.feeTotal) : null,
+      total,
+      currency: quote.currency || order.currency || "AED",
+      quoteId: quote.quoteId || null,
+      pricingVerified: quote.verified === true,
+      pricingMode: quote.demo === true ? "demo" : "live",
+      transactionWarning: quote.warning || order.transactionWarning || null,
+    };
+    const quoteState = { seatKey: [...updatedOrder.seats].sort().join(","), loading: false, quote, error: null };
+    pendingOrderRef.current = updatedOrder;
+    setPendingOrder(updatedOrder);
+    seatsRef.current = [...updatedOrder.seats];
+    setSelectedSeats([...updatedOrder.seats]);
+    setSeatQuote(quoteState);
+    const nextCheckout = {
+      ...checkout,
+      view: "checkout",
+      order: updatedOrder,
+      movie,
+      session,
+      cinema: checkout.cinema || cinemaRef.current,
+      scheduleDate: updatedOrder.programmingDate || updatedOrder.sourceDate || updatedOrder.date,
+      selectedSeats: [...updatedOrder.seats],
+      plan,
+      planContext,
+      planMeta: vista.getResultMeta(plan),
+      seatQuote: quoteState,
+    };
+    checkoutStageRef.current = nextCheckout;
+    showStage(nextCheckout);
+    return { restored: true, validation: { session: true, availability: true, pricing: true }, stage: nextCheckout };
+  };
+
+  const restorePausedJourney = async ({ target = "last", source = "conversation" } = {}) => {
+    restoredStageToolGuardRef.current = null;
+    const requestedView = ["last", "journey"].includes(target) ? undefined : target;
+    const entry = target === "journey"
+      ? ["checkout", "seatmap", "showtimes", "movies"].map((view) => selectRestorableRichStage(pausedJourneyRef.current, { view })).find(Boolean) || null
+      : selectRestorableRichStage(pausedJourneyRef.current, { view: requestedView });
+    if (!entry && ["checkout", "journey"].includes(target) && activeCheckoutStage()) {
+      const result = await revalidatePausedCheckout(activeCheckoutStage());
+      if (result.restored) {
+        renderTopicRef.current = "booking";
+        restoredStageToolGuardRef.current = { view: "checkout", journeyId: bookingJourneyIdRef.current, restoredAt: Date.now() };
+      }
+      return result;
+    }
+    if (!entry) return { restored: false, reason: "nothing_to_restore", target };
+    if (entry.view === "checkout") {
+      const result = await revalidatePausedCheckout(entry.snapshot);
+      const restored = restorePausedRichStage(pausedJourneyRef.current, {
+        view: "checkout",
+        validation: result.validation,
+        sessionId: appConversationIdRef.current,
+        journeyId: bookingJourneyIdRef.current,
+      });
+      commitPausedJourney(restored.model);
+      if (result.restored) {
+        cancellationPausedRef.current = false;
+        renderTopicRef.current = "booking";
+        restoredStageToolGuardRef.current = { view: "checkout", journeyId: bookingJourneyIdRef.current, restoredAt: Date.now() };
+      }
+      return { ...result, target: "checkout", source };
+    }
+
+    const snapshot = entry.snapshot;
+    const validation = {};
+    if (["showtimes", "seatmap"].includes(entry.view)) {
+      const sessionSource = entry.view === "showtimes" ? snapshot.sessions || [] : [snapshot.session].filter(Boolean);
+      validation.session = entry.view === "showtimes"
+        ? filterCurrentSessions(sessionSource).available.length > 0
+        : filterCurrentSessions(sessionSource.map((session) => ({ ...session, date: session.date || snapshot.pausedContext?.scheduleDate }))).available.length > 0;
+      if (entry.view === "seatmap") {
+        try {
+          const plan = await vista.getSeatPlan(snapshot.pausedContext?.cinema?.id || cinemaRef.current?.id, snapshot.session?.sessionId);
+          const selected = snapshot.pausedContext?.selectedSeats || [];
+          const allSeats = plan.flatMap((row) => row.seats || []);
+          validation.availability = selected.every((seatId) => allSeats.some((seat) => String(seat.id).toUpperCase() === String(seatId).toUpperCase() && seat.status === 0));
+          if (validation.availability) {
+            snapshot.plan = plan;
+            snapshot.planMeta = vista.getResultMeta(plan);
+            snapshot.pausedContext.plan = plan;
+          }
+        } catch {
+          validation.availability = false;
+        }
+      }
+    }
+    if (["history", "booking", "cancellation"].includes(entry.view)) {
+      const refreshedBookings = readBookings();
+      const candidateRefs = Array.isArray(snapshot.candidateRefs) ? snapshot.candidateRefs : [];
+      const refreshedCandidates = candidateRefs.filter((candidateRef) => (
+        refreshedBookings.some((item) => norm(item.ref) === norm(candidateRef) && isCurrentBooking(item))
+      ));
+      if (candidateRefs.length) snapshot.candidateRefs = refreshedCandidates;
+      validation.booking = entry.view === "history"
+        || (entry.view === "cancellation" && refreshedCandidates.length > 0)
+        || Boolean(refreshedBookings.find((item) => norm(item.ref) === norm(snapshot.booking?.ref || snapshot.pausedContext?.booking?.ref)) || bookingRef.current?.ref);
+      if (["history", "cancellation"].includes(entry.view)) {
+        const visibleRefs = entry.view === "cancellation" && refreshedCandidates.length ? new Set(refreshedCandidates.map(norm)) : null;
+        setBookings(refreshedBookings.filter((item) => (
+          (!visibleRefs || visibleRefs.has(norm(item.ref)))
+          && (historyFilter !== "active" || isCurrentBooking(item))
+        )));
+      }
+      const refreshedBooking = refreshedBookings.find((item) => norm(item.ref) === norm(snapshot.booking?.ref || snapshot.pausedContext?.booking?.ref));
+      if (refreshedBooking) {
+        snapshot.booking = refreshedBooking;
+        snapshot.pausedContext.booking = refreshedBooking;
+      }
+    }
+    const restored = restorePausedRichStage(pausedJourneyRef.current, {
+      view: entry.view,
+      validation,
+      sessionId: appConversationIdRef.current,
+      journeyId: bookingJourneyIdRef.current,
+    });
+    commitPausedJourney(restored.model);
+    if (!restored.stage) return { restored: false, reason: restored.plan.outcome, failed: restored.plan.failed, target: entry.view };
+    restorePausedSnapshotContext(restored.stage);
+    cancellationPausedRef.current = false;
+    renderTopicRef.current = ["history", "booking", "cancellation"].includes(entry.view) ? "booking_records" : "booking";
+    showStage(restored.stage);
+    restoredStageToolGuardRef.current = { view: entry.view, journeyId: bookingJourneyIdRef.current, restoredAt: Date.now() };
+    return { restored: true, stage: restored.stage, target: entry.view, source };
+  };
+
+  const pausedRestoreContext = (result) => {
+    if (result?.restored) {
+      const validation = result.validation
+        ? ` Revalidation: session ${result.validation.session === true ? "current" : "not required"}, seats ${result.validation.availability === true ? "available" : "not required"}, pricing ${result.validation.pricing === true ? "refreshed" : "not required"}.`
+        : "";
+      return `The widget restored the paused ${result.target || result.stage?.view || "booking"} step.${validation} Continue from the visible panel without restarting the journey or repeating completed questions.`;
+    }
+    if (result?.reason === "showtime_unavailable") return "The old showtime is no longer available. The widget displayed current showtimes and cleared incompatible seat and checkout state. Ask the guest to choose another showtime.";
+    if (result?.reason === "selected_seats_unavailable") return "The selected seats are no longer available. The widget displayed the refreshed seat map and cleared the old checkout. Ask the guest to select available seats.";
+    return `The requested paused step could not be restored (${result?.reason || "nothing_to_restore"}). Do not claim that an old panel is visible. Ask the guest what they would like to do next.`;
+  };
+
+  const abandonActiveBookingJourney = (reason = "guest_cancelled_active_journey") => {
+    if (checkoutPaymentActiveRef.current || activeCancellationMutation()) return false;
+    clearSeatSelection({ clearTarget: true });
+    bookingRef.current = null;
+    bookingOpenedFromHistoryRef.current = false;
+    setBooking(null);
+    cinemaRef.current = null;
+    setCinema(null);
+    discoveryPreferencesRef.current = createDiscoveryPreferences();
+    setDiscoveryPreferences(discoveryPreferencesRef.current);
+    filmsRef.current = [];
+    filmsCinemaRef.current = "";
+    filmsDateRef.current = "";
+    sessionsRef.current = [];
+    sessionsFilmRef.current = "";
+    planRef.current = [];
+    planContextRef.current = null;
+    clearPausedJourneyForLifecycle("cancelled", reason);
+    renderTopicRef.current = "general_enquiry";
+    showStage({ view: "empty" });
+    journeyRef.current = { ...journeyRef.current, intent: "general_enquiry", cinema: null, movie: null, session: null, selectedSeats: [] };
+    dispatchJourney({ type: "intent", intent: "general_enquiry" });
+    return true;
+  };
+
+  const beginReplacementBookingJourney = (reason = "new_booking_replaced_previous") => {
+    const hasPreviousJourney = Boolean(
+      pendingOrderRef.current?.checkoutId
+      || seatsRef.current.length
+      || bookingRef.current?.ref
+      || richJourneyViewFromStage(stageRef.current)
+      || selectRestorableRichStage(pausedJourneyRef.current),
+    );
+    if (!hasPreviousJourney) {
+      renderTopicRef.current = "booking";
+      return false;
+    }
+    replacePausedJourneyForNewBooking(reason);
+    clearSeatSelection({ clearTarget: true });
+    bookingRef.current = null;
+    bookingOpenedFromHistoryRef.current = false;
+    setBooking(null);
+    historyReturnRef.current = null;
+    historyContextRef.current = null;
+    offersReturnRef.current = null;
+    return true;
+  };
+
   const seatConfirmationKey = (seatIds) => [
     cinemaRef.current?.id || "",
     stageRef.current.session?.sessionId || "",
@@ -1805,6 +2303,7 @@ export default function App() {
     setRequestedSeatTarget(null);
     setBooking(completed);
     showStage({ view: "booking", booking: completed });
+    clearPausedJourneyForLifecycle("completed", "booking_completed");
     say("system", t("app.paymentSimulated", { method: label, ref }));
     resetClarificationFailures();
     conversation.sendContextualUpdate?.(`The widget saved a non-verified booking summary with reference ${ref} for ${order.movieTitle} at ${order.cinemaName} on ${order.performanceDate || order.date} ${order.showtime}, seats ${order.seats.join(", ")}, total ${order.currency || "AED"} ${order.total}. ${label} was selected on the review card, but no payment was charged and no VOX inventory was reserved. The deterministic system notice already states this outcome, so do not add another completion response. Never describe this summary as confirmed, paid, reserved, an admission ticket, or a ready QR.`);
@@ -1818,6 +2317,8 @@ export default function App() {
    * ====================================================================== */
   const clientTools = {
     show_movie_selection: async ({ cinemaId, cinemaName, date, displayDate, scheduleDate: toolDate } = {}) => {
+      const pausedTopicGuard = preservePausedTopicForTool("show_movie_selection");
+      if (pausedTopicGuard) return pausedTopicGuard;
       const cancellationGuard = preserveActiveCancellationForTool("show_movie_selection");
       if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_movie_selection");
@@ -1880,6 +2381,8 @@ export default function App() {
     },
 
     show_showtimes: async ({ movieId, movieTitle, date, displayDate, scheduleDate: toolDate } = {}) => {
+      const pausedTopicGuard = preservePausedTopicForTool("show_showtimes");
+      if (pausedTopicGuard) return pausedTopicGuard;
       const cancellationGuard = preserveActiveCancellationForTool("show_showtimes");
       if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_showtimes");
@@ -1972,6 +2475,8 @@ export default function App() {
     },
 
     show_seat_map: async ({ movieTitle, sessionId, showtime, ticketQuantity: requestedQuantity, date, displayDate, scheduleDate: toolDate } = {}) => {
+      const pausedTopicGuard = preservePausedTopicForTool("show_seat_map");
+      if (pausedTopicGuard) return pausedTopicGuard;
       const cancellationGuard = preserveActiveCancellationForTool("show_seat_map");
       if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_seat_map");
@@ -2099,6 +2604,8 @@ export default function App() {
     },
 
     select_seats: async ({ seats } = {}) => {
+      const pausedTopicGuard = preservePausedTopicForTool("select_seats");
+      if (pausedTopicGuard) return pausedTopicGuard;
       const cancellationGuard = preserveActiveCancellationForTool("select_seats");
       if (cancellationGuard) return cancellationGuard;
       const availableSeatIds = (planRef.current || [])
@@ -2182,6 +2689,8 @@ export default function App() {
     },
 
     show_booking_summary: ({ movieTitle, screen, showtime, seats, ref, total } = {}) => {
+      const pausedTopicGuard = preservePausedTopicForTool("show_booking_summary");
+      if (pausedTopicGuard) return pausedTopicGuard;
       const cancellationGuard = preserveActiveCancellationForTool("show_booking_summary");
       if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_booking_summary");
@@ -2332,10 +2841,8 @@ export default function App() {
 
       dismissPendingCancellation("replaced");
       setCancellationFlow({ phase: "checking", bookingRef: target.bookingRef, message: localeRef.current === "ar" ? "جارٍ التحقق من إمكانية إلغاء الحجز…" : "Checking cancellation eligibility…" });
-      const requestRevision = stageRevisionRef.current;
       const cancellationRequestId = cancellationOperationRef.current;
-      const cancellationRequestIsStale = () => cancellationOperationRef.current !== cancellationRequestId
-        || stageRevisionRef.current !== requestRevision;
+      const cancellationRequestIsStale = () => cancellationOperationRef.current !== cancellationRequestId;
       const staleCancellationResult = () => {
         if (cancellationOperationRef.current === cancellationRequestId) setCancellationFlow(null);
         const message = localeRef.current === "ar" ? "تم الانتقال إلى طلب آخر قبل اكتمال التحقق من الحجز." : "The booking check stopped because you moved to another task.";
@@ -2371,7 +2878,22 @@ export default function App() {
       bookingRef.current = displayed;
       bookingOpenedFromHistoryRef.current = openedFromHistory;
       setBooking(displayed);
-      showStage({ view: "booking", booking: displayed });
+      const cancellationStage = { view: "booking", booking: displayed, purpose: CANCELLATION_TARGET_SELECTION_PURPOSE };
+      const keepCancellationHidden = cancellationPausedRef.current
+        || !stageVisibleRef.current
+        || !["booking_records", "cancellation"].includes(renderTopicRef.current);
+      if (keepCancellationHidden) {
+        let model = capturePausedRichStage(pausedJourneyRef.current, pausedSnapshotStage(cancellationStage), {
+          sessionId: appConversationIdRef.current,
+          journeyId: bookingJourneyIdRef.current,
+          contextVersion: stageRevisionRef.current,
+        });
+        model = hidePausedRichStage(model, { reason: "cancellation_continued_while_hidden" });
+        commitPausedJourney(model);
+        cancellationPausedRef.current = true;
+      } else {
+        showStage(cancellationStage);
+      }
       resetClarificationFailures();
       if (displayed.cancelled) {
         const message = localeRef.current === "ar"
@@ -2413,9 +2935,10 @@ export default function App() {
         || displayed.paymentStatus === "simulated_not_charged"
         || displayed.bookingStatus === "confirmed_demo";
       if (demoOnly) {
+        const summary = cancellationBookingSummary(displayed, localeRef.current);
         const message = localeRef.current === "ar"
-          ? `هل تريد تسجيل الحجز ${displayed.ref} كملغى على هذا الجهاز؟ لن يتم التواصل مع VOX أو إصدار أي استرداد. قل نعم لتسجيله كملغى أو لا للإبقاء عليه.`
-          : `Mark booking ${displayed.ref} as cancelled on this device? This will not contact VOX or issue a refund. Say yes to mark it cancelled or no to keep it active.`;
+          ? `${summary} الأثر: سيُسجل هذا الملخص كملغى على هذا الجهاز فقط. لن يتم التواصل مع VOX ولن يصدر أي استرداد. هل تريد مني إلغاء هذا الحجز؟`
+          : `${summary} Impact: this summary will be marked cancelled on this device only. VOX will not be contacted and no refund will be issued. Would you like me to cancel this booking?`;
         setCancellationFlow({
           bookingRef: displayed.ref,
           phase: "final_confirmation",
@@ -2454,9 +2977,10 @@ export default function App() {
           message,
         });
       }
+      const summary = cancellationBookingSummary(displayed, localeRef.current);
       const message = localeRef.current === "ar"
-        ? `سيُعاد المبلغ المؤهل افتراضياً إلى محفظة VOX للحجز ${displayed.ref}. قل نعم لاختيار محفظة VOX، ثم سأطلب تأكيداً نهائياً منفصلاً.`
-        : `Eligible refunds default to VOX Wallet credit for booking ${displayed.ref}. Say yes to choose VOX Wallet; Voxi will then ask for a separate final confirmation.`;
+        ? `${summary} الأثر: سيعاد المبلغ المؤهل افتراضياً إلى محفظة VOX. قل نعم لاختيار محفظة VOX، ثم سأطلب تأكيداً نهائياً.`
+        : `${summary} Impact: the eligible amount will default to VOX Wallet credit. Say yes to choose VOX Wallet, then I will ask for final confirmation.`;
       setCancellationFlow({
         bookingRef: displayed.ref,
         phase: "route_confirmation",
@@ -2470,15 +2994,12 @@ export default function App() {
     },
 
     show_offers: async ({ bankName = "", cardName = "", experience = "", detailTopic = "", format = "", seatType = "", isMember, monthlyTicketsUsed, monthlySpend } = {}) => {
-      const cancellationGuard = preserveActiveCancellationForTool("show_offers");
-      if (cancellationGuard) return cancellationGuard;
       if (checkoutPaymentActiveRef.current) return JSON.stringify({ shown: false, reason: "payment_in_progress", instruction: "Payment authorization is in progress. Keep checkout visible and ask the guest to wait for the result." });
       const current = stageRef.current;
-      const preservedCheckout = current.view === "checkout" ? activeCheckoutStage() : null;
+      const preservedCheckout = activeCheckoutStage();
       const checkoutPreserved = Boolean(preservedCheckout);
-      if (!checkoutPreserved) dismissPendingCancellation("offers_opened");
       const origin = current.view === "offers" ? offersReturnRef.current || { view: "empty" } : current;
-      const order = origin.view === "checkout" ? pendingOrderRef.current : null;
+      const order = origin.view === "checkout" ? preservedCheckout?.order || pendingOrderRef.current : null;
       const activeBooking = origin.view === "booking" ? bookingRef.current : null;
       const preferences = discoveryPreferencesRef.current || {};
       const retainedContext = current.view === "offers" ? lastOfferRef.current?.context || null : null;
@@ -2533,7 +3054,10 @@ export default function App() {
       lastOfferRef.current = result;
       const toolLocale = localeRef.current;
       const disclaimer = OFFER_META.disclaimer[toolLocale] || OFFER_META.disclaimer.en;
-      if (!checkoutPreserved && current.view !== "offers") offersReturnRef.current = current;
+      if (current.view !== "offers") {
+        offersReturnRef.current = current;
+        pauseRichRenderingForTopicChange("offers_opened", "offers");
+      }
       const eligibilityCheckRequested = Boolean(
         effectiveCardName
         || experience
@@ -2544,10 +3068,9 @@ export default function App() {
         || Number.isFinite(suppliedMonthlySpend),
       );
       const showtimeRequired = eligibilityCheckRequested && !context.isSessionGrounded;
-      if (!checkoutPreserved) {
-        showStage({ view: "offers", query, context, result, showtimeRequired });
-        resetClarificationFailures();
-      }
+      renderTopicRef.current = "offers";
+      showStage({ view: "offers", query, context, result, showtimeRequired });
+      resetClarificationFailures();
       if (!query) {
         return JSON.stringify({
           shown: "all offers",
@@ -2741,48 +3264,91 @@ export default function App() {
     return `The seat map remains visible and checkout did not start. Reason: ${result?.reason || "seat confirmation was not completed"} State that requirement briefly and never claim a booking or reference was created.`;
   };
 
-  const routeCancellationTurn = async (text, { continuation: suppliedContinuation = null } = {}) => {
+  const routeCancellationTurn = async (text) => {
+    renderTopicRef.current = "cancellation";
+    cancellationPausedRef.current = false;
     const storedBookings = readBookings();
-    const continuation = suppliedContinuation || resolveCancellationContinuation({
+    const newestFirst = sortBookingsForDisplay(storedBookings);
+    const displayedBookingRefs = stageRef.current.view === "history" && stageRef.current.candidateRefs?.length
+      ? stageRef.current.candidateRefs
+      : newestFirst.map((item) => item.ref).filter(Boolean);
+    const currentMovie = stageRef.current.movie
+      || (bookingRef.current ? { id: bookingRef.current.movieId, title: bookingRef.current.movieTitle } : null)
+      || (discoveryPreferencesRef.current.movieTitle
+        ? { id: discoveryPreferencesRef.current.movieId, title: discoveryPreferencesRef.current.movieTitle }
+        : null);
+    const resolution = resolveConversationalCancellation({
       text,
-      stage: stageRef.current,
-      storedBookings,
+      bookings: storedBookings,
+      displayedBookingRefs,
+      conversationContext: { currentMovie },
+      now: new Date(),
     });
-    if (continuation.handled && !continuation.bookingRef) {
-      const ambiguous = continuation.reason === "ambiguous_movie_title";
-      const message = localeRef.current === "ar"
-        ? (ambiguous
-          ? "يوجد أكثر من حجز معروض للفيلم نفسه. اكتب أو قل مرجع الحجز الظاهر على البطاقة."
-          : "لم يطابق ذلك أحد الحجوزات المعروضة بدقة. اكتب أو قل اسم الفيلم أو مرجع الحجز الظاهر في القائمة.")
-        : (ambiguous
-          ? "More than one displayed booking has that movie title. Say or type the booking reference shown on the card."
-          : "That did not exactly match a displayed booking. Say or type the movie title or booking reference shown in the list.");
+
+    if (resolution.status === "ambiguous") {
+      const candidateRefs = resolution.candidateRefs;
+      const candidateKeys = new Set(candidateRefs.map(norm));
+      const matchingBookings = candidateRefs
+        .map((candidateRef) => storedBookings.find((item) => norm(item.ref) === norm(candidateRef)))
+        .filter(Boolean);
+      if (stageRef.current.view !== "history") captureHistoryReturn();
+      setHistoryFilter("active");
+      setBookings(matchingBookings.filter((item) => candidateKeys.has(norm(item.ref))));
+      showStage({
+        view: "history",
+        purpose: CANCELLATION_TARGET_SELECTION_PURPOSE,
+        candidateRefs,
+        differentiators: resolution.differentiators,
+      });
+      const message = focusedCancellationChoice(resolution.candidates, localeRef.current);
       return {
         found: false,
         confirmationRequired: false,
         phase: "target_selection",
-        reason: continuation.reason,
-        candidates: continuation.candidates,
+        reason: resolution.reason,
+        candidates: candidateRefs,
+        candidateDetails: resolution.candidates,
+        differentiators: resolution.differentiators,
         message,
       };
     }
-    const target = resolveCancellationTarget({
-      requestedRef: continuation.bookingRef || "",
-      text,
-      visibleBooking: stageRef.current.view === "booking" && isCurrentBooking(bookingRef.current)
-        ? bookingRef.current
-        : null,
-      storedBookings,
-    });
-    const rawResult = await showBookingForAuthorizedCancellation(
-      { bookingRef: target.bookingRef || undefined },
-      "direct_user_turn",
-    );
-    try {
-      return typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
-    } catch {
-      return { found: false, confirmationRequired: false, reason: "unreadable_cancellation_result", message: "The cancellation check returned an unreadable result." };
+
+    const explicitLifecycleTarget = resolution.matchedBy?.length > 0;
+    if ((resolution.status === "unique" || (explicitLifecycleTarget && ["ineligible", "already_cancelled"].includes(resolution.status))) && resolution.bookingRef) {
+      const rawResult = await showBookingForAuthorizedCancellation(
+        { bookingRef: resolution.bookingRef },
+        "direct_user_turn",
+      );
+      try {
+        return typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+      } catch {
+        return { found: false, confirmationRequired: false, reason: "unreadable_cancellation_result", message: "The cancellation check returned an unreadable result." };
+      }
     }
+
+    const activeBookings = newestFirst.filter((item) => isCurrentBooking(item));
+    if (activeBookings.length) {
+      if (stageRef.current.view !== "history") captureHistoryReturn();
+      const candidateRefs = activeBookings.map((item) => item.ref).filter(Boolean);
+      setHistoryFilter("active");
+      setBookings(activeBookings);
+      showStage({ view: "history", purpose: CANCELLATION_TARGET_SELECTION_PURPOSE, candidateRefs });
+    }
+    const message = localeRef.current === "ar"
+      ? (activeBookings.length
+        ? "لم أجد حجزاً يطابق هذا الوصف. اذكر الفيلم أو التاريخ أو الوقت أو السينما أو المرجع أو رقم الحجز في القائمة."
+        : "لا توجد حجوزات نشطة محفوظة على هذا الجهاز.")
+      : (activeBookings.length
+        ? "I could not match that description to a booking. Say the movie, date, time, cinema, reference, or list position."
+        : "No active bookings are saved on this device.");
+    return {
+      found: false,
+      confirmationRequired: false,
+      phase: activeBookings.length ? "target_selection" : "idle",
+      reason: activeBookings.length ? resolution.reason : "no_active_booking",
+      candidates: activeBookings.map((item) => item.ref),
+      message,
+    };
   };
 
   const cancellationResultContext = (result, { promptAlreadyVisible = false } = {}) => {
@@ -2795,15 +3361,15 @@ export default function App() {
     if (result.phase === "processing") return `The widget is processing cancellation for ${result.bookingRef}. Do not claim success until a completed result is supplied.`;
     if (result.confirmationRequired) {
       if (promptAlreadyVisible) {
-        return `The widget is awaiting ${result.phase} for booking ${result.bookingRef}. The exact confirmation prompt and controls are already visible in the widget. Do not repeat the prompt or call show_booking_for_cancellation again. Reply with one short sentence in the active language telling the guest to use the confirmation below or answer yes/no.`;
+        return `The widget is awaiting ${result.phase} for booking ${result.bookingRef}. The controls are already visible, but the conversational confirmation must still be accessible in text and voice. Speak this exact prompt once now: ${result.message} Do not call show_booking_for_cancellation again and do not add other booking fields.`;
       }
       return `The widget is awaiting ${result.phase} for booking ${result.bookingRef}. Speak this confirmation prompt now: ${result.message} Do not call show_booking_for_cancellation again while this phase is active.`;
     }
     if (result.reason === "multiple_active_bookings") {
       return `${bookingHistoryAgentContext(readBookings().filter((item) => isCurrentBooking(item)))} Ask the guest to select or name exactly one booking; never guess.`;
     }
-    if (["ambiguous_movie_title", "no_displayed_candidate_match", "displayed_candidates_unavailable"].includes(result.reason)) {
-      return `${bookingHistoryAgentContext(readBookings().filter((item) => (result.candidates || []).includes(item.ref)))} The cancellation target-selection list remains visible. ${result.message} Do not start movie discovery, change the active panel, or guess a booking.`;
+    if (result.phase === "target_selection" || ["multiple_matching_bookings", "ambiguous_movie_title", "no_displayed_candidate_match", "displayed_candidates_unavailable"].includes(result.reason)) {
+      return `${bookingHistoryAgentContext(readBookings().filter((item) => (result.candidates || []).includes(item.ref)))} ${result.message} Ask only for a missing distinguishing detail. Do not start movie discovery or guess a booking.`;
     }
     if (result.reason === "no_active_booking") {
       return `The widget found no active bookings saved on this device. Reply with only one short sentence in the active language saying there are no current bookings available to cancel, then end the turn. Do not ask for a booking reference, offer a lookup, or imply that a hidden booking may still be active.`;
@@ -2820,7 +3386,7 @@ export default function App() {
   const bookingHistoryTurnContext = (visibleBookings, { activeOnly = false } = {}) => {
     const items = Array.isArray(visibleBookings) ? visibleBookings : [];
     const instruction = items.length
-      ? "Acknowledge briefly and ask the guest to select the booking they need help with."
+      ? `The widget has already displayed ${items.length} ${activeOnly ? "active" : "recent and cancelled"} booking ${items.length === 1 ? "record" : "records"}. Never say the list is empty and never ask the guest to provide a booking reference before acknowledging the visible list. Ask them to select one by movie, date, time, cinema, reference, or displayed position if they need help with a specific booking.`
       : activeOnly
         ? "Tell the guest there are no active bookings saved on this device. Do not ask them to select a booking."
         : "Tell the guest there are no booking summaries saved on this device. Do not ask them to select a booking.";
@@ -2844,7 +3410,9 @@ export default function App() {
     setInput("");
     stageRevisionRef.current += 1;
     stageRef.current = { view: "empty" };
+    stageVisibleRef.current = true;
     setStage({ view: "empty" });
+    setStageVisible(true);
     cinemaRef.current = null;
     setCinema(null);
     bookingRef.current = null;
@@ -2883,8 +3451,21 @@ export default function App() {
     lastOfferRef.current = null;
     resetClarificationFailures();
     transportConversationIdRef.current = null;
+    const endedPausedJourney = reason === "timeout"
+      ? expirePausedRichJourney(pausedJourneyRef.current, { reason })
+      : endPausedRichJourney(pausedJourneyRef.current, { reason });
+    pausedJourneyRef.current = endedPausedJourney;
     appConversationIdRef.current = newConversationId();
     conversationIdRef.current = appConversationIdRef.current;
+    bookingJourneyIdRef.current = appConversationIdRef.current;
+    const freshPausedJourney = createPausedRichJourney({
+      sessionId: appConversationIdRef.current,
+      journeyId: bookingJourneyIdRef.current,
+    });
+    pausedJourneyRef.current = freshPausedJourney;
+    setPausedJourney(freshPausedJourney);
+    cancellationPausedRef.current = false;
+    renderTopicRef.current = "general_enquiry";
     journeyRef.current = createConversationJourney(appConversationIdRef.current);
     dispatchJourney({ type: "reset", sessionId: appConversationIdRef.current });
     lastSentTextRef.current = null;
@@ -2938,7 +3519,7 @@ export default function App() {
         if (!suppressNotice) say("system", t(reason === "timeout" ? "app.timeoutMessage" : "app.disconnectedMessage"));
       }
     },
-    onMessage: (message) => {
+    onMessage: async (message) => {
       const normalizedMessage = normalizeElevenLabsMessageEvent(message);
       if (!normalizedMessage) return;
       const { role, text: eventText } = normalizedMessage;
@@ -2954,7 +3535,10 @@ export default function App() {
       const sanitized = role === "user" ? sanitizeUserText(eventText) : { safeText: eventText, sensitive: false };
       const safeMessage = sanitized.safeText;
       if (role === "user") {
-        const movieSelectionGrounding = buildMovieSelectionGroundingContext({ text: safeMessage, stage: stageRef.current });
+        if (!hasMeaningfulTurnContent(safeMessage)) return;
+        const requestedResumeTarget = pausedResumeTarget(safeMessage);
+        if (!requestedResumeTarget) restoredStageToolGuardRef.current = null;
+        const movieSelectionGrounding = buildMovieSelectionGroundingContext({ text: safeMessage, stage: stageVisibleRef.current ? stageRef.current : { view: "empty" } });
         if (movieSelectionGrounding) conversation.sendContextualUpdate?.(movieSelectionGrounding);
         if (sanitized.sensitive) say("system", localeRef.current === "ar" ? "تمت إزالة بيانات الدفع الحساسة من المحادثة. استخدم شاشة الدفع الآمنة فقط." : "Sensitive payment details were removed. Use only the secure checkout screen for payment.");
         say("user", safeMessage);
@@ -2962,7 +3546,31 @@ export default function App() {
           conversation.sendContextualUpdate?.("Payment authorization is in progress. Keep checkout mounted, answer without calling any display-changing tool, and ask the guest to wait for the on-screen result.");
           return;
         }
-        const decision = cancellationFlowRef.current ? cancellationDecision(safeMessage) : null;
+        if (isExplicitConversationEndTurn(safeMessage)) {
+          conversation.sendContextualUpdate?.("The guest explicitly ended the conversation. The widget cleared the active journey. Do not continue booking or cancellation and do not claim that any stored booking record was cancelled.");
+          const cleared = clearConversationState("conversation_ended");
+          if (cleared) say("system", localeRef.current === "ar" ? "انتهت المحادثة وتم مسح رحلة الحجز النشطة." : "The conversation ended and the active booking journey was cleared.");
+          suppressDisconnectNoticeRef.current = true;
+          void conversation.endSession?.();
+          return;
+        }
+        if (isExplicitJourneyCancellationTurn(safeMessage)) {
+          const abandoned = abandonActiveBookingJourney("guest_cancelled_active_journey");
+          const notice = abandoned
+            ? (localeRef.current === "ar" ? "تم إلغاء رحلة الحجز النشطة. لم يتم تغيير أي حجز مكتمل." : "The active booking journey was cleared. No completed booking record was changed.")
+            : (localeRef.current === "ar" ? "لا يمكن إيقاف الرحلة أثناء معالجة عملية آمنة." : "The journey cannot be cleared while a secure operation is processing.");
+          say("system", notice);
+          conversation.sendContextualUpdate?.(`${notice} Do not call cancellation tools because this was about the active journey, not an existing booking record.`);
+          return;
+        }
+        if (requestedResumeTarget) {
+          conversation.sendContextualUpdate?.(`The guest asked to restore the paused ${requestedResumeTarget} step. The widget is revalidating it now. Do not restart discovery or claim restoration until the widget result is supplied.`);
+          const restoreResult = await restorePausedJourney({ target: requestedResumeTarget, source: "voice" });
+          conversation.sendContextualUpdate?.(pausedRestoreContext(restoreResult));
+          updateIntentFromText(safeMessage);
+          return;
+        }
+        const decision = cancellationFlowRef.current && !cancellationPausedRef.current ? cancellationDecision(safeMessage) : null;
         if (decision !== null) publishCancellationDecision(handleCancellationDecision(decision, { source: "conversation" }));
         const historyRequest = classifyBookingHistoryRequest(safeMessage);
         const visibleHistory = historyRequest.requested
@@ -3014,8 +3622,21 @@ export default function App() {
         const checkoutOfferEvaluation = activeCheckout && localOfferTurn
           ? evaluateCheckoutOfferTurn(localOfferTurn)
           : null;
-        if (checkoutOfferEvaluation) {
-          conversation.sendContextualUpdate?.(`Approved published offer result for the guest's spoken question: ${checkoutOfferEvaluation.answer} The unpaid checkout remains visible with checkout ID ${checkoutOfferEvaluation.checkout.order.checkoutId}, seats ${(checkoutOfferEvaluation.checkout.order.seats || []).join(", ")}, and total ${checkoutOfferEvaluation.checkout.order.total}. Answer only from these facts, do not claim the offer was applied, and do not replace checkout.`);
+        if (localOfferTurn) {
+          if (checkoutOfferEvaluation) {
+            conversation.sendContextualUpdate?.(`Approved published offer result for the guest's spoken question: ${checkoutOfferEvaluation.answer} The unpaid checkout is preserved but will be hidden while the relevant offer panel is shown. Do not claim the offer was applied.`);
+          }
+          try {
+            const rawResult = await clientTools.show_offers({
+              bankName: localOfferTurn.bankName,
+              cardName: localOfferTurn.cardName,
+              detailTopic: localOfferTurn.detailTopic,
+            });
+            const offerResult = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+            conversation.sendContextualUpdate?.(`The widget displayed the relevant published offer information and paused any previous booking panel. Approved answer: ${offerResult?.answer || checkoutOfferEvaluation?.answer || localOfferTurn.answer}. The checkout data remains preserved but hidden. Do not claim the offer was applied.`);
+          } catch (error) {
+            conversation.sendContextualUpdate?.(`The offer panel could not be opened: ${error?.message || "unknown error"}. Do not claim an offer was applied.`);
+          }
         }
         dismissStaleTransactionalView({ text: safeMessage, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
         const checkoutFaq = activeCheckout && !localOfferTurn && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection
@@ -3030,13 +3651,29 @@ export default function App() {
             ? { matches: [], context: "" }
             : prepareFaqContext(safeMessage);
         const explicitDiscoveryTurn = !faq.matches.length && (actionIntent === "booking" || directCinemaSelection || isDiscoveryRequest(safeMessage));
+        if (explicitDiscoveryTurn && (pausedJourneyRef.current.status === "paused" || activeCheckout || bookingRef.current?.ref)) {
+          beginReplacementBookingJourney("voice_new_booking_replaced_previous");
+        }
+        pauseRenderingForUnrelatedTurn({
+          decision,
+          historyRequested: historyRequest.requested,
+          directCancellation,
+          directSeatSelection,
+          directCinemaSelection,
+          resumeTarget: requestedResumeTarget,
+          languageControlTurn: isLanguageControlTurn(safeMessage),
+          localOfferTurn,
+          discoveryFilterTurn,
+          actionIntent,
+          faq,
+        });
         const details = activeCheckout && !explicitDiscoveryTurn
           ? { cinema: null, requestedSeatTarget: null }
           : applyUtteranceBookingDetails(safeMessage, { actionIntent, hasFaq: faq.matches.length > 0 });
         const availableDates = programmingDatesForCinema(cinemaRef.current);
         const bookingContext = decision === null && !directCancellation && !faq.matches.length && (
           actionIntent === "booking"
-          || (!activeCheckout && journeyRef.current.intent === "booking")
+          || (stageVisibleRef.current && !activeCheckout && journeyRef.current.intent === "booking")
           || isDiscoveryRequest(safeMessage)
           || isCinemaSelectionTurn({ view: stageRef.current.view, intent: journeyRef.current.intent, actionIntent, cinemaMatch: details.cinema })
         );
@@ -3071,9 +3708,9 @@ export default function App() {
             conversation.sendContextualUpdate?.(`Filtered discovery could not be completed: ${error?.message || "unknown error"}. Do not claim that movie results are displayed.`);
           });
         }
-        if (checkoutResumeTurn) conversation.sendContextualUpdate?.("The existing unpaid checkout has been restored with the same movie, cinema, showtime, seats, and total. Do not call a movie, showtime, or seat tool. Ask the guest to complete checkout on screen or use Edit seats.");
-        else if (resumeOnlyTurn) conversation.sendContextualUpdate?.(`Continue from the currently visible ${stageRef.current.view} step. Preserve the selected movie, cinema, date, showtime, seats, and pricing. Do not restart discovery or replace the active panel.`);
-        else if (activeCheckout && !checkoutOfferEvaluation && !explicitDiscoveryTurn && !directCancellation && !historyRequest.requested) conversation.sendContextualUpdate?.("An unpaid checkout remains active. Answer this question without calling movie, showtime, or seat-selection tools and without replacing the checkout panel.");
+        if (checkoutResumeTurn) conversation.sendContextualUpdate?.("The existing unpaid checkout was requested. Continue only from the widget result and do not restart movie, showtime, or seat selection.");
+        else if (resumeOnlyTurn) conversation.sendContextualUpdate?.(`Continue from the currently visible ${stageRef.current.view} step. Preserve valid booking context and do not restart discovery.`);
+        else if (activeCheckout && !checkoutOfferEvaluation && !explicitDiscoveryTurn && !directCancellation && !historyRequest.requested) conversation.sendContextualUpdate?.("An unpaid checkout remains preserved. If this is an unrelated question, it is hidden until the guest explicitly asks to return to checkout.");
         if (details.requestedSeatTarget) conversation.sendContextualUpdate?.(`The guest would like ${details.requestedSeatTarget} tickets. Treat this only as a target and guide them to select ${details.requestedSeatTarget} seats. The number of selected seats is the actual ticket count and controls pricing.`);
         if (directSeatSelection) {
           conversation.sendContextualUpdate?.("The widget is applying the guest's visible seat selection now. Wait for the widget result; do not claim checkout, payment, booking confirmation, a reference, or a QR yet.");
@@ -3123,10 +3760,11 @@ export default function App() {
         return;
       }
       if (role !== "user") {
+        const claimStage = stageVisibleRef.current ? stageRef.current : { view: "empty", pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null };
         const displayedMessage = role === "agent"
           ? guardAgentStateClaim(
-            guardMovieDisplayClaim(safeMessage, stageRef.current, localeRef.current),
-            { stage: stageRef.current, pendingOrder: pendingOrderRef.current, locale: localeRef.current },
+            guardMovieDisplayClaim(safeMessage, claimStage, localeRef.current),
+            { stage: claimStage, pendingOrder: pendingOrderRef.current, locale: localeRef.current },
           )
           : safeMessage;
         say(role, displayedMessage);
@@ -3426,7 +4064,7 @@ export default function App() {
           locale: activeLocale,
           cinema: cinemaRef.current,
           scheduleDate: scheduleDateRef.current,
-          stage: stageRef.current,
+          stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
           selectedSeats: seatsRef.current,
           ticketQuantity: pendingOrderRef.current?.seats?.length || seatsRef.current.length || null,
           pendingOrder: pendingOrderRef.current,
@@ -3440,7 +4078,7 @@ export default function App() {
           locale: activeLocale,
           cinema: cinemaRef.current,
           scheduleDate: scheduleDateRef.current,
-          stage: stageRef.current,
+          stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
           selectedSeats: seatsRef.current,
           requestedSeatTarget: requestedSeatTargetRef.current,
           discoveryPreferences: discoveryPreferencesRef.current,
@@ -3537,7 +4175,7 @@ export default function App() {
           locale: activeLocale,
           cinema: cinemaRef.current,
           scheduleDate: scheduleDateRef.current,
-          stage: stageRef.current,
+          stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
           selectedSeats: seatsRef.current,
           ticketQuantity: pendingOrderRef.current?.seats?.length || seatsRef.current.length || null,
           pendingOrder: pendingOrderRef.current,
@@ -3551,7 +4189,7 @@ export default function App() {
           locale: activeLocale,
           cinema: cinemaRef.current,
           scheduleDate: scheduleDateRef.current,
-          stage: stageRef.current,
+          stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
           selectedSeats: seatsRef.current,
           requestedSeatTarget: requestedSeatTargetRef.current,
           discoveryPreferences: discoveryPreferencesRef.current,
@@ -3609,7 +4247,13 @@ export default function App() {
     }
     const sanitized = sanitizeUserText(rawValue);
     const value = sanitized.safeText.trim();
-    const movieSelectionGrounding = buildMovieSelectionGroundingContext({ text: value, stage: stageRef.current });
+    if (!hasMeaningfulTurnContent(value)) {
+      setInput("");
+      return;
+    }
+    const requestedResumeTarget = pausedResumeTarget(value);
+    if (!requestedResumeTarget) restoredStageToolGuardRef.current = null;
+    const movieSelectionGrounding = buildMovieSelectionGroundingContext({ text: value, stage: stageVisibleRef.current ? stageRef.current : { view: "empty" } });
     const retryMovieSelectionGroundingAfterStart = Boolean(movieSelectionGrounding && !isConnected);
     if (movieSelectionGrounding) conversation.sendContextualUpdate?.(movieSelectionGrounding);
     if (sanitized.sensitive) {
@@ -3640,7 +4284,42 @@ export default function App() {
       }
       return;
     }
-    const decision = cancellationFlowRef.current ? cancellationDecision(value) : null;
+    if (isExplicitConversationEndTurn(value)) {
+      setInput("");
+      conversation.sendContextualUpdate?.("The guest explicitly ended the conversation. The widget is clearing the active journey. Do not continue booking or cancellation and do not claim an existing booking record was cancelled.");
+      const cleared = clearConversationState("conversation_ended");
+      if (cleared) say("system", localeRef.current === "ar" ? "انتهت المحادثة وتم مسح رحلة الحجز النشطة." : "The conversation ended and the active booking journey was cleared.");
+      if (conversation.status === "connected") {
+        suppressDisconnectNoticeRef.current = true;
+        await conversation.endSession();
+      }
+      return;
+    }
+    if (isExplicitJourneyCancellationTurn(value)) {
+      setInput("");
+      const abandoned = abandonActiveBookingJourney("guest_cancelled_active_journey");
+      const notice = abandoned
+        ? (localeRef.current === "ar" ? "تم إلغاء رحلة الحجز النشطة. لم يتم تغيير أي حجز مكتمل." : "The active booking journey was cleared. No completed booking record was changed.")
+        : (localeRef.current === "ar" ? "لا يمكن إيقاف الرحلة أثناء معالجة عملية آمنة." : "The journey cannot be cleared while a secure operation is processing.");
+      say("system", notice);
+      conversation.sendContextualUpdate?.(`${notice} Do not call booking cancellation tools because this was about the active journey, not an existing booking record.`);
+      return;
+    }
+    if (requestedResumeTarget) {
+      setInput("");
+      const restoreResult = await restorePausedJourney({ target: requestedResumeTarget, source: "text" });
+      queuePendingEcho(value);
+      const transition = sessionStartRef.current;
+      if (transition) await transition.promise;
+      const ready = sessionModeRef.current ? true : await startTextSession(localMessage.id);
+      if (ready && conversation.sendUserMessage) {
+        conversation.sendContextualUpdate?.(pausedRestoreContext(restoreResult));
+        conversation.sendUserMessage(value);
+      }
+      updateIntentFromText(value);
+      return;
+    }
+    const decision = cancellationFlowRef.current && !cancellationPausedRef.current ? cancellationDecision(value) : null;
     if (decision !== null) publishCancellationDecision(handleCancellationDecision(decision, { source: "conversation" }), { promptAlreadyVisible: true });
     const historyRequest = classifyBookingHistoryRequest(value);
     const visibleHistory = historyRequest.requested
@@ -3714,7 +4393,7 @@ export default function App() {
       }
       say("agent", localAnswer);
       if (activeCheckout && isConnected) {
-        conversation.sendContextualUpdate?.(`The guest asked about ${localOfferTurn.cardName || localOfferTurn.bankName}. The widget answered from the published offer data: ${localAnswer} Checkout ${parsedResult?.checkoutId || pendingOrderRef.current?.checkoutId || "current"} remains visible with the same seats and total. Do not generate another reply for this turn and do not call a display-changing tool.`);
+        conversation.sendContextualUpdate?.(`The guest asked about ${localOfferTurn.cardName || localOfferTurn.bankName}. The widget answered from published offer data and displayed the offer panel: ${localAnswer} Checkout ${parsedResult?.checkoutId || pendingOrderRef.current?.checkoutId || "current"} is preserved but hidden. Do not generate another reply for this turn and do not claim the offer was applied.`);
       }
       return;
     }
@@ -3729,13 +4408,29 @@ export default function App() {
         ? { matches: [], context: "" }
         : prepareFaqContext(value);
     const explicitDiscoveryTurn = !faq.matches.length && (actionIntent === "booking" || directCinemaSelection || isDiscoveryRequest(value));
+    if (explicitDiscoveryTurn && (pausedJourneyRef.current.status === "paused" || activeCheckout || bookingRef.current?.ref)) {
+      beginReplacementBookingJourney("text_new_booking_replaced_previous");
+    }
+    pauseRenderingForUnrelatedTurn({
+      decision,
+      historyRequested: historyRequest.requested,
+      directCancellation,
+      directSeatSelection,
+      directCinemaSelection,
+      resumeTarget: requestedResumeTarget,
+      languageControlTurn,
+      localOfferTurn,
+      discoveryFilterTurn,
+      actionIntent,
+      faq,
+    });
     const details = activeCheckout && !explicitDiscoveryTurn
       ? { cinema: null, requestedSeatTarget: null }
       : applyUtteranceBookingDetails(value, { actionIntent, hasFaq: faq.matches.length > 0 });
     const agentFacingValue = normalizeCinemaAsrForAgent(value, details.cinema);
     const bookingContext = decision === null && !directCancellation && !faq.matches.length && (
       actionIntent === "booking"
-      || (!activeCheckout && journeyRef.current.intent === "booking")
+      || (stageVisibleRef.current && !activeCheckout && journeyRef.current.intent === "booking")
       || isDiscoveryRequest(value)
       || isCinemaSelectionTurn({ view: stageRef.current.view, intent: journeyRef.current.intent, actionIntent, cinemaMatch: details.cinema })
     );
@@ -3782,9 +4477,9 @@ export default function App() {
         conversation.sendContextualUpdate?.(`The widget applied every supplied discovery criterion. Visible result: ${discoveryRouteResult.shown || "none"}; movie count: ${movieCount}; missing: ${(discoveryRouteResult.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${retained.preferredTime || retained.timeBand || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; movie: ${retained.movieTitle || "not supplied"}. ${buildAuthoritativeDiscoveryContext(discoveryRouteResult)} Ask only the first missing item and do not list unfiltered movies.${discoveryRouteResult.time?.usedNearestFallback ? ` No exact ${discoveryRouteResult.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}`);
       }
       if (details.requestedSeatTarget) conversation.sendContextualUpdate?.(`The guest would like ${details.requestedSeatTarget} tickets. Treat this only as a target and guide them to select ${details.requestedSeatTarget} seats. The number of selected seats is the actual ticket count and controls pricing.`);
-      if (checkoutResumeTurn) conversation.sendContextualUpdate?.("The existing unpaid checkout has been restored with the same movie, cinema, showtime, seats, and total. Do not call a movie, showtime, or seat tool. Ask the guest to complete checkout on screen or use Edit seats.");
-      else if (resumeOnlyTurn) conversation.sendContextualUpdate?.(`Continue from the currently visible ${stageRef.current.view} step. Preserve the selected movie, cinema, date, showtime, seats, and pricing. Do not restart discovery or replace the active panel.`);
-      else if (activeCheckout && !explicitDiscoveryTurn && !directCancellation && !historyRequest.requested) conversation.sendContextualUpdate?.("An unpaid checkout remains active. Answer this question without calling movie, showtime, or seat-selection tools and without replacing the checkout panel.");
+      if (checkoutResumeTurn) conversation.sendContextualUpdate?.("The existing unpaid checkout was requested. Continue only from the widget result and do not restart movie, showtime, or seat selection.");
+      else if (resumeOnlyTurn) conversation.sendContextualUpdate?.(`Continue from the currently visible ${stageRef.current.view} step. Preserve valid booking context and do not restart discovery.`);
+      else if (activeCheckout && !explicitDiscoveryTurn && !directCancellation && !historyRequest.requested) conversation.sendContextualUpdate?.("An unpaid checkout remains preserved. If this is an unrelated question, it is hidden until the guest explicitly asks to return to checkout.");
       if (seatRoutePromise) {
         try {
           const seatResult = await seatRoutePromise;
@@ -4038,13 +4733,14 @@ export default function App() {
         : "Local data access is paused until this site's data is cleared after an incomplete logout.");
       return [];
     }
-    dismissPendingCancellation("history_opened");
     if (stageRef.current.view === "history" && !forceOpen) {
       restoreHistoryReturn();
       return [];
     }
     if (!preserveReturn && stageRef.current.view !== "history") captureHistoryReturn();
-    const visibleBookings = readBookings().filter((item) => !activeOnly || isCurrentBooking(item));
+    if (stageRef.current.view !== "history") pauseRichRenderingForTopicChange("history_opened", "booking_records");
+    renderTopicRef.current = "booking_records";
+    const visibleBookings = sortBookingsForDisplay(readBookings()).filter((item) => !activeOnly || isCurrentBooking(item));
     setHistoryFilter(activeOnly ? "active" : "all");
     setBookings(visibleBookings);
     showStage({ view: "history" });
@@ -4057,13 +4753,27 @@ export default function App() {
   const openOffers = () => {
     if (checkoutPaymentActiveRef.current) return;
     if (stageRef.current.view === "offers") {
-      showStage(offersReturnRef.current || { view: "empty" });
+      void restoreOffersReturn();
       return;
     }
     const current = stageRef.current;
     const activeOrder = pendingOrderRef.current;
     const activeBooking = current.view === "booking" ? bookingRef.current : null;
     clientTools.show_offers({ experience: current.session?.exp || activeOrder?.experience || activeBooking?.experience || "" });
+  };
+
+  const restoreOffersReturn = async () => {
+    const target = offersReturnRef.current || { view: "empty" };
+    const richView = richJourneyViewFromStage(target);
+    if (!richView) {
+      renderTopicRef.current = "general_enquiry";
+      showStage(target);
+      return;
+    }
+    const result = await restorePausedJourney({ target: richView, source: "offers_back" });
+    if (!result.restored && !["showtime_unavailable", "selected_seats_unavailable"].includes(result.reason)) {
+      showStage({ view: "empty" });
+    }
   };
 
   const handleOfferSelection = (result) => {
@@ -4434,7 +5144,17 @@ export default function App() {
       : (existing) => existing.some((item) => norm(item.ref) === operationBookingRef)
         ? existing.map((item) => norm(item.ref) === operationBookingRef ? updated : item)
         : [...existing, updated]);
-    if (bookingPanelIsCurrent) showStage({ view: "booking", booking: updated });
+    const cancellationResultShouldRender = bookingPanelIsCurrent
+      && stageVisibleRef.current
+      && ["booking_records", "cancellation"].includes(renderTopicRef.current)
+      && !cancellationPausedRef.current;
+    if (cancellationResultShouldRender) showStage({ view: "booking", booking: updated });
+    const withoutCancellation = invalidatePausedRichStage(pausedJourneyRef.current, {
+      views: ["cancellation"],
+      reason: "cancellation_completed",
+    });
+    if (withoutCancellation !== pausedJourneyRef.current) commitPausedJourney(withoutCancellation);
+    cancellationPausedRef.current = false;
     window.clearTimeout(cancelTimerRef.current);
     cancelTimerRef.current = null;
     setCancellationFlow(null);
@@ -4591,9 +5311,10 @@ export default function App() {
       window.clearTimeout(cancelTimerRef.current);
       cancelTimerRef.current = window.setTimeout(() => dismissPendingCancellation("confirmation_timeout"), 90_000);
       const current = bookingRef.current;
+      const summary = cancellationBookingSummary(current, localeRef.current);
       const message = localeRef.current === "ar"
-        ? `تأكيد نهائي: هل تريد إلغاء الحجز ${flow.bookingRef} وإعادة ${current?.total ?? current?.refundAmount ?? "المبلغ"} درهماً إلى محفظة VOX؟ قل نعم للمتابعة أو لا للإبقاء على الحجز.`
-        : `Final confirmation: cancel booking ${flow.bookingRef} and return AED ${current?.total ?? current?.refundAmount ?? "the eligible amount"} to VOX Wallet? Say yes to proceed or no to keep the booking.`;
+        ? `${summary} الأثر: سيعاد ${current?.total ?? current?.refundAmount ?? "المبلغ المؤهل"} درهماً إلى محفظة VOX. هل تريد مني إلغاء هذا الحجز؟`
+        : `${summary} Impact: AED ${current?.total ?? current?.refundAmount ?? "the eligible amount"} will be returned to VOX Wallet. Would you like me to cancel this booking?`;
       setCancellationFlow({ ...flow, phase: "final_confirmation", message, error: null });
       return { handled: true, confirmed: false, confirmationRequired: true, phase: "final_confirmation", bookingRef: flow.bookingRef, refundRoute: flow.refundRoute, message };
     }
@@ -4634,7 +5355,7 @@ export default function App() {
         locale: nextLocale,
         cinema: cinemaRef.current,
         scheduleDate: scheduleDateRef.current,
-        stage: stageRef.current,
+        stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
         selectedSeats: seatsRef.current,
         requestedSeatTarget: requestedSeatTargetRef.current,
         discoveryPreferences: discoveryPreferencesRef.current,
@@ -4650,7 +5371,7 @@ export default function App() {
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;
-    if (stage.view === "empty") {
+    if (!stageVisible || stage.view === "empty") {
       scroller.scrollTop = scroller.scrollHeight;
       return;
     }
@@ -4661,7 +5382,7 @@ export default function App() {
       + scroller.scrollTop
       - 10;
     scroller.scrollTop = Math.max(0, target);
-  }, [stage]);
+  }, [stage, stageVisible]);
   useEffect(() => {
     const scroller = scrollRef.current;
     if (!scroller) return;
@@ -4678,7 +5399,8 @@ export default function App() {
       : t("app.disconnected");
   const displayedBooking = stage.booking || booking;
   const displayedProgrammingDates = programmingDatesForCinema(cinema);
-  const transcriptMessageLimit = stage.view === "empty" ? VISIBLE_TRANSCRIPT_MESSAGES : RICH_STAGE_TRANSCRIPT_MESSAGES;
+  const visibleStageView = stageVisible ? stage.view : "empty";
+  const transcriptMessageLimit = visibleStageView === "empty" ? VISIBLE_TRANSCRIPT_MESSAGES : RICH_STAGE_TRANSCRIPT_MESSAGES;
   const earlierMessageCount = Math.max(0, messages.length - transcriptMessageLimit);
   const displayedMessages = showFullTranscript || !earlierMessageCount
     ? messages
@@ -4721,7 +5443,7 @@ export default function App() {
         </header>
 
         <main ref={scrollRef} aria-label={t("app.conversation")} style={{ flex: 1, minHeight: 0, overflowX: "hidden", overflowY: "auto", padding: 16, background: `linear-gradient(180deg, ${C.canvas}, ${C.primarySoft})` }}>
-          {pendingOrder?.checkoutId && stage.view !== "checkout" && (
+          {stageVisible && pendingOrder?.checkoutId && visibleStageView !== "checkout" && (
             <aside role="region" aria-label={t("checkout.resume")} style={{ position: "sticky", top: -6, zIndex: 4, display: "flex", alignItems: "center", gap: 9, margin: "-6px 0 12px", border: `1px solid ${C.primary}`, borderRadius: 12, background: C.surface, padding: "8px 9px", boxShadow: `0 6px 18px ${C.shadow}` }}>
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ color: C.text, fontSize: 11, fontWeight: 800 }}>{t("checkout.resumeTitle")}</div>
@@ -4729,11 +5451,11 @@ export default function App() {
                   <bdi dir="auto">{pendingOrder.movieTitle}</bdi>. {t("checkout.seatCountOnly", { count: pendingOrder.seats?.length || 0 })}. <span dir="ltr">{formatCurrency(pendingOrder.total || 0, pendingOrder.currency || "AED")}</span>
                 </div>
               </div>
-              <button type="button" onClick={restoreActiveCheckout} style={{ minHeight: 44, flexShrink: 0, border: 0, borderRadius: 10, background: C.primary, padding: "8px 10px", color: C.onPrimary, fontSize: 10, fontWeight: 800, cursor: "pointer" }}>{t("checkout.resume")}</button>
+              <button type="button" onClick={() => { void restorePausedJourney({ target: "checkout", source: "ui" }); }} style={{ minHeight: 44, flexShrink: 0, border: 0, borderRadius: 10, background: C.primary, padding: "8px 10px", color: C.onPrimary, fontSize: 10, fontWeight: 800, cursor: "pointer" }}>{t("checkout.resume")}</button>
             </aside>
           )}
           {!!messages.length && (
-            <div role="log" aria-live="polite" aria-relevant="additions text" style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: stage.view === "empty" ? 0 : 14 }}>
+            <div role="log" aria-live="polite" aria-relevant="additions text" style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: visibleStageView === "empty" ? 0 : 14 }}>
               {!!earlierMessageCount && <button type="button" onClick={() => setShowFullTranscript((current) => !current)} aria-expanded={showFullTranscript} style={{ alignSelf: "center", border: `1px solid ${C.border}`, borderRadius: 999, background: C.surface, padding: "6px 11px", color: C.primary, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
                 {showFullTranscript ? t("app.showRecentMessages") : t("app.showEarlierMessages", { count: earlierMessageCount })}
               </button>}
@@ -4744,7 +5466,7 @@ export default function App() {
               ))}
             </div>
           )}
-          {stage.view === "empty" && (!messages.length || messages.every((message) => message.role === "system")) && (
+          {visibleStageView === "empty" && (!messages.length || messages.every((message) => message.role === "system")) && (
             <div style={{ display: "flex", height: "100%", minHeight: 240, flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
               <div style={{ display: "flex", height: 56, width: 56, alignItems: "center", justifyContent: "center", borderRadius: 16, background: C.primarySoft, marginBottom: 16 }}><Sparkles color={C.brand} size={26} /></div>
               <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>{t("app.emptyTitle")}</div>
@@ -4752,22 +5474,22 @@ export default function App() {
               {!cinema && <button type="button" onClick={openCinemaPicker} style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 12, border: 0, borderRadius: 999, background: C.primary, padding: "9px 15px", color: C.onPrimary, fontSize: 12, fontWeight: 700, cursor: "pointer" }}><MapPin size={14} />{t("app.chooseCinema")}</button>}
             </div>
           )}
-          {stage.view !== "empty" && <div ref={stageAnchorRef} aria-hidden="true" />}
-          {cinema && ["movies", "showtimes"].includes(stage.view) && <DateStrip dates={displayedProgrammingDates} selected={stage.errorCode === "date_unavailable" || !discoveryPreferences.date ? null : scheduleDate} locale={locale} label={t("dates.label")} onSelect={chooseDate} />}
-          {stage.view === "loading" && <LoadingPanel label={stage.label} />}
-          {stage.view === "discovery" && <DiscoveryPrompt
+          {visibleStageView !== "empty" && <div ref={stageAnchorRef} aria-hidden="true" />}
+          {cinema && ["movies", "showtimes"].includes(visibleStageView) && <DateStrip dates={displayedProgrammingDates} selected={stage.errorCode === "date_unavailable" || !discoveryPreferences.date ? null : scheduleDate} locale={locale} label={t("dates.label")} onSelect={chooseDate} />}
+          {visibleStageView === "loading" && <LoadingPanel label={stage.label} />}
+          {visibleStageView === "discovery" && <DiscoveryPrompt
             question={stage.question}
             preferences={stage.preferences}
             dateOptions={stage.missing?.[0] === "date" ? displayedProgrammingDates : []}
             dateLabel={t("dates.label")}
             onDateSelect={chooseDate}
           />}
-          {stage.view === "cinemas" && <CinemaPicker cinemas={stage.cinemas || CINEMAS} selected={cinema} notice={stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => routeDiscoveryTurn("", { preferencesAlreadyApplied: true }) : undefined} onSelect={chooseCinema} onBack={() => showStage(cinemaReturnRef.current || { view: "empty" })} />}
-          {stage.view === "movies" && cinema && <MovieGrid movies={stage.movies} cinemaName={stripVox(cinema.name)} scheduleDate={stage.errorCode === "date_unavailable" ? userRequestedDateRef.current : scheduleDate} notice={stage.notice} onSelect={pickMovie} error={stage.error} onRetry={stage.errorCode === "date_unavailable" ? undefined : () => routeDiscoveryTurn("", { cinemaOverride: cinema, dateOverride: scheduleDate, preferencesAlreadyApplied: true })} />}
-          {stage.view === "showtimes" && <Showtimes movie={stage.movie} sessions={stage.sessions} notice={stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => pickMovie(stage.movie) : undefined} onSelect={pickSession} onBack={backFromShowtimes} />}
-          {stage.view === "seatmap" && <SeatMap movie={stage.movie} session={stage.session} plan={stage.plan} selected={selectedSeats} requestedTarget={requestedSeatTarget} pricing={SEAT_PRICING_PREVIEW} quoteState={seatQuote} notice={stage.planMeta?.verified === false ? true : stage.planMeta?.warning || false} onToggle={toggleSeat} onConfirm={confirmSeats} onBack={backFromSeatMap} />}
-          {stage.view === "checkout" && stage.order && pendingOrder?.checkoutId === stage.order.checkoutId && <Checkout key={stage.order.checkoutId} order={stage.order} deviceSessionEpoch={deviceSessionEpochRef.current} onPaid={handlePaid} onCancel={backToSeatMapFromCheckout} onPaymentStateChange={handleCheckoutPaymentState} />}
-          {stage.view === "booking" && displayedBooking && <BookingCard
+          {visibleStageView === "cinemas" && <CinemaPicker cinemas={stage.cinemas || CINEMAS} selected={cinema} notice={stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => routeDiscoveryTurn("", { preferencesAlreadyApplied: true }) : undefined} onSelect={chooseCinema} onBack={() => showStage(cinemaReturnRef.current || { view: "empty" })} />}
+          {visibleStageView === "movies" && cinema && <MovieGrid movies={stage.movies} cinemaName={stripVox(cinema.name)} scheduleDate={stage.errorCode === "date_unavailable" ? userRequestedDateRef.current : scheduleDate} notice={stage.notice} onSelect={pickMovie} error={stage.error} onRetry={stage.errorCode === "date_unavailable" ? undefined : () => routeDiscoveryTurn("", { cinemaOverride: cinema, dateOverride: scheduleDate, preferencesAlreadyApplied: true })} />}
+          {visibleStageView === "showtimes" && <Showtimes movie={stage.movie} sessions={stage.sessions} notice={stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => pickMovie(stage.movie) : undefined} onSelect={pickSession} onBack={backFromShowtimes} />}
+          {visibleStageView === "seatmap" && <SeatMap movie={stage.movie} session={stage.session} plan={stage.plan} selected={selectedSeats} requestedTarget={requestedSeatTarget} pricing={SEAT_PRICING_PREVIEW} quoteState={seatQuote} notice={stage.planMeta?.verified === false ? true : stage.planMeta?.warning || false} onToggle={toggleSeat} onConfirm={confirmSeats} onBack={backFromSeatMap} />}
+          {visibleStageView === "checkout" && stage.order && pendingOrder?.checkoutId === stage.order.checkoutId && <Checkout key={stage.order.checkoutId} order={stage.order} deviceSessionEpoch={deviceSessionEpochRef.current} onPaid={handlePaid} onCancel={backToSeatMapFromCheckout} onPaymentStateChange={handleCheckoutPaymentState} />}
+          {visibleStageView === "booking" && displayedBooking && <BookingCard
             booking={displayedBooking}
             cancellation={cancellationState.bookingRef && norm(cancellationState.bookingRef) !== norm(displayedBooking.ref) ? IDLE_CANCELLATION_STATE : cancellationState}
             onRequestCancel={cancelBooking}
@@ -4776,8 +5498,8 @@ export default function App() {
             onBack={bookingOpenedFromHistoryRef.current ? () => { dismissPendingCancellation("back_to_history"); openHistory({ notifyAgent: false, forceOpen: true, activeOnly: historyFilter === "active", preserveReturn: true }); } : undefined}
             cancelled={displayedBooking.cancelled}
           />}
-          {stage.view === "history" && <BookingHistory bookings={bookings} filter={historyFilter} onCancel={cancelHistoryBooking} onSelect={selectHistoryBooking} onBack={restoreHistoryReturn} />}
-          {stage.view === "offers" && (
+          {visibleStageView === "history" && <BookingHistory bookings={bookings} filter={historyFilter} onCancel={cancelHistoryBooking} onSelect={selectHistoryBooking} onBack={restoreHistoryReturn} />}
+          {visibleStageView === "offers" && (
             <div>
               {stage.showtimeRequired && <div role="status" style={{ marginBottom: 10, borderRadius: 10, background: C.warningSoft, padding: "9px 11px", color: C.warning, fontSize: 10, lineHeight: 1.45 }}>{t("offers.showtimeRequired")}</div>}
               <OffersPanel
@@ -4787,11 +5509,11 @@ export default function App() {
                 initialOfferId={stage.result?.offer?.id}
                 initialProfileId={stage.result?.cardProfile?.id}
                 onSelectionChange={handleOfferSelection}
-                onBack={() => showStage(offersReturnRef.current || { view: "empty" })}
+                onBack={() => { void restoreOffersReturn(); }}
               />
             </div>
           )}
-          {stage.view === "handover" && <HandoverPanel payload={stage.payload} labels={{
+          {visibleStageView === "handover" && <HandoverPanel payload={stage.payload} labels={{
             connectingTitle: t("handover.connecting"),
             connectingBody: t("handover.connectingBody"),
             readyTitle: t("handover.ready"),

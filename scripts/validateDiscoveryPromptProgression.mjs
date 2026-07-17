@@ -166,9 +166,11 @@ assert.equal(
   "a displayed-movies claim may pass through only when at least one local movie card is rendered",
 );
 
-const transportMessageFlow = app.slice(app.indexOf("onMessage: (message) =>"), app.indexOf("onError: (error)", app.indexOf("onMessage: (message) =>")));
+const onMessageStart = Math.max(app.indexOf("onMessage: async (message) =>"), app.indexOf("onMessage: (message) =>"));
+const transportMessageFlow = app.slice(onMessageStart, app.indexOf("onError: (error)", onMessageStart));
 const guardCallIndex = transportMessageFlow.indexOf("guardMovieDisplayClaim(");
 assert.notEqual(guardCallIndex, -1, "incoming agent messages must pass through the local rendered-card claim guard");
+assert.match(transportMessageFlow, /const claimStage = stageVisibleRef\.current \? stageRef\.current : \{ view: "empty"/, "hidden rich panels must be treated as empty by the rendered-card claim guard");
 assert.ok(
   guardCallIndex < transportMessageFlow.lastIndexOf("say(role, displayedMessage)"),
   "the rendered-card claim guard must run before an agent message is added to the visible conversation",

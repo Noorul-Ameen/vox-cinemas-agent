@@ -192,7 +192,8 @@ assert.equal(extractTicketQuantity("make seat to 2"), 2, "the annotated seat-tar
 assert.equal(extractTicketQuantity("change the number of seats to three"), 3, "a natural seat-count adjustment must remain a conversational target");
 assert.equal(extractTicketQuantity("three tickets"), 3, "the original ticket-target wording must remain supported");
 
-const voiceFlow = app.slice(app.indexOf("onMessage: (message) =>"), app.indexOf("onError: (error)", app.indexOf("onMessage: (message) =>")));
+const voiceStart = Math.max(app.indexOf("onMessage: async (message) =>"), app.indexOf("onMessage: (message) =>"));
+const voiceFlow = app.slice(voiceStart, app.indexOf("onError: (error)", voiceStart));
 const textFlow = app.slice(app.indexOf("const sendText"), app.indexOf("const sendUiTurn"));
 for (const [name, flow] of [["voice", voiceFlow], ["text", textFlow]]) {
   assert.match(flow, /const checkoutSeatEditTurn =/, `${name} must classify checkout seat-edit turns locally`);
@@ -208,8 +209,9 @@ assert.match(paymentCompletion, /\["stale_checkout", "stale_device_session"\][\s
 assert.match(paymentCompletion, /checkout session changed[\s\S]*No payment was taken/i, "stale checkout outcomes must display a no-charge recovery message");
 assert.doesNotMatch(paymentCompletion, /sendUiTurn\(`Booking summary/, "completion must not trigger a duplicate agent response after the deterministic summary notice");
 const cancellationRouting = app.slice(app.indexOf("const routeCancellationTurn"), app.indexOf("const cancellationResultContext"));
-assert.match(cancellationRouting, /stageRef\.current\.view === "booking" && isCurrentBooking\(bookingRef\.current\)/, "a cancelled or past summary must not become the target of a new generic cancellation request");
-assert.equal((app.match(/visibleBooking: stageRef\.current\.view === "booking" && isCurrentBooking\(bookingRef\.current\)/g) || []).length, 2, "both local cancellation routing layers must ignore a cancelled or past visible summary unless an exact reference is supplied");
+assert.match(cancellationRouting, /const explicitLifecycleTarget = resolution\.matchedBy\?\.length > 0/, "a cancelled or ineligible summary must require an explicit conversational selector");
+assert.match(cancellationRouting, /explicitLifecycleTarget && \["ineligible", "already_cancelled"\]/, "generic cancellation must not target a cancelled or ineligible summary");
+assert.equal((app.match(/visibleBooking: stageRef\.current\.view === "booking" && isCurrentBooking\(bookingRef\.current\)/g) || []).length, 1, "the exact-reference cancellation tool must ignore a cancelled or past visible summary");
 const cancellationCompletion = app.slice(app.indexOf("const executeCancellationMutation"), app.indexOf("const completeCancellation"));
 assert.match(cancellationCompletion, /if \(isDemoSimulation\) \{[\s\S]*deterministic system notice already states this outcome/, "device-only cancellation must not elicit a duplicate agent completion after its deterministic notice");
 

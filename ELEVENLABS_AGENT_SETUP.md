@@ -2,9 +2,9 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-17.2`
+Prompt contract version: `2026-07-17.5`
 
-Prompt source SHA-256: `cd7e157c550647ba23d87073e57800ac083acc04caa4a4bf8a5aa134d52351ac`
+Prompt source SHA-256: `3fcaa0926b51d026ba98f749608dc94c34a8a4aa7a3540e75ac1c87d35480b5a`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 
@@ -455,6 +455,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 ## Core prompt safeguards
 
 - Never ask the guest to say a card number, expiry, CVV, OTP, password, Emirates ID, or bank credential. Checkout happens only on screen.
+- Keep secure payment guest-controlled. The guest must click or tap the on-screen checkout controls. A spoken or typed pay, confirm, or yes instruction must never authorize payment or select a payment method.
 - Keep `show_seat_map` non-blocking with respect to customer interaction. When the guest names seats, call `select_seats` with those labels.
 - Never ask for a separate ticket quantity and never introduce a quantity stage or quantity controls. One selected seat is one ticket. Selected seats are the only source of ticket count, pricing, fees, offers context, and checkout totals.
 - Treat "I need three tickets" and similar utterances only as a conversational target. Guide the guest to select three seats, but allow checkout with the seats actually selected.
@@ -467,6 +468,11 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 - One word, a mixed phrase, background speech, unclear audio, or one sentence in the other language does not confirm a switch. Ask for confirmation in the active language before switching or processing that business request.
 - The visible language selector and a direct command such as "Switch to Arabic" are explicit. A capability question such as "Can you speak Arabic?" still requires confirmation.
 - Preserve cinema, movie, showtime, seats, checkout, booking, cancellation, refund, offer, history, and FAQ context across a language or transport switch.
+- When the guest temporarily changes to an unrelated topic or FAQ, hide the currently visible rich panel while answering, but retain the exact booking or cancellation journey as paused state. An ordinary topic change, FAQ, voice disconnect, or voice-to-text switch must never clear it.
+- Recognize the restore phrases "Continue my booking", "Go back to the seats", "Show the showtimes again", "Return to checkout", and "Continue where I stopped". Restore the matching paused step only after its required availability, pricing, session, or booking revalidation succeeds.
+- End the current booking journey only for an explicit request to abandon or end that journey. Keep this lifecycle distinct from cancelling an existing booking record, and ask one focused clarification when the word cancel is ambiguous.
+- Resolve cancellation targets from a booking reference, movie title, absolute or relative performance date, exact showtime, time band, cinema, displayed list position, contextual "this movie", or any combination of those criteria.
+- When more than one booking matches, ask only for the smallest detail that distinguishes the candidates. Once one target is authoritative, the confirmation contains exactly movie, cinema, performance date, showtime, booking reference, and cancellation or refund impact, followed by one yes/no question.
 - Bank-offer terms are guidance subject to the bank and VOX checkout. Never say an offer was applied.
 - Payment, offer redemption, Vista writes, Genesys, OneView, provider cancellation, and provider refunds remain unavailable until their production connectors are enabled.
 - Never use Unicode em dash or en dash punctuation in a customer-facing response.
@@ -499,7 +505,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 1. Confirm the dashboard target is `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`.
 2. Confirm all eight exact client-tool names and schemas match `config/elevenlabs-agent-contract.json`.
 3. Enable Wait for response on all eight tools. Confirm `show_seat_map` returns after map loading and never waits for a later seat-selection turn.
-4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-17.2`.
+4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-17.5`.
 5. Set the first message to `{{voxi_session_opening}}`.
 6. Create all 13 dynamic-variable placeholders and defaults.
 7. Configure English and Arabic support, then disable the automatic `language_detection` system tool.
@@ -517,6 +523,12 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 19. Test "I need three tickets" and verify Voxi guides the guest to select three seats without a quantity control. Select two seats and verify checkout reports two tickets.
 20. Return from checkout, change seats, and verify ticket count and totals are recalculated.
 21. Change cinema, date, movie, or showtime and verify prior seats and pricing are cleared.
+22. From a visible booking or cancellation panel, ask an unrelated FAQ. Verify the rich panel is hidden while the answer is shown and the exact journey remains paused.
+23. Verify each restore phrase independently: "Continue my booking", "Go back to the seats", "Show the showtimes again", "Return to checkout", and "Continue where I stopped". Confirm the matching stage is revalidated before it is restored.
+24. During a paused journey, disconnect voice and continue in text. Verify neither the disconnect nor the voice-to-text switch clears the paused state.
+25. Test cancellation by reference, movie, performance date, relative date, exact showtime, time band, cinema, displayed list position, "this movie", and combined criteria.
+26. Create an ambiguous cancellation match and verify Voxi asks only for the smallest differentiating detail. Select a unique target and verify its confirmation states only movie, cinema, performance date, showtime, booking reference, cancellation or refund impact, and one yes/no question.
+27. Verify that explicitly abandoning the current booking journey clears it, while cancelling an existing booking record remains a separate cancellation flow. Verify secure payment can be initiated only by clicking or tapping checkout, never by a spoken or typed pay instruction.
 
 ## Contract update procedure
 

@@ -52,14 +52,31 @@ export function isCurrentBooking(booking, { now = new Date() } = {}) {
   return performanceMinutes >= nowMinutes;
 }
 
+const bookingCreatedAtTimestamp = (booking) => {
+  const timestamp = Date.parse(booking?.createdAt || "");
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+export function sortBookingsForDisplay(bookings) {
+  return (Array.isArray(bookings) ? bookings : [])
+    .map((booking, originalIndex) => ({ booking, originalIndex }))
+    .sort((left, right) => (
+      bookingCreatedAtTimestamp(right.booking) - bookingCreatedAtTimestamp(left.booking)
+      || left.originalIndex - right.originalIndex
+    ))
+    .map(({ booking }) => booking);
+}
+
 const ACTIVE_HISTORY_EN = /\b(?:current|active|upcoming)\s+(?:booking|bookings|reservation|reservations|tickets?)\b|\bmy\s+(?:current|active|upcoming)\s+(?:booking|bookings|reservation|reservations|tickets?)\b/;
 const ACTIVE_HISTORY_AR = /(?:حجوزاتي|حجوزات(?:ي)?|حجزي|الحجوزات|الحجز)\s+(?:الحاليه|الحالي|النشطه|النشط|القادمه|القادم)/;
 const GENERIC_HISTORY_EN = /\b(?:show|open|find|view|list)\s+(?:(?:me|my)\s+)?(?:booking|bookings|booking history|purchase history|reservations?)\b|\b(?:my|past|previous)\s+(?:bookings?|booking history|reservations?)\b|\bbooking history\b/;
 const GENERIC_HISTORY_AR = /(?:اعرض|افتح|طلع|ورني|اظهر).{0,30}(?:حجوزاتي|حجزي|سجل الحجوزات|سجل المشتريات|الحجوزات)|(?:حجوزاتي|سجل الحجوزات)/;
 
-const POLICY_EN = /\b(?:policy|rules?|deadline|eligible|eligibility|possible)\b|\b(?:can|could)\s+i\s+(?:cancel|refund|void)\s+(?:a|any)\s+(?:booking|reservation|tickets?)\b|\bhow\s+(?:do|does|can)\b.{0,35}\b(?:cancel|refund|void)\b/;
+const POLICY_EN = /\b(?:policy|rules?|deadline|eligible|eligibility|possible)\b|\b(?:can|could|may|should)\s+i\s+(?:please\s+)?(?:cancel|refund|void)\b|\b(?:am\s+i|would\s+i\s+be)\s+able\s+to\s+(?:cancel|refund|void)\b|\b(?:how|what|when|where|why)\b.{0,45}\b(?:cancel|refund|void)\b/;
 const POLICY_AR = /(?:سياسه|شروط|موعد|اهليه|كيف).{0,35}(?:الغاء|الغي|استرداد|استرجاع)|(?:هل|اقدر|يمكنني).{0,20}(?:الغاء|الغي)\s+(?:ال)?(?:حجز|تذكره)(?:\s|$)/;
 const DIRECT_EN = /\b(?:please\s+)?(?:cancel|refund|void)\s+(?:(?:my|the|this|a|an|one)\s+)?(?:(?:current|active|upcoming)\s+)?(?:booking|reservation|tickets?)\b|\b(?:please\s+)?(?:cancel|refund|void)\s+(?:my|the)\s+.{1,80}\s+(?:booking|reservation|tickets?)\b|\b(?:i|we)\s+(?:want|need|would like)\s+to\s+(?:cancel|refund|void)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:cancel|refund|void)\b.{0,50}\b(?:my|our|this|the|a|an|one)\s+(?:(?:current|active|upcoming)\s+)?(?:booking|reservation|tickets?)\b|\b(?:cancel|refund|void)\b.{0,40}\b(?:booking\s+(?:reference|ref)|wl[a-z0-9-]+)\b/;
+const TARGETED_DIRECT_EN = /^(?:please\s+)?(?:cancel|refund|void)\s+.{1,120}$/;
+const NEGATED_DIRECT_EN = /\b(?:do\s+not|dont|never|no\s+longer)\b.{0,30}\b(?:cancel|refund|void)\b/;
 const DIRECT_AR = /(?:الغي|الغي|الغاء|لغي|رجع|استرد|استرجع).{0,40}(?:حجزي|الحجز|تذكرتي|تذاكري|التذاكر)|(?:ابي|ابغي|ابغى|عايز|بدي|اريد).{0,25}(?:الغي|الغاء|استرد|استرجع)|(?:هل\s+)?(?:يمكنك|تقدر|تستطيع).{0,20}(?:تلغي|الغاء|ترجع|تسترد).{0,30}(?:حجزي|الحجز|تذكرتي|تذاكري|التذاكر)/;
 const CONTEXTUAL_EN = /^(?:please\s+)?(?:cancel|refund|void)(?:\s+(?:it|this|that))?$/;
 const CONTEXTUAL_AR = /^(?:الغي|الغه|الغيه|الغيها|الغاءه|لغه|رجعه|استرده|نعم\s+الغي(?:ه|ها)?)$/;
@@ -79,7 +96,9 @@ export function isDirectCancellationRequest(text, { hasBookingContext = false } 
   const query = normalizeText(text);
   if (!query) return false;
   if (POLICY_EN.test(query) || POLICY_AR.test(query)) return false;
+  if (NEGATED_DIRECT_EN.test(query)) return false;
   if (DIRECT_EN.test(query) || DIRECT_AR.test(query)) return true;
+  if (TARGETED_DIRECT_EN.test(query) && !CONTEXTUAL_EN.test(query)) return true;
   return Boolean(hasBookingContext && (CONTEXTUAL_EN.test(query) || CONTEXTUAL_AR.test(query)));
 }
 
@@ -294,11 +313,14 @@ export function resolveCancellationTarget({
 }
 
 export function bookingHistoryAgentContext(bookings) {
-  const safe = (Array.isArray(bookings) ? bookings : []).map((booking) => ({
+  const safe = sortBookingsForDisplay(bookings).map((booking, index) => ({
+    listPosition: index + 1,
     bookingRef: String(booking?.ref || ""),
-    status: booking?.cancelled ? "cancelled" : booking?.bookingStatus || "active",
+    status: booking?.cancelled ? "cancelled" : booking?.bookingStatus || booking?.status || "active",
     movie: String(booking?.movieTitle || ""),
     performanceDate: booking?.performanceDate || booking?.sourceDate || booking?.date || null,
+    showtime: booking?.showtime || null,
+    cinema: booking?.cinemaName || booking?.cinema?.name || (typeof booking?.cinema === "string" ? booking.cinema : null),
   }));
   return `Visible on-device booking summaries: ${JSON.stringify(safe)}. These are device records, not provider confirmations.`;
 }

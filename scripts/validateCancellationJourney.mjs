@@ -7,6 +7,7 @@ import {
   isDirectCancellationRequest,
   resolveCancellationContinuation,
   resolveCancellationTarget,
+  sortBookingsForDisplay,
 } from "../src/lib/cancellationRouting.js";
 
 const activeA = Object.freeze({
@@ -90,6 +91,11 @@ for (const text of [
   "Cancel my booking",
   "Cancel this booking",
   "Cancel a booking",
+  "Cancel Mission Impossible",
+  "Cancel the booking for the 18th",
+  "Cancel the evening booking",
+  "Cancel the second booking",
+  "Cancel booking for tomorrow",
   "Please cancel one reservation",
   "Please cancel booking WLACTIVE1",
   "Cancel my The Odyssey booking",
@@ -110,6 +116,11 @@ for (const text of ["Cancel it", "Please cancel it", "ألغه", "ألغيها"]
 }
 for (const text of [
   "Can I cancel a booking?",
+  "Can I cancel my booking?",
+  "Can I please cancel booking for tomorrow?",
+  "Could I cancel Mission Impossible?",
+  "When can I cancel the evening booking?",
+  "What happens if I cancel the second booking?",
   "What is the cancellation policy?",
   "How do refunds work?",
   "هل يمكنني إلغاء الحجز؟",
@@ -122,6 +133,19 @@ for (const text of [
     `${text}: a policy question must remain informational even with visible booking context`,
   );
 }
+for (const text of ["Do not cancel my booking", "Please don't cancel Mission Impossible"]) {
+  assert.equal(isDirectCancellationRequest(text, { hasBookingContext: true }), false, `${text}: a negated request must not begin cancellation`);
+}
+
+const newestBooking = Object.freeze({ ...activeA, ref: "WLNEWEST", createdAt: "2026-07-13T11:00:00.000Z", showtime: "20:30", cinemaName: "VOX Mall of the Emirates" });
+const olderBooking = Object.freeze({ ...activeB, ref: "WLOLDER", createdAt: "2026-07-12T11:00:00.000Z", showtime: "18:00", cinemaName: "VOX City Centre Mirdif" });
+const unsortedBookings = [olderBooking, newestBooking];
+assert.deepEqual(
+  sortBookingsForDisplay(unsortedBookings).map((booking) => booking.ref),
+  [newestBooking.ref, olderBooking.ref],
+  "booking display order must be newest first",
+);
+assert.deepEqual(unsortedBookings.map((booking) => booking.ref), [olderBooking.ref, newestBooking.ref], "display sorting must not mutate stored history");
 
 const explicitRequested = resolveAtFixtureTime({
   requestedRef: "wlactive2",
@@ -315,8 +339,13 @@ for (const contextChange of ["Go back", "Show me movies", "Show my current booki
   assert.equal(continuation.handled, false, `${contextChange}: an explicit task change or FAQ must not trap the guest in cancellation target selection`);
 }
 
-const agentContext = bookingHistoryAgentContext([activeA, cancelled]);
-assert.match(agentContext, new RegExp(activeA.ref), "agent history context must include the active reference needed for cancellation");
+const agentContext = bookingHistoryAgentContext([olderBooking, newestBooking, cancelled]);
+const agentSummaries = JSON.parse(agentContext.match(/summaries: (\[.*\])\. These are/)?.[1] || "[]");
+assert.deepEqual(agentSummaries.map((booking) => booking.bookingRef), [newestBooking.ref, olderBooking.ref, cancelled.ref], "agent history context must use the visible newest-first order");
+assert.deepEqual(agentSummaries.map((booking) => booking.listPosition), [1, 2, 3], "agent history context must expose one-based visible list positions");
+assert.equal(agentSummaries[0].showtime, newestBooking.showtime, "agent history context must expose the visible showtime");
+assert.equal(agentSummaries[0].cinema, newestBooking.cinemaName, "agent history context must expose the visible cinema");
+assert.match(agentContext, new RegExp(newestBooking.ref), "agent history context must include the active reference needed for cancellation");
 assert.match(agentContext, new RegExp(cancelled.ref), "agent history context must include cancelled status for disambiguation");
 assert.match(agentContext, /cancelled/i, "agent history context must label cancellation state explicitly");
 assert.doesNotMatch(agentContext, /guest@example\.com|4111111111111111/, "agent history context must serialize an allowlist, not private booking fields");

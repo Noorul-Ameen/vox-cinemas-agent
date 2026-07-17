@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import vm from "node:vm";
 import { STRINGS } from "../src/i18n/strings.js";
+import { isResumeCheckoutTurn } from "../src/lib/pausedJourneyRouting.js";
 import {
   createDiscoveryPreferences,
   extractDiscoveryPreferencePatch,
@@ -34,12 +34,6 @@ function sliceConstDeclaration(source, name, label) {
   return source.slice(start, match.index);
 }
 
-const resumeClassifier = sliceConstDeclaration(app, "isResumeCheckoutTurn", "checkout resume classifier");
-assert.match(resumeClassifier, /checkout|payment|pay/i, "checkout resume must recognise checkout or payment wording");
-assert.match(resumeClassifier, /return|back|resume|continue/i, "checkout resume must recognise return and continuation wording");
-assert.match(resumeClassifier, /[\u0600-\u06ff]/u, "checkout resume must recognise Arabic wording");
-const resumeExpression = resumeClassifier.slice(resumeClassifier.indexOf("=") + 1).trim().replace(/;\s*$/, "");
-const classifyCheckoutResume = vm.runInNewContext(`(${resumeExpression})`, Object.create(null));
 for (const phrase of [
   "Return to checkout",
   "Back to payment",
@@ -49,7 +43,7 @@ for (const phrase of [
   "متابعة عملية الدفع",
   "صفحة الدفع مرة أخرى",
 ]) {
-  assert.equal(classifyCheckoutResume(phrase), true, `must resume checkout for: ${phrase}`);
+  assert.equal(isResumeCheckoutTurn(phrase), true, `must resume checkout for: ${phrase}`);
 }
 for (const phrase of [
   "Continue",
@@ -57,7 +51,7 @@ for (const phrase of [
   "Can I get a refund?",
   "Change the cinema",
 ]) {
-  assert.equal(classifyCheckoutResume(phrase), false, `must not resume checkout for: ${phrase}`);
+  assert.equal(isResumeCheckoutTurn(phrase), false, `must not resume checkout for: ${phrase}`);
 }
 
 const restoreCheckout = sliceConstDeclaration(app, "restoreActiveCheckout", "active checkout restoration");
@@ -85,24 +79,25 @@ const finalizeSeats = sliceBetween(app, "const finalizeSeats", "const seatConfir
 assert.match(finalizeSeats, new RegExp(`${resumableCheckoutRef}\\.current\\s*=`), "confirmed seat pricing must save the exact checkout stage for later restoration");
 assert.match(finalizeSeats, /checkoutId[\s\S]*showStage\(/, "saved checkout restoration must be tied to the newly priced order");
 
-const voicePath = sliceBetween(app, "onMessage: (message) =>", "onError: (error)", "voice transcript route");
+const voicePath = sliceBetween(app, "onMessage: async (message) =>", "onError: (error)", "voice transcript route");
 const textPath = sliceBetween(app, "const sendText", "const sendUiTurn", "typed transcript route");
 for (const [label, source, messageVariable] of [
   ["voice", voicePath, "safeMessage"],
   ["text", textPath, "value"],
 ]) {
-  assert.match(source, new RegExp(`isResumeCheckoutTurn\\(${messageVariable}\\)`), `${label} routing must classify an explicit checkout resume`);
-  assert.match(source, /restoreActiveCheckout\(\)/, `${label} routing must restore the exact pending checkout`);
+  assert.match(source, new RegExp(`pausedResumeTarget\\(${messageVariable}\\)`), `${label} routing must classify explicit paused-step restoration`);
+  assert.match(source, /restorePausedJourney\(/, `${label} routing must restore and revalidate the exact paused checkout`);
   assert.ok(
-    source.indexOf("restoreActiveCheckout()") < source.indexOf("routeDiscoveryTurn"),
+    source.indexOf("restorePausedJourney(") < source.indexOf("routeDiscoveryTurn"),
     `${label} checkout restoration must happen before discovery can replace the panel`,
   );
 }
 
 const faqPreparation = sliceBetween(app, "const prepareFaqContext", "useEffect(() =>", "FAQ preparation");
-assert.doesNotMatch(faqPreparation, /showStage\(/, "an FAQ answer must not replace checkout or another rich panel");
+assert.doesNotMatch(faqPreparation, /showStage\(/, "FAQ retrieval must not mutate the stored rich step");
 assert.match(faqPreparation, /preserveBookingIntent[\s\S]*["']checkout["']/, "FAQ handling must preserve checkout booking intent");
 assert.doesNotMatch(app, /function FaqPanel|stage\.view === ["']faq["']/, "FAQ answers must remain in the transcript instead of replacing checkout");
+assert.match(app, /pauseRenderingForUnrelatedTurn[\s\S]*pauseRichRenderingForTopicChange/, "an unrelated FAQ must hide the old rich panel while preserving it for restoration");
 
 const faqSignal = extractDiscoveryPreferencePatch("Is IMAX wheelchair accessible?");
 assert.equal(
@@ -115,7 +110,7 @@ const mainRender = sliceBetween(app, "<main ref={scrollRef}", "</main>", "main c
 assert.match(mainRender, /pendingOrder[\s\S]{0,2400}checkout\.resume|checkout\.resume[\s\S]{0,2400}pendingOrder/, "a pending checkout must expose a persistent resume affordance outside checkout");
 assert.match(mainRender, /role=["']region["']/, "the pending checkout affordance must be a named region");
 assert.match(mainRender, /aria-label=\{t\(["']checkout\.resume["']\)\}/, "the pending checkout region must have a localized accessible name");
-assert.match(mainRender, /onClick=\{restoreActiveCheckout\}/, "the visible resume action must use exact checkout restoration");
+assert.match(mainRender, /onClick=\{\(\) => \{ void restorePausedJourney\(\{ target: "checkout", source: "ui" \}\); \}\}/, "the visible resume action must use revalidated paused-checkout restoration");
 assert.match(mainRender, /<button\b[\s\S]{0,900}t\(["']checkout\.resume["']\)/, "the pending checkout affordance must include a visible localized action");
 
 for (const locale of ["en", "ar"]) {
@@ -185,4 +180,4 @@ assert.match(stageTransition, /checkoutPaymentActiveRef\.current/, "stage transi
 assert.match(stageTransition, /stageRef\.current\??\.view\s*===\s*["']checkout["'][\s\S]*next\.view\s*!==\s*["']checkout["']/, "active authorization must block displacement from checkout");
 assert.match(mainRender, /<Checkout\b[\s\S]{0,1200}onPaymentStateChange=/, "App must connect checkout authorization state to the displacement guard");
 
-console.log("Validated checkout continuity: inline FAQ, exact EN/AR text and voice resume, persistent accessible return, intentional invalidation, edit-seat repricing, payment lock, and completion cleanup.");
+console.log("Validated checkout continuity: FAQ hiding with preserved state, exact EN/AR text and voice resume, checkout revalidation, intentional invalidation, edit-seat repricing, payment lock, and completion cleanup.");

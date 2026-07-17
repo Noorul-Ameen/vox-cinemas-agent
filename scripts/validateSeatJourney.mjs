@@ -43,7 +43,8 @@ assert.equal(resolveSeatSelectionTurn("confirm seats", { availableSeatIds: avail
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const prompt = fs.readFileSync(new URL("../src/lib/voxiSession.js", import.meta.url), "utf8");
-const voiceFlow = app.slice(app.indexOf("onMessage: (message) =>"), app.indexOf("onError:", app.indexOf("onMessage: (message) =>")));
+const voiceStart = Math.max(app.indexOf("onMessage: async (message) =>"), app.indexOf("onMessage: (message) =>"));
+const voiceFlow = app.slice(voiceStart, app.indexOf("onError:", voiceStart));
 const typedFlow = app.slice(app.indexOf("const sendText"), app.indexOf("const sendUiTurn"));
 for (const [label, flow] of [["voice", voiceFlow], ["typed", typedFlow]]) {
   assert.match(flow, /resolveVisibleSeatTurn\(/, `${label} must recognize seat labels and visible-seat confirmation locally`);
@@ -73,7 +74,7 @@ assert.match(touchSeatConfirmation, /used Back from the seat map[\s\S]*no seat c
 assert.match(selectSeats, /completedOrder\?\.checkoutId && sameSeatSelection\(ids, completedOrder\.seats/, "a duplicate confirmation completing behind another quote must reuse the rendered checkout result");
 assert.match(app, /result\.currentView === "seatmap"[\s\S]*do not say the seat map remains visible/, "stale confirmation messaging must reflect the panel actually rendered after Back");
 assert.match(selectSeats, /stageRef\.current\.view === "checkout"[\s\S]*alreadyConfirmed:\s*true/, "duplicate seat tools must be idempotent once checkout is visible");
-assert.match(app, /stage\.view === "checkout" && stage\.order && pendingOrder\?\.checkoutId === stage\.order\.checkoutId/, "a checkout may render only while its matching order is active");
+assert.match(app, /visibleStageView === "checkout" && stage\.order && pendingOrder\?\.checkoutId === stage\.order\.checkoutId/, "a checkout may render only while its matching order is active and visible");
 assert.match(prompt, /confirmed select_seats result means checkout is displayed; it does not mean payment or booking confirmation/, "the agent must not turn seat confirmation into a fake booking or reference");
 assert.doesNotMatch(app, /TicketQuantityControl|ticketQuantityRef|quantity_mismatch/, "the separate ticket quantity stage and exact-count gate must be removed");
 assert.match(app, /current\.length >= MAX_TICKETS/, "seat selection must be limited only by the booking maximum");

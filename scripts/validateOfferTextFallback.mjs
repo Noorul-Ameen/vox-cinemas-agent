@@ -97,18 +97,18 @@ assert.ok(callbacksStart >= 0 && voiceMessageStart >= 0 && voiceMessageEnd > voi
 const voiceMessages = app.slice(voiceMessageStart, voiceMessageEnd);
 assert.match(voiceMessages, /resolveLocalOfferTextTurn\(safeMessage/, "Voice transcripts must use the same named-offer resolver as typed text");
 assert.match(voiceMessages, /Approved published offer result for the guest's spoken question/, "Voice must receive the grounded checkout offer result before responding");
-assert.match(voiceMessages, /checkoutOfferEvaluation[\s\S]*do not claim the offer was applied[\s\S]*do not replace checkout/, "Voice offer guidance must preserve checkout and avoid false application claims");
+assert.match(voiceMessages, /checkoutOfferEvaluation[\s\S]*checkout is preserved but will be hidden[\s\S]*Do not claim the offer was applied/, "Voice offer guidance must hide but preserve checkout and avoid false application claims");
 
 const showOffersStart = app.indexOf("show_offers: async");
 const showOffersEnd = app.indexOf("handover_to_agent:", showOffersStart);
 assert.ok(showOffersStart >= 0 && showOffersEnd > showOffersStart, "show_offers client tool was not found");
 const showOffers = app.slice(showOffersStart, showOffersEnd);
 assert.match(showOffers, /const origin = current\.view === "offers" \? offersReturnRef\.current/, "Offer origin must preserve the return stage");
-assert.match(showOffers, /const preservedCheckout = current\.view === "checkout" \? activeCheckoutStage\(\) : null/, "Offer checks must detect the exact active checkout");
-assert.match(showOffers, /if \(!checkoutPreserved && current\.view !== "offers"\) offersReturnRef\.current = current;/, "Only non-checkout offer navigation may capture a return stage");
-assert.match(showOffers, /if \(!checkoutPreserved\)\s*\{[\s\S]*showStage\(\{ view: "offers"/, "A checkout offer check must not replace checkout with the offers panel");
+assert.match(showOffers, /const preservedCheckout = activeCheckoutStage\(\)/, "Offer checks must detect the exact active checkout even while its panel is hidden");
+assert.match(showOffers, /current\.view !== "offers"[\s\S]*offersReturnRef\.current = current[\s\S]*pauseRichRenderingForTopicChange/, "Offer navigation must save and pause the previous rich stage");
+assert.match(showOffers, /showStage\(\{ view: "offers"/, "The offer panel must replace unrelated visible rendering while checkout data remains paused");
 assert.match(showOffers, /checkoutPreserved,[\s\S]*checkoutId: preservedCheckout\?\.order\?\.checkoutId[\s\S]*seats: preservedCheckout\?\.order\?\.seats[\s\S]*total: preservedCheckout\?\.order\?\.total/, "The tool result must prove the same checkout, seats, and total were preserved");
-assert.ok(showOffers.indexOf("offersReturnRef.current = current") < showOffers.indexOf('showStage({ view: "offers"'), "Return stage must be saved before a non-checkout offer panel opens");
+assert.ok(showOffers.indexOf("offersReturnRef.current = current") < showOffers.indexOf('showStage({ view: "offers"'), "Return stage must be saved before the offer panel opens");
 assert.doesNotMatch(showOffers, /setPendingOrder|clearPendingOrder|setSelectedSeats|seatsRef\.current\s*=/, "Offer evaluation must not mutate checkout order or seats");
 
 console.log("Offer text fallback validation passed.");

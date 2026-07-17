@@ -181,7 +181,7 @@ assert.match(discoveryRouter, /loadDiscoveryForCinema\(target,\s*preferences\.da
 assert.match(discoveryRouter, /requestEpochRef\.current\s*!==\s*scanEpoch/, "cross-cinema discovery must suppress obsolete async results");
 assert.match(discoveryLoader, /const unresolvedSignal = extractDiscoveryPreferencePatch\(unresolvedTitleTurn,[\s\S]*cinemas:\s*CINEMAS,[\s\S]*movies,[\s\S]*unresolvedMovieTitleCandidate\(unresolvedTitleTurn,\s*unresolvedSignal\)/, "deferred fuzzy-title resolution must subtract the retained cinema, date, time, and experience before matching the loaded catalog");
 
-const voiceMessageFlow = sliceBetween(app, "onMessage: (message) =>", "onError:", "SDK voice message flow");
+const voiceMessageFlow = sliceBetween(app, "onMessage: async (message) =>", "onError:", "SDK voice message flow");
 const typedMessageFlow = sliceBetween(app, "const sendText", "const sendUiTurn", "typed message flow");
 assert.match(voiceMessageFlow, /normalizeElevenLabsMessageEvent\(message\)/, "SDK events must be normalized from the documented ElevenLabs onMessage contract");
 for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMessageFlow]]) {
@@ -199,7 +199,7 @@ for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMes
   assert.ok(flow.indexOf("isDirectCancellationRequest(") < flow.indexOf("dismissStaleTransactionalView("), `${label} must recognize contextual cancellation before stale booking context can be dismissed`);
   assert.ok(flow.indexOf("resolveCancellationContinuation(") < flow.indexOf("dismissStaleTransactionalView("), `${label} must resolve cancellation continuation before transactional or discovery cleanup`);
   assert.match(flow, /actionIntent:\s*directCancellation\s*\?\s*["']cancellation["']\s*:\s*actionIntent/, `${label} must preserve the visible booking while shared cancellation routing begins`);
-  assert.match(flow, /routeCancellationTurn\((?:safeMessage|value),\s*\{\s*continuation:\s*cancellationContinuation\s*\}\)/, `${label} must pass the exact displayed-candidate result to the shared cancellation router`);
+  assert.match(flow, /routeCancellationTurn\((?:safeMessage|value),\s*\{\s*continuation:\s*cancellationContinuation\s*\}\)/, `${label} must route displayed cancellation context through the shared conversational resolver`);
   assert.match(flow, /handleCancellationDecision\(decision,\s*\{\s*source:\s*["']conversation["']\s*\}\)/, `${label} must continue pending yes/no cancellation through the shared decision handler`);
   assert.match(flow, /applyDiscoveryPreferencesFromText\([^,]+,\s*details\.cinema\s*\?\s*\{\s*cinemaId:\s*details\.cinema\.id,\s*cinemaName:\s*details\.cinema\.name\s*\}\s*:\s*\{\}\)/, `${label} must retain a cinema already recognized in the guest's turn`);
   assert.match(flow, /routeDiscoveryTurn\((?:safeMessage|value),\s*\{\s*cinemaOverride:\s*details\.cinema,\s*dateOverride:\s*requestedDate,\s*preferencesAlreadyApplied:\s*true/, `${label} must use the same all-criteria discovery router for text and speech transcripts`);
@@ -227,22 +227,22 @@ const staleViewHandler = sliceBetween(app, "const dismissStaleTransactionalView"
 assert.match(staleViewHandler, /\["booking",\s*"history"\]\.includes\(current\.view\)/, "only completed booking/history views should be automatically dismissed");
 assert.match(staleViewHandler, /historyRequested[\s\S]*actionIntent === "booking_history"[\s\S]*actionIntent === "cancellation"/, "booking-history and cancellation turns must preserve their active panel");
 assert.match(staleViewHandler, /cancellationReply[\s\S]*Boolean\(cancellationFlowRef\.current\)/, "pending yes/no cancellation turns must preserve the active booking panel");
-assert.match(staleViewHandler, /startsNewBooking[\s\S]*clearSeatSelection[\s\S]*activeCheckoutStage\(\)[\s\S]*restoreActiveCheckout\(\)/, "an unrelated booking/history turn must restore a resumable checkout, while an explicit new booking invalidates it");
-assert.match(staleViewHandler, /showStage\(canRestoreMovies\s*\?[\s\S]*view:\s*"movies"[\s\S]*:\s*\{\s*view:\s*"empty"\s*\}\)/, "an unrelated turn must hide the stale booking/history panel while preserving available movie context");
-assert.match(app, /const isResumeOnlyTurn[\s\S]*continue\|resume\|go on\|carry on/, "the router must identify explicit booking-continuation turns");
+assert.match(staleViewHandler, /startsNewBooking[\s\S]*return false[\s\S]*pauseRichRenderingForTopicChange/, "an unrelated booking/history turn must hide the panel without clearing its resumable state");
+assert.doesNotMatch(staleViewHandler, /clearSeatSelection|clearPendingOrder|bookingRef\.current\s*=\s*null/, "topic-only cleanup must not discard valid booking context");
+assert.match(app, /import \{ isResumeCheckoutTurn, isResumeOnlyTurn, pausedResumeTarget \} from "\.\/lib\/pausedJourneyRouting\.js"/, "App must use the executable paused-stage continuation router");
 assert.match(app, /bookingContext && !resumeOnlyTurn[\s\S]*routeDiscoveryTurn/, "a continuation turn must not restart movie discovery");
-assert.match(app, /Continue from the currently visible \$\{stageRef\.current\.view\} step[\s\S]*Do not restart discovery/, "text and voice continuation turns must preserve the visible booking panel");
+assert.match(app, /const restorePausedJourney[\s\S]*selectRestorableRichStage[\s\S]*restorePausedRichStage/, "text and voice continuation turns must restore the correct saved rich step");
 
 const offersTool = sliceBetween(app, "show_offers: async", "handover_to_agent:", "offers tool");
 assert.match(offersTool, /const origin = current\.view === "offers" \? offersReturnRef\.current[\s\S]*: current/, "offer refinements must retain one explicit return-view origin");
 assert.match(offersTool, /const activeBooking = origin\.view === "booking" \? bookingRef\.current : null/, "offers must use booking context only when the visible origin is a booking");
-assert.match(offersTool, /const order = origin\.view === "checkout" \? pendingOrderRef\.current : null/, "offers must use a suspended order only when the visible origin is checkout");
+assert.match(offersTool, /const order = origin\.view === "checkout" \? preservedCheckout\?\.order \|\| pendingOrderRef\.current : null/, "offers must use the exact suspended order when checkout is the origin");
 assert.match(offersTool, /buildOfferEvaluationContext\(\{[\s\S]*checkout: order[\s\S]*booking: activeBooking/, "offers must build one canonical, non-mixed evaluation context");
-assert.match(offersTool, /if \(!checkoutPreserved && current\.view !== "offers"\) offersReturnRef\.current = current/, "repeated offer queries and checkout-preserving checks must not overwrite the return target");
+assert.match(offersTool, /current\.view !== "offers"[\s\S]*offersReturnRef\.current = current[\s\S]*pauseRichRenderingForTopicChange/, "repeated offer queries must preserve one paused return target");
 const activeCancellationToolGuard = sliceBetween(app, "const preserveActiveCancellationForTool", "const commitDiscoveryPreferences", "active cancellation tool guard");
 assert.match(activeCancellationToolGuard, /\["checking", "route_confirmation", "final_confirmation", "processing"\]/, "every active cancellation phase must block unrelated display tools");
 assert.doesNotMatch(activeCancellationToolGuard, /showStage|clearSeatSelection|clearPendingOrder/, "the cancellation tool guard must preserve the current panel and booking state");
-assert.equal((app.match(/const cancellationGuard = preserveActiveCancellationForTool\(/g) || []).length, 6, "all discovery, seat, summary, and offer display tools must respect an active cancellation");
+assert.equal((app.match(/const cancellationGuard = preserveActiveCancellationForTool\(/g) || []).length, 5, "all booking discovery, seat, and summary tools must respect an active cancellation while offers may replace rendering without clearing it");
 
 const mainRender = sliceBetween(app, "<main ref={scrollRef}", "</main>", "inline stage render");
 const guardedPanels = [
@@ -258,14 +258,14 @@ const guardedPanels = [
 ];
 for (const [component, view] of guardedPanels) {
   assert.equal((mainRender.match(new RegExp(`<${component}\\b`, "g")) || []).length, 1, `${component} must have one render site`);
-  assert.match(mainRender, new RegExp(`stage\\.view === ["']${view}["'][\\s\\S]{0,2400}<${component}\\b`), `${component} must be guarded by its exclusive stage.view`);
+  assert.match(mainRender, new RegExp(`visibleStageView === ["']${view}["'][\\s\\S]{0,2400}<${component}\\b`), `${component} must be guarded by its exclusive visible stage`);
 }
-assert.doesNotMatch(app, /function FaqPanel|stage\.view === ["']faq["']/, "FAQ answers must stay in chat and must not replace the active booking panel");
+assert.doesNotMatch(app, /function FaqPanel|stage\.view === ["']faq["']/, "FAQ answers must stay in chat and must not append a stale panel");
 const faqPreparation = sliceBetween(app, "const prepareFaqContext", "useEffect(() =>", "FAQ context preparation");
-assert.doesNotMatch(faqPreparation, /showStage\(/, "FAQ context preparation must preserve the active rich panel");
+assert.doesNotMatch(faqPreparation, /showStage\(/, "FAQ context preparation must preserve logical rich-panel state");
 assert.match(faqPreparation, /preserveBookingIntent[\s\S]*\["movies", "showtimes", "seatmap", "checkout", "booking", "history"\]/, "FAQ interruptions must preserve the active booking intent");
-assert.match(mainRender, /stage\.view === "booking" && displayedBooking && <BookingCard\b/, "a stored booking must not render unless booking is the active view");
-assert.match(mainRender, /stage\.view === "history" && <BookingHistory\b/, "booking history must not render unless history is the active view");
+assert.match(mainRender, /visibleStageView === "booking" && displayedBooking && <BookingCard\b/, "a stored booking must not render unless booking is the visible active view");
+assert.match(mainRender, /visibleStageView === "history" && <BookingHistory\b/, "booking history must not render unless history is the visible active view");
 assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}cancellation=\{[\s\S]{0,350}\bcancellationState\b/, "BookingCard must render the booking-scoped shared cancellation state used by text, voice, and touch");
 assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}onRequestCancel=\{/, "BookingCard must initiate cancellation through its parent-owned router");
 assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}onConfirm=\{/, "BookingCard confirmation must use the shared cancellation decision handler");
@@ -290,14 +290,16 @@ assert.doesNotMatch(unresolvedCancellationTarget, /setCancellationFlow\(/, "a ta
 assert.match(unresolvedCancellationTarget, /purpose:\s*CANCELLATION_TARGET_SELECTION_PURPOSE[\s\S]*candidateRefs/, "multiple targets must mark the history stage with an explicit cancellation purpose and displayed candidate references");
 assert.match(unresolvedCancellationTarget, /phase:\s*multiple\s*\?\s*["']target_selection["']\s*:\s*["']idle["']/, "multiple targets must return an explicit target-selection phase");
 const cancellationRouter = sliceBetween(app, "const routeCancellationTurn", "const cancellationResultContext", "shared cancellation continuation router");
-assert.match(cancellationRouter, /continuation\.handled\s*&&\s*!continuation\.bookingRef[\s\S]*phase:\s*["']target_selection["']/, "an ambiguous or unmatched displayed title must retain target selection instead of starting discovery");
-assert.match(cancellationRouter, /requestedRef:\s*continuation\.bookingRef\s*\|\|\s*["']["']/, "a unique displayed title or exact candidate reference must route using the resolved booking reference");
+assert.match(cancellationRouter, /resolveConversationalCancellation\(\{[\s\S]*displayedBookingRefs[\s\S]*conversationContext/, "cancellation must resolve natural selectors against displayed history and conversation context");
+assert.match(cancellationRouter, /resolution\.status === "ambiguous"[\s\S]*focusedCancellationChoice[\s\S]*phase:\s*"target_selection"/, "ambiguous matches must retain a focused target-selection list");
+assert.match(cancellationRouter, /resolution\.bookingRef[\s\S]*showBookingForAuthorizedCancellation/, "a unique conversational match must route using its exact booking reference");
 assert.match(cancellationRouter, /showBookingForAuthorizedCancellation\([\s\S]*["']direct_user_turn["']/, "typed and voice cancellation turns must grant explicit direct-user authorization");
 const inactiveCancellationTarget = sliceBetween(cancellationTool, "if ([\"already_cancelled\", \"not_current_booking\"]", "if (existingFlow?.bookingRef", "inactive cancellation target");
 assert.match(inactiveCancellationTarget, /dismissPendingCancellation\(target\.reason\)/, "known cancelled or past bookings must end the shared flow without confirmation");
 assert.match(inactiveCancellationTarget, /eligible:\s*false[\s\S]{0,180}confirmationRequired:\s*false/, "known past bookings must be returned as ineligible without confirmation");
 assert.ok(cancellationTool.indexOf("if (!isCurrentBooking(displayed))") < cancellationTool.indexOf("if (demoOnly)"), "a provider or fixture result must be rejected as past before any local cancellation confirmation is offered");
-assert.match(cancellationTool, /cancellationRequestId[\s\S]{0,900}cancellationRequestIsStale\(\)[\s\S]{0,300}staleCancellationResult\(\)/, "an obsolete booking lookup must not restore cancellation state after the guest moves to another task");
+assert.match(cancellationTool, /cancellationRequestIsStale = \(\) => cancellationOperationRef\.current !== cancellationRequestId/, "only an invalidated cancellation operation may obsolete an in-flight lookup");
+assert.match(cancellationTool, /keepCancellationHidden[\s\S]*capturePausedRichStage[\s\S]*cancellation_continued_while_hidden/, "a lookup completing after a topic change must stay hidden and resumable");
 assert.doesNotMatch(cancellationTool, /clearPendingOrder\(\)/, "cancellation lookup and review must preserve a resumable checkout instead of leaving a blank stage");
 assert.match(app, /const bookingHistoryTurnContext[\s\S]{0,900}no active bookings saved on this device[\s\S]{0,300}Do not ask them to select a booking/, "an empty current-booking result must not ask the guest to select a missing booking");
 assert.match(app, /The guest selected on-device booking summary[\s\S]{0,900}movie \$\{localBooking\.movie[\s\S]{0,900}seats \$\{\(localBooking\.seats \|\| \[\]\)\.join[\s\S]{0,900}Never invent or substitute a time, seat, screen, or amount/, "history selection context must give the agent exact booking fields instead of allowing stale-detail invention");
@@ -360,7 +362,7 @@ assert.ok(completionHandler.indexOf("appendBooking(updated)") < completionHandle
 assert.match(completionHandler, /else if \(liveRefundSucceeded\) markCancellationJournalForReconciliation/, "verified provider success with local persistence failure must retain a reconciliation lock");
 assert.match(completionHandler, /!cancellationJournal\.persisted[\s\S]*persistent_mutation_lock_unavailable[\s\S]*no request was sent[\s\S]*return/, "a provider cancellation must not be sent when its durable mutation lock cannot be stored");
 assert.match(completionHandler, /if \(!mountedRef\.current\)[\s\S]*storagePersisted/, "an unmounted mutation owner must still persist and return the verified result without issuing UI state updates");
-assert.match(completionHandler, /if \(bookingContextIsCurrent\)[\s\S]*bookingRef\.current = updated[\s\S]*if \(bookingPanelIsCurrent\) showStage/, "background cancellation completion must not replace an unrelated visible booking panel");
+assert.match(completionHandler, /if \(bookingContextIsCurrent\)[\s\S]*bookingRef\.current = updated[\s\S]*cancellationResultShouldRender[\s\S]*stageVisibleRef\.current[\s\S]*renderTopicRef\.current[\s\S]*if \(cancellationResultShouldRender\) showStage/, "background cancellation completion must not replace an unrelated or hidden panel");
 assert.match(completionHandler, /historyReturnRef\.current\?\.booking\?\.ref[\s\S]*historyReturnRef\.current = \{ \.\.\.historyReturnRef\.current, booking: updated \}/, "cancelling a history parent booking must refresh its saved return stage");
 assert.match(completionHandler, /historyContextRef\.current\?\.booking\?\.ref[\s\S]*historyContextRef\.current = \{ \.\.\.historyContextRef\.current, booking: updated \}/, "cancelling a history parent booking must refresh its action context");
 assert.match(completionLockWrapper, /withCancellationMutationLock\([\s\S]*navigator\.locks[\s\S]*executeCancellationMutation[\s\S]*cross_tab_mutation_in_progress[\s\S]*no request was sent/i, "all provider mutations must hold an exclusive browser-wide lock and fail closed when unavailable or busy");

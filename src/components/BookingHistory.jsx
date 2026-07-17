@@ -2,18 +2,14 @@ import React from "react";
 import { CalendarDays, Check, ChevronLeft, ChevronRight, History, RotateCcw, Ticket, X } from "lucide-react";
 import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
-import { isCurrentBooking } from "../lib/cancellationRouting.js";
+import { isCurrentBooking, sortBookingsForDisplay } from "../lib/cancellationRouting.js";
 
 export default function BookingHistory({ bookings = [], onSelect, onBack, onCancel, onRequestCancel, filter = "all" }) {
   const { t, dir, formatCurrency, formatDate } = useI18n();
   const cancelBooking = onCancel || onRequestCancel;
   const activeOnly = filter === "active";
   const visibleBookings = activeOnly ? bookings.filter((booking) => isCurrentBooking(booking)) : bookings;
-  const sorted = [...visibleBookings].sort((a, b) => {
-    const right = Date.parse(b.createdAt || "") || 0;
-    const left = Date.parse(a.createdAt || "") || 0;
-    return right - left;
-  });
+  const sorted = sortBookingsForDisplay(visibleBookings);
 
   return (
     <section aria-labelledby="booking-history-title" style={{ width: "100%", maxWidth: 420, margin: "0 auto" }}>
