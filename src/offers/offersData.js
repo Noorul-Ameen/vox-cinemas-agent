@@ -4,8 +4,10 @@
 export const OFFER_META = Object.freeze({
   source: "VOX Cinemas UAE bank deals",
   sourceUrl: "https://uae.voxcinemas.com/offers/bank-deals",
-  capturedDate: "2026-06-23",
-  verifiedDate: "2026-07-08",
+  capturedDate: "2026-07-17",
+  verifiedDate: "2026-07-17",
+  promotionCount: 21,
+  issuerCount: 20,
   disclaimer: {
     en: "Offer information is for guidance only. Final eligibility is verified at VOX checkout and remains subject to the bank’s current terms.",
     ar: "معلومات العروض إرشادية. يتم التحقق من الأهلية النهائية عند إتمام الحجز لدى ڤوكس، وتظل خاضعة لشروط البنك الحالية.",
@@ -31,6 +33,29 @@ const ALL = ["STANDARD", "PREMIER", "MAX", "IMAX", "KIDS", "GOLD", "THEATRE", "4
 const CORE = ["STANDARD", "PREMIER", "MAX", "IMAX", "KIDS", "GOLD", "THEATRE", "4DX"];
 const MOE_THEATRE_EXCLUSION = [{ cinemas: ["mall of the emirates", "moe"], experiences: ["THEATRE"] }];
 
+const OFFICIAL_OFFER_SLUGS = Object.freeze({
+  "fab-share": "fab-buy-one-ticket-get-one-free",
+  mawarid: "mawarid-50-off",
+  nbf: "nbf-buy-one-get-one-free",
+  "emirates-nbd": "enbd-offer-buy-one-ticket-get-one-free",
+  liv: "liv-bank-buy-one-get-one-free",
+  "sharjah-islamic-bank": "sharjah-islamic-bank-50-off",
+  aafaq: "aafaq-buy-one-get-one",
+  hsbc: "hsbc-buy-one-ticket-get-one-free",
+  deem: "deem-buy-one-get-one-free",
+  citibank: "citibank-buy-one-ticket-get-one-free",
+  "standard-chartered": "standard-chartered-buy-one-ticket-get-one-free",
+  "arab-bank-signature": "arab-bank-signature-bogof",
+  cbd: "cbd-credit-card-50-off",
+  adcb: "adcb-buy-one-ticket-get-one-free",
+  rakbank: "rakbank-50-off",
+  uab: "uab-buy-one-get-one-free",
+  "arab-bank": "arab-bank-buy-one-get-one-free",
+  "emirates-islamic": "emirates-islamic-bogof",
+  mashreq: "mashreq-credit-cards-50-off",
+  "adcb-touchpoints": "pay-with-touchpoints-and-experience-the-best-at-vox-cinemas",
+});
+
 const text = (en, ar) => ({ en, ar });
 const eligibility = (experiences, extra = {}) => ({ experiences, ...extra });
 const card = (id, name, aliases, rules, limit = null, extra = {}) => ({
@@ -41,21 +66,28 @@ const card = (id, name, aliases, rules, limit = null, extra = {}) => ({
   monthlyLimit: limit,
   ...extra,
 });
-const offer = (id, bank, bankAr, aliases, benefit, headline, headlineAr, summary, summaryAr, profiles, extra = {}) => ({
-  id,
-  bank: text(bank, bankAr),
-  aliases,
-  benefit,
-  headline: text(headline, headlineAr),
-  summary: text(summary, summaryAr),
-  profiles,
-  memberRequired: true,
-  onlineOnly: true,
-  sourceUrl: OFFER_META.sourceUrl,
-  capturedDate: OFFER_META.capturedDate,
-  verifiedDate: OFFER_META.verifiedDate,
-  ...extra,
-});
+const offer = (id, bank, bankAr, aliases, benefit, headline, headlineAr, summary, summaryAr, profiles, extra = {}) => {
+  const officialSlug = OFFICIAL_OFFER_SLUGS[id];
+  const detailUrl = officialSlug ? `${OFFER_META.sourceUrl}/${officialSlug}` : OFFER_META.sourceUrl;
+  return {
+    id,
+    bank: text(bank, bankAr),
+    aliases,
+    benefit,
+    headline: text(headline, headlineAr),
+    summary: text(summary, summaryAr),
+    profiles,
+    memberRequired: true,
+    onlineOnly: true,
+    sourceUrl: OFFER_META.sourceUrl,
+    detailUrl,
+    termsUrl: `${detailUrl}/terms-conditions`,
+    promotionCount: id === "citibank" ? 2 : 1,
+    capturedDate: OFFER_META.capturedDate,
+    verifiedDate: OFFER_META.verifiedDate,
+    ...extra,
+  };
+};
 
 export const OFFERS = Object.freeze([
   offer(
@@ -139,6 +171,34 @@ export const OFFERS = Object.freeze([
   ),
 
   offer(
+    "sharjah-islamic-bank",
+    "Sharjah Islamic Bank",
+    "مصرف الشارقة الإسلامي",
+    ["SIB", "Sharjah Islamic Bank", "SIB card"],
+    "half_price",
+    "50% off movie tickets",
+    "خصم 50٪ على تذاكر السينما",
+    "VOX currently lists this 50% offer, but its official detail and terms pages do not yet publish eligible card names or conditions.",
+    "تعرض VOX حالياً هذا العرض بخصم 50٪، لكن صفحة التفاصيل والشروط الرسمية لا تنشر بعد أسماء البطاقات المؤهلة أو الأحكام.",
+    [card(
+      "sib-checkout-verification",
+      "Eligibility details not yet published",
+      ["SIB eligible card", "Sharjah Islamic Bank eligible card"],
+      eligibility([]),
+      { stated: false },
+      { noCardRequired: true, verificationOnly: true },
+    )],
+    {
+      mediaCode: "SIB50",
+      detailsPublished: false,
+      notes: text(
+        "Check the current VOX ticket-offers step or contact Sharjah Islamic Bank before relying on this listing. Voxi will not guess card eligibility.",
+        "تحقق من خطوة عروض التذاكر الحالية لدى VOX أو تواصل مع مصرف الشارقة الإسلامي قبل الاعتماد على هذا الإعلان. لن يخمن Voxi أهلية البطاقة.",
+      ),
+    },
+  ),
+
+  offer(
     "aafaq",
     "Aafaq Finance",
     "آفاق للتمويل الإسلامي",
@@ -207,7 +267,33 @@ export const OFFERS = Object.freeze([
       card("citi-30-four", "Premier", ["Citi Premier", "Premier card"], eligibility(["STANDARD", "MAX", "KIDS", "PREMIER"], { onlyAt: [{ experiences: ["PREMIER"], cinemas: ["mall of the emirates", "moe"] }], excludedAt: [{ cinemas: ["city centre deira"], experiences: ["MAX"], seats: ["BALCONY"] }] }), { maxTickets: 4 }, { benefit: "thirty_percent" }),
       card("citi-30-two", "Life Platinum or Rewards", ["Citi Life Platinum", "Citi Rewards", "Life Platinum", "Rewards card"], eligibility(["STANDARD", "MAX", "KIDS", "PREMIER"], { onlyAt: [{ experiences: ["PREMIER"], cinemas: ["mall of the emirates", "moe"] }], excludedAt: [{ cinemas: ["city centre deira"], experiences: ["MAX"], seats: ["BALCONY"] }] }), { maxTickets: 2 }, { benefit: "thirty_percent" }),
     ],
-    { notes: text("Primary cardholders only; excludes IMAX, GOLD, THEATRE, 4DX, VIP, ONYX, Snow Cinema and Kempinski VOX.", "لحامل البطاقة الأساسية فقط؛ لا يشمل IMAX وGOLD وTHEATRE و4DX وVIP وONYX وSnow Cinema وڤوكس كمبينسكي.") },
+    {
+      mediaCode: "citi30",
+      notes: text("Primary cardholders only; excludes IMAX, GOLD, THEATRE, 4DX, VIP, ONYX, Snow Cinema and Kempinski VOX.", "لحامل البطاقة الأساسية فقط؛ لا يشمل IMAX وGOLD وTHEATRE و4DX وVIP وONYX وSnow Cinema وڤوكس كمبينسكي."),
+      campaigns: [
+        {
+          id: "citi-bogo",
+          benefit: "bogo",
+          headline: text("Buy one ticket, get one free", "اشترِ تذكرة واحصل على الثانية مجاناً"),
+          profileIds: ["citi-bogo-four", "citi-bogo-two"],
+          mediaCode: "CITI",
+          detailsPublished: false,
+          detailUrl: "https://uae.voxcinemas.com/offers/bank-deals/citibank-buy-one-ticket-get-one-free",
+          termsUrl: "https://uae.voxcinemas.com/offers/bank-deals/citibank-buy-one-ticket-get-one-free/terms-conditions",
+        },
+        {
+          id: "citi-30",
+          benefit: "thirty_percent",
+          headline: text("30% off movie tickets", "خصم 30٪ على تذاكر السينما"),
+          profileIds: ["citi-30-four", "citi-30-two"],
+          mediaCode: "citi30",
+          detailsPublished: true,
+          validUntil: "2027-04-30",
+          detailUrl: "https://uae.voxcinemas.com/offers/bank-deals/citi-bank-30-off",
+          termsUrl: "https://uae.voxcinemas.com/offers/bank-deals/citi-bank-30-off/terms-conditions",
+        },
+      ],
+    },
   ),
 
   offer(

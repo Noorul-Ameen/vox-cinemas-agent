@@ -1,279 +1,268 @@
 # VOXi end-to-end validation report
 
-## Test basis
+Test date: 17 July 2026, UAE
 
-| Item | Value |
-| --- | --- |
-| Test date | 16 July 2026, UAE |
-| Cloudflare URL | <https://voxi-ai.pages.dev/> |
-| Repository | `Noorul-Ameen/vox-cinemas-agent` |
-| Branch | `main` |
-| Tested application commit | `4ab7b23dc96ba461b8d1d411177892f36b4b66e6` |
-| Cloudflare bundle | `/assets/index-CSAd90cI.js` |
-| Bundle bytes | 4,744,533 |
-| Bundle SHA-256 | `E68AB19B95D15F205DB1F524AAF131331B352EF2D4055A3E28F2E382A1C4EF72` |
-| Data extraction | `2026-07-15T22:38:00.344Z` |
-| Desktop coverage | Signed-in Chrome, 1440 by 1000 |
-| Responsive coverage | Codex in-app browser, 420 by 900 |
-| Local coverage | Vite development server and production build |
+Build under test: local working tree, production build from `pnpm run build`
 
-The Cloudflare JavaScript was downloaded and compared with the local production bundle. Byte count and SHA-256 matched exactly. The root document used no-store behavior and the hashed JavaScript asset used immutable caching.
+Current working branch: `concierge-inline`
 
-## Executive assessment
+Local URL: <http://127.0.0.1:4173/>
 
-| Scope | Status | Assessment |
+Hosted URL: <https://voxi-ai.pages.dev/>
+
+Hosted status: the changes covered by this report are not yet deployed.
+
+## Executive result
+
+| Area | Status | Result |
 | --- | --- | --- |
-| Leadership review | PARTIALLY WORKING | The complete text and touch journey, current schedule discovery, filtering, seat flow, checkout preview, booking summary, reference QR, and device-only cancellation passed. Actual spoken voice remains blocked. |
-| Customer production sales | BLOCKED | Live inventory, holds, authoritative pricing, payment, official ticket QR, cross-device lookup, cancellation, and refund gateways are not connected. |
-| Repository quality gates | PASS | All 26 validators, production build, converter validation, punctuation checks, secret-pattern scan, and hosted asset parity passed. |
+| Bank-offer catalogue and details | PASS | 21 promotions across 20 offer groups, 42 card profiles, detailed English and Arabic content, official links, and truthful eligibility states. |
+| Typed bank-offer conversation | PASS LOCALLY | Specific bank and card questions work without microphone or external transport and open the same rich offer panel. |
+| Bank-offer search | PASS | Exact issuer searches are narrow and generic card or benefit searches remain broad. |
+| 420 px visual layout | PASS | English LTR and Arabic RTL fit the protected widget width without widget-level horizontal overflow. |
+| Core booking regression suite | PASS | Discovery, seat-derived ticket count, checkout return, cancellation continuation, FAQ continuity, history, and handover validators passed. |
+| Repository ElevenLabs contract | PASS | Prompt, protected transport, first message, languages, variables, and eight client tools match the versioned contract. |
+| Published ElevenLabs dashboard | PASS | The exact target agent returns HTTP 200 from the EU token endpoint and matches the repository prompt, first message, languages, and eight client tools. The widget supplies all 13 journey variables at runtime. |
+| Live ElevenLabs text | PASS LOCAL AND HOSTED | Text chat connected locally and on Cloudflare. English and Arabic identity responses passed, and the local FAB offer follow-up passed. |
+| Live spoken voice audio | ENVIRONMENT BLOCKED | The controlled in-app browser and Chrome did not expose a microphone permission state. Voice startup timed out safely and returned to text chat without losing the conversation. |
+| Cloudflare published-agent compatibility | PASS | The current hosted widget connected to the newly published agent in English and Arabic with no console warnings or errors. Remaining local code changes still require an authorized deployment. |
+| Live customer transactions | BLOCKED | Production inventory, payment, ticket, cancellation, refund, and related provider APIs are unavailable. |
 
-No repository-level FAIL remains in the tested text journey. External and environment-dependent gaps are listed as BLOCKED, PARTIALLY WORKING, or NOT TESTED.
+## What changed
 
-## Showtime error investigation and completed fixes
+### Complete bank-offer knowledge
 
-The previously reported generic Cloudflare showtime error could not be reproduced on the final hosted asset. The current production site uses the bundled validated VOX snapshot because `VITE_VISTA_BASE` is unset. It does not make a browser-side live Vista request, so CORS, provider authentication headers, and Cloudflare proxy rewrites were not the cause of the final deployment behavior.
+- Added structured offer facts for every current issuer shown on the official VOX UAE bank-deals page.
+- Grouped 21 promotions under 20 offer cards. Citi has two separately sourced campaigns.
+- Added 42 card or card-tier profiles.
+- Added English and Arabic content for summary, cards, experiences, formats, seat categories, monthly and booking limits, membership rules, exclusions, location rules, redemption, food and drink benefits, expiry, and complete terms.
+- Added official catalogue, detail, and terms links for each promotion when those pages publish information.
+- Added explicit source-boundary warnings where an official page is blank or one campaign must not inherit another campaign's terms.
+- Added contextual guidance that evaluates non-sensitive facts only. The code never accepts card numbers, CVV, OTP, passwords, or bank credentials.
 
-A concrete freshness defect was found: the daily extractor defaulted to tomorrow. After a refresh, the current UAE date could disappear even while the official source still published sessions for that date. The extractor now starts on the current UAE date, and the freshness gate requires both today and tomorrow to have sessions.
+### Search and conversation behavior
 
-Additional fixes completed during this validation:
+- Exact issuer and strong alias matches now narrow to the intended bank.
+- Generic card-tier and benefit searches still return all relevant issuers.
+- Typed issuer or card questions in English and Arabic use the existing `show_offers` tool handler while disconnected.
+- Local typed fallback is limited to specific offer questions. It does not take over generic FAQ, cancellation, refund, booking history, cinema selection, seat selection, checkout return, or language commands.
+- A clean card selection with no showtime context now requests a showtime experience instead of incorrectly returning ineligible.
+- Checkout remains resumable after viewing or refining offers.
 
-- Showtime errors now retain scoped error detail, console context, and a retry path instead of leaving a generic dead state.
-- Past sessions are filtered using UAE time and a 06:00 programming-day cutoff.
-- The Arabic generic movie question no longer becomes an unresolved title.
-- Dynamic pricing, cancellation, movie, showtime, notice, loading, and question strings pass through the customer-facing punctuation boundary.
-- FAQ answers render in the transcript while the active rich booking stage remains visible.
-- `Continue` after an FAQ interruption preserves the booking stage.
-- The seat map is replaced by checkout after seat confirmation, and the booking summary displays the selected seats and reference QR.
-- Previously verified official media is retained only when the new source response is clearly partial.
+### Offer interface
 
-Because the exact historical generic failure was not reproduced before the fix, this report does not claim that the today-omission defect was the sole cause of every past screenshot.
+- Catalogue cards start compact, while a targeted bank or card match opens automatically. Cards progressively reveal tiers, limits, experiences, redemption, food and drink details, full terms, and official sources.
+- Search, membership status, and card-selection controls meet the 44 px touch-target goal.
+- Long card names and condition text wrap inside the 420 px widget.
+- Focus states, disclosure indicators, RTL layout, reduced-motion handling, and readable body text are present.
+- Duplicate list keys, blank expiry spacing, and disclosure-state reset issues are fixed.
 
-## Data source and freshness
+## Official sources and boundaries
 
-| Property | Current behavior |
+Primary sources:
+
+- [VOX UAE bank deals](https://uae.voxcinemas.com/offers/bank-deals)
+- [FAB buy one ticket get one free](https://uae.voxcinemas.com/offers/bank-deals/fab-buy-one-ticket-get-one-free)
+- [FAB terms and conditions](https://uae.voxcinemas.com/offers/bank-deals/fab-buy-one-ticket-get-one-free/terms-conditions)
+
+Source limitations found during validation:
+
+- Sharjah Islamic Bank is listed as a 50 percent offer, but its detail and terms pages do not publish eligible cards or conditions. VOXi reports that limitation and requires checkout verification.
+- The standalone Citi BOGO page has no detailed terms. The separately published Citi 30 percent or BOGO campaign contains card-tier information and is displayed as a separate source.
+- Conflicting or incomplete published terms are surfaced as caveats. They are not silently resolved in favor of eligibility.
+
+## Automated validation
+
+Command: `pnpm run validate`
+
+Result: PASS
+
+The aggregate suite validated:
+
+- 9,668 schedule sessions, 37 films, 22 cinemas, and 20 dates.
+- Snapshot manifest integrity, 283 on-demand shards, cache reuse, seat metadata, and source-session deduplication.
+- Progressive discovery, retained criteria, exact-time and nearest-time behavior, bare-date progression, and current programming-day filtering.
+- Text and voice transcript routing parity.
+- Versioned booking persistence, duplicate merge safety, cancellation state, and explicit clearing.
+- Cancellation by exact displayed movie title or booking reference without escaping into movie discovery.
+- Seat routing, invalid-seat rejection, idempotent confirmation, and seat-derived ticket count.
+- Checkout FAQ continuity, return to seat map, edit-seat repricing, payment lock, and completion cleanup.
+- 21 promotions, 20 offer groups, 42 card profiles, 882 bilingual offer answers, official links, unpublished-detail boundaries, and tri-state eligibility.
+- Specific English and Arabic offer fallback, detail topics, cancellation priority, checkout return, and voice-path isolation.
+- Exact bank search regressions for SIB, FAB, Citibank, Emirates NBD, HSBC, and ADCB.
+- Broad card and benefit search regressions for Visa Infinite and buy one get one free.
+- English and Arabic UI matching, explicit language switching, and confirmation-only language changes.
+- Protected WebRTC voice, WebSocket typed chat, EU residency, bounded startup, worklet assets, and safe recovery.
+- The versioned ElevenLabs prompt, first message, 13 variables, and eight exact client tools.
+- FAQ knowledge, conversation routing, handover threshold, redaction, and unified rendering.
+- Customer-facing punctuation across 398 repository text files, including the prohibition on Unicode em dash and en dash characters.
+- Fresh schedule coverage from 17 July through 5 August 2026.
+
+## Production build and load budget
+
+Command: `pnpm run build`
+
+Result: PASS
+
+| Measurement | Result |
 | --- | --- |
-| Schedule source | Official VOX UAE public-site routes under `uae.voxcinemas.com` and `uae-apife.voxcinemas.com` |
-| Runtime mode | Validated bundled snapshot |
-| Live provider writes | Disabled |
-| Extraction start | Current date in `Asia/Dubai` |
-| Date discovery | Official advertised `availableDays`, capped at 31 days |
-| Current coverage | 16 to 26 July 2026 |
-| Sessions | 10,010 raw, 9,972 unique, 38 duplicates removed |
-| Catalog | 35 films and 22 cinemas |
-| Today and tomorrow | 1,450 sessions on 16 July, 1,449 on 17 July |
-| Browser cache | Root no-store, hashed asset immutable |
-| Data refresh | Daily at 05:30 UAE, plus Thursday at 10:30 UAE, and manual dispatch |
-| Past-session filtering | UAE clock with a 06:00 programming-day cutoff |
-| Sold-out detection | Not authoritative in snapshot mode |
-| Checkout revalidation | No licensed inventory hold or provider quote is available |
+| Initial requests | 2 |
+| Initial JavaScript raw | 773,130 bytes |
+| Initial JavaScript gzip | 218,599 bytes |
+| Initial JavaScript Brotli | 199,055 bytes |
+| Initial CSS gzip | 623 bytes |
+| Largest schedule shard raw | 54,533 bytes |
+| Largest schedule shard gzip | 2,249 bytes |
+| Cold-load budget | PASS |
 
-The widget does not substitute a stale date when the requested date is not covered. It shows an explicit unavailable state. Snapshot seat availability is labelled as a preview. Final availability and pricing require the licensed booking gateway.
+Vite reports its advisory warning for chunks over 500 kB. Both enforced initial-load budgets pass, and the ElevenLabs transport remains deferred until text or voice startup.
 
-## Official source comparison samples
+## Mounted 420 px browser validation
 
-The values below were taken from the current official extraction and checked against the concierge mapping.
+The production build was reloaded at `http://127.0.0.1:4173/` and tested through its visible interface.
 
-| Movie | Cinema and date | Official sample | Concierge result | Status |
-| --- | --- | --- | --- | --- |
-| Toy Story 5 | Mall of the Emirates, 17 July | 19 sessions, English, official poster. Session `619806` at 17:45 KIDS and `619657` at 18:30 PREMIER. | Exact 18:00 request clearly stated no exact match and showed only 17:45 and 18:30. | PASS |
-| The Odyssey | Mall of the Emirates, 17 July | 51 sessions, English, official poster. IMAX sessions `619116`, `619117`, `619118` at 09:00, 12:30, 16:00. 4DX sessions `619154`, `619155`, `619156` at 10:15, 13:45, 17:15. | IMAX showed only the IMAX times. Changing to 4DX replaced them with the 4DX times. | PASS |
-| Supergirl | Yas Mall Abu Dhabi, 17 July | Two PREMIER sessions, `531556` at 13:40 and `531559` at 20:50, English, official poster. | Cinema, date, and language mapping matched the snapshot. | PASS |
-| Ezma | Mall of the Emirates, 16 July | One limited session, `619699` at 15:45 PREMIER, Arabic, official poster. | Arabic and limited-showtime mapping matched. | PASS |
-| Sakr w Canaria | Mall of the Emirates, 16 July | Sessions `619552`, `619554`, `619556` at 14:00, 19:00, and 00:00 PREMIER, Arabic, official poster. | Arabic results retained all three programming-day sessions. | PASS |
-| The Match: FIFA WC Documentary | Mall of the Emirates, 16 July | One session, `619700` at 18:10 PREMIER, Spanish and English, official poster. | Limited-session mapping matched. | PASS |
-| Jana Nayagan | City Centre Deira, 22 July | Tamil, sessions `664534` and `664536` at 04:30, poster missing from the official source. | Session data is present. UI uses an explicit neutral fallback and records `missing_at_source`. | PARTIALLY WORKING |
+| Scenario | Expected | Actual | Status |
+| --- | --- | --- | --- |
+| FAB typed question while disconnected | A concise answer and FAB rich panel | Correct answer and only First Abu Dhabi Bank displayed | PASS |
+| FAB card selected without experience | Ask for missing showtime experience | `More details needed` and showtime guidance displayed | PASS |
+| ENBD card question | List cards and open ENBD | Card summary plus Emirates NBD panel displayed | PASS |
+| Arabic FAB question | Arabic answer and Arabic panel | Correct Arabic answer, RTL panel, official source retained | PASS |
+| SIB exact search | One issuer | One Sharjah Islamic Bank issuer card | PASS |
+| FAB exact search | One issuer | One First Abu Dhabi Bank issuer card | PASS |
+| Citibank exact search | One issuer with two campaigns | One Citibank card with two-campaign summary | PASS |
+| Emirates NBD exact search | One issuer | One Emirates NBD issuer card | PASS |
+| HSBC exact search | One issuer | One HSBC issuer card | PASS |
+| ADCB exact search | One issuer | One Abu Dhabi Commercial Bank result | PASS |
+| Visa Infinite broad search | Multiple relevant issuers | Eight issuer cards | PASS |
+| BOGO broad search | Multiple relevant issuers | Fourteen issuer cards | PASS |
+| SIB unpublished conditions | No invented card details | Clear missing-publication warning and checkout verification | PASS |
+| Citi source separation | No cross-campaign assumption | Explicit standalone BOGO and separate campaign boundary | PASS |
+| FAB complete details | Cards, limits, experiences, redemption, terms, sources | All sections expanded and correct official links displayed | PASS |
+| Offer artwork | No failed rendered images | 19 of 19 rendered official images loaded | PASS |
+| English layout | 420 px and no widget overflow | Widget width 420 px, content stays inside widget | PASS |
+| Arabic layout | RTL, 420 px, no widget overflow | `lang=ar`, `dir=rtl`, widget width 420 px | PASS |
+| Runtime logs | No browser errors or warnings | Empty runtime log | PASS |
 
-No authoritative sold-out sample was available in the snapshot payload. Sold-out validation is therefore not claimed.
+Screenshots:
 
-## Complete scenario matrix
+These screenshots predate the final subtitle terminology correction from issuers to offer groups. The final build contains the corrected label; layout and offer content are unchanged.
 
-| Area | Test Scenario | Status | Expected Result | Actual Result | Fix Applied | Remaining Dependency |
-| --- | --- | --- | --- | --- | --- | --- |
-| Deployment | Cloudflare asset matches local build | PASS | Same production bytes | Byte count and SHA-256 matched | Verified exact artifact | None |
-| Deployment | Prior generic showtime error reproduction | NOT TESTED | Reproduce the exact original state | Final and earlier inspected builds did not reproduce the exact generic state | Concrete freshness defect and error path fixed | Original failing network trace was unavailable |
-| Showtime | Current UAE date remains after refresh | PASS | Today and tomorrow are available | 1,450 today and 1,449 tomorrow | Extractor starts on UAE today and freshness validator checks both | Official source availability |
-| Showtime | Structured loading and retry behavior | PARTIALLY WORKING | Scoped error, retry, and console context | Source and local error paths passed. Hosted normal loading passed, but a hosted provider failure was not deliberately injected. | Added structured error metadata and retry | Hosted live-gateway failure replay |
-| Data | Current schedule coverage | PASS | Current official advertised dates | 9,972 sessions across 11 dates | Transactional extraction and validation | Daily source access |
-| Data | Exact title, cinema, date, format, language, and session IDs | PASS | Mappings agree with source | Sample matrix agreed | Source IDs and fields preserved | None for snapshot mapping |
-| Data | Limited-showtime movies | PASS | Single and low-count sessions remain visible | Ezma, Supergirl, and Match samples retained | No broad minimum-session filter | None |
-| Data | Official poster display | PASS | Contained official posters render | Toy Story, Arabic catalog, and confirmation poster loaded at 420 px | Poster retention and load evidence | Remote host availability |
-| Data | Jana Nayagan poster | PARTIALLY WORKING | Official poster or truthful fallback | Official source omitted the poster, fallback rendered | Added explicit missing-source metadata | VOX source poster |
-| Data | Experience artwork refresh | PARTIALLY WORKING | Complete current official set | One fresh record plus 13 previously verified official records retained because the current response was partial | Partial-response guard | Complete official response |
-| Data | Offer imagery refresh | PASS | Current official offer records | 21 fresh records, no retained stale records | Campaign-aware refresh | Official offer pages |
-| Data | Authoritative sold-out sessions | BLOCKED | Sold-out status matches provider | Snapshot status does not provide reliable sold-out inventory | UI labels availability as preview | Licensed inventory API |
-| Automation | Daily refresh configuration | PASS | Automated daily current data | Daily and Thursday schedules configured | Today-first transactional refresh | GitHub and source availability |
-| Automation | Observe next natural scheduled run and alert path | NOT TESTED | Scheduled run completes after this report | Configuration and prior manual paths validated, next natural run not observed | Workflow includes validation gates | Time and external runner state |
-| Discovery | Cinema already provided | PASS | Do not ask for cinema again | Mall of the Emirates retained | Persistent criteria parser | None |
-| Discovery | Date already provided | PASS | Do not ask for date again | Tomorrow became 17 July | UAE date parser | None |
-| Discovery | Preferred time supplied | PASS | Filter to exact or nearby sessions | 18:00 returned only 17:45 and 18:30 for Toy Story | Nearest-time result window | None |
-| Discovery | Specific movie filtering | PASS | Do not show unrelated movies | Toy Story query returned only Toy Story | Specific-title grounding | None |
-| Discovery | Genre filtering | PASS | Only matching catalog movies | Comedy results excluded The Odyssey | Genre metadata filter | Source metadata quality |
-| Discovery | Kids and family filtering | PASS | Only suitable movies or KIDS sessions | Minions, Toy Story, and Supergirl matched, The Odyssey did not | Audience and KIDS-session filter | Source classifications |
-| Discovery | Experience filtering | PASS | Only matching experience sessions | IMAX showed the three IMAX times | Experience-session filter | None |
-| Discovery | Change experience | PASS | Replace stale experience results | 4DX replaced IMAX with 10:15, 13:45, 17:15 | Preference invalidation | None |
-| Discovery | Arabic language, cinema, and date request | PASS | Arabic movies at Mall of the Emirates tomorrow | Four Arabic films rendered, Toy Story did not, no unresolved-title error | Arabic generic-question guard and regression test | None |
-| Discovery | Text and voice transcript parsing parity | PASS | Same transcript produces same criteria | Deterministic tests passed | Shared parser and journey reducer | Actual microphone transport separate |
-| Booking | Ticket count derives from seats | PASS | One seat equals one ticket | A2 and A3 produced two seats and AED 84.00 | Removed quantity flow, seat-derived totals | Live pricing gateway |
-| Booking | Return from checkout and change seats | PASS | New seats replace stale checkout | A2 and A3 changed to A2 and A4, total remained two seats and AED 84.00 | Back-navigation and quote refresh | Live price quote |
-| Booking | Natural back to seats | PASS | Text command returns to seat map | `Go back to the seats` restored seat map with A2 and A4 | Shared navigation intent | Voice replay blocked |
-| Booking | Change showtime clears seat and checkout | PASS | Earlier selection invalidates downstream state | Showtime panel returned and seat map and checkout were removed | Selection invalidation graph | None |
-| Navigation | Browser Back and Forward history buttons | NOT TESTED | Browser history preserves or safely resets the journey | Separate browser Back and Forward controls were not replayed after the final deployment. In-app Back and natural navigation passed. | None | Dedicated browser-history replay |
-| Booking | Payment confirmation rendering | PASS | Checkout leaves seat map and shows final summary | Booking summary showed A2 and A4, AED 84.00, poster, reference, and QR | Unified confirmation stage | Real payment and reservation APIs |
-| Booking | Booking history persistence | PASS | Saved record remains on device | Record appeared in history | Versioned local storage | Cross-device booking API |
-| Cancellation | Current booking cancellation | PASS | Truthful confirmation and cleanup | Device-only warning displayed, record marked cancelled, action and QR removed | Deterministic cancellation routing and storage | Provider cancellation and refund API |
-| Transaction | Real payment, reservation, official ticket QR | BLOCKED | Provider confirms a paid reservation | Current flow is explicitly a payment preview and reference QR | Honest capability boundaries | PCI payment, inventory hold, booking and ticket APIs |
-| Transaction | Real cancellation and refund | BLOCKED | Provider verifies eligibility and refund outcome | Current action changes only the device-local record | Two-step truthful confirmation | Provider cancellation and refund APIs |
-| FAQ | Refund question during seat selection | PASS | Answer in transcript, stage preserved, no duplicate panel | Refund answer appeared and seat map stayed visible | Inline FAQ response | Production content approval |
-| FAQ | Continue after FAQ | PASS | Resume same stage | Seat map remained active and discovery did not restart | Resume-only context routing | None |
-| Conversation | Internal readiness lines | PASS | No customer-facing `Text is ready` message | No readiness transcript line rendered | Removed readiness transcript copy | None |
-| Conversation | End and start new conversation | PASS | Clear logical journey without stale rich stage | Repeated hosted resets returned to the welcome state | Unified reset lifecycle | None |
-| Voice | Protected source and transport contract | PASS | WebRTC, EU residency, tool names, worklets, and timeouts remain valid | All source validators passed | No protected contract changed | ElevenLabs service availability |
-| Voice | Actual hosted microphone and spoken reply | BLOCKED | Voice connects and continues current journey | Chrome permission remained pending, then `Microphone permission timed out`; text state remained intact | Bounded timeout and graceful fallback | Chrome permission state and ElevenLabs session verification |
-| Visual | Desktop layout | PASS | Centered, contained, readable widget | 1440 by 1000 inspection passed | White and blue compact layout | None |
-| Visual | 420 px English and Arabic layout | PASS | No document overflow, compact posters, fixed composer | 420 by 900 screenshots passed in LTR and RTL | Responsive grid and compact media | Physical device check remains separate |
-| Visual | Physical phone and tablet | NOT TESTED | Real-device input, keyboard, and rotation pass | No physical device was attached | 420 px browser coverage completed | Device lab |
-| Accessibility | Keyboard and semantic control contracts | PASS | Buttons, labels, status, alerts, and focus paths are present | Automated contracts and browser interaction passed | Accessible names and state labels | Screen-reader audit separate |
-| Accessibility | Screen reader and contrast audit | NOT TESTED | Formal WCAG review | Not executed | None | Accessibility specialist and device tools |
-| Punctuation | No Unicode em dash or en dash in customer-facing content | PASS | Forbidden characters never render | 96 repository text files, bilingual strings, FAQ, prompts, fallbacks, transcripts, provider fields, and dynamic errors passed | Static scan and runtime normalization | Re-run on every change |
-| Security | Real secret exclusion | PASS | No real secrets committed | Only `.env.example` found, secret-pattern scan found no credential value, ignore rules cover local secrets and key files | Existing repository rules | Full third-party security review |
-| Dependencies | Package vulnerability audit | NOT TESTED | Lockfile audit result | `pnpm audit` could not run because the project uses `package-lock.json` and no pnpm lockfile; npm CLI was not available in this runtime | None | Run `npm audit --omit=dev` in CI |
-| Performance | JavaScript bundle size | PARTIALLY WORKING | Production load budget is defined and met | Build passed, but the bundle is 4,744,533 bytes and Vite emitted a chunk-size warning | None in this scope | Code splitting, performance budget, Lighthouse testing |
+- [FAB compact offer](../evidence/screenshots/local-bank-offers-fab-2026-07-17.png)
+- [Arabic FAB offer](../evidence/screenshots/local-bank-offers-arabic-2026-07-17.png)
+- [Captured mounted browser results](../evidence/logs/bank-offers-mounted-browser-results-2026-07-17.json)
 
-## What works
+## Core journey regression matrix
 
-- Current official schedule discovery for covered dates.
-- Specific movie, cinema, date, time, genre, kids, language, and experience filtering.
-- Exact and nearest-time behavior.
-- English and Arabic text interaction.
-- Inline FAQ interruption and stage preservation.
-- Seat-derived ticket count, total, fees, and checkout summary.
-- Checkout back-navigation, seat replacement, and natural navigation commands.
-- Booking summary, compact posters, reference QR, local history, and device-only cancellation.
-- Desktop and 420 px responsive rendering.
-- Automated data refresh configuration and transactional validation.
-- Customer-facing punctuation compliance.
+These paths are covered by deterministic validators. The stated live text smokes were replayed through the published target agent, but the complete matrix and live voice audio were not replayed through a remote session.
 
-## What does not work as a live customer transaction
+| Area | Scenario | Status | Evidence basis |
+| --- | --- | --- | --- |
+| Discovery | Cinema already supplied is not asked again | PASS | Discovery preference and annotated journey validators |
+| Discovery | Date already supplied is not asked again | PASS | Discovery prompt validator |
+| Discovery | Time filters exact or nearest showtimes | PASS | Discovery and showtime validators |
+| Discovery | Genre, kids, family, language, experience, and specific movie filters combine | PASS | Discovery preference validator |
+| Discovery | Changing criteria refreshes results | PASS | Preference invalidation validator |
+| Seats | One selected seat equals one ticket | PASS | Seat journey validator |
+| Seats | No quantity stage or plus and minus control | PASS | Invariant and seat validators |
+| Seats | Changing cinema, date, movie, or showtime clears incompatible seats | PASS | Journey state validator |
+| Checkout | Return to seats and reprice | PASS | Checkout continuity validator |
+| Checkout | FAQ or offers do not destroy checkout | PASS | Checkout continuity validator |
+| Booking | Completed local summary persists and displays reference QR | PASS | Booking and unified conversation validators |
+| Cancellation | Movie title continues displayed cancellation candidates | PASS | Cancellation journey validator |
+| Cancellation | Duplicate title is handled conservatively | PASS | Cancellation safety validator |
+| FAQ | Answers remain inline without duplicating rich panels | PASS | FAQ and unified conversation validators |
+| Language | English and Arabic preserve journey state | PASS | Language and conversation-mode validators |
+| Handover | Explicit request and two distinct failed clarifications | PASS | Handover validator |
+| Browser navigation | Document Back and Forward safely exit and restore the standalone page. Transient rich stages use in-widget controls instead of browser history. | PARTIAL BY DESIGN | [Annotated mounted evidence](../evidence/logs/annotated-end-to-end-validation-2026-07-16.md) |
+| Punctuation | Customer-facing text contains no prohibited Unicode dash | PASS | Punctuation validator |
 
-- Real seat inventory and holds.
-- Authoritative provider prices and fees.
-- Real payment authorization.
-- Official VOX booking creation and admission QR.
+## ElevenLabs contract validation
+
+Repository contract: [config/elevenlabs-agent-contract.json](../config/elevenlabs-agent-contract.json)
+
+Setup guide: [ELEVENLABS_AGENT_SETUP.md](../ELEVENLABS_AGENT_SETUP.md)
+
+Contract version: `2026-07-17.2`
+
+Expected public agent ID: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
+
+Prompt hash: `cd7e157c550647ba23d87073e57800ac083acc04caa4a4bf8a5aa134d52351ac`
+
+Expected client tools:
+
+1. `show_movie_selection`
+2. `show_showtimes`
+3. `show_seat_map`
+4. `select_seats`
+5. `show_booking_summary`
+6. `show_booking_for_cancellation`
+7. `show_offers`
+8. `handover_to_agent`
+
+Static contract result: PASS.
+
+Published dashboard result: PASS.
+
+Published findings:
+
+- The exact target is published as `VOXi - VOX Cinemas UAE`.
+- Its EU public token endpoint returns HTTP 200.
+- Its prompt matches the repository `VOXI_AGENT_PROMPT` after ignoring editor-only surrounding whitespace.
+- Its first message is exactly `{{voxi_session_opening}}`.
+- Its dashboard test default is set for `voxi_session_opening`. The widget supplies the complete 13-variable journey payload at session start, including values that the dashboard does not list as prompt placeholders.
+- It supports English and Arabic, and Detect language is off.
+- All eight exact client-tool names and descriptions are present, with Wait for response enabled on every tool.
+- First-message override is off and text-only override is on.
+- ElevenLabs forces Agent language override on and disables its toggle when Arabic is configured. The widget intentionally sends no language override, so compatibility is preserved.
+
+### Live text smoke
+
+- Status reached: `Text chat`.
+- Voxi identity response: "I'm Voxi, the warm, confident bilingual AI assistant for VOX Cinemas UAE."
+- FAB follow-up response: "The FAB offer is for 2D tickets only."
+- The Cloudflare widget also returned a grounded English Voxi identity and the Arabic response: "أنا ڤوكسي، المساعد الافتراضي ثنائي اللغة الواثق والودود لڤوكس سينما الإمارات."
+- Local and hosted text checks recorded 0 console errors and 0 console warnings.
+
+Voice startup reached the microphone permission gate, but the controlled in-app browser and Chrome test surface both reported the permission state as unavailable. The bounded timeout returned safely to text chat, so no live audio was captured. Manual English and Arabic voice validation remains required in a normal browser with an available microphone. Preserve WebRTC, WebSocket text-only startup, `select_seats`, all client-tool names, and `serverLocation: "eu-residency"`.
+
+## Required provider API and knowledge actions
+
+### Required for customer transactions
+
+- Licensed current film, session, seat inventory, and seat-hold APIs.
+- Authoritative price, fee, and bank-offer application APIs.
+- Secure payment authorization.
+- Provider booking confirmation and official ticket or QR issuance.
 - Cross-device booking lookup.
-- Provider cancellation, refund, and offer redemption.
+- Provider cancellation eligibility, cancellation mutation, refund outcome, and refund-reference APIs.
+- Confirmed human-contact connector if live transfer is required.
 
-These paths are intentionally not simulated as live.
+### Required for sustained bank-offer accuracy
 
-## Partially working
+- A VOX-owned structured offer feed or CMS API with promotion ID, issuer, cards, benefit, limits, locations, experiences, expiry, and terms URL.
+- A named business owner for offer-copy approval and conflict resolution.
+- A scheduled source-diff alert for blank, changed, expired, or conflicting official offer pages.
+- A policy decision for whether expired offers stay visible as historical information or disappear immediately.
 
-- Leadership review is partially working because actual spoken voice is blocked in the current automated Chrome permission state.
-- Experience-media refresh is partially working because the official response was partial and 13 previously verified records were retained.
-- Jana Nayagan uses a truthful poster fallback because the official source omitted its poster.
-- Performance is partially working because the production build passes but the large single bundle has no agreed performance budget.
+### Current safe fallback
 
-## Blocked items and exact actions
+- Showtimes use the refreshed official public-site snapshot and versioned shards.
+- Bank offers use the official public pages captured on 17 July 2026.
+- Final ticket and offer eligibility is deferred to VOX checkout.
+- Device-only booking and cancellation records are labeled truthfully and never presented as provider-confirmed transactions.
 
-### ElevenLabs
+## Evidence files
 
-1. Confirm the dashboard agent uses the same public agent ID as the deployment.
-2. Keep WebRTC and `serverLocation: "eu-residency"` unchanged.
-3. Keep all existing client-tool names and `select_seats` unchanged.
-4. Synchronize the dashboard prompt with `src/lib/voxiSession.js`, including the no-Unicode-dash rule and the current bilingual journey guidance.
-5. Configure the dashboard first message as `{{voxi_session_opening}}` so text-to-voice continuation does not replay the welcome.
-6. Confirm `show_offers` and `handover_to_agent` exist in the dashboard only if those added tools are intended to be callable.
-7. In a normal Chrome session, set microphone access for `https://voxi-ai.pages.dev/` to Allow, reload, and complete an English and Arabic spoken booking replay.
-8. If permission is already Allow but the request remains pending, inspect Chrome enterprise policy, operating-system microphone privacy, device availability, and ElevenLabs session logs.
+- [Bank-offer and ElevenLabs validation log](../evidence/logs/bank-offers-elevenlabs-validation-2026-07-17.md)
+- [Production readiness summary](../PRODUCTION_READINESS_REPORT.md)
+- [ElevenLabs setup guide](../ELEVENLABS_AGENT_SETUP.md)
+- [Versioned ElevenLabs contract](../config/elevenlabs-agent-contract.json)
+- [FAB screenshot](../evidence/screenshots/local-bank-offers-fab-2026-07-17.png)
+- [Arabic screenshot](../evidence/screenshots/local-bank-offers-arabic-2026-07-17.png)
+- [Mounted browser result capture](../evidence/logs/bank-offers-mounted-browser-results-2026-07-17.json)
 
-No repository CSP change is required for the current timeout. Primary worklets are self-hosted and the required secondary `blob:` worklet allowance is present.
+## Final status
 
-### Live booking APIs
+The repository-level bank-offer work is complete and no remaining reproducible bank-offer or local layout defect was found. The exact ElevenLabs target is published, and local plus hosted English and Arabic text passed.
 
-Provide an approved server gateway for:
-
-- Current movies and sessions.
-- Authoritative sold-out and wheelchair inventory.
-- Seat plan, seat status, and expiring hold tokens.
-- Authoritative price, fee, tax, and offer quote.
-- PCI-compliant payment intent and final status.
-- Booking creation and official admission ticket or QR.
-- Cross-device booking lookup.
-- Cancellation eligibility, idempotent cancellation, refund status, and reconciliation.
-
-The browser must never receive upstream credentials.
-
-### Knowledge base
-
-- Assign an owner and approval date for each FAQ topic.
-- Obtain legal and operations approval for refund, offer, accessibility, and age-rating wording.
-- Add effective dates and expiry review for campaign content.
-- Provide an escalation path for questions that the approved knowledge set cannot answer.
-
-## Code-review findings
-
-- Fixed the tomorrow-only extraction start.
-- Fixed the Arabic generic discovery residual-title path.
-- Fixed dynamic rich UI error punctuation normalization.
-- Fixed media-retention rules so complete campaign removals are not silently retained.
-- Preserved verified media only for clearly partial source responses.
-- Preserved FAQ and `Continue` behavior without replacing the active booking panel.
-- Verified there is no separate ticket quantity stage.
-- Verified no real secret file is tracked.
-- No live Vista credential or payment value is placed in a Vite environment variable.
-- Resolved in the pending cold-start candidate: showtimes and ElevenLabs are split from the initial JavaScript, and build budgets enforce the result. A repeatable external hosted browser trace is still not present in repository CI.
-
-## Evidence
-
-### Screenshots
-
-- [Before-fix hosted baseline](../evidence/screenshots/hosted-before-2026-07-16.png)
-- [Final desktop showtimes](../evidence/screenshots/hosted-after-desktop-showtimes-2026-07-16.png)
-- [Final 420 px English showtimes](../evidence/screenshots/hosted-after-mobile-showtimes-2026-07-16.png)
-- [Final 420 px Arabic results](../evidence/screenshots/hosted-after-mobile-arabic-2026-07-16.png)
-- [Final 420 px booking summary and reference QR](../evidence/screenshots/hosted-after-mobile-confirmation-2026-07-16.png)
-
-### Logs
-
-- [Hosted end-to-end evidence](../evidence/logs/hosted-e2e-2026-07-16.md)
-- [Repository validation summary](../evidence/logs/pnpm-run-validate-2026-07-16.txt)
-- [Production build summary](../evidence/logs/pnpm-run-build-2026-07-16.txt)
-- [Converter and secret-scan evidence](../evidence/logs/converter-and-security-2026-07-16.txt)
-
-## Final production-readiness status
-
-| Decision | Status | Reason |
-| --- | --- | --- |
-| Leadership review with text and touch | PARTIALLY WORKING | The complete text and visual journey passed, but actual spoken voice remains blocked. |
-| Public customer browsing of covered snapshot dates | PARTIALLY WORKING | Discovery is current and tested, but freshness still depends on the scheduled extraction and deploy path. |
-| Public customer sales and service | BLOCKED | Live transactional and customer-service provider APIs are not connected. |
-
-The repository-level fixes that could be reproduced safely are complete. The remaining gaps require browser permission, ElevenLabs dashboard or service evidence, approved provider APIs, production knowledge ownership, performance work, or physical-device testing.
-
-## 16 July checkout continuity addendum
-
-The pending local candidate fixes checkout loss after conversational and side-panel interruptions.
-
-- Checkout remained visible for refund and parking questions.
-- Offers and repeated offer refinement retained the correct checkout return target.
-- Booking History and a stored booking detail retained the checkout draft.
-- English and Arabic typed return phrases restored the exact movie, showtime, seats, and total.
-- Voice transcript routing uses the same tested local restoration helper.
-- Edit seats restored the exact seats and recalculated ticket count and pricing after a seat was removed.
-- Payment authorization is protected from panel displacement.
-- Local Arabic voice startup reached Voice chat, and ending voice returned to Text chat without losing the visible booking.
-- Checkout completion rendered the saved booking summary and reference QR.
-- Full validation, build, punctuation scan, 420 px layout inspection, and browser error check passed.
-
-Detailed evidence: [checkout continuity validation](../evidence/logs/checkout-continuity-2026-07-16.md).
-
-## 16 July annotated browser addendum
-
-The latest local candidate supersedes the earlier microphone-timeout result for this environment.
-
-- Voice chat connected successfully with the current agent and EU residency configuration.
-- The exact annotated cinema-picker, DCC, transcript-history, checkout edit, and saved-summary cases passed.
-- Progressive cinema and movie disclosure, combined time filtering, no-exact-time fallback, family-to-action replacement, specific IMAX selection, seat repricing, FAQ continuity, Arabic RTL, persistence, and cancellation continuation were replayed in the mounted browser.
-- The unique cancellation title remained in cancellation. Duplicate movie titles requested the displayed booking reference and did not enter movie discovery.
-- Browser Back left the standalone document and Forward restored it safely, while transient stage restoration remains available through the in-widget controls rather than browser history.
-- The exact final candidate remains local until it is pushed and deployed.
-
-Detailed matrix and evidence: [annotated end-to-end validation](../evidence/logs/annotated-end-to-end-validation-2026-07-16.md).
+Hosted compatibility with the published agent passed. Deployment of the remaining local repository changes, live microphone and voice-audio validation, and customer transactions remain external boundaries. The report does not represent those paths as complete.

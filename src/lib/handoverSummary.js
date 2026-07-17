@@ -5,6 +5,14 @@ export const HANDOVER_TRIGGER = Object.freeze({
   FAILED_CLARIFICATIONS: "failed_clarifications",
 });
 
+export const HANDOVER_REASON = Object.freeze({
+  EXPLICIT_REQUEST: "explicit_request",
+  CLARIFICATION_FAILURE: "clarification_failure",
+  FALLBACK: "fallback",
+});
+
+export const HANDOVER_CLARIFICATION_FAILURE_LIMIT = 2;
+
 export const HANDOVER_STATUS = Object.freeze({
   CONNECTING: "connecting",
   QUEUE_READY: "queue_ready",
@@ -28,7 +36,12 @@ function safeString(value, maxLength = 240) {
 }
 
 export function isClarificationFailureReason(value) {
-  return /clarification|failed|fallback/.test(safeString(value, 80).toLowerCase());
+  const reason = safeString(value, 80).toLowerCase();
+  return reason === HANDOVER_REASON.CLARIFICATION_FAILURE || reason === HANDOVER_REASON.FALLBACK;
+}
+
+export function isSupportedHandoverReason(value) {
+  return Object.values(HANDOVER_REASON).includes(safeString(value, 80).toLowerCase());
 }
 
 function nullableString(value, maxLength) {
@@ -145,6 +158,53 @@ export function sanitizeTranscript(messages, { maxMessages = 16, maxMessageLengt
       return text ? { role, text, ...(at ? { at } : {}) } : null;
     })
     .filter(Boolean);
+}
+
+function latestUserTurnKey(messages) {
+  if (!Array.isArray(messages)) return "missing_user_turn";
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    const role = safeString(message?.role ?? message?.source, 24).toLowerCase();
+    if (!["user", "customer", "guest"].includes(role)) continue;
+    const id = safeString(message?.id, 120);
+    if (id) return `id:${id}`;
+    const at = normalizeIso(message?.at ?? message?.timestamp ?? message?.createdAt);
+    if (at) return `at:${at}`;
+    return `index:${index}`;
+  }
+  return "missing_user_turn";
+}
+
+export function registerClarificationFailureAttempt({ attempts = [], messages = [], detail = "", at = null } = {}) {
+  const retainedAttempts = Array.isArray(attempts)
+    ? attempts.filter((attempt) => isPlainObject(attempt) && safeString(attempt.turnKey, 160))
+    : [];
+  const turnKey = latestUserTurnKey(messages);
+  const duplicate = retainedAttempts.some((attempt) => attempt.turnKey === turnKey);
+  if (duplicate) {
+    const count = retainedAttempts.length;
+    return {
+      accepted: false,
+      thresholdReached: count >= HANDOVER_CLARIFICATION_FAILURE_LIMIT,
+      count,
+      remaining: Math.max(0, HANDOVER_CLARIFICATION_FAILURE_LIMIT - count),
+      attempts: retainedAttempts,
+    };
+  }
+
+  const nextAttempts = [...retainedAttempts, {
+    turnKey,
+    detail: sanitizeTranscriptText(detail, 240) || null,
+    at: normalizeIso(at),
+  }];
+  const count = nextAttempts.length;
+  return {
+    accepted: true,
+    thresholdReached: count >= HANDOVER_CLARIFICATION_FAILURE_LIMIT,
+    count,
+    remaining: Math.max(0, HANDOVER_CLARIFICATION_FAILURE_LIMIT - count),
+    attempts: nextAttempts,
+  };
 }
 
 function normalizeTrigger(trigger, clarificationFailures) {

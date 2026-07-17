@@ -234,8 +234,10 @@ assert.match(app, /bookingContext && !resumeOnlyTurn[\s\S]*routeDiscoveryTurn/, 
 assert.match(app, /Continue from the currently visible \$\{stageRef\.current\.view\} step[\s\S]*Do not restart discovery/, "text and voice continuation turns must preserve the visible booking panel");
 
 const offersTool = sliceBetween(app, "show_offers: async", "handover_to_agent:", "offers tool");
-assert.match(offersTool, /current\.view === "booking"\s*\?\s*bookingRef\.current\s*:\s*null/, "offers must use a booking's experience only while that booking is visibly active");
-assert.match(offersTool, /const order = pendingOrderRef\.current/, "offer refinements must retain the suspended checkout order context");
+assert.match(offersTool, /const origin = current\.view === "offers" \? offersReturnRef\.current[\s\S]*: current/, "offer refinements must retain one explicit return-view origin");
+assert.match(offersTool, /const activeBooking = origin\.view === "booking" \? bookingRef\.current : null/, "offers must use booking context only when the visible origin is a booking");
+assert.match(offersTool, /const order = origin\.view === "checkout" \? pendingOrderRef\.current : null/, "offers must use a suspended order only when the visible origin is checkout");
+assert.match(offersTool, /buildOfferEvaluationContext\(\{[\s\S]*checkout: order[\s\S]*booking: activeBooking/, "offers must build one canonical, non-mixed evaluation context");
 assert.match(offersTool, /if \(current\.view !== "offers"\) offersReturnRef\.current = current/, "repeated offer queries must not overwrite the checkout return target");
 
 const mainRender = sliceBetween(app, "<main ref={scrollRef}", "</main>", "inline stage render");

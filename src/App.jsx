@@ -9,7 +9,7 @@ import OffersPanel from "./components/OffersPanel.jsx";
 import { appendBooking, BOOKING_STORAGE_KEY, clearBookings, findBooking, readBookings } from "./bookingStore.js";
 import { DEMO_CARD_STORAGE_KEY, DEVICE_SESSION_EPOCH_KEY } from "./checkoutSafety.js";
 import { useI18n } from "./i18n/I18nProvider.jsx";
-import { HANDOVER_TRIGGER, buildHandoverPayload, isClarificationFailureReason } from "./lib/handoverSummary.js";
+import { HANDOVER_TRIGGER, buildHandoverPayload, isClarificationFailureReason, isSupportedHandoverReason, registerClarificationFailureAttempt } from "./lib/handoverSummary.js";
 import { resolveFilmCandidate } from "./lib/fuzzyResolvers.js";
 import { isCinemaSelectionTurn, isDirectCinemaSelectionUtterance, resolveCinemaCandidate } from "./lib/cinemaRouting.js";
 import { CANCELLATION_TARGET_SELECTION_PURPOSE, bookingHistoryAgentContext, classifyBookingHistoryRequest, isCurrentBooking, isDirectCancellationRequest, resolveCancellationContinuation, resolveCancellationTarget } from "./lib/cancellationRouting.js";
@@ -29,7 +29,10 @@ import { startTransportWithRetirement } from "./lib/transportStart.js";
 import { ELEVENLABS_WORKLET_PATHS, VOICE_MIC_PERMISSION_TIMEOUT_MS, VOICE_TRANSPORT_START_TIMEOUT_MS, voiceStartupErrorKey } from "./lib/voiceStartup.js";
 import { VOXI_AGENT_PROMPT, VOXI_FIRST_MESSAGES, buildVoxiContext } from "./lib/voxiSession.js";
 import { OFFER_META } from "./offers/offersData.js";
+import { answerForOfferTopic, buildOfferFacts } from "./offers/offerFacts.js";
+import { buildOfferEvaluationContext, shouldInvalidateOfferResult } from "./offers/offerContext.js";
 import { resolveOffer, resolveOfferForBankAndCard } from "./offers/offerResolver.js";
+import { resolveLocalOfferTextTurn } from "./offers/offerTextFallback.js";
 import { VOX_FAQ_ENTRIES, buildFaqContextForQuery, classifyFaqActionIntent, serializeFaqContext } from "./knowledge/index.js";
 import * as vista from "./vistaClient.js";
 
@@ -66,6 +69,7 @@ const localizedOfferReason = (result, locale) => {
       monthlySpend: "الإنفاق الشهري المطلوب",
       cinema: "السينما",
       seatType: "فئة المقعد",
+      checkoutVerification: "التحقق عند إتمام الحجز لدى VOX",
     };
     const missing = [...new Set((result?.missingFields || []).map((field) => labels[field] || field))];
     return missing.length
@@ -749,6 +753,7 @@ export default function App() {
   const showStage = useCallback((nextStage) => {
     const next = normalizeCustomerFacingFields(nextStage || { view: "empty" }, ["label", "notice", "error", "question", "reason"]);
     if (checkoutPaymentActiveRef.current && stageRef.current?.view === "checkout" && next.view !== "checkout") return false;
+    if (next.view !== "offers" && lastOfferRef.current) lastOfferRef.current = null;
     stageRevisionRef.current += 1;
     stageRef.current = next;
     lastActivityRef.current = Date.now();
@@ -2386,66 +2391,160 @@ export default function App() {
       return JSON.stringify({ found: true, bookingRef: displayed.ref, eligible: true, simulationOnly: false, confirmationRequired: true, phase: "route_confirmation", refundRoute: "VOX Wallet", message });
     },
 
-    show_offers: async ({ bankName = "", cardName = "", experience = "" } = {}) => {
+    show_offers: async ({ bankName = "", cardName = "", experience = "", detailTopic = "", format = "", seatType = "", isMember, monthlyTicketsUsed, monthlySpend } = {}) => {
       if (checkoutPaymentActiveRef.current) return JSON.stringify({ shown: false, reason: "payment_in_progress", instruction: "Payment authorization is in progress. Keep checkout visible and ask the guest to wait for the result." });
       dismissPendingCancellation("offers_opened");
       const current = stageRef.current;
-      const activeBooking = current.view === "booking" ? bookingRef.current : null;
-      const order = pendingOrderRef.current;
-      const selectedExperience = experience || current.session?.exp || current.order?.experience || order?.experience || activeBooking?.experience || "";
-      const query = [bankName, cardName].filter(Boolean).join(" ").trim();
-      const context = {
-        cinemaId: cinemaRef.current?.id,
-        cinemaName: cinemaRef.current?.name,
-        experience: selectedExperience,
-        ticketCount: order?.seats?.length || seatsRef.current.length || undefined,
-        orderTotal: order?.total,
+      const origin = current.view === "offers" ? offersReturnRef.current || { view: "empty" } : current;
+      const order = origin.view === "checkout" ? pendingOrderRef.current : null;
+      const activeBooking = origin.view === "booking" ? bookingRef.current : null;
+      const preferences = discoveryPreferencesRef.current || {};
+      const retainedContext = current.view === "offers" ? lastOfferRef.current?.context || null : null;
+      const suppliedMonthlyTickets = monthlyTicketsUsed === "" || monthlyTicketsUsed === null || monthlyTicketsUsed === undefined ? null : Number(monthlyTicketsUsed);
+      const suppliedMonthlySpend = monthlySpend === "" || monthlySpend === null || monthlySpend === undefined ? null : Number(monthlySpend);
+      const eligibilityInput = {
+        format: format || retainedContext?.format || "",
+        seatType: seatType || retainedContext?.seatType || "",
+        isMember: typeof isMember === "boolean" ? isMember : retainedContext?.isMember,
+        monthlyTicketsUsed: Number.isFinite(suppliedMonthlyTickets) ? suppliedMonthlyTickets : retainedContext?.monthlyTicketsUsed,
+        monthlySpend: Number.isFinite(suppliedMonthlySpend) ? suppliedMonthlySpend : retainedContext?.monthlySpend,
         channel: "web",
       };
+      const context = buildOfferEvaluationContext({
+        view: current.view,
+        originView: origin.view,
+        checkout: order,
+        session: ["movies", "showtimes", "seatmap"].includes(origin.view) ? {
+          cinema: cinemaRef.current,
+          movie: origin.movie || null,
+          session: origin.session || null,
+          selectedSeats: seatsRef.current,
+        } : null,
+        booking: activeBooking,
+        browse: {
+          cinemaId: cinemaRef.current?.id,
+          cinemaName: cinemaRef.current?.name || preferences.cinemaName,
+          movieId: preferences.movieId,
+          movieTitle: preferences.movieTitle,
+          performanceDate: preferences.date || scheduleDateRef.current,
+          preferredTime: preferences.preferredTime,
+          experience: experience || retainedContext?.experience || preferences.experience,
+          format: format || retainedContext?.format,
+          seatType: seatType || retainedContext?.seatType,
+          channel: "web",
+        },
+        eligibility: eligibilityInput,
+      });
+
+      if (lastOfferRef.current && shouldInvalidateOfferResult(lastOfferRef.current, context)) lastOfferRef.current = null;
+      const retained = current.view === "offers" ? lastOfferRef.current : null;
+      const retainedBank = retained?.offer?.bank?.en || "";
+      const retainedCard = retained?.cardProfile?.name?.en || "";
+      const effectiveBankName = bankName || (cardName && retainedBank ? retainedBank : "") || (detailTopic && retainedBank ? retainedBank : "");
+      const effectiveCardName = cardName || (detailTopic && retainedCard ? retainedCard : "");
+      const query = [effectiveBankName, effectiveCardName].filter(Boolean).join(" ").trim();
       const result = query
-        ? cardName
-          ? resolveOfferForBankAndCard(bankName, cardName, context)
-          : resolveOffer(bankName || query, context)
+        ? effectiveCardName
+          ? resolveOfferForBankAndCard(effectiveBankName, effectiveCardName, context)
+          : resolveOffer(effectiveBankName || query, context)
         : null;
       lastOfferRef.current = result;
       const toolLocale = localeRef.current;
       const disclaimer = OFFER_META.disclaimer[toolLocale] || OFFER_META.disclaimer.en;
       if (current.view !== "offers") offersReturnRef.current = current;
-      showStage({ view: "offers", query, context, result, showtimeRequired: Boolean(query && !selectedExperience) });
+      const eligibilityCheckRequested = Boolean(
+        effectiveCardName
+        || experience
+        || format
+        || seatType
+        || typeof isMember === "boolean"
+        || Number.isFinite(suppliedMonthlyTickets)
+        || Number.isFinite(suppliedMonthlySpend),
+      );
+      const showtimeRequired = eligibilityCheckRequested && !context.isSessionGrounded;
+      showStage({ view: "offers", query, context, result, showtimeRequired });
       resetClarificationFailures();
       if (!query) {
-        return JSON.stringify({ shown: "all offers", offerCount: 19, context, disclaimer });
+        return JSON.stringify({
+          shown: "all offers",
+          promotionCount: OFFER_META.promotionCount,
+          issuerCount: OFFER_META.issuerCount,
+          answer: toolLocale === "ar"
+            ? `تم عرض ${OFFER_META.promotionCount} عرضاً حالياً ضمن ${OFFER_META.issuerCount} مجموعة عروض. ابحث باسم البنك أو البطاقة لعرض التفاصيل.`
+            : `I displayed ${OFFER_META.promotionCount} current promotions across ${OFFER_META.issuerCount} offer groups. Search by bank or card for full details.`,
+          context,
+          disclaimer,
+        });
       }
       const localizedReason = localizedOfferReason(result, toolLocale);
       const localizedHeadline = localizedValue(result?.offer?.headline, toolLocale) || (toolLocale === "ar" ? "لا يوجد عرض مطابق" : "No matching offer");
       const localizedAdvisory = toolLocale === "ar" && result?.advisory
         ? "قد تُطلب عضوية ڤوكس مسجلة، ويتم التأكيد النهائي للأهلية عند الدفع."
         : result?.advisory || "";
+      const facts = buildOfferFacts(result?.offer, toolLocale);
+      const topicAnswer = answerForOfferTopic(result?.offer, result?.cardProfile, toolLocale, detailTopic || "summary");
       return JSON.stringify({
         shown: "offer card",
         bank: localizedValue(result?.offer?.bank, toolLocale) || bankName,
         card: localizedValue(result?.cardProfile?.name, toolLocale) || cardName || null,
         headline: localizedHeadline,
+        detailTopic: detailTopic || "summary",
         eligibility: result?.status || "ineligible",
-        showtimeRequired: !selectedExperience,
+        showtimeRequired,
+        selectedShowtime: context.selectedShowtime,
         missingFields: result?.missingFields || [],
         reason: localizedReason,
         advisory: localizedAdvisory,
-        answer: `${localizedHeadline}: ${localizedReason}${localizedAdvisory ? ` ${localizedAdvisory}` : ""}`,
+        details: facts ? {
+          summary: facts.summary,
+          benefit: facts.benefit,
+          promotionCount: facts.promotionCount,
+          cardTiers: facts.profiles,
+          eligibleCards: facts.cards,
+          experiences: facts.experiences,
+          limits: facts.limits,
+          requirements: facts.requirements,
+          restrictions: facts.restrictions,
+          foodBenefit: facts.foodBenefit || null,
+          redemptionSteps: facts.redemptionSteps,
+          commonTerms: facts.commonTerms,
+          detailsPublished: facts.detailsPublished,
+          detailUrl: facts.detailUrl,
+          termsUrl: facts.termsUrl,
+          verifiedDate: facts.verifiedDate,
+        } : null,
+        answer: `${topicAnswer}${effectiveCardName ? ` ${localizedReason}` : ""}${localizedAdvisory ? ` ${localizedAdvisory}` : ""}`,
         context,
+        contextFingerprint: context.fingerprint,
         disclaimer,
       });
     },
 
-    handover_to_agent: ({ reason = "explicit_request", detail = "" } = {}) => {
+    handover_to_agent: ({ reason = "", detail = "" } = {}) => {
       if (checkoutPaymentActiveRef.current) return JSON.stringify({ handoverStarted: false, reason: "payment_in_progress", instruction: "Payment authorization is in progress. Keep checkout visible and ask the guest to wait for the result." });
       const normalizedReason = norm(reason);
+      if (!isSupportedHandoverReason(normalizedReason)) {
+        return JSON.stringify({ handoverStarted: false, reason: "invalid_handover_reason", instruction: "Call handover_to_agent again only with reason explicit_request, clarification_failure, or fallback." });
+      }
+      const existingPayload = stageRef.current.view === "handover" ? stageRef.current.payload : null;
+      if (existingPayload?.event?.handoverId) {
+        return JSON.stringify({ handoverStarted: true, existing: true, mode: "summary_only", status: "summary_prepared", externalConnectionStarted: false, schemaVersion: existingPayload.schemaVersion, handoverId: existingPayload.event.handoverId });
+      }
       const isClarificationFailure = isClarificationFailureReason(normalizedReason);
       if (isClarificationFailure) {
-        clarificationFailuresRef.current += 1;
-        clarificationFailureLogRef.current.push({ detail, at: new Date().toISOString() });
-        if (clarificationFailuresRef.current < 2) {
-          return JSON.stringify({ handoverStarted: false, clarificationFailureCount: 1, remaining: 1, instruction: "Try one more concise clarification. If it also fails, call handover_to_agent again with reason clarification_failure." });
+        const attempt = registerClarificationFailureAttempt({
+          attempts: clarificationFailureLogRef.current,
+          messages: messagesRef.current,
+          detail,
+          at: new Date().toISOString(),
+        });
+        clarificationFailureLogRef.current = attempt.attempts;
+        clarificationFailuresRef.current = attempt.count;
+        if (!attempt.accepted) {
+          return JSON.stringify({ handoverStarted: false, reason: "duplicate_clarification_failure", clarificationFailureCount: attempt.count, remaining: attempt.remaining, instruction: "Wait for the guest's answer to the clarification before recording another failed clarification." });
+        }
+        if (!attempt.thresholdReached) {
+          return JSON.stringify({ handoverStarted: false, clarificationFailureCount: attempt.count, remaining: attempt.remaining, instruction: "Try one more concise clarification. If it also fails after the guest replies, call handover_to_agent again with reason clarification_failure." });
         }
       }
 
@@ -2485,8 +2584,8 @@ export default function App() {
         messages: messagesRef.current,
       });
       showStage({ view: "handover", payload });
-      clarificationFailureLogRef.current = [];
-      return JSON.stringify({ handoverStarted: true, mode: "simulated", status: "connecting", schemaVersion: payload.schemaVersion, handoverId: payload.event.handoverId });
+      resetClarificationFailures();
+      return JSON.stringify({ handoverStarted: true, mode: "summary_only", status: "summary_prepared", externalConnectionStarted: false, schemaVersion: payload.schemaVersion, handoverId: payload.event.handoverId });
     },
   };
 
@@ -3224,6 +3323,7 @@ export default function App() {
           selectedSeats: seatsRef.current,
           requestedSeatTarget: requestedSeatTargetRef.current,
           discoveryPreferences: discoveryPreferencesRef.current,
+          offer: lastOfferRef.current,
           journey: journeyRef.current,
           messages: contextMessages,
         })}${continuation ? `\n\n${buildTransportHandoff(handoffJourney, contextMessages)}` : ""}\n\n${serializeFaqContext(VOX_FAQ_ENTRIES, { locale: activeLocale, maxChars: 14_000 })}`);
@@ -3334,6 +3434,7 @@ export default function App() {
           selectedSeats: seatsRef.current,
           requestedSeatTarget: requestedSeatTargetRef.current,
           discoveryPreferences: discoveryPreferencesRef.current,
+          offer: lastOfferRef.current,
           journey: journeyRef.current,
           messages: messagesRef.current,
         })}${continuation ? `\n\n${buildTransportHandoff(handoffJourney, messagesRef.current)}` : ""}\n\n${serializeFaqContext(VOX_FAQ_ENTRIES, { locale: activeLocale, maxChars: 14_000 })}`);
@@ -3465,6 +3566,33 @@ export default function App() {
       cancellationContinuation.handled
       || isDirectCancellationRequest(value, { hasBookingContext })
     );
+    const localOfferTurn = decision === null
+      && !cancellationFlowRef.current
+      && !directCancellation
+      && !historyRequest.requested
+      && !directSeatSelection
+      && !directCinemaSelection
+      && !checkoutResumeTurn
+      && !languageControlTurn
+      ? resolveLocalOfferTextTurn(value, { locale: localeRef.current })
+      : null;
+    if (localOfferTurn && !isConnected) {
+      setInput("");
+      let localAnswer = localOfferTurn.answer;
+      try {
+        const rawResult = await clientTools.show_offers({
+          bankName: localOfferTurn.bankName,
+          cardName: localOfferTurn.cardName,
+          detailTopic: localOfferTurn.detailTopic,
+        });
+        const parsedResult = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+        if (parsedResult?.answer) localAnswer = parsedResult.answer;
+      } catch (error) {
+        console.warn("Local offer panel could not be opened", error);
+      }
+      say("agent", localAnswer);
+      return;
+    }
     dismissStaleTransactionalView({ text: value, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
     const checkoutFaq = activeCheckout && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection
       ? prepareFaqContext(value)
@@ -3556,7 +3684,7 @@ export default function App() {
       pendingTypedMessagesRef.current = pendingTypedMessagesRef.current.filter((item) => item.text !== agentFacingValue);
       lastSentTextRef.current = pendingTypedMessagesRef.current.at(-1) || null;
     }
-  }, [conversation, input, prepareFaqContext, say, setLocale, startTextSession, updateIntentFromText]);
+  }, [conversation, input, isConnected, prepareFaqContext, say, setLocale, startTextSession, updateIntentFromText]);
 
   const sendUiTurn = (text, { display = true, context = "" } = {}) => {
     if (display) say("user", text);
@@ -4385,6 +4513,7 @@ export default function App() {
         selectedSeats: seatsRef.current,
         requestedSeatTarget: requestedSeatTargetRef.current,
         discoveryPreferences: discoveryPreferencesRef.current,
+        offer: lastOfferRef.current,
         journey: { ...journeyRef.current, locale: nextLocale },
         messages: messagesRef.current,
       })} ${serializeFaqContext(VOX_FAQ_ENTRIES, { locale: nextLocale, maxChars: 14_000 })}`);

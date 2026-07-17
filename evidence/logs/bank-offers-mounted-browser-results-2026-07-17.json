@@ -1,0 +1,98 @@
+{
+  "testDate": "2026-07-17",
+  "url": "http://127.0.0.1:4173/",
+  "build": "Vite production preview",
+  "typedFallback": [
+    {
+      "input": "Tell me the FAB offer",
+      "transportStatus": "Disconnected",
+      "answer": "First Abu Dhabi Bank: Buy one ticket, get one free. For the FAB SHARE Credit Card and Regular 2D tickets at all UAE VOX locations.",
+      "renderedOfferGroup": "First Abu Dhabi Bank",
+      "renderedOfferGroupCount": 1
+    },
+    {
+      "input": "Which ENBD cards qualify?",
+      "transportStatus": "Disconnected",
+      "answer": "Eligible cards: Priority Banking Visa Infinite, Skywards Infinite, Skywards Signature, Etihad Limitless, Etihad Elevate, Etihad Inspire, and 16 more",
+      "renderedOfferGroup": "Emirates NBD",
+      "renderedOfferGroupCount": 1
+    },
+    {
+      "input": "Arabic FAB offer question",
+      "transportStatus": "Disconnected",
+      "responseLanguage": "Arabic",
+      "renderedOfferGroup": "First Abu Dhabi Bank",
+      "renderedOfferGroupCount": 1
+    }
+  ],
+  "fabEligibilityWithoutShowtime": {
+    "selectedCard": "FAB SHARE Credit Card",
+    "status": "More details needed",
+    "message": "Select a showtime experience before checking this offer.",
+    "advisory": "Final eligibility is confirmed at VOX checkout.",
+    "containsFalseIneligibleResult": false
+  },
+  "searchResults": [
+    {
+      "query": "SIB",
+      "offerGroupCount": 1
+    },
+    {
+      "query": "FAB",
+      "offerGroupCount": 1
+    },
+    {
+      "query": "Citibank",
+      "offerGroupCount": 1
+    },
+    {
+      "query": "Emirates NBD",
+      "offerGroupCount": 1
+    },
+    {
+      "query": "HSBC",
+      "offerGroupCount": 1
+    },
+    {
+      "query": "ADCB",
+      "offerGroupCount": 1
+    },
+    {
+      "query": "Visa Infinite",
+      "offerGroupCount": 8
+    },
+    {
+      "query": "buy one get one free",
+      "offerGroupCount": 14
+    }
+  ],
+  "sourceBoundaries": {
+    "sharjahIslamicBank": {
+      "message": "VOX currently lists this 50% offer, but its official detail and terms pages do not yet publish eligible card names or conditions.",
+      "status": "More details needed",
+      "inventedEligibility": false
+    },
+    "citibank": {
+      "promotionSummary": "Buy one get one free, or 30% off (2)",
+      "message": "Citi card-tier guidance below comes from the separately published Citi 30% off or BOGO campaign. It is not published as terms for the standalone Citi BOGO listing.",
+      "campaignsKeptSeparate": true
+    }
+  },
+  "catalogue": {
+    "promotionCount": 21,
+    "offerGroupCount": 20,
+    "renderedImageCount": 19,
+    "loadedImageCount": 19,
+    "failedImageCount": 0
+  },
+  "layout": {
+    "widgetWidthPx": 420,
+    "widgetScrollWidthPx": 418,
+    "mainWidthPx": 418.4,
+    "mainScrollWidthPx": 403,
+    "arabicHtmlLang": "ar",
+    "arabicHtmlDir": "rtl",
+    "widgetHorizontalOverflow": false
+  },
+  "runtimeLogs": []
+}

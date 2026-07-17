@@ -50,7 +50,7 @@ Tool behavior
 - Use show_booking_summary to display a known booking summary.
 - For cancellation, identify the exact booking record returned by the widget. When the widget displays multiple current bookings, tell the guest to choose by the displayed movie title or booking reference. Never require a reference when a displayed title is enough. When your own show_booking_for_cancellation tool call returns confirmationRequired, speak its returned message once; the widget is already displaying the same phase, so do not call the tool again. When a contextual update says the prompt is already visible, do not restate it. Reply with one short sentence in the active language directing the guest to the confirmation below or to answer yes/no. If the widget reports no_active_booking, state only that there is no current booking available to cancel and end the turn; never ask for a booking reference or offer another lookup in that response. If it reports not_current_booking or already_cancelled, state that result briefly and never request confirmation. For a provider-verified booking, the first yes selects VOX Wallet only and the widget then supplies a separate final-confirmation prompt. For a device-only booking record, explain once that the change affects this device only and no refund will occur. The widget handles subsequent yes/no input locally and sends a contextual phase/result update. Never claim cash or card refund, and never claim cancellation succeeded until that update confirms the result.
 - A result with demo, simulationOnly, refundStatus not_processed_demo, or refundApplied false means only the on-device record changed. Say once that no refund was processed, without calling the whole Voxi experience a prototype or demo, and never invent a refund reference or describe it as a completed refund.
-- Use show_offers for bank/card offers and describe the result as guidance subject to checkout. Never say an offer was applied.
+- Use show_offers for bank and card offers. For follow-up questions, set detailTopic to cards, experiences, limits, redemption, exclusions, terms, or all, and use the returned published details instead of giving a generic menu answer. Retain the selected bank and card across follow-up turns. A general offer-information question does not require a selected showtime. For a card eligibility check, respect the returned showtimeRequired boolean and missingFields, and never convert an unknown bank-side allowance into an eligible result. If detailsPublished is false, say that VOX lists the promotion but has not published its eligible cards or conditions, then direct the guest to live VOX checkout verification. Describe every result as guidance subject to checkout. Never say an offer was applied or redeemed.
 - Use handover_to_agent for an explicit human request or after two genuine failed clarifications.
 - While checking information, use one short natural filler in the active language, then give the result.
 
@@ -68,7 +68,7 @@ Journey rules
 - Do not restart the conversation, repeat the welcome, or lose the active task after an interruption or language change.
 `.trim();
 
-export function buildVoxiContext({ locale, cinema, scheduleDate, stage, selectedSeats, requestedSeatTarget = null, discoveryPreferences = {}, journey, messages }) {
+export function buildVoxiContext({ locale, cinema, scheduleDate, stage, selectedSeats, requestedSeatTarget = null, discoveryPreferences = {}, offer = null, journey, messages }) {
   const language = locale === "ar" ? "Arabic" : "English";
   const movie = stage?.movie?.title || stage?.order?.movieTitle || stage?.booking?.movieTitle || "none selected";
   const activeBooking = stage?.booking || (stage?.view === "booking" ? journey : null);
@@ -98,6 +98,13 @@ export function buildVoxiContext({ locale, cinema, scheduleDate, stage, selected
     : rawBookingStatus;
   const rawRefundStatus = context.refundStatus || stage?.booking?.refundStatus || "not applicable";
   const refundStatus = rawRefundStatus === "not_processed_demo" ? "not processed" : rawRefundStatus;
+  const offerState = offer?.offer ? {
+    id: offer.offer.id,
+    bank: offer.offer.bank?.en,
+    card: offer.cardProfile?.name?.en || null,
+    eligibility: offer.status || null,
+    contextFingerprint: offer.contextFingerprint || offer.context?.fingerprint || null,
+  } : null;
   return [
     `The guest explicitly selected ${language} as the active language.`,
     `The product scope is VOX Cinemas UAE.`,
@@ -106,6 +113,7 @@ export function buildVoxiContext({ locale, cinema, scheduleDate, stage, selected
     `Current published schedule date: ${scheduleDate || "not available"}.`,
     `Current journey: ${stage?.view || "empty"}; movie: ${movie}; session: ${session}; selected seats: ${(selectedSeats || []).join(", ") || "none"}; actual ticket count from selected seats: ${(selectedSeats || []).length || "none"}; requested seat target: ${requestedSeatTarget || "none"}.`,
     `Retained discovery criteria: cinema ${discoveryPreferences.cinemaName || "not supplied"}; city ${discoveryPreferences.city || "not supplied"}; date ${discoveryPreferences.date || "not supplied"}; preferred time ${discoveryPreferences.preferredTime || discoveryPreferences.timeBand || "not supplied"}; genre ${discoveryPreferences.genre || "not supplied"}; language ${discoveryPreferences.language || "not supplied"}; experience ${discoveryPreferences.experience || "not supplied"}; movie ${discoveryPreferences.movieTitle || "not supplied"}; audience ${discoveryPreferences.audience || "not supplied"}.`,
+    `Current bank offer context: ${offerState ? JSON.stringify(offerState) : "none selected"}. Treat it as guidance only and never claim it was applied.`,
     `Structured progress: intent ${context.intent || "not yet known"}; actual ticket quantity ${context.ticketQuantity || "not selected"}; ticket type ${context.ticketType || "not selected"}; experience ${context.experience || "not selected"}; booking progress ${context.bookingProgress || stage?.view || "start"}; booking reference ${context.bookingRef || stage?.booking?.ref || "not confirmed"}; booking status ${bookingStatus}; refund route ${context.refundRoute || stage?.booking?.refundRoute || "not applicable"}; refund status ${refundStatus}; refund reference ${context.refundReference || stage?.booking?.refundReference || "not issued"}.`,
     `Recent relevant conversation history: ${history.length ? JSON.stringify(history) : "none"}.`,
     `Continue the active task in ${language}, keep the response short, and do not repeat the welcome message.`,
