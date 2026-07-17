@@ -21,6 +21,10 @@ function expectTurn(query, expected, options = {}) {
 }
 
 expectTurn("Tell me the FAB offer", { offerId: "fab-share", detailTopic: "summary" });
+const fabCheckoutTurn = expectTurn("Can I use FAB SHARE for this booking?", { offerId: "fab-share", detailTopic: "summary" });
+assert.equal(fabCheckoutTurn.profileId, "fab-share-credit", "A uniquely named FAB SHARE use question must resolve the published card profile");
+assert.match(fabCheckoutTurn.answer, /FAB SHARE Credit Card/i, "The checkout answer must name the required card");
+assert.match(fabCheckoutTurn.answer, /Regular 2D/i, "The checkout answer must state the published experience and format boundary");
 expectTurn("Which ENBD cards qualify?", { offerId: "emirates-nbd", detailTopic: "cards" });
 expectTurn("ما هو عرض بنك أبوظبي الأول؟", { offerId: "fab-share", detailTopic: "summary" }, { locale: "ar" });
 expectTurn("ما البطاقات المؤهلة من بنك الإمارات دبي الوطني؟", { offerId: "emirates-nbd", detailTopic: "cards" }, { locale: "ar" });
@@ -35,6 +39,10 @@ assert.equal(resolveLocalOfferTextTurn("How do bank offers work?"), null, "Gener
 assert.equal(resolveLocalOfferTextTurn("Which cards qualify?"), null, "A bank or uniquely resolved card is required");
 assert.equal(resolveLocalOfferTextTurn("Cancel my FAB booking"), null, "Cancellation must retain routing priority");
 assert.equal(resolveLocalOfferTextTurn("Can I get a refund for my ENBD booking?"), null, "Refund requests must retain routing priority");
+assert.equal(resolveLocalOfferTextTurn("Can I use Apple Pay?"), null, "A payment method must not be misrouted to a bank offer");
+assert.equal(resolveLocalOfferTextTurn("Can I use this card?"), null, "A card use question requires a uniquely named published offer");
+assert.equal(resolveLocalOfferTextTurn("Can I use Visa Infinite for this booking?"), null, "A generic card tier requires its issuing bank");
+assert.equal(resolveLocalOfferTextTurn("Can I use FAB SHARE to cancel my booking?"), null, "Cancellation must outrank a named offer use question");
 
 const unpublished = expectTurn("Tell me the SIB offer", { offerId: "sharjah-islamic-bank", detailTopic: "summary" });
 assert.match(unpublished.answer, /does not publish|checkout/i, "Unpublished offer details must be represented truthfully");
@@ -76,23 +84,31 @@ const transportIndex = sendText.indexOf("await startTextSession", fallbackIndex)
 assert.ok(cancellationIndex >= 0 && cancellationIndex < fallbackIndex, "Cancellation must be classified before the offer fallback");
 assert.ok(fallbackIndex >= 0 && fallbackIndex < dismissIndex, "Offer fallback must run before stale transactional views are dismissed");
 assert.ok(dismissIndex < transportIndex, "The general text transport path must remain after the local fallback");
-assert.match(sendText, /localOfferTurn\s*&&\s*!isConnected/, "Fallback must be limited to unavailable transport");
+assert.match(sendText, /localOfferTurn\s*&&\s*\(activeCheckout\s*\|\|\s*!isConnected\)/, "Named offers must be handled deterministically during checkout even when transport is connected");
 assert.match(sendText, /clientTools\.show_offers\(\{/, "Fallback must open the existing rich offer panel");
 assert.match(sendText, /say\("agent", localAnswer\)/, "Fallback must publish the local detail answer");
+assert.match(sendText, /activeCheckout\s*&&\s*isConnected[\s\S]*sendContextualUpdate/, "Connected checkout must receive the exact locally published offer result without a duplicate user turn");
 assert.match(sendText, /!cancellationFlowRef\.current/, "An active cancellation flow must block the offer fallback");
 
-const voiceStart = app.indexOf("const startVoiceSession");
-const voiceEnd = app.indexOf("const endVoiceSession", voiceStart);
-assert.ok(voiceStart >= 0 && voiceEnd > voiceStart, "Voice startup route was not found");
-const voiceStartup = app.slice(voiceStart, voiceEnd);
-assert.doesNotMatch(voiceStartup, /resolveLocalOfferTextTurn|localOfferTurn/, "The local typed fallback must not alter voice startup");
+const callbacksStart = app.indexOf("const transportCallbacks");
+const voiceMessageStart = app.indexOf("onMessage:", callbacksStart);
+const voiceMessageEnd = app.indexOf("const startTextSession", voiceMessageStart);
+assert.ok(callbacksStart >= 0 && voiceMessageStart >= 0 && voiceMessageEnd > voiceMessageStart, "Voice transcript route was not found");
+const voiceMessages = app.slice(voiceMessageStart, voiceMessageEnd);
+assert.match(voiceMessages, /resolveLocalOfferTextTurn\(safeMessage/, "Voice transcripts must use the same named-offer resolver as typed text");
+assert.match(voiceMessages, /Approved published offer result for the guest's spoken question/, "Voice must receive the grounded checkout offer result before responding");
+assert.match(voiceMessages, /checkoutOfferEvaluation[\s\S]*do not claim the offer was applied[\s\S]*do not replace checkout/, "Voice offer guidance must preserve checkout and avoid false application claims");
 
 const showOffersStart = app.indexOf("show_offers: async");
 const showOffersEnd = app.indexOf("handover_to_agent:", showOffersStart);
 assert.ok(showOffersStart >= 0 && showOffersEnd > showOffersStart, "show_offers client tool was not found");
 const showOffers = app.slice(showOffersStart, showOffersEnd);
 assert.match(showOffers, /const origin = current\.view === "offers" \? offersReturnRef\.current/, "Offer origin must preserve the return stage");
-assert.match(showOffers, /if \(current\.view !== "offers"\) offersReturnRef\.current = current;/, "Offer panel must capture the current return stage");
-assert.ok(showOffers.indexOf("offersReturnRef.current = current") < showOffers.indexOf('showStage({ view: "offers"'), "Return stage must be saved before the offer panel opens");
+assert.match(showOffers, /const preservedCheckout = current\.view === "checkout" \? activeCheckoutStage\(\) : null/, "Offer checks must detect the exact active checkout");
+assert.match(showOffers, /if \(!checkoutPreserved && current\.view !== "offers"\) offersReturnRef\.current = current;/, "Only non-checkout offer navigation may capture a return stage");
+assert.match(showOffers, /if \(!checkoutPreserved\)\s*\{[\s\S]*showStage\(\{ view: "offers"/, "A checkout offer check must not replace checkout with the offers panel");
+assert.match(showOffers, /checkoutPreserved,[\s\S]*checkoutId: preservedCheckout\?\.order\?\.checkoutId[\s\S]*seats: preservedCheckout\?\.order\?\.seats[\s\S]*total: preservedCheckout\?\.order\?\.total/, "The tool result must prove the same checkout, seats, and total were preserved");
+assert.ok(showOffers.indexOf("offersReturnRef.current = current") < showOffers.indexOf('showStage({ view: "offers"'), "Return stage must be saved before a non-checkout offer panel opens");
+assert.doesNotMatch(showOffers, /setPendingOrder|clearPendingOrder|setSelectedSeats|seatsRef\.current\s*=/, "Offer evaluation must not mutate checkout order or seats");
 
 console.log("Offer text fallback validation passed.");

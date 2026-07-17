@@ -59,7 +59,7 @@ const GENERIC_HISTORY_AR = /(?:اعرض|افتح|طلع|ورني|اظهر).{0,30
 
 const POLICY_EN = /\b(?:policy|rules?|deadline|eligible|eligibility|possible)\b|\b(?:can|could)\s+i\s+(?:cancel|refund|void)\s+(?:a|any)\s+(?:booking|reservation|tickets?)\b|\bhow\s+(?:do|does|can)\b.{0,35}\b(?:cancel|refund|void)\b/;
 const POLICY_AR = /(?:سياسه|شروط|موعد|اهليه|كيف).{0,35}(?:الغاء|الغي|استرداد|استرجاع)|(?:هل|اقدر|يمكنني).{0,20}(?:الغاء|الغي)\s+(?:ال)?(?:حجز|تذكره)(?:\s|$)/;
-const DIRECT_EN = /\b(?:please\s+)?(?:cancel|refund|void)\s+(?:(?:my|the|this|a|an|one)\s+)?(?:(?:current|active|upcoming)\s+)?(?:booking|reservation|tickets?)\b|\b(?:i|we)\s+(?:want|need|would like)\s+to\s+(?:cancel|refund|void)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:cancel|refund|void)\b.{0,50}\b(?:my|our|this|the|a|an|one)\s+(?:(?:current|active|upcoming)\s+)?(?:booking|reservation|tickets?)\b|\b(?:cancel|refund|void)\b.{0,40}\b(?:booking\s+(?:reference|ref)|wl[a-z0-9-]+)\b/;
+const DIRECT_EN = /\b(?:please\s+)?(?:cancel|refund|void)\s+(?:(?:my|the|this|a|an|one)\s+)?(?:(?:current|active|upcoming)\s+)?(?:booking|reservation|tickets?)\b|\b(?:please\s+)?(?:cancel|refund|void)\s+(?:my|the)\s+.{1,80}\s+(?:booking|reservation|tickets?)\b|\b(?:i|we)\s+(?:want|need|would like)\s+to\s+(?:cancel|refund|void)\b|\b(?:can|could|would|will)\s+you\s+(?:please\s+)?(?:cancel|refund|void)\b.{0,50}\b(?:my|our|this|the|a|an|one)\s+(?:(?:current|active|upcoming)\s+)?(?:booking|reservation|tickets?)\b|\b(?:cancel|refund|void)\b.{0,40}\b(?:booking\s+(?:reference|ref)|wl[a-z0-9-]+)\b/;
 const DIRECT_AR = /(?:الغي|الغي|الغاء|لغي|رجع|استرد|استرجع).{0,40}(?:حجزي|الحجز|تذكرتي|تذاكري|التذاكر)|(?:ابي|ابغي|ابغى|عايز|بدي|اريد).{0,25}(?:الغي|الغاء|استرد|استرجع)|(?:هل\s+)?(?:يمكنك|تقدر|تستطيع).{0,20}(?:تلغي|الغاء|ترجع|تسترد).{0,30}(?:حجزي|الحجز|تذكرتي|تذاكري|التذاكر)/;
 const CONTEXTUAL_EN = /^(?:please\s+)?(?:cancel|refund|void)(?:\s+(?:it|this|that))?$/;
 const CONTEXTUAL_AR = /^(?:الغي|الغه|الغيه|الغيها|الغاءه|لغه|رجعه|استرده|نعم\s+الغي(?:ه|ها)?)$/;
@@ -219,6 +219,44 @@ export function resolveCancellationTarget({
           ? "not_current_booking"
           : null,
       candidates: [explicitBooking?.ref || explicitRef],
+    });
+  }
+
+  const titleSelector = normalizeCancellationSelector(text);
+  const titleMatches = titleSelector
+    ? bookings.filter((booking) => normalizeCancellationSelector(bookingTitle(booking)) === titleSelector)
+    : [];
+  const currentTitleMatches = titleMatches.filter((booking) => isCurrentBooking(booking, { now }));
+  if (currentTitleMatches.length === 1 || (currentTitleMatches.length === 0 && titleMatches.length === 1)) {
+    const titleBooking = currentTitleMatches[0] || titleMatches[0];
+    return Object.freeze({
+      bookingRef: titleBooking.ref,
+      booking: titleBooking,
+      source: "spoken_title",
+      reason: titleBooking.cancelled
+        ? "already_cancelled"
+        : !isCurrentBooking(titleBooking, { now })
+          ? "not_current_booking"
+          : null,
+      candidates: [titleBooking.ref],
+    });
+  }
+  if (currentTitleMatches.length > 1) {
+    return Object.freeze({
+      bookingRef: null,
+      booking: null,
+      source: "spoken_title",
+      reason: "multiple_active_bookings",
+      candidates: currentTitleMatches.map((booking) => booking.ref),
+    });
+  }
+  if (titleMatches.length > 1) {
+    return Object.freeze({
+      bookingRef: null,
+      booking: null,
+      source: "spoken_title",
+      reason: "no_active_booking",
+      candidates: [],
     });
   }
 

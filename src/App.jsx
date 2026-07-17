@@ -478,6 +478,7 @@ export default function App() {
   const cancelTimerRef = useRef(null);
   const cancellationJournalTimerRef = useRef(null);
   const cancellationFlowRef = useRef(null);
+  const cancellationIntentAuthorizationRef = useRef(null);
   const cancellationInFlightRef = useRef(false);
   const cancellationLockPendingRef = useRef(false);
   const cancellationLockPromiseRef = useRef(null);
@@ -779,6 +780,32 @@ export default function App() {
     };
   };
 
+  const evaluateCheckoutOfferTurn = (turn) => {
+    const checkout = activeCheckoutStage();
+    if (!checkout || !turn?.bankName) return null;
+    const context = buildOfferEvaluationContext({
+      view: "checkout",
+      originView: "checkout",
+      checkout: checkout.order,
+      eligibility: { channel: "web" },
+    });
+    const result = turn.cardName
+      ? resolveOfferForBankAndCard(turn.bankName, turn.cardName, context)
+      : resolveOffer(turn.bankName, context);
+    const toolLocale = localeRef.current;
+    const topicAnswer = answerForOfferTopic(result?.offer, result?.cardProfile, toolLocale, turn.detailTopic || "summary");
+    const reason = turn.cardName ? localizedOfferReason(result, toolLocale) : "";
+    const advisory = toolLocale === "ar" && result?.advisory
+      ? "قد تُطلب عضوية ڤوكس مسجلة، ويتم التأكيد النهائي للأهلية عند الدفع."
+      : result?.advisory || "";
+    return {
+      answer: [topicAnswer, reason, advisory].filter(Boolean).join(" "),
+      result,
+      context,
+      checkout,
+    };
+  };
+
   const restoreActiveCheckout = () => {
     const checkout = activeCheckoutStage();
     if (!checkout) return false;
@@ -817,6 +844,19 @@ export default function App() {
       currency: checkout.order.currency,
       blockedTool: toolName,
       instruction: "An unpaid checkout is active and has been restored. Answer the guest without restarting movie, showtime, or seat selection. The guest can use Edit seats or explicitly start a new booking.",
+    });
+  };
+
+  const preserveActiveCancellationForTool = (toolName) => {
+    const flow = cancellationFlowRef.current;
+    if (!flow?.bookingRef || !["checking", "route_confirmation", "final_confirmation", "processing"].includes(flow.phase)) return null;
+    return JSON.stringify({
+      shown: stageRef.current.view,
+      blockedTool: toolName,
+      reason: "cancellation_in_progress",
+      bookingRef: flow.bookingRef,
+      phase: flow.phase,
+      instruction: "A cancellation check or confirmation is active. Keep the current panel visible and continue only with that cancellation until the guest confirms, declines, or changes task.",
     });
   };
 
@@ -1778,6 +1818,8 @@ export default function App() {
    * ====================================================================== */
   const clientTools = {
     show_movie_selection: async ({ cinemaId, cinemaName, date, displayDate, scheduleDate: toolDate } = {}) => {
+      const cancellationGuard = preserveActiveCancellationForTool("show_movie_selection");
+      if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_movie_selection");
       if (checkoutGuard) return checkoutGuard;
       dismissPendingCancellation("new_journey");
@@ -1838,6 +1880,8 @@ export default function App() {
     },
 
     show_showtimes: async ({ movieId, movieTitle, date, displayDate, scheduleDate: toolDate } = {}) => {
+      const cancellationGuard = preserveActiveCancellationForTool("show_showtimes");
+      if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_showtimes");
       if (checkoutGuard) return checkoutGuard;
       dismissPendingCancellation("new_journey");
@@ -1928,6 +1972,8 @@ export default function App() {
     },
 
     show_seat_map: async ({ movieTitle, sessionId, showtime, ticketQuantity: requestedQuantity, date, displayDate, scheduleDate: toolDate } = {}) => {
+      const cancellationGuard = preserveActiveCancellationForTool("show_seat_map");
+      if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_seat_map");
       if (checkoutGuard) return checkoutGuard;
       dismissPendingCancellation("new_journey");
@@ -2053,6 +2099,8 @@ export default function App() {
     },
 
     select_seats: async ({ seats } = {}) => {
+      const cancellationGuard = preserveActiveCancellationForTool("select_seats");
+      if (cancellationGuard) return cancellationGuard;
       const availableSeatIds = (planRef.current || [])
         .flatMap((row) => row.seats || [])
         .filter((seat) => seat.status === 0)
@@ -2134,6 +2182,8 @@ export default function App() {
     },
 
     show_booking_summary: ({ movieTitle, screen, showtime, seats, ref, total } = {}) => {
+      const cancellationGuard = preserveActiveCancellationForTool("show_booking_summary");
+      if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_booking_summary");
       if (checkoutGuard) return checkoutGuard;
       dismissPendingCancellation("booking_summary");
@@ -2176,10 +2226,39 @@ export default function App() {
     },
 
     show_booking_for_cancellation: async ({ bookingRef: requestedRef } = {}) => {
+      const intentAuthorization = cancellationIntentAuthorizationRef.current;
+      cancellationIntentAuthorizationRef.current = null;
       if (checkoutPaymentActiveRef.current) return JSON.stringify({ found: false, reason: "payment_in_progress", instruction: "Payment authorization is in progress. Keep checkout visible and ask the guest to wait for the result." });
-      const openedFromHistory = stageRef.current.view === "history" || bookingOpenedFromHistoryRef.current;
       const processingMutation = activeCancellationMutation();
       if (processingMutation) return JSON.stringify(processingMutation);
+      const existingFlow = cancellationFlowRef.current;
+      const idempotentActiveFlow = Boolean(
+        existingFlow?.bookingRef
+        && (!requestedRef || norm(existingFlow.bookingRef) === norm(requestedRef))
+        && ["checking", "route_confirmation", "final_confirmation", "processing"].includes(existingFlow.phase),
+      );
+      const locallyAuthorized = ["direct_user_turn", "ui_action"].includes(intentAuthorization?.source);
+      if (!locallyAuthorized && !idempotentActiveFlow) {
+        return JSON.stringify({
+          found: false,
+          confirmationRequired: false,
+          phase: "idle",
+          reason: "cancellation_intent_required",
+          instruction: "No explicit cancellation request was confirmed. Keep the current booking or history panel visible and do not start cancellation.",
+        });
+      }
+      if (idempotentActiveFlow && !locallyAuthorized) {
+        return JSON.stringify({
+          found: true,
+          bookingRef: existingFlow.bookingRef,
+          confirmationRequired: ["route_confirmation", "final_confirmation"].includes(existingFlow.phase),
+          phase: existingFlow.phase,
+          refundRoute: existingFlow.refundRoute || null,
+          simulationOnly: Boolean(existingFlow.demoOnly),
+          message: existingFlow.message || "The cancellation flow is already active in the widget. Do not restart it.",
+        });
+      }
+      const openedFromHistory = stageRef.current.view === "history" || bookingOpenedFromHistoryRef.current;
       const storedBookings = readBookings();
       const target = resolveCancellationTarget({
         requestedRef,
@@ -2238,7 +2317,6 @@ export default function App() {
       const reconciliationRequired = cancellationReconciliationRequired(target.bookingRef);
       if (reconciliationRequired) return JSON.stringify(reconciliationRequired);
 
-      const existingFlow = cancellationFlowRef.current;
       if (existingFlow?.bookingRef && norm(existingFlow.bookingRef) === norm(target.bookingRef)
         && ["checking", "route_confirmation", "final_confirmation", "processing"].includes(existingFlow.phase)) {
         return JSON.stringify({
@@ -2392,9 +2470,13 @@ export default function App() {
     },
 
     show_offers: async ({ bankName = "", cardName = "", experience = "", detailTopic = "", format = "", seatType = "", isMember, monthlyTicketsUsed, monthlySpend } = {}) => {
+      const cancellationGuard = preserveActiveCancellationForTool("show_offers");
+      if (cancellationGuard) return cancellationGuard;
       if (checkoutPaymentActiveRef.current) return JSON.stringify({ shown: false, reason: "payment_in_progress", instruction: "Payment authorization is in progress. Keep checkout visible and ask the guest to wait for the result." });
-      dismissPendingCancellation("offers_opened");
       const current = stageRef.current;
+      const preservedCheckout = current.view === "checkout" ? activeCheckoutStage() : null;
+      const checkoutPreserved = Boolean(preservedCheckout);
+      if (!checkoutPreserved) dismissPendingCancellation("offers_opened");
       const origin = current.view === "offers" ? offersReturnRef.current || { view: "empty" } : current;
       const order = origin.view === "checkout" ? pendingOrderRef.current : null;
       const activeBooking = origin.view === "booking" ? bookingRef.current : null;
@@ -2451,7 +2533,7 @@ export default function App() {
       lastOfferRef.current = result;
       const toolLocale = localeRef.current;
       const disclaimer = OFFER_META.disclaimer[toolLocale] || OFFER_META.disclaimer.en;
-      if (current.view !== "offers") offersReturnRef.current = current;
+      if (!checkoutPreserved && current.view !== "offers") offersReturnRef.current = current;
       const eligibilityCheckRequested = Boolean(
         effectiveCardName
         || experience
@@ -2462,11 +2544,17 @@ export default function App() {
         || Number.isFinite(suppliedMonthlySpend),
       );
       const showtimeRequired = eligibilityCheckRequested && !context.isSessionGrounded;
-      showStage({ view: "offers", query, context, result, showtimeRequired });
-      resetClarificationFailures();
+      if (!checkoutPreserved) {
+        showStage({ view: "offers", query, context, result, showtimeRequired });
+        resetClarificationFailures();
+      }
       if (!query) {
         return JSON.stringify({
           shown: "all offers",
+          checkoutPreserved,
+          checkoutId: preservedCheckout?.order?.checkoutId || null,
+          seats: preservedCheckout?.order?.seats || [],
+          total: preservedCheckout?.order?.total ?? null,
           promotionCount: OFFER_META.promotionCount,
           issuerCount: OFFER_META.issuerCount,
           answer: toolLocale === "ar"
@@ -2485,6 +2573,10 @@ export default function App() {
       const topicAnswer = answerForOfferTopic(result?.offer, result?.cardProfile, toolLocale, detailTopic || "summary");
       return JSON.stringify({
         shown: "offer card",
+        checkoutPreserved,
+        checkoutId: preservedCheckout?.order?.checkoutId || null,
+        seats: preservedCheckout?.order?.seats || [],
+        total: preservedCheckout?.order?.total ?? null,
         bank: localizedValue(result?.offer?.bank, toolLocale) || bankName,
         card: localizedValue(result?.cardProfile?.name, toolLocale) || cardName || null,
         headline: localizedHeadline,
@@ -2589,6 +2681,15 @@ export default function App() {
     },
   };
 
+  const showBookingForAuthorizedCancellation = (args, source) => {
+    cancellationIntentAuthorizationRef.current = { source };
+    try {
+      return clientTools.show_booking_for_cancellation(args);
+    } finally {
+      cancellationIntentAuthorizationRef.current = null;
+    }
+  };
+
   const resolveVisibleSeatTurn = (text) => {
     if (stageRef.current.view !== "seatmap") return Object.freeze({ requested: false, seats: [] });
     const availableSeatIds = (planRef.current || [])
@@ -2673,7 +2774,10 @@ export default function App() {
         : null,
       storedBookings,
     });
-    const rawResult = await clientTools.show_booking_for_cancellation({ bookingRef: target.bookingRef || undefined });
+    const rawResult = await showBookingForAuthorizedCancellation(
+      { bookingRef: target.bookingRef || undefined },
+      "direct_user_turn",
+    );
     try {
       return typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
     } catch {
@@ -2898,12 +3002,29 @@ export default function App() {
           cancellationContinuation.handled
           || isDirectCancellationRequest(safeMessage, { hasBookingContext })
         );
+        const localOfferTurn = decision === null
+          && !cancellationFlowRef.current
+          && !directCancellation
+          && !historyRequest.requested
+          && !directSeatSelection
+          && !directCinemaSelection
+          && !checkoutResumeTurn
+          ? resolveLocalOfferTextTurn(safeMessage, { locale: localeRef.current })
+          : null;
+        const checkoutOfferEvaluation = activeCheckout && localOfferTurn
+          ? evaluateCheckoutOfferTurn(localOfferTurn)
+          : null;
+        if (checkoutOfferEvaluation) {
+          conversation.sendContextualUpdate?.(`Approved published offer result for the guest's spoken question: ${checkoutOfferEvaluation.answer} The unpaid checkout remains visible with checkout ID ${checkoutOfferEvaluation.checkout.order.checkoutId}, seats ${(checkoutOfferEvaluation.checkout.order.seats || []).join(", ")}, and total ${checkoutOfferEvaluation.checkout.order.total}. Answer only from these facts, do not claim the offer was applied, and do not replace checkout.`);
+        }
         dismissStaleTransactionalView({ text: safeMessage, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
-        const checkoutFaq = activeCheckout && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection
+        const checkoutFaq = activeCheckout && !localOfferTurn && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection
           ? prepareFaqContext(safeMessage)
           : { matches: [], context: "" };
         const discoveryFilterTurn = checkoutFaq.matches.length ? false : isDiscoveryFilterTurn(safeMessage);
-        const faq = checkoutFaq.matches.length
+        const faq = localOfferTurn
+          ? { matches: [], context: "" }
+          : checkoutFaq.matches.length
           ? checkoutFaq
           : directCinemaSelection || directCancellation || directSeatSelection || discoveryFilterTurn
             ? { matches: [], context: "" }
@@ -2952,7 +3073,7 @@ export default function App() {
         }
         if (checkoutResumeTurn) conversation.sendContextualUpdate?.("The existing unpaid checkout has been restored with the same movie, cinema, showtime, seats, and total. Do not call a movie, showtime, or seat tool. Ask the guest to complete checkout on screen or use Edit seats.");
         else if (resumeOnlyTurn) conversation.sendContextualUpdate?.(`Continue from the currently visible ${stageRef.current.view} step. Preserve the selected movie, cinema, date, showtime, seats, and pricing. Do not restart discovery or replace the active panel.`);
-        else if (activeCheckout && !explicitDiscoveryTurn && !directCancellation && !historyRequest.requested) conversation.sendContextualUpdate?.("An unpaid checkout remains active. Answer this question without calling movie, showtime, or seat-selection tools and without replacing the checkout panel.");
+        else if (activeCheckout && !checkoutOfferEvaluation && !explicitDiscoveryTurn && !directCancellation && !historyRequest.requested) conversation.sendContextualUpdate?.("An unpaid checkout remains active. Answer this question without calling movie, showtime, or seat-selection tools and without replacing the checkout panel.");
         if (details.requestedSeatTarget) conversation.sendContextualUpdate?.(`The guest would like ${details.requestedSeatTarget} tickets. Treat this only as a target and guide them to select ${details.requestedSeatTarget} seats. The number of selected seats is the actual ticket count and controls pricing.`);
         if (directSeatSelection) {
           conversation.sendContextualUpdate?.("The widget is applying the guest's visible seat selection now. Wait for the widget result; do not claim checkout, payment, booking confirmation, a reference, or a QR yet.");
@@ -2975,7 +3096,7 @@ export default function App() {
         }
         if (faq.matches.length) {
           conversation.sendContextualUpdate?.(`${faq.context}\nThe guest's spoken question is: ${safeMessage}. Answer from this approved context without restarting the active task.`);
-        } else updateIntentFromText(safeMessage);
+        } else if (!localOfferTurn) updateIntentFromText(safeMessage);
       }
       const languageSignal = resolveLanguageSignal({
         role,
@@ -3576,21 +3697,25 @@ export default function App() {
       && !languageControlTurn
       ? resolveLocalOfferTextTurn(value, { locale: localeRef.current })
       : null;
-    if (localOfferTurn && !isConnected) {
+    if (localOfferTurn && (activeCheckout || !isConnected)) {
       setInput("");
       let localAnswer = localOfferTurn.answer;
+      let parsedResult = null;
       try {
         const rawResult = await clientTools.show_offers({
           bankName: localOfferTurn.bankName,
           cardName: localOfferTurn.cardName,
           detailTopic: localOfferTurn.detailTopic,
         });
-        const parsedResult = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+        parsedResult = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
         if (parsedResult?.answer) localAnswer = parsedResult.answer;
       } catch (error) {
         console.warn("Local offer panel could not be opened", error);
       }
       say("agent", localAnswer);
+      if (activeCheckout && isConnected) {
+        conversation.sendContextualUpdate?.(`The guest asked about ${localOfferTurn.cardName || localOfferTurn.bankName}. The widget answered from the published offer data: ${localAnswer} Checkout ${parsedResult?.checkoutId || pendingOrderRef.current?.checkoutId || "current"} remains visible with the same seats and total. Do not generate another reply for this turn and do not call a display-changing tool.`);
+      }
       return;
     }
     dismissStaleTransactionalView({ text: value, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
@@ -3989,7 +4114,7 @@ export default function App() {
       };
     }
     selectHistoryBooking(selected);
-    const rawResult = await clientTools.show_booking_for_cancellation({ bookingRef: selectedRef });
+    const rawResult = await showBookingForAuthorizedCancellation({ bookingRef: selectedRef }, "ui_action");
     const result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
     conversation.sendContextualUpdate?.(cancellationResultContext(result, { promptAlreadyVisible: true }));
     return result;
@@ -4492,7 +4617,7 @@ export default function App() {
   const cancelBooking = async () => {
     const current = stageRef.current.view === "booking" ? bookingRef.current : null;
     if (!current?.ref || !isCurrentBooking(current)) return { found: false, reason: "active_booking_required" };
-    const rawResult = await clientTools.show_booking_for_cancellation({ bookingRef: current.ref });
+    const rawResult = await showBookingForAuthorizedCancellation({ bookingRef: current.ref }, "ui_action");
     const result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
     conversation.sendContextualUpdate?.(cancellationResultContext(result, { promptAlreadyVisible: true }));
     return result;

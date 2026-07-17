@@ -92,6 +92,7 @@ for (const text of [
   "Cancel a booking",
   "Please cancel one reservation",
   "Please cancel booking WLACTIVE1",
+  "Cancel my The Odyssey booking",
   "I want to cancel my reservation",
   "ألغي حجزي",
   "الغي هذا الحجز",
@@ -141,6 +142,21 @@ const explicitInText = resolveAtFixtureTime({
 assert.equal(explicitInText.bookingRef, activeB.ref, "a reference in the utterance must beat the visible booking");
 assert.equal(explicitInText.booking, activeB);
 assert.match(explicitInText.source, /explicit|text|spoken|reference/i);
+
+const namedMovieBooking = Object.freeze({ ...activeB, ref: "WLODYSS5Y", movieTitle: "The Odyssey" });
+const namedMovieTarget = resolveAtFixtureTime({
+  text: "Cancel my The Odyssey booking",
+  storedBookings: [activeA, namedMovieBooking, cancelled],
+});
+assert.equal(namedMovieTarget.bookingRef, namedMovieBooking.ref, "a direct cancellation naming one stored movie must not enter movie discovery");
+assert.equal(namedMovieTarget.source, "spoken_title");
+assert.equal(namedMovieTarget.reason, null);
+const cancelledNamedDuplicate = Object.freeze({ ...cancelled, ref: "WLODYOLD", movieTitle: "The Odyssey" });
+const namedMovieWithCancelledHistory = resolveAtFixtureTime({
+  text: "Cancel my The Odyssey booking",
+  storedBookings: [activeA, namedMovieBooking, cancelledNamedDuplicate],
+});
+assert.equal(namedMovieWithCancelledHistory.bookingRef, namedMovieBooking.ref, "one current title match must beat an older cancelled record for the same movie");
 
 const visibleSelection = resolveAtFixtureTime({
   text: "Cancel it",
@@ -290,7 +306,7 @@ const unrelatedStage = resolveCancellationContinuation({
 });
 assert.equal(unrelatedStage.handled, false, "candidate matching must require the explicit cancellation history purpose");
 
-for (const contextChange of ["Go back", "Show me movies", "What is the cancellation policy?"]) {
+for (const contextChange of ["Go back", "Show me movies", "Show my current bookings", "What is the cancellation policy?"]) {
   const continuation = resolveCancellationContinuation({
     text: contextChange,
     stage: selectionStage,

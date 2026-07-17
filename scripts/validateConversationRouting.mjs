@@ -238,7 +238,11 @@ assert.match(offersTool, /const origin = current\.view === "offers" \? offersRet
 assert.match(offersTool, /const activeBooking = origin\.view === "booking" \? bookingRef\.current : null/, "offers must use booking context only when the visible origin is a booking");
 assert.match(offersTool, /const order = origin\.view === "checkout" \? pendingOrderRef\.current : null/, "offers must use a suspended order only when the visible origin is checkout");
 assert.match(offersTool, /buildOfferEvaluationContext\(\{[\s\S]*checkout: order[\s\S]*booking: activeBooking/, "offers must build one canonical, non-mixed evaluation context");
-assert.match(offersTool, /if \(current\.view !== "offers"\) offersReturnRef\.current = current/, "repeated offer queries must not overwrite the checkout return target");
+assert.match(offersTool, /if \(!checkoutPreserved && current\.view !== "offers"\) offersReturnRef\.current = current/, "repeated offer queries and checkout-preserving checks must not overwrite the return target");
+const activeCancellationToolGuard = sliceBetween(app, "const preserveActiveCancellationForTool", "const commitDiscoveryPreferences", "active cancellation tool guard");
+assert.match(activeCancellationToolGuard, /\["checking", "route_confirmation", "final_confirmation", "processing"\]/, "every active cancellation phase must block unrelated display tools");
+assert.doesNotMatch(activeCancellationToolGuard, /showStage|clearSeatSelection|clearPendingOrder/, "the cancellation tool guard must preserve the current panel and booking state");
+assert.equal((app.match(/const cancellationGuard = preserveActiveCancellationForTool\(/g) || []).length, 6, "all discovery, seat, summary, and offer display tools must respect an active cancellation");
 
 const mainRender = sliceBetween(app, "<main ref={scrollRef}", "</main>", "inline stage render");
 const guardedPanels = [
@@ -271,6 +275,15 @@ assert.ok((app.match(/routeCancellationTurn\(/g) || []).length >= 2, "the shared
 assert.match(app, /const IDLE_CANCELLATION_STATE\s*=\s*Object\.freeze\(\{\s*phase:\s*["']idle["']/, "cancellation rendering must begin from an explicit idle phase");
 const cancellationTool = sliceBetween(app, "show_booking_for_cancellation:", "show_offers:", "cancellation tool");
 assert.match(cancellationTool, /setHistoryFilter\(["']active["']\)/, "zero or multiple cancellation targets must render the active-bookings list with matching current-booking copy");
+assert.match(cancellationTool, /cancellationIntentAuthorizationRef\.current[\s\S]*cancellationIntentAuthorizationRef\.current\s*=\s*null/, "the private cancellation authorization must be consumed synchronously and cleared");
+assert.match(cancellationTool, /reason:\s*["']cancellation_intent_required["']/, "an unapproved agent tool call must be rejected without opening cancellation");
+const cancellationAuthorizationRejection = cancellationTool.indexOf("cancellation_intent_required");
+for (const marker of ["readBookings(", "resolveCancellationTarget(", "showStage(", "setCancellationFlow(", "vista.searchBooking("]) {
+  assert.ok(cancellationAuthorizationRejection >= 0 && cancellationAuthorizationRejection < cancellationTool.indexOf(marker), `cancellation intent authorization must precede ${marker}`);
+}
+const authorizedCancellationWrapper = sliceBetween(app, "const showBookingForAuthorizedCancellation", "const resolveVisibleSeatTurn", "authorized cancellation wrapper");
+assert.match(authorizedCancellationWrapper, /cancellationIntentAuthorizationRef\.current\s*=\s*\{ source \}[\s\S]*clientTools\.show_booking_for_cancellation\(args\)[\s\S]*finally[\s\S]*cancellationIntentAuthorizationRef\.current\s*=\s*null/, "only the local wrapper may grant one-shot cancellation authorization");
+assert.equal((app.match(/clientTools\.show_booking_for_cancellation\(/g) || []).length, 1, "only the trusted local wrapper may invoke the cancellation client tool directly");
 const unresolvedCancellationTarget = sliceBetween(cancellationTool, "if (!target.bookingRef)", "if ([\"already_cancelled\", \"not_current_booking\"]", "unresolved cancellation target");
 assert.match(unresolvedCancellationTarget, /dismissPendingCancellation\(["']target_selection_required["']\)/, "zero or multiple targets must clear pending cancellation state before showing history");
 assert.doesNotMatch(unresolvedCancellationTarget, /setCancellationFlow\(/, "a target-selection outcome must not create a hidden confirmation or error flow");
@@ -279,7 +292,8 @@ assert.match(unresolvedCancellationTarget, /phase:\s*multiple\s*\?\s*["']target_
 const cancellationRouter = sliceBetween(app, "const routeCancellationTurn", "const cancellationResultContext", "shared cancellation continuation router");
 assert.match(cancellationRouter, /continuation\.handled\s*&&\s*!continuation\.bookingRef[\s\S]*phase:\s*["']target_selection["']/, "an ambiguous or unmatched displayed title must retain target selection instead of starting discovery");
 assert.match(cancellationRouter, /requestedRef:\s*continuation\.bookingRef\s*\|\|\s*["']["']/, "a unique displayed title or exact candidate reference must route using the resolved booking reference");
-const inactiveCancellationTarget = sliceBetween(cancellationTool, "if ([\"already_cancelled\", \"not_current_booking\"]", "const existingFlow", "inactive cancellation target");
+assert.match(cancellationRouter, /showBookingForAuthorizedCancellation\([\s\S]*["']direct_user_turn["']/, "typed and voice cancellation turns must grant explicit direct-user authorization");
+const inactiveCancellationTarget = sliceBetween(cancellationTool, "if ([\"already_cancelled\", \"not_current_booking\"]", "if (existingFlow?.bookingRef", "inactive cancellation target");
 assert.match(inactiveCancellationTarget, /dismissPendingCancellation\(target\.reason\)/, "known cancelled or past bookings must end the shared flow without confirmation");
 assert.match(inactiveCancellationTarget, /eligible:\s*false[\s\S]{0,180}confirmationRequired:\s*false/, "known past bookings must be returned as ineligible without confirmation");
 assert.ok(cancellationTool.indexOf("if (!isCurrentBooking(displayed))") < cancellationTool.indexOf("if (demoOnly)"), "a provider or fixture result must be rejected as past before any local cancellation confirmation is offered");
@@ -320,6 +334,9 @@ const historyCancelHandler = sliceBetween(app, "const cancelHistoryBooking", "co
 assert.ok(historyCancelHandler.indexOf("activeCancellationMutation()") < historyCancelHandler.indexOf("selectHistoryBooking(selected)"), "a different history booking must not replace an active provider cancellation mutation");
 assert.ok(historyCancelHandler.indexOf("existingFlow") < historyCancelHandler.indexOf("selectHistoryBooking(selected)"), "a repeated history cancel click must be ignored before it can invalidate the active lookup");
 assert.match(historyCancelHandler, /\["checking", "route_confirmation", "final_confirmation", "processing"\]\.includes\(existingFlow\.phase\)/, "history cancellation must guard every active phase against repeated clicks");
+assert.match(historyCancelHandler, /showBookingForAuthorizedCancellation\([^\n]*["']ui_action["']\)/, "the visible history cancel action must grant explicit UI authorization");
+const bookingCancelHandler = sliceBetween(app, "const cancelBooking", "const changeLanguage", "booking cancel handler");
+assert.match(bookingCancelHandler, /showBookingForAuthorizedCancellation\([^\n]*["']ui_action["']\)/, "the visible booking cancel action must grant explicit UI authorization");
 const historyOpenHandler = sliceBetween(app, "const openHistory", "const openOffers", "history open handler");
 assert.match(historyOpenHandler, /!preserveReturn && stageRef\.current\.view !== "history"[\s\S]*captureHistoryReturn\(\)/, "opening or refreshing history must preserve the original non-history parent view");
 assert.match(cancellationTool, /if \(stageRef\.current\.view !== "history"\) captureHistoryReturn\(\)/, "cancellation-driven history must capture the same return context as the history control");
