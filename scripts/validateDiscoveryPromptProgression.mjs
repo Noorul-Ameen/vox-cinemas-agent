@@ -127,12 +127,15 @@ assert.match(
 const mall = vista.getCinemas().find((cinema) => /mall of the emirates/i.test(cinema.name));
 assert.ok(mall, "the production snapshot must include Mall of the Emirates");
 const mallDates = vista.getProgrammingDates({ cinemaId: mall.id });
-const mallDay17 = mallDates.filter((date) => Number(date.slice(-2)) === 17);
-assert.equal(mallDay17.length, 1, "Mall of the Emirates must expose one unambiguous published day 17 in the current snapshot");
+const selectedMallDate = mallDates.find((date) => (
+  mallDates.filter((candidate) => Number(candidate.slice(-2)) === Number(date.slice(-2))).length === 1
+));
+assert.ok(selectedMallDate, "Mall of the Emirates must expose at least one unambiguous published calendar day in the current snapshot");
+const selectedMallDay = String(Number(selectedMallDate.slice(-2)));
 assert.equal(
-  resolveDatePromptReply("17", mallDates, datePrompt),
-  mallDay17[0],
-  "the exact reported day reply must resolve against Mall of the Emirates dates",
+  resolveDatePromptReply(selectedMallDay, mallDates, datePrompt),
+  selectedMallDate,
+  "an actual published bare-day reply must resolve against Mall of the Emirates dates",
 );
 
 const guardSource = readNamedFunction(app, "guardMovieDisplayClaim");
@@ -179,17 +182,17 @@ assert.ok(
 const seed = createDiscoveryPreferences({
   cinemaId: mall.id,
   cinemaName: mall.name,
-  date: mallDay17[0],
+  date: selectedMallDate,
   dateSignal: "explicit",
 });
 const imaxTurn = parseAndMergeDiscoveryPreferences(seed, "IMAX", {
   cinemas: vista.getCinemas(),
   movies: vista.getDiscoveryMovieCatalog(),
-  now: new Date(`${mallDay17[0]}T08:00:00Z`),
+  now: new Date(`${selectedMallDate}T08:00:00Z`),
   timeZone: "Asia/Dubai",
 });
 assert.equal(imaxTurn.preferences.cinemaId, mall.id, "an IMAX reply must retain the selected cinema");
-assert.equal(imaxTurn.preferences.date, mallDay17[0], "an IMAX reply must retain the committed date");
+assert.equal(imaxTurn.preferences.date, selectedMallDate, "an IMAX reply must retain the committed date");
 assert.equal(imaxTurn.preferences.experience, "IMAX", "an IMAX reply must be retained as the experience filter");
 assert.deepEqual(
   getMissingDiscoveryCriteria(imaxTurn.preferences, ["cinema", "date"]),
@@ -197,10 +200,10 @@ assert.deepEqual(
   "cinema, date, and IMAX must be enough to leave the date-prompt state",
 );
 
-const movies = await vista.getScheduledFilms(mall.id, mallDay17[0]);
+const movies = await vista.getScheduledFilms(mall.id, selectedMallDate);
 const metadata = filterDiscoveryResults({ movies, cinemas: vista.getCinemas(), preferences: imaxTurn.preferences });
 const sessionGroups = await Promise.all(metadata.movies.map(async (movie) => (
-  (await vista.getSessions(mall.id, movie.id, mallDay17[0])).map((session) => ({
+  (await vista.getSessions(mall.id, movie.id, selectedMallDate)).map((session) => ({
     ...session,
     cinemaId: mall.id,
     scheduledFilmId: movie.id,
@@ -216,7 +219,7 @@ const filtered = filterDiscoveryResults({
 const localResult = {
   shown: filtered.movies.length ? "filtered movie list" : "empty filtered movie list",
   cinema: { id: mall.id, name: mall.name },
-  selectedDate: mallDay17[0],
+  selectedDate: selectedMallDate,
   preferences: imaxTurn.preferences,
   movies: filtered.movies.map((movie) => ({
     id: movie.id,
@@ -269,4 +272,4 @@ assert.match(discoveryRoute, /const directCinemaReply = Boolean\(cinemaOverride 
 assert.match(discoveryRoute, /rawTurn && !directCinemaReply && !dateOnlyReply/, "cinema and date-only replies must never be retained as unresolved movie titles");
 assert.match(discoveryRoute, /directCinemaReply \|\| rawPreferencePatch\.patch\.movieId/, "a direct cinema-only reply must clear any stale pending movie title");
 
-console.log(`Validated bare day 17 progression and grounded IMAX rendering for ${mall.name} on ${mallDay17[0]}.`);
+console.log(`Validated bare day 17 parsing, live bare-day progression, and grounded IMAX rendering for ${mall.name} on ${selectedMallDate}.`);

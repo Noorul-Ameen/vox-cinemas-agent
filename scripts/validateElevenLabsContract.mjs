@@ -169,6 +169,10 @@ assert.equal(contract.prompt.hashAlgorithm, "sha256");
 assert.equal(contract.prompt.hashNormalization, "utf8_lf");
 const promptSource = readText(contract.prompt.source);
 assert.match(promptSource, new RegExp(`export const ${escapeRegExp(contract.prompt.exportName)}\\s*=`), "the configured prompt export must exist");
+assert.match(promptSource, /After a microphone voice yes\/no answer[\s\S]*call show_booking_for_cancellation exactly once with the same active booking reference and wait for its response[\s\S]*Speak only the returned message once/, "the agent prompt must route microphone cancellation decisions through the authoritative client tool result");
+assert.match(promptSource, /Typed yes\/no cancellation decisions are handled locally by the widget and are not sent as a new agent turn/, "the agent prompt must distinguish widget-local typed cancellation decisions");
+assert.match(promptSource, /During an eligible retryable cancellation error[\s\S]*spoken no or keep-booking answer must also call show_booking_for_cancellation exactly once with the same active booking reference and wait for its response[\s\S]*Speak only the returned message once so the tool owns the acknowledgement/, "the prompt must route a spoken retryable-error decline through one authoritative tool response");
+assert.match(promptSource, /spoken yes during an error does not authorize a destructive retry/, "the prompt must reject destructive retries from an error-state yes answer");
 const promptHash = createHash("sha256").update(normalizeSource(promptSource), "utf8").digest("hex");
 assert.equal(promptHash, contract.prompt.sha256, "the ElevenLabs prompt hash changed without a contract version update");
 

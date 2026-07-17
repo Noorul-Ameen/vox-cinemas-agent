@@ -11,6 +11,7 @@ import * as vista from "../src/vistaClient.js";
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const richMedia = fs.readFileSync(new URL("../src/components/RichMedia.jsx", import.meta.url), "utf8");
 const cancellationSafety = fs.readFileSync(new URL("../src/lib/cancellationSafety.js", import.meta.url), "utf8");
+const voiceCancellationDecision = fs.readFileSync(new URL("../src/lib/voiceCancellationDecision.js", import.meta.url), "utf8");
 const vistaClient = fs.readFileSync(new URL("../src/vistaClient.js", import.meta.url), "utf8");
 const cinemas = vista.getCinemas();
 
@@ -183,6 +184,12 @@ assert.match(discoveryLoader, /const unresolvedSignal = extractDiscoveryPreferen
 
 const voiceMessageFlow = sliceBetween(app, "onMessage: async (message) =>", "onError:", "SDK voice message flow");
 const typedMessageFlow = sliceBetween(app, "const sendText", "const sendUiTurn", "typed message flow");
+const typedCancellationDecisionStart = typedMessageFlow.indexOf("const decision =");
+const typedCancellationDecisionEnd = typedMessageFlow.indexOf("const historyRequest", typedCancellationDecisionStart);
+assert.ok(typedCancellationDecisionStart >= 0 && typedCancellationDecisionEnd > typedCancellationDecisionStart, "typed cancellation decision branch must precede general typed routing");
+const typedCancellationDecisionFlow = typedMessageFlow.slice(typedCancellationDecisionStart, typedCancellationDecisionEnd);
+assert.match(typedCancellationDecisionFlow, /const cancellationOutcome = publishCancellationDecision\([\s\S]*handleCancellationDecision\(decision,\s*\{\s*source:\s*["']conversation["']\s*\}\)[\s\S]*if \(cancellationOutcome\?\.handled\) \{[\s\S]*setInput\(["']["']\);[\s\S]*return;/, "a locally handled typed yes/no cancellation decision must stop before general routing");
+assert.doesNotMatch(typedCancellationDecisionFlow, /sendUserMessage|queuePendingEcho|startTextSession/, "a locally handled typed cancellation decision must not be forwarded to ElevenLabs");
 assert.match(voiceMessageFlow, /normalizeElevenLabsMessageEvent\(message\)/, "SDK events must be normalized from the documented ElevenLabs onMessage contract");
 for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMessageFlow]]) {
   assert.match(flow, /isDirectCinemaSelectionUtterance\(/, `${label} must identify a direct cinema reply before FAQ rendering`);
@@ -200,7 +207,13 @@ for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMes
   assert.ok(flow.indexOf("resolveCancellationContinuation(") < flow.indexOf("dismissStaleTransactionalView("), `${label} must resolve cancellation continuation before transactional or discovery cleanup`);
   assert.match(flow, /actionIntent:\s*directCancellation\s*\?\s*["']cancellation["']\s*:\s*actionIntent/, `${label} must preserve the visible booking while shared cancellation routing begins`);
   assert.match(flow, /routeCancellationTurn\((?:safeMessage|value),\s*\{\s*continuation:\s*cancellationContinuation\s*\}\)/, `${label} must route displayed cancellation context through the shared conversational resolver`);
-  assert.match(flow, /handleCancellationDecision\(decision,\s*\{\s*source:\s*["']conversation["']\s*\}\)/, `${label} must continue pending yes/no cancellation through the shared decision handler`);
+  if (label === "typed") {
+    assert.match(flow, /handleCancellationDecision\(decision,\s*\{\s*source:\s*["']conversation["']\s*\}\)/, "typed cancellation decisions must continue through the shared local decision handler");
+  } else {
+    assert.match(flow, /capturePendingVoiceCancellationDecision\(decision\)[\s\S]*show_booking_for_cancellation exactly once[\s\S]*return;/, "microphone cancellation decisions must pause local mutation and direct the agent to the existing cancellation tool");
+    assert.doesNotMatch(flow, /publishCancellationDecision\(handleCancellationDecision\(decision/, "microphone cancellation decisions must not mutate locally before the agent tool call");
+    assert.doesNotMatch(flow, /source:\s*["']voice_local["']/, "microphone cancellation decisions must never create a competing local transcript response");
+  }
   assert.match(flow, /applyDiscoveryPreferencesFromText\([^,]+,\s*details\.cinema\s*\?\s*\{\s*cinemaId:\s*details\.cinema\.id,\s*cinemaName:\s*details\.cinema\.name\s*\}\s*:\s*\{\}\)/, `${label} must retain a cinema already recognized in the guest's turn`);
   assert.match(flow, /routeDiscoveryTurn\((?:safeMessage|value),\s*\{\s*cinemaOverride:\s*details\.cinema,\s*dateOverride:\s*requestedDate,\s*preferencesAlreadyApplied:\s*true/, `${label} must use the same all-criteria discovery router for text and speech transcripts`);
   assert.match(flow, /isDiscoveryRequest\((?:safeMessage|value)\)/, `${label} must recognize progressive discovery replies without requiring an agent tool round-trip`);
@@ -266,7 +279,7 @@ assert.doesNotMatch(faqPreparation, /showStage\(/, "FAQ context preparation must
 assert.match(faqPreparation, /preserveBookingIntent[\s\S]*\["movies", "showtimes", "seatmap", "checkout", "booking", "history"\]/, "FAQ interruptions must preserve the active booking intent");
 assert.match(mainRender, /visibleStageView === "booking" && displayedBooking && <BookingCard\b/, "a stored booking must not render unless booking is the visible active view");
 assert.match(mainRender, /visibleStageView === "history" && <BookingHistory\b/, "booking history must not render unless history is the visible active view");
-assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}cancellation=\{[\s\S]{0,350}\bcancellationState\b/, "BookingCard must render the booking-scoped shared cancellation state used by text, voice, and touch");
+assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}cancellation=\{displayedCancellationState\}/, "BookingCard must render the synchronized booking-scoped cancellation state used by text, voice, and touch");
 assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}onRequestCancel=\{/, "BookingCard must initiate cancellation through its parent-owned router");
 assert.match(mainRender, /<BookingCard\b[\s\S]{0,1200}onConfirm=\{/, "BookingCard confirmation must use the shared cancellation decision handler");
 
@@ -274,6 +287,27 @@ assert.match(app, /const routeCancellationTurn\s*=\s*/, "App must define one sha
 assert.ok((app.match(/routeCancellationTurn\(/g) || []).length >= 2, "the shared cancellation router must be used by both SDK voice and typed turns");
 assert.match(app, /const IDLE_CANCELLATION_STATE\s*=\s*Object\.freeze\(\{\s*phase:\s*["']idle["']/, "cancellation rendering must begin from an explicit idle phase");
 const cancellationTool = sliceBetween(app, "show_booking_for_cancellation:", "show_offers:", "cancellation tool");
+assert.match(voiceCancellationDecision, /VOICE_CANCELLATION_DECISION_TTL_MS = 90_000/, "voice cancellation decisions must remain available for the full confirmation timeout");
+assert.match(voiceCancellationDecision, /userTurn:[\s\S]*confirmationNonce:[\s\S]*decisionNonce:[\s\S]*expiresAt:/, "a captured decision must bind to monotonic turn, confirmation, decision, and expiry state");
+assert.match(voiceCancellationDecision, /phase === "error" && decision !== false[\s\S]*destructive_error_decision_rejected/, "the voice decision state must reject destructive yes decisions during an error");
+assert.match(voiceCancellationDecision, /error:retryable[\s\S]*decision,[\s\S]*confirmationKey: contextKey[\s\S]*userTurn:[\s\S]*confirmationNonce:/, "an eligible retryable error decline must bind the exact flow, turn, and confirmation nonce");
+assert.match(voiceCancellationDecision, /if \(paused\)[\s\S]*cancellation_paused/, "a paused cancellation must fail closed before consumption");
+assert.match(voiceCancellationDecision, /if \(!bookingKey\(requestedRef\)\)[\s\S]*booking_ref_required[\s\S]*booking_ref_mismatch[\s\S]*pending: null[\s\S]*status: "consumed"/, "only a non-empty exact booking reference may consume once");
+assert.match(app, /pendingVoiceCancellationDecisionRef = useRef\(createVoiceCancellationDecisionState\(\)\)/, "App must keep the executable voice-decision state in one synchronous ref");
+assert.match(app, /syncVoiceCancellationConfirmation\(currentDecisionState, customerSafe \|\| \{\}\)/, "booking and phase changes must advance the confirmation nonce and invalidate stale decisions");
+assert.match(app, /const beginMeaningfulCancellationUserTurn = \(\) => \{[\s\S]*advanceVoiceCancellationUserTurn/, "meaningful turns must advance the monotonic cancellation turn");
+assert.equal((app.match(/beginMeaningfulCancellationUserTurn\(\);/g) || []).length, 2, "both microphone and typed meaningful turns must invalidate an older voice decision");
+assert.match(app, /pendingVoiceCancellationDecisionRef\.current\.pending\?\.decisionNonce === pending\.decisionNonce/, "timer expiry must be nonce-safe against a newer captured decision");
+assert.match(cancellationTool, /consumePendingVoiceCancellationDecision\(\{ requestedRef, flow: existingFlow \}\)[\s\S]*handleCancellationDecision\(pendingVoiceDecision\.decision, \{ source: "voice_tool" \}\)[\s\S]*outcome\?\.completion \? await outcome\.completion[\s\S]*voiceDecisionHandled: true[\s\S]*message/, "the next idempotent cancellation tool call must consume the matching voice decision, await completion, and return one authoritative message");
+assert.match(cancellationTool, /voiceDecisionConsumption\.reason !== "no_pending_decision"[\s\S]*No change was confirmed[\s\S]*do not retry the decision without a new guest answer/, "missing, wrong, expired, paused, or stale voice decisions must fail closed instead of replaying a prior confirmation");
+assert.ok(
+  cancellationTool.indexOf('if (voiceDecisionConsumption.reason !== "no_pending_decision")')
+    < cancellationTool.indexOf("const idempotentActiveFlow"),
+  "paused or stale voice decisions must be rejected before any idempotent confirmation replay",
+);
+assert.match(cancellationTool, /let message = authoritativeResult\?\.message \|\| outcome\?\.message[\s\S]*message,/, "the voice cancellation tool must return the executor's authoritative message unchanged when supplied");
+assert.match(cancellationTool, /requestedRef[\s\S]*pendingVoiceDecision\.bookingRef/, "the cancellation tool must bind a captured voice decision to the same active booking reference");
+assert.match(cancellationTool, /Speak the returned message exactly once[\s\S]*Do not repeat an earlier confirmation/, "the voice tool result must prohibit stale confirmation replay");
 assert.match(cancellationTool, /setHistoryFilter\(["']active["']\)/, "zero or multiple cancellation targets must render the active-bookings list with matching current-booking copy");
 assert.match(cancellationTool, /cancellationIntentAuthorizationRef\.current[\s\S]*cancellationIntentAuthorizationRef\.current\s*=\s*null/, "the private cancellation authorization must be consumed synchronously and cleared");
 assert.match(cancellationTool, /reason:\s*["']cancellation_intent_required["']/, "an unapproved agent tool call must be rejected without opening cancellation");
@@ -350,9 +384,18 @@ assert.match(historyReturnHandler, /planContext\?\.cinemaId === targetCinemaId[\
 assert.match(historyReturnHandler, /cinemaRef\.current = targetCinema[\s\S]*setCinema\(targetCinema\)/, "restoring a checkout seat map must restore its cinema context first");
 assert.match(mainRender, /openHistory\(\{[^}]*preserveReturn:\s*true/, "the booking card's back action must reopen history without overwriting its original return target");
 const completionHandler = sliceBetween(app, "const executeCancellationMutation", "const completeCancellation", "cancellation mutation executor");
+assert.doesNotMatch(completionHandler, /say\("system"/, "voice-tool mutation results must use the source-aware announcer instead of emitting duplicate system copy");
+assert.match(voiceCancellationDecision, /buildCancellationCompletionMessage[\s\S]*!storagePersisted[\s\S]*live refund was confirmed with reference[\s\S]*cancelled status could not be saved on this device/, "a live refund with failed local persistence must produce the complete authoritative warning");
+assert.match(completionHandler, /buildCancellationCompletionMessage\(\{[\s\S]*cancellationCompletionOutputOwner\(\{ source, isDemoSimulation \}\)[\s\S]*completionOutputOwner === "local"[\s\S]*message: completionMessage/, "completion must assign one transcript owner and return the same authoritative message");
 const completionLockWrapper = sliceBetween(app, "const completeCancellation", "const handleCancellationDecision", "cancellation lock wrapper");
+assert.doesNotMatch(completionLockWrapper, /say\("system"/, "completeCancellation failures must not bypass source-aware duplicate suppression");
+assert.match(completionLockWrapper, /announceCancellationSystem\(source, message\)/, "completeCancellation failures must announce only when their source permits local copy");
+assert.match(voiceMessageFlow, /pendingVoiceDecision\.phase === "error"[\s\S]*declined retry and chose to keep the booking[\s\S]*Call show_booking_for_cancellation exactly once[\s\S]*speak only the returned message once/, "a spoken retryable-error decline must be captured and acknowledged only through the existing client tool");
+assert.match(app, /const announceCancellationSystem = \(source, message\)[\s\S]*cancellationDecisionOutputOwner\(\{ source \}\) === "local"/, "voice-tool decisions must suppress local transcript copy so the tool owns the acknowledgement");
+assert.doesNotMatch(app, /shouldHandleVoiceCancellationErrorLocally|source:\s*["']voice_local["']/, "retryable microphone declines must not use the removed local response path");
+assert.match(cancellationDecisionHandler, /flow\.phase === "route_confirmation"[\s\S]*setCancellationFlow\([\s\S]*announceCancellationSystem\(source, message\)[\s\S]*phase: "final_confirmation"/, "typed and UI route confirmation must render one local final-confirmation response while voice-tool output remains suppressed");
 assert.match(completionHandler, /!isCurrentBooking\(current\)/, "final cancellation must re-check that the showtime is still current before any mutation");
-assert.match(completionHandler, /const existingJournal = readCancellationJournal\(\);[\s\S]{0,100}const journalBlocksCurrent = Boolean\(existingJournal\);[\s\S]{0,260}if \(journalBlocksCurrent\) \{[\s\S]{0,260}return/, "no cancellation may overwrite either a pending or orphaned provider journal");
+assert.match(completionHandler, /const existingJournal = readCancellationJournal\(\);[\s\S]{0,100}const journalBlocksCurrent = Boolean\(existingJournal\);[\s\S]{0,260}if \(journalBlocksCurrent\) \{[\s\S]*provider_reconciliation_required[\s\S]*return/, "no cancellation may overwrite either a pending or orphaned provider journal");
 assert.match(completionHandler, /findBooking\(current\.ref, \{ strict: true \}\)[\s\S]{0,1200}latestStoredBooking\?\.cancelled/, "a tab must strictly re-read durable booking state inside the exclusive lock before issuing a refund");
 assert.match(completionHandler, /appSessionIsCurrent[\s\S]*bookingContextIsCurrent[\s\S]*bookingPanelIsCurrent/, "cancellation completion must distinguish session validity from the currently visible panel");
 assert.match(completionHandler, /!operationIsCurrent \|\| !appSessionIsCurrent/, "a same-session verified result must be reconciled even after panel navigation");
@@ -371,7 +414,7 @@ assert.match(completionLockWrapper, /catch \(error\)[\s\S]*cancellationInFlightR
 assert.match(vistaClient, /idempotencyKey[\s\S]*"Idempotency-Key"[\s\S]*explicitRejection[\s\S]*REFUND_REJECTED[\s\S]*REFUND_OUTCOME_UNVERIFIED/, "the refund adapter must send an idempotency key and distinguish explicit rejection from an ambiguous response");
 const cardCancelHandler = sliceBetween(app, "const cancelBooking", "const changeLanguage", "booking-card cancellation handler");
 assert.match(cardCancelHandler, /!isCurrentBooking\(current\)/, "the booking-card action must refuse past or cancelled records");
-assert.match(cancellationTool, /const processingMutation = activeCancellationMutation\(\)[\s\S]*if \(processingMutation\) return JSON\.stringify\(processingMutation\)/, "text, voice, and booking-card cancellation must reject every new target while a provider mutation is active");
+assert.match(cancellationTool, /const processingMutation = activeCancellationMutation\(\)[\s\S]*if \(processingMutation\) \{[\s\S]*return JSON\.stringify\(processingMutation\)/, "text, voice, and booking-card cancellation must reject every new target while a provider mutation is active");
 for (const phase of ["checking", "route_confirmation", "final_confirmation", "processing", "error"]) {
   assert.match(app, new RegExp(`phase:\\s*["']${phase}["']`), `App cancellation state must represent the ${phase} phase`);
   assert.match(richMedia, new RegExp(`["']${phase}["']`), `BookingCard must render the ${phase} phase`);

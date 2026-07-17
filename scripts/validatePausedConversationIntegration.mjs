@@ -16,7 +16,11 @@ assert.match(app, /const restoredStageToolGuardRef = useRef\(null\)/, "restored 
 
 const pause = between("const pauseRichRenderingForTopicChange", "const clearPausedJourneyForLifecycle");
 assert.match(pause, /capturePausedRichStage[\s\S]*hidePausedRichStage/, "topic changes must capture before hiding");
+assert.match(app, /pausedContext:[\s\S]*cancellationFlow: cancellationFlowRef\.current \? \{ \.\.\.cancellationFlowRef\.current \} : null/, "a paused cancellation snapshot must retain the exact flow that owns its controls");
+assert.match(app, /const cancellationBookingMatches = !cancellationPausedRef\.current[\s\S]*nextStage\.view === "booking"[\s\S]*nextStage\.booking\?\.ref[\s\S]*cancellationFlow\.bookingRef/, "only the exact active booking may be auto-tagged as a cancellation snapshot");
+assert.doesNotMatch(app, /cancellationBookingMatches[\s\S]{0,350}\["booking", "history"\]/, "an unrelated history panel must never overwrite the paused cancellation entry");
 assert.match(pause, /setStageVisible\(false\)/, "topic changes must hide the rendered panel immediately");
+assert.match(pause, /cancellationPausedRef\.current = true[\s\S]*suspendCancellationConfirmationTimer/, "pausing cancellation must suspend and invalidate the old confirmation deadline");
 assert.doesNotMatch(pause, /clearSeatSelection|clearPendingOrder|bookingRef\.current\s*=\s*null/, "topic changes must not discard valid booking state");
 
 const restore = between("const restorePausedJourney", "const pausedRestoreContext");
@@ -24,6 +28,11 @@ assert.match(restore, /\["checkout", "seatmap", "showtimes", "movies"\]/, "conti
 assert.match(restore, /revalidatePausedCheckout/, "checkout restoration must revalidate current data");
 assert.match(restore, /vista\.getSeatPlan/, "seat restoration must revalidate seat availability");
 assert.match(restore, /readBookings\(\)/, "history and cancellation restoration must revalidate stored bookings");
+assert.match(restore, /entry\.view === "cancellation"[\s\S]*readBookings\(\{ strict: true \}\)[\s\S]*planPausedCancellationRestoration/, "cancellation restoration must strictly re-read the booking and plan against the live flow");
+assert.match(restore, /resume_cancellation_revalidation[\s\S]*showBookingForAuthorizedCancellation/, "a missing or stale cancellation flow must be re-created only through a fresh authorized eligibility check");
+assert.match(restore, /resumeCancellationConfirmationTimer[\s\S]*armCancellationConfirmationTimer/, "a synchronized cancellation restore must receive a fresh confirmation window");
+assert.match(restore, /targetSelection[\s\S]*activeCancellationMutation\(\) \|\| cancellationFlowRef\.current[\s\S]*currentCandidates[\s\S]*setHistoryFilter\("active"\)/, "a flowless cancellation target list must revalidate its candidates without replacing another active flow");
+assert.match(restore, /restoreBookingWithoutConfirmation[\s\S]*showStage\(\{ view: "booking", booking: safeBooking \}\)/, "failed cancellation restoration must show a safe booking panel without stale confirmation purpose");
 assert.match(restore, /restorePausedRichStage/, "validated state must be restored through the paused-stage model");
 assert.match(restore, /restoredStageToolGuardRef\.current = \{ view:/, "a restored stage must arm the one-turn delayed-tool guard");
 
@@ -53,6 +62,7 @@ for (const view of ["movies", "showtimes", "seatmap", "checkout", "booking", "hi
   assert.match(render, new RegExp(`visibleStageView === ["']${view}["']`), `${view} must render only when visible`);
 }
 assert.doesNotMatch(render, /stage\.view === ["'](?:movies|showtimes|seatmap|checkout|booking|history)["']/, "logical paused stages must not leak into rendering guards");
+assert.match(app, /const displayedCancellationState = synchronizedCancellationRenderState\([\s\S]*cancellation=\{displayedCancellationState\}/, "booking confirmation controls must render only when React state and the synchronous cancellation flow agree");
 
 const lifecycle = between("const abandonActiveBookingJourney", "const seatConfirmationKey");
 assert.match(lifecycle, /clearPausedJourneyForLifecycle\("cancelled"/, "explicit active-journey cancellation must clear saved stages");

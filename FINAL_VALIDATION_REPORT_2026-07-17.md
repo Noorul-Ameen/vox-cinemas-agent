@@ -1,14 +1,14 @@
 # VOXI Final Validation Report
 
-Date: 17 July 2026
+Date: 18 July 2026
 
 ## Executive status
 
-The current local build is ready for leadership review. The booking concierge now keeps the logical booking journey while temporarily hiding an unrelated rich screen, restores the correct screen on request, supports contextual booking cancellation, and preserves the same interaction rules for text and voice transport.
+The current local release candidate is ready for final online verification. The booking concierge now keeps the logical booking journey while temporarily hiding an unrelated rich screen, restores the correct screen on request, supports contextual booking cancellation, and preserves the same interaction rules for text and voice transport.
 
 No known repository-level functional defect remains in the tested scope. Production ticket sales are still conditional on the external VOX reservation, payment, refund, live seat inventory, and live showtime APIs. The current checkout produces a device-only saved booking summary. It does not charge a card or reserve cinema inventory.
 
-The latest changes in this report were validated locally before publication. Cloudflare verification is performed after the associated main-branch commit is received because deployment cannot precede that commit.
+Commit `ac82db5` was deployed to Cloudflare and passed the live end-to-end journey described below. That run exposed one cancellation post-confirmation replay. The repository fix has passed local validation. Publication of the final follow-up commit and its Cloudflare regression test remain pending.
 
 ## Root causes and fixes
 
@@ -46,6 +46,22 @@ Fix: cancellation has priority while its lifecycle is active. The resolver now e
 Root cause: the prompt and local fallback did not share a single confirmation contract, and punctuation in phrases such as Yes, cancel it prevented a match.
 
 Fix: confirmation now includes movie, cinema, date, time, booking reference, device-only impact, and a direct yes or no question. Natural variants such as yes, confirm, cancel it, no, keep it, and never mind are normalized before routing. Confirmation updates the stored booking and preserves it in full history with cancelled status.
+
+### A confirmed cancellation could be repeated by the voice agent
+
+Root cause: a typed cancellation decision was completed by the widget and then forwarded as a new ElevenLabs user turn. For microphone input, the local result and the agent response could also race. The agent could therefore replay the earlier confirmation after the cancellation had already succeeded.
+
+Fix: typed confirmation decisions now complete locally and are not forwarded upstream. Voice decisions are held against the active booking reference, monotonic user turn, and confirmation phase, then resolved through the existing `show_booking_for_cancellation` tool. The tool requires the exact booking reference and returns one authoritative result for the agent to speak once. A later user turn, topic pause, timeout, booking or phase change, reset, disconnect, or successful consume invalidates the decision. A retryable spoken error decline uses the same one-time tool response, while a spoken yes during an error cannot authorize a destructive retry.
+
+Local validation of the serialized result path and typed-local path passed. The final deployed Cloudflare regression test is pending.
+
+### A paused cancellation could restore expired controls
+
+Root cause: the 90-second confirmation timer continued while cancellation was hidden for an FAQ. The timer could clear the live cancellation flow while its immutable paused panel remained restorable. The restored panel then looked actionable, but a typed yes had no matching live flow and fell through to general conversation routing.
+
+Fix: cancellation confirmation now has an executable timer lifecycle. Pausing suspends and invalidates the old callback generation. A synchronized restore receives a fresh 90-second window, while wrong-reference, expired, processing, cancelled, or unknown-outcome states fail closed. Confirmation controls render only when the visible booking, live flow, booking reference, phase, pause state, and React state all agree. Restoring checkout or history no longer reactivates a hidden cancellation.
+
+The mounted regression created booking `WLAX5HM`, paused its confirmation for an age-policy FAQ, restored it with Continue cancellation, and completed it by typing Yes, cancel it. The booking changed to Cancelled exactly once and remained in device history with the correct no-refund disclosure.
 
 ### History and language changes could lose the visible screen
 
@@ -89,9 +105,9 @@ The current data operation updates browser localStorage only. A real refund or c
 
 ## ElevenLabs and tool integration
 
-Contract version: `2026-07-17.5`
+Contract version: `2026-07-18.1`
 
-Normalized prompt contract hash: `3fcaa0926b51d026ba98f749608dc94c34a8a4aa7a3540e75ac1c87d35480b5a`
+Normalized prompt contract hash: `8245375a8cde647f9c62e7ee357b67ac4c4f6df08dc1c0a3cc967e2d9ce177b0`
 
 The repository prompt contract now requires the same lifecycle, restoration, cancellation, concise confirmation, language, and punctuation behavior as the widget. The contextual contract is also provided when the widget starts an ElevenLabs session.
 
@@ -103,7 +119,7 @@ Protected integration details were not changed:
 - fuzzy movie and session resolvers
 - 420 px mobile layout target
 
-The exact repository prompt was published to the active ElevenLabs agent branch on 17 July 2026. The configuration was reopened after publication and the paused-journey, booking-history, and secure-payment rules were confirmed as persisted. The prompt payload contains 15,010 normalized characters across 65 lines and has SHA-256 `7ca6dd42e9935e66c52822c5fe1c4ddbb0139485f598351dc136f0bebc6677cd`.
+The exact repository prompt was published to the active ElevenLabs agent branch on 18 July 2026. The configuration was reopened after publication and the paused-journey, booking-history, secure-payment, exact-reference cancellation, retryable-error decline, and single-response rules were confirmed as persisted. The prompt payload contains 15,875 normalized characters across 65 lines and has SHA-256 `446cfd7f2183cc9d1996a2fd6d578efaacc8ca5318b5da3f6cff4f32473cc787`.
 
 Voice WebRTC startup succeeded in the mounted browser and reached Voice chat status. Text and voice use the same routing and state functions. Automated tests validate that shared route contract. A real spoken acoustic utterance was not injected into the microphone during automation, so one manual microphone recognition pass remains required on the deployed HTTPS site.
 
@@ -118,6 +134,7 @@ Primary implementation:
 - `src/lib/conversationalCancellationResolver.js`
 - `src/lib/cancellationConfirmation.js`
 - `src/lib/cancellationRouting.js`
+- `src/lib/voiceCancellationDecision.js`
 - `src/lib/voxiSession.js`
 
 Agent contract:
@@ -132,9 +149,19 @@ Validation coverage:
 - `scripts/validatePausedConversationIntegration.mjs`
 - `scripts/validateConversationalCancellationResolver.mjs`
 - `scripts/validateCancellationConfirmation.mjs`
+- `scripts/validateVoiceCancellationDecision.mjs`
+- `scripts/validateCancellationRestoration.mjs`
 - `scripts/validateConversationLifecyclePrompt.mjs`
+- `scripts/validateDiscoveryPromptProgression.mjs`
 - existing conversation, checkout, seat, cancellation, discovery, offer, annotation, and punctuation validators
 - `package.json`
+
+Fresh schedule assets:
+
+- `data/vox_showtimes_full.json`
+- `src/mockVistaData.js`
+- `src/generated/voxSnapshotManifest.js`
+- `public/data/vox-snapshot/20260717-a97029fceaf39797`
 
 ## Automated validation evidence
 
@@ -144,10 +171,10 @@ Validated data and scope:
 
 - 22 cinemas
 - 37 films
-- 9,668 showtime sessions
-- 20 dates from 17 July 2026 through 5 August 2026
-- 1,464 sessions for 17 July 2026
-- 1,446 sessions for 18 July 2026
+- 8,302 showtime sessions
+- 19 dates from 18 July 2026 through 5 August 2026
+- 1,479 sessions for 18 July 2026
+- 1,347 sessions for 19 July 2026
 - paused journey storage, hiding, restoration, and cleanup
 - restoration intent routing
 - cancellation matching, ambiguity, confirmation, decline, and persistence
@@ -155,21 +182,43 @@ Validated data and scope:
 - conversational discovery progression
 - FAQ and offer fallback behavior
 - text and voice shared routing contract
-- customer-facing punctuation validation across 418 repository text files
+- executable voice-cancellation lifecycle coverage for stale turns, pause, timeout, exact reference, one-time consume, retryable error decline, and output ownership
+- executable paused-cancellation timer suspension, fresh rearm, cross-journey isolation, stale-control suppression, and destructive fail-closed coverage
+- customer-facing punctuation validation across 406 repository text files
 
 The punctuation validator confirms that customer-facing responses do not contain an em dash or en dash.
 
 Final `pnpm run build` result: passed.
 
-- Vite transformed 1,556 modules
-- main bundle gzip size: 236.32 KB
-- main bundle brotli size: 214.28 KB
+- Vite transformed 1,559 modules
+- main bundle gzip size: 241.80 KB
+- main bundle brotli size: 219,050 bytes
 - gzip budget: 256 KB
 - brotli budget: 230.4 KB
-- generated main asset: `index-DN-kNQev.js`
-- generated ElevenLabs transport asset: `ElevenLabsTransport-B93VRWWf.js`
+- generated main asset: `index-DYvhRg5r.js`
+- generated ElevenLabs transport asset: `ElevenLabsTransport-BWlL4yYa.js`
 
 `git diff --check` passed, with only line-ending notices from the Windows checkout.
+
+The transactional official-source refresh also passed. Snapshot version `20260717-a97029fceaf39797` contains 8,302 sessions across 22 cinemas and 19 published programming dates from 18 July through 5 August 2026. The refresh retained verified media where the upstream response was partial, regenerated the client data and 265 on-demand shards, ran every repository validator, passed the production build, and only then promoted the new snapshot.
+
+## Cloudflare deployed end-to-end evidence
+
+Commit `ac82db5` was deployed at `https://voxi-ai.pages.dev/` and exercised as a mounted production page.
+
+Passed scenarios:
+
+- family discovery at Mall of the Emirates for the next day returned three relevant movie cards
+- an FAQ hid the movie results and Continue my booking restored them
+- Toy Story 5 opened its showtimes and the exact 17:00 PREMIER session opened the seat map
+- selecting E1 and E2 produced two tickets and an AED 84 checkout
+- the detailed FAB offer hid checkout and Return to checkout restored E1, E2, and AED 84
+- switching between Arabic and English preserved checkout state
+- ElevenLabs WebRTC reached Voice chat status
+- completing the review flow saved a device-only booking summary, QR code, and reference
+- cancellation by the selected movie targeted the correct stored booking and displayed the complete confirmation
+
+The same run exposed the post-confirmation cancellation replay described in Root causes and fixes. The fix passed local validation but is not represented by `ac82db5`. Final Cloudflare deployment and regression verification of the fix are pending.
 
 ## Mounted browser end-to-end evidence
 
@@ -247,11 +296,10 @@ These captures were made in the task browser and were not added to the repositor
 - refund execution
 - server-backed customer booking history across devices
 - authoritative live VOX showtime API access
-- deploying this final source set to Cloudflare
 
 ### Known repository defects
 
-None found in the tested scope after the final validation run.
+None found in the locally tested scope after the final validation run. The cancellation replay fix still requires its final deployed Cloudflare regression test.
 
 ## Required production integrations
 
@@ -270,12 +318,14 @@ ElevenLabs should receive the exact prompt contract in `config/elevenlabs-agent-
 
 ## Final readiness decision
 
-Leadership review readiness: ready after this source set is pushed and deployed.
+Leadership review readiness: local release candidate passed. Final online approval is pending deployment and Cloudflare regression verification of the cancellation replay fix.
 
 Repository functional validation: passed.
 
 Local visual validation: passed at the required 420 px layout.
 
-Cloudflare validation for this final source set: pending deployment.
+Cloudflare validation for commit `ac82db5`: passed, with the cancellation replay issue identified during the run.
+
+Cloudflare validation for the final follow-up fix: pending deployment.
 
 Real transaction production readiness: blocked by the VOX booking, payment, refund, identity, and live inventory integrations listed above.

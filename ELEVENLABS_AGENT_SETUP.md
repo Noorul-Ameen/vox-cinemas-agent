@@ -2,9 +2,9 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-17.5`
+Prompt contract version: `2026-07-18.1`
 
-Prompt source SHA-256: `3fcaa0926b51d026ba98f749608dc94c34a8a4aa7a3540e75ac1c87d35480b5a`
+Prompt source SHA-256: `8245375a8cde647f9c62e7ee357b67ac4c4f6df08dc1c0a3cc967e2d9ce177b0`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 
@@ -313,7 +313,7 @@ Parameters:
 
 Agent rule:
 
-> When multiple current bookings are shown, accept an exact displayed movie title or reference and never route that continuation into movie discovery. Speak only the returned cancellation phase. Never claim a refund or cancellation succeeded until the authoritative result confirms it.
+> When multiple current bookings are shown, accept an exact displayed movie title or reference and never route that continuation into movie discovery. Speak only the returned cancellation phase. After a microphone yes/no answer during an active cancellation confirmation, call this same tool exactly once with the active booking reference, wait for its response, and speak only its returned message once. Do not repeat the prior confirmation. Typed yes/no decisions are handled locally by the widget and do not require another tool call. During an eligible retryable cancellation error, a spoken no or keep booking answer must also call this tool exactly once with the same active booking reference, wait for its response, and speak only its returned message once. Never answer that decline from memory. A spoken yes during an error does not authorize a destructive retry. Never claim a refund or cancellation succeeded until the authoritative result confirms it.
 
 ## `show_offers`
 
@@ -505,7 +505,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 1. Confirm the dashboard target is `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`.
 2. Confirm all eight exact client-tool names and schemas match `config/elevenlabs-agent-contract.json`.
 3. Enable Wait for response on all eight tools. Confirm `show_seat_map` returns after map loading and never waits for a later seat-selection turn.
-4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-17.5`.
+4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-18.1`.
 5. Set the first message to `{{voxi_session_opening}}`.
 6. Create all 13 dynamic-variable placeholders and defaults.
 7. Configure English and Arabic support, then disable the automatic `language_detection` system tool.
