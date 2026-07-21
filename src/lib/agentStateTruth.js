@@ -169,6 +169,11 @@ function discoveryStepGuidance(stage, locale) {
   return null;
 }
 
+function requiredDiscoveryClarification(stage) {
+  if (stage?.view !== "discovery" || stage?.missing?.[0] !== "unsupported_language_afghan") return null;
+  return clean(stage?.question || stage?.error);
+}
+
 function wrongDiscoveryQuestion(value, stage) {
   if (stage?.view !== "discovery" || !stage?.missing?.[0] || !stage.question) return false;
   const asksCinema = /\b(?:which|what)\b[\s\S]{0,30}\b(?:cinema|location)\b|\bwhere\b[\s\S]{0,30}\b(?:watch|cinema|location)\b|(?:أي|اي|ما)\s+(?:سينما|موقع)|وين[\s\S]{0,20}(?:سينما|موقع)/iu.test(value);
@@ -197,6 +202,9 @@ function staleProgressionQuestion(value, stage, pendingOrder, locale) {
 export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, locale = "en" } = {}) {
   const value = clean(text);
   if (!value) return value;
+
+  const requiredClarification = requiredDiscoveryClarification(stage);
+  if (requiredClarification) return requiredClarification;
 
   if (overloadedMovieListing(value, stage)) return conciseMovieChoiceGuidance(stage, locale);
 

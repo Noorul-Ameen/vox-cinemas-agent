@@ -77,6 +77,28 @@ assert.equal(
   "the agent must ask the first locally missing criterion",
 );
 
+for (const { locale, question, unsafeReply } of [
+  {
+    locale: "en",
+    question: "Do you mean Afghan-produced movies, Dari-language movies, or Pashto-language movies?",
+    unsafeReply: "I cannot suggest Afghan movies. Would you like Dari or Pashto movies instead?",
+  },
+  {
+    locale: "ar",
+    question: "هل تقصد أفلاماً أفغانية الإنتاج، أم أفلاماً باللغة الدارية، أم باللغة البشتوية؟",
+    unsafeReply: "لا توجد أفلام أفغانية. هل تريد أفلاماً باللغة الدارية؟",
+  },
+]) {
+  assert.equal(
+    guardAgentStateClaim(unsafeReply, {
+      stage: { view: "discovery", missing: ["unsupported_language_afghan"], question },
+      locale,
+    }),
+    question,
+    `${locale}: Afghan origin and language ambiguity must always use the complete authoritative clarification`,
+  );
+}
+
 assert.equal(
   guardAgentStateClaim("What movie would you like to watch?", {
     stage: { view: "showtimes", movie: { title: "Ezma" }, sessions: [{ sessionId: "s1", time: "15:35" }] },

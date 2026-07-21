@@ -522,6 +522,11 @@ const changedExperience = parseAndMergeDiscoveryPreferences(changedGenre.prefere
 assert.equal(changedExperience.preferences.experience, "IMAX");
 assert.equal(changedExperience.preferences.genre, "Action");
 assert.equal(changedExperience.invalidates.pricing, true);
+for (const request of ["Show me IMAX instead", "Show me IMAX only", "اعرض آيماكس بدلاً", "اعرض آيماكس فقط"]) {
+  const signal = extractDiscoveryPreferencePatch(request, { cinemas, movies, now: NOW });
+  assert.equal(signal.patch.experience, "IMAX", `${request}: the replacement experience must be retained`);
+  assert.equal(unresolvedMovieTitleCandidate(request, signal), null, `${request}: a replacement modifier must not become an unresolved movie title`);
+}
 
 const mallJuly17 = createDiscoveryPreferences({
   cinemaId: "0002",

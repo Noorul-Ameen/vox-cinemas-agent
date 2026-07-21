@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { normalizeSeatIds, resolveSeatSelectionTurn, resolveSeatToolInput } from "../src/lib/seatRouting.js";
+import { createSeatToolAuthorization, matchesSeatToolAuthorization, normalizeSeatIds, resolveSeatSelectionTurn, resolveSeatToolInput, SEAT_TOOL_AUTHORIZATION_TTL_MS } from "../src/lib/seatRouting.js";
 
 const available = ["A1", "A2", "E1", "E2", "H12"];
 
@@ -41,6 +41,14 @@ assert.equal(resolveSeatSelectionTurn("yes", { availableSeatIds: available }).re
 assert.equal(resolveSeatSelectionTurn("Is A1 available?", { availableSeatIds: available }).requested, false, "an availability question must not confirm a seat");
 assert.equal(resolveSeatSelectionTurn("confirm seats", { availableSeatIds: available }).reason, "no_selected_seats");
 
+const authorizedSeatTurn = createSeatToolAuthorization({ seats: ["E2", "E1"], sessionEpoch: 4, stageRevision: 9, planContext: "0002:s1", now: 1_000 });
+assert.equal(matchesSeatToolAuthorization(authorizedSeatTurn, { seats: ["E1", "E2"], sessionEpoch: 4, stageRevision: 9, planContext: "0002:s1", now: 1_001 }), true, "the exact current guest seat turn must authorize one matching tool request");
+assert.equal(matchesSeatToolAuthorization(null, { seats: ["E1", "E2"], sessionEpoch: 4, stageRevision: 9, planContext: "0002:s1", now: 1_001 }), false, "an unsolicited agent seat tool call must not be authorized");
+assert.equal(matchesSeatToolAuthorization(authorizedSeatTurn, { seats: ["E1", "E3"], sessionEpoch: 4, stageRevision: 9, planContext: "0002:s1", now: 1_001 }), false, "different seats must not reuse a guest authorization");
+assert.equal(matchesSeatToolAuthorization(authorizedSeatTurn, { seats: ["E1", "E2"], sessionEpoch: 5, stageRevision: 9, planContext: "0002:s1", now: 1_001 }), false, "a new conversation must invalidate seat authorization");
+assert.equal(matchesSeatToolAuthorization(authorizedSeatTurn, { seats: ["E1", "E2"], sessionEpoch: 4, stageRevision: 10, planContext: "0002:s1", now: 1_001 }), false, "a changed visible stage must invalidate seat authorization");
+assert.equal(matchesSeatToolAuthorization(authorizedSeatTurn, { seats: ["E1", "E2"], sessionEpoch: 4, stageRevision: 9, planContext: "0002:s1", now: 1_000 + SEAT_TOOL_AUTHORIZATION_TTL_MS + 1 }), false, "an expired seat authorization must fail closed");
+
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const prompt = fs.readFileSync(new URL("../src/lib/voxiSession.js", import.meta.url), "utf8");
 const voiceStart = Math.max(app.indexOf("onMessage: async (message) =>"), app.indexOf("onMessage: (message) =>"));
@@ -66,6 +74,9 @@ const sharedSeatConfirmation = app.slice(app.indexOf("const priceSeatSelection")
 const touchSeatConfirmation = app.slice(app.indexOf("const confirmSeats"), app.indexOf("const completeCancellation"));
 assert.match(selectSeats, /resolveSeatToolInput\(seats, \{ availableSeatIds, currentSeats: seatsRef\.current \}\)/, "the client tool must use the tested invalid-seat/fallback resolver");
 assert.match(selectSeats, /invalidSeats\.length[\s\S]*invalid or unavailable/, "explicit invalid or unavailable seats must fail before pricing");
+assert.match(selectSeats, /matchesSeatToolAuthorization\(authorization,[\s\S]*unauthorized:\s*true[\s\S]*No current guest seat selection authorized this request/, "an unsolicited agent tool call must not select seats without a current matching guest turn");
+assert.match(app, /seatToolAuthorizationRef\.current = createSeatToolAuthorization\([\s\S]*clientTools\.select_seats/, "text and voice guest seat turns must create the authorization immediately before the protected client tool call");
+assert.ok((app.match(/seatToolAuthorizationRef\.current = null/g) || []).length >= 3, "seat authorization must be consumed and cleared on journey resets");
 assert.match(sharedSeatConfirmation, /seatConfirmationInFlightRef\.current\.get\(key\)[\s\S]*seatConfirmationInFlightRef\.current\.set\(key, trackedPromise\)/, "identical confirmations must share one pricing operation");
 assert.match(selectSeats, /await priceSeatSelection\(ids\)/, "text and voice confirmations must use the shared pricing operation");
 assert.match(touchSeatConfirmation, /await priceSeatSelection\(seats\)/, "touch confirmation must share the same pricing operation as text and voice");

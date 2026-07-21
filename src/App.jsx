@@ -44,7 +44,7 @@ import { createDiscoveryPreferences, extractDiscoveryPreferencePatch, filterDisc
 import { buildAuthoritativeDiscoveryContext, buildMovieSelectionGroundingContext } from "./lib/discoveryResultContext.js";
 import { resolveVisibleMovieSelectionTurn } from "./lib/movieSelectionRouting.js";
 import { resolveVisibleShowtimeSelectionTurn, visibleShowtimeSelectionCandidates } from "./lib/showtimeSelectionRouting.js";
-import { normalizeSeatIds, resolveSeatSelectionTurn, resolveSeatToolInput } from "./lib/seatRouting.js";
+import { createSeatToolAuthorization, matchesSeatToolAuthorization, normalizeSeatIds, resolveSeatSelectionTurn, resolveSeatToolInput } from "./lib/seatRouting.js";
 import { filterBookableSessions } from "./lib/showtimeAvailability.js";
 import { startTransportWithRetirement } from "./lib/transportStart.js";
 import { conversationSessionOverrides } from "./lib/transportLanguage.js";
@@ -582,6 +582,7 @@ export default function App() {
   const mountedRef = useRef(true);
   const seatConfirmationInFlightRef = useRef(new Map());
   const uiSeatConfirmationKeyRef = useRef(null);
+  const seatToolAuthorizationRef = useRef(null);
 
   // Voice-resolution caches and non-recursive return-navigation snapshots.
   const filmsRef = useRef([]);
@@ -955,6 +956,7 @@ export default function App() {
     seatQuoteRequestRef.current += 1;
     seatConfirmationInFlightRef.current.clear();
     uiSeatConfirmationKeyRef.current = null;
+    seatToolAuthorizationRef.current = null;
     clearPendingOrder();
     seatsRef.current = [];
     setSelectedSeats([]);
@@ -3310,6 +3312,21 @@ export default function App() {
             reason: "Checkout is already displayed for different seats. Ask the guest to use Edit seats before changing seats.",
           });
       }
+      const authorization = seatToolAuthorizationRef.current;
+      seatToolAuthorizationRef.current = null;
+      const authorizedByCurrentGuestTurn = matchesSeatToolAuthorization(authorization, {
+        seats: ids,
+        sessionEpoch: sessionEpochRef.current,
+        stageRevision: stageRevisionRef.current,
+        planContext: planContextRef.current,
+      });
+      if (!authorizedByCurrentGuestTurn) {
+        return JSON.stringify({
+          confirmed: false,
+          unauthorized: true,
+          reason: "No current guest seat selection authorized this request. Keep the seat map visible and ask the guest to choose or confirm seats.",
+        });
+      }
       const result = await priceSeatSelection(ids);
       if (result.stale) {
         const completedOrder = pendingOrderRef.current;
@@ -3995,6 +4012,12 @@ export default function App() {
           : "Select at least one available seat, then confirm the seats.",
       };
     }
+    seatToolAuthorizationRef.current = createSeatToolAuthorization({
+      seats: resolvedTurn.seats,
+      sessionEpoch: sessionEpochRef.current,
+      stageRevision: stageRevisionRef.current,
+      planContext: planContextRef.current,
+    });
     const rawResult = await clientTools.select_seats({ seats: resolvedTurn.seats });
     try {
       return typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
@@ -4215,6 +4238,7 @@ export default function App() {
     pendingOrderRef.current = null;
     checkoutStageRef.current = null;
     setPendingOrder(null);
+    seatToolAuthorizationRef.current = null;
     seatsRef.current = [];
     setSelectedSeats([]);
     requestedSeatTargetRef.current = null;

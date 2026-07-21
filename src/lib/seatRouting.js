@@ -116,3 +116,31 @@ export function resolveSeatSelectionTurn(text, { availableSeatIds = [], currentS
     reason: invalidSeats.length ? "invalid_or_unavailable_seats" : confirmation && !selected.length ? "no_selected_seats" : null,
   });
 }
+
+export const SEAT_TOOL_AUTHORIZATION_TTL_MS = 15_000;
+
+const seatAuthorizationKey = (seats = []) => [...new Set((seats || [])
+  .map((seat) => String(seat || "").trim().toUpperCase())
+  .filter(Boolean))]
+  .sort()
+  .join(",");
+
+export function createSeatToolAuthorization({ seats = [], sessionEpoch, stageRevision, planContext, now = Date.now() } = {}) {
+  const seatKey = seatAuthorizationKey(seats);
+  if (!seatKey) return null;
+  return Object.freeze({
+    seatKey,
+    sessionEpoch,
+    stageRevision,
+    planContext: planContext == null ? null : String(planContext),
+    expiresAt: now + SEAT_TOOL_AUTHORIZATION_TTL_MS,
+  });
+}
+
+export function matchesSeatToolAuthorization(authorization, { seats = [], sessionEpoch, stageRevision, planContext, now = Date.now() } = {}) {
+  if (!authorization || authorization.expiresAt < now) return false;
+  return authorization.seatKey === seatAuthorizationKey(seats)
+    && authorization.sessionEpoch === sessionEpoch
+    && authorization.stageRevision === stageRevision
+    && authorization.planContext === (planContext == null ? null : String(planContext));
+}

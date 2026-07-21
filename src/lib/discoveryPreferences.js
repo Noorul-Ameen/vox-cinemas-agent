@@ -610,7 +610,7 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
   if (!candidate) return null;
   const normalized = normalizeText(candidate);
   if (GENERIC_DISCOVERY_TITLE_RESIDUAL.test(normalized)) return null;
-  if (!normalized || /^(?:a|an|the|this|that|movies?|films?|showtimes?|options?|choices?|something|anything|one|tickets?|seats?|أفلام|افلام|فيلم|خيارات|شيء|أي شيء|تذاكر|مقاعد)$/iu.test(normalized)) return null;
+  if (!normalized || /^(?:a|an|the|this|that|movies?|films?|showtimes?|options?|choices?|something|anything|one|tickets?|seats?|instead|only|أفلام|افلام|فيلم|خيارات|شيء|أي شيء|تذاكر|مقاعد|بدلا|بدلاً|فقط)$/iu.test(normalized)) return null;
   if (/\b(?:tickets?|seats?)\b|(?:تذاكر|مقاعد)/iu.test(normalized)) return null;
   return candidate;
 }
