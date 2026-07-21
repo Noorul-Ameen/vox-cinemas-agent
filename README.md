@@ -57,7 +57,7 @@ The current site uses Cloudflare Pages Git integration:
 - Build command: `npm ci && npm run validate && npm run build`
 - Output directory: `dist`
 
-The current July 21 working-tree changes are local and are not deployed. The revision presently served by Cloudflare was not validated as containing these changes, so older hosted asset-parity evidence must not be treated as evidence for this candidate.
+The July 21 feature build was deployed from `main` at commit `98e543f4b14019723b084e9eb0602a541d6f3358`. Cloudflare reported a successful deployment, and the production domain served the expected bundle and versioned showtime snapshot. See [FINAL_VALIDATION_REPORT_2026-07-21.md](./FINAL_VALIDATION_REPORT_2026-07-21.md) for the live replay evidence and remaining external boundaries.
 
 Snapshot mode requires no secret environment variables. If `VITE_VISTA_BASE` is enabled later, it must point only to a public-safe server gateway. Every `VITE_*` value is embedded in the browser bundle.
 
@@ -115,7 +115,7 @@ The workflow `.github/workflows/refresh-vox-showtimes.yml` runs daily at 01:30 U
 npm run refresh:data
 ```
 
-The local candidate uses versioned snapshot `20260721-2cd3483aeb62e458`. It does not silently cycle to stale dates. When a requested date is not covered, the UI shows an honest unavailable state. Past showtimes are filtered with UAE time and a 06:00 programming-day cutoff. This snapshot is not claimed to be present on Cloudflare until the repository is deployed and verified.
+The deployed candidate uses versioned snapshot `20260721-2cd3483aeb62e458`. It does not silently cycle to stale dates. When a requested date is not covered, the UI shows an honest unavailable state. Past showtimes are filtered with UAE time and a 06:00 programming-day cutoff. The snapshot was verified as JSON on the Cloudflare production domain.
 
 Live sold-out status, seat inventory, holds, authoritative pricing, payment, official admission QR, refunds, and provider cancellation require a licensed server integration and are not represented as live in snapshot mode.
 
@@ -138,14 +138,14 @@ Live sold-out status, seat inventory, holds, authoritative pricing, payment, off
 
 Current July 21 validation status:
 
-- Local text and mounted 420 px English and Arabic journeys: PASS.
+- Local and Cloudflare mounted 420 px English and Arabic text journeys: PASS.
 - Repository WebRTC, WebSocket, bilingual transport, location, availability, continuity, and punctuation checks: PASS.
 - Local movie-result rendering: approximately 334 to 368 ms in sampled mounted-browser runs.
 - Final Arabic mounted journey: Ezma `17:55`, A6 and A7, two seats, AED 84, food FAQ pause, and exact checkout restore all passed with empty browser error and warning logs.
 - Cold-load budget: PASS at 230,379 of 230,400 initial JavaScript Brotli bytes.
 - ElevenLabs contract `2026-07-21.2`: PUBLISHED AND DASHBOARD-VERIFIED.
 - Real microphone recognition and TTS: BLOCKED by the in-app browser permission timeout and still requires manual acceptance.
-- Cloudflare validation of these exact changes: NOT RUN because the changes are not deployed.
+- Cloudflare validation of the July 21 feature build: PASS for the expected bundle, versioned snapshot, headers, bilingual discovery, exact movie and showtime selection, seat and checkout continuity, FAQ restoration, grounded unsupported locations, unavailable-language handling, navigation, and empty browser logs.
 - Live customer transaction readiness: BLOCKED by external inventory, payment, ticket, cancellation, and refund APIs.
 
 The authoritative evidence and readiness decision are in [FINAL_VALIDATION_REPORT_2026-07-21.md](./FINAL_VALIDATION_REPORT_2026-07-21.md). A shorter synchronized summary is in [docs/end-to-end-test-report.md](./docs/end-to-end-test-report.md).

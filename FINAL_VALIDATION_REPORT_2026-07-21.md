@@ -2,7 +2,7 @@
 
 Date: 21 July 2026, UAE
 
-Scope: current local working tree on `concierge-inline`
+Scope: feature commit `98e543f4b14019723b084e9eb0602a541d6f3358`, deployed from `main`
 
 Local validation URL: <http://127.0.0.1:4174/>
 
@@ -10,9 +10,9 @@ Public URL: <https://voxi-ai.pages.dev/>
 
 ## Executive status
 
-The current local candidate passes the tested text journeys, deterministic repository checks, 420 px visual inspection, and the protected ElevenLabs transport contract. It improves explicit English and Arabic transport switching, retained booking context, grounded location routing, availability filtering, and initial movie-result performance.
+The deployed candidate passes the tested text journeys, deterministic repository checks, 420 px visual inspection, protected ElevenLabs transport contract, and critical Cloudflare production replay. It improves explicit English and Arabic transport switching, retained booking context, grounded location routing, availability filtering, and initial movie-result performance.
 
-These changes are local and are **not deployed**. The Cloudflare revision currently served at the public URL was not validated as containing these changes. No Cloudflare parity or production acceptance claim is made for this working tree.
+Feature commit `98e543f4b14019723b084e9eb0602a541d6f3358` was pushed to `main`. Its Cloudflare Pages check completed successfully, its production bundle `/assets/index-uT8EEHGH.js` was served from <https://voxi-ai.pages.dev/>, and snapshot `20260721-2cd3483aeb62e458` was verified as JSON on the production domain. The commit-specific preview is <https://712e42d6.voxi-ai.pages.dev/>.
 
 Voice WebRTC configuration and code-level routing tests pass. A real acoustic microphone and TTS exchange was not validated because the in-app browser permission request timed out. ElevenLabs dashboard language, voice, residency, override, first-message, and tool settings are correct. The exact repository prompt for contract `2026-07-21.2` was published, reloaded, and verified in the signed-in dashboard.
 
@@ -20,15 +20,15 @@ Voice WebRTC configuration and code-level routing tests pass. A real acoustic mi
 
 | Area | Status | Evidence-based result |
 | --- | --- | --- |
-| Local text journeys | PASS | English and Arabic discovery, filtering, location routing, showtimes, seats, checkout continuity, FAQ pause and restore, and cancellation routing use the same local journey state. |
-| Arabic interface and agent transport | PASS LOCALLY | Explicit selector or confirmed language command restarts the active text or voice transport with `overrides.agent.language` set to `ar` or `en` while preserving journey context. |
-| Arabic movie-language request | PASS LOCALLY | Arabic script alone does not switch the interface. A request for Arabic movies remains a movie-language filter unless the guest explicitly requests an interface language change. |
-| Showtime and movie rendering | PASS LOCALLY | Rich local results rendered in approximately 334 to 368 ms in sampled mounted-browser runs. The remaining longer delay is the deferred ElevenLabs SDK, WebSocket, or model response, not the local movie data renderer. |
-| Grounded availability | PASS LOCALLY | Cinema, city, date, time, genre, language, experience, movie, and audience preferences are retained and checked against available sessions before results are shown. |
-| Unsupported locations | PASS LOCALLY | Known unsupported venues are not fuzzy-matched to a different cinema. UAE areas route to verified VOX choices, and outside-UAE requests receive a truthful UAE-only response. Nearby suggestions use the repository's known area and city mapping, not live device geolocation. |
-| Exact visible-movie selection | PASS LOCALLY | An exact displayed title or explicit selection phrase deterministically loads that movie's verified showtimes for both typed and normalized voice turns. Generic or information-only references do not silently select a movie. |
-| Exact visible-showtime selection | PASS LOCALLY | An exact visible time or explicit English or Arabic showtime phrase deterministically opens that session's seat map for typed and normalized voice turns. It is not reinterpreted as a new discovery time filter. Ambiguous same-time experiences and information-only questions remain non-selecting. |
-| Booking context continuity | PASS LOCALLY | FAQ and topic detours can return to the revalidated showtime, seat, checkout, history, or cancellation stage in the same page session. Delayed agent tool calls cannot replace a newer guest-selected stage. |
+| Text journeys | PASS LOCALLY AND ON CLOUDFLARE | English and Arabic discovery, filtering, location routing, showtimes, seats, checkout continuity, FAQ pause and restore, and cancellation routing use the same journey state. |
+| Arabic interface and agent transport | PASS LOCALLY AND ON CLOUDFLARE | Explicit selector or confirmed language command restarts the active text or voice transport with `overrides.agent.language` set to `ar` or `en` while preserving journey context. |
+| Arabic movie-language request | PASS LOCALLY AND ON CLOUDFLARE | Arabic script alone does not switch the interface. A request for Arabic movies remains a movie-language filter unless the guest explicitly requests an interface language change. |
+| Showtime and movie rendering | PASS LOCALLY AND ON CLOUDFLARE | Rich local results rendered in approximately 334 to 368 ms in sampled mounted-browser runs. Production serves the same sharded snapshot and budgeted bundle. The remaining longer delay is the deferred ElevenLabs SDK, WebSocket, or model response, not the local movie data renderer. |
+| Grounded availability | PASS LOCALLY AND ON CLOUDFLARE | Cinema, city, date, time, genre, language, experience, movie, and audience preferences are retained and checked against available sessions before results are shown. |
+| Unsupported locations | PASS LOCALLY AND ON CLOUDFLARE | Known unsupported venues are not fuzzy-matched to a different cinema. UAE areas route to verified VOX choices, and outside-UAE requests receive a truthful UAE-only response. Nearby suggestions use the repository's known area and city mapping, not live device geolocation. |
+| Exact visible-movie selection | PASS LOCALLY AND ON CLOUDFLARE | An exact displayed title or explicit selection phrase deterministically loads that movie's verified showtimes for both typed and normalized voice turns. Generic or information-only references do not silently select a movie. |
+| Exact visible-showtime selection | PASS LOCALLY AND ON CLOUDFLARE | An exact visible time or explicit English or Arabic showtime phrase deterministically opens that session's seat map for typed and normalized voice turns. It is not reinterpreted as a new discovery time filter. Ambiguous same-time experiences and information-only questions remain non-selecting. |
+| Booking context continuity | PASS LOCALLY AND ON CLOUDFLARE | FAQ and topic detours can return to the revalidated showtime, seat, checkout, history, or cancellation stage in the same page session. Delayed agent tool calls cannot replace a newer guest-selected stage. |
 | Paused-stage freshness | PASS LOCALLY | Restored movies, showtimes, and seat maps are checked against the current catalog, current sessions, and current seat plan. Expired or unavailable items are not resurrected from a stale snapshot. |
 | Journey lifecycle and date authority | PASS LOCALLY | Only an explicit journey end or abandonment clears active progress. A visible selection keeps its displayed programming date unless the guest explicitly supplies a different date, and an unavailable explicit date is never substituted silently. |
 | Seat and checkout flow | PASS LOCALLY | One selected seat equals one ticket. Seat changes update count and price. Checkout can return to the seat map and restore the selected order. |
@@ -37,7 +37,7 @@ Voice WebRTC configuration and code-level routing tests pass. A real acoustic mi
 | Acoustic voice and TTS | BLOCKED BY TEST ENVIRONMENT | The controlled in-app browser did not complete the microphone permission request. No spoken English or Arabic acceptance claim is made. |
 | ElevenLabs dashboard settings | PASS | English and Arabic, English primary, Arabic voice override, Detect language off, agent language override on, text-only override on, first-message variable, EU target, and all eight exact client tools were verified read-only. |
 | ElevenLabs dashboard prompt | PASS | The exact repository prompt for contract `2026-07-21.2` was published and read back. The three new language-intent, unsupported-location, and retained-availability rules were present, and the dashboard showed a clean saved state. |
-| Cloudflare current-change validation | NOT RUN | The current local files were not deployed, so the public site was not treated as evidence for these changes. |
+| Cloudflare current-change validation | PASS | GitHub reported `Deployed successfully` for feature commit `98e543f`. Production served the expected bundle and snapshot. Critical English and Arabic text, visual, navigation, availability, unsupported-location, seat, checkout, FAQ, and restore scenarios passed with empty browser logs. |
 | Live customer transaction APIs | BLOCKED | Seat holds, authoritative prices, payments, official tickets and QR codes, provider cancellation, and refunds need licensed server APIs. |
 | Cold-load budget | PASS LOCALLY | Initial JavaScript Brotli was 230,379 bytes against the 230,400-byte limit. This leaves 21 bytes of headroom, so the final build must be rechecked after any source change. |
 
@@ -90,7 +90,7 @@ The official available-day crawl stopped because the upstream published days wer
 - Voice application logic, transport selection, Arabic override, recovery, and transcript routing pass. Real microphone recognition, audio quality, and Arabic or English TTS remain a manual HTTPS-browser test.
 - Microphone permission denial or timeout now produces permission guidance, while an unavailable capture API or unsupported browser produces supported-browser guidance. This correct classification does not prove acoustic input or output.
 - Journey context survives FAQ detours, language changes, and text or voice transport restarts in the current page session. A full browser refresh resets an unfinished journey. Saved bookings remain device-local.
-- The local schedule is a refreshed, versioned public-site snapshot. Ongoing freshness depends on the scheduled refresh workflow and deployment of the promoted snapshot.
+- The deployed schedule is a refreshed, versioned public-site snapshot. Ongoing freshness depends on the scheduled refresh workflow and deployment of each promoted snapshot.
 - Local movie rendering is fast in the sampled browser run. First conversational-agent response time still depends on SDK loading, network latency, WebSocket or WebRTC setup, and ElevenLabs model latency.
 
 ## ElevenLabs published state and remaining validation
@@ -118,7 +118,7 @@ The complete `VOXI_AGENT_PROMPT` value from `src/lib/voxiSession.js` was publish
 - rejecting unsupported locations without a fabricated fuzzy cinema match;
 - verifying availability across all retained cinema, location, date, time, genre, language, experience, movie, and audience criteria before responding.
 
-No further prompt edit is required for the current repository contract. After deployment, run live English and Arabic text checks and one real microphone and TTS check in each language. Do not rename tools or change the protected transport configuration.
+No further prompt edit is required for the current repository contract. Live English and Arabic text checks are complete. One real microphone and TTS check in each language remains required. Do not rename tools or change the protected transport configuration.
 
 ## API and knowledge-base changes required
 
@@ -165,13 +165,25 @@ Final mounted Arabic continuity replay:
 4. An Arabic food FAQ hid the checkout while preserving the unpaid order.
 5. The Arabic return-to-checkout request restored Ezma, `17:55`, seats A6 and A7, two tickets, and AED 84.
 
-The mounted browser recorded no console errors or warnings during this replay. Acoustic microphone recognition and TTS were not exercised.
+The local and Cloudflare mounted browsers recorded no console errors or warnings during the critical replay. Acoustic microphone recognition and TTS were not exercised.
+
+Cloudflare production replay also verified:
+
+1. An Arabic-script request for Arabic movies kept the English interface and returned only verified Arabic films at Mall of the Emirates for the requested date.
+2. Typing `I choose Ezma` replaced the movie list with Ezma's verified showtimes.
+3. The Arabic selector changed the interface and active ElevenLabs text transport language while preserving the visible showtime stage.
+4. An Arabic `17:55` selection opened the seat map, and A6 plus A7 produced the same two-seat AED 84 checkout.
+5. An Arabic food FAQ hid checkout, and the Arabic return request restored the exact movie, time, seats, ticket count, and total.
+6. Roxy Cinemas Boxpark was rejected as a non-VOX venue, with Mercato, Burjuman, and Wafi Mall at Wafi City offered as nearby verified alternatives.
+7. A Korean-language request with no matching sessions returned an explicit no-result state instead of invented movies.
+8. Browser back and forward navigation completed without application errors.
 
 Screenshots:
 
 - [Arabic checkout continuity](./evidence/screenshots/local-arabic-checkout-continuity-2026-07-21.png)
 - [Al Quoz action routing](./evidence/screenshots/local-al-quoz-action-routing-2026-07-21.png)
 - [Final Arabic checkout and FAQ continuity](./evidence/screenshots/local-final-arabic-checkout-2026-07-21.jpg)
+- [Cloudflare Arabic checkout restored](./evidence/screenshots/cloudflare-arabic-checkout-restored-2026-07-21.jpg)
 
 Repository evidence:
 
@@ -183,9 +195,9 @@ Repository evidence:
 
 ## Final production-readiness status
 
-**Leadership review of the current local candidate: READY WITH DISCLOSED BOUNDARIES.**
+**Leadership review of the deployed candidate: READY WITH DISCLOSED BOUNDARIES.**
 
-**Deployment readiness: CONDITIONAL.** Before deploying the repository, rerun the complete validator and production build on the final working tree, deploy the same tested commit, and repeat the critical English and Arabic text and visual journeys on Cloudflare. The ElevenLabs prompt contract is already published and dashboard-verified.
+**Web deployment readiness: PASS.** The complete validator and production build passed on the promoted source, Cloudflare deployed the commit successfully, and the critical English and Arabic text and visual journeys passed on the production domain. The ElevenLabs prompt contract is published and dashboard-verified.
 
 **Acoustic voice readiness: PENDING.** A normal HTTPS browser with an available microphone must complete English and Arabic microphone and TTS acceptance.
 

@@ -2,17 +2,17 @@
 
 Test date: 21 July 2026, UAE
 
-Build under test: current local working tree on `concierge-inline`
+Build under test: feature commit `98e543f4b14019723b084e9eb0602a541d6f3358`, deployed from `main`
 
 Authoritative report: [FINAL_VALIDATION_REPORT_2026-07-21.md](../FINAL_VALIDATION_REPORT_2026-07-21.md)
 
 ## Current status
 
-The July 21 changes are local and are **not deployed**. The Cloudflare URL <https://voxi-ai.pages.dev/> may serve an earlier revision and was not validated as containing this working tree. Historical hosted evidence remains useful only for the older revision it names.
+The July 21 changes are deployed at <https://voxi-ai.pages.dev/>. Cloudflare reported a successful deployment for feature commit `98e543f`, production served `/assets/index-uT8EEHGH.js`, and the production snapshot endpoint returned version `20260721-2cd3483aeb62e458` as JSON. The commit-specific preview is <https://712e42d6.voxi-ai.pages.dev/>.
 
 | Area | Status |
 | --- | --- |
-| Local English and Arabic text journeys | PASS |
+| Local and Cloudflare English and Arabic text journeys | PASS |
 | Local 420 px mounted-browser inspection | PASS |
 | Local movie-result rendering | PASS, approximately 334 to 368 ms in sampled runs |
 | Exact visible movie and showtime routing | PASS for typed and normalized voice turns |
@@ -21,7 +21,7 @@ The July 21 changes are local and are **not deployed**. The Cloudflare URL <http
 | Real microphone recognition and TTS | BLOCKED, in-app browser permission request timed out |
 | ElevenLabs dashboard language, voice, override, first-message, and tool settings | PASS |
 | ElevenLabs dashboard prompt parity | PASS, repository contract `2026-07-21.2` was published and read back |
-| Cloudflare validation of the July 21 changes | NOT RUN |
+| Cloudflare validation of the July 21 changes | PASS |
 | Provider-confirmed payment, ticket, cancellation, and refund | BLOCKED BY EXTERNAL APIS |
 
 ## Local coverage
@@ -47,7 +47,7 @@ The current local regression covers:
 - separate actionable microphone permission and unsupported-browser error guidance;
 - customer-facing rejection of Unicode em dash and en dash characters.
 
-The final mounted Arabic replay preserved visible Ezma showtimes during the Arabic selector change, opened the seat map from the Arabic `17:55` choice, and produced a two-seat AED 84 checkout for A6 and A7. An Arabic food FAQ hid checkout, then the Arabic return request restored the exact movie, time, seats, count, and total. Browser error and warning logs were empty. Acoustic voice was not exercised.
+The final local and Cloudflare Arabic replays preserved visible Ezma showtimes during the Arabic selector change, opened the seat map from the Arabic `17:55` choice, and produced a two-seat AED 84 checkout for A6 and A7. An Arabic food FAQ hid checkout, then the Arabic return request restored the exact movie, time, seats, count, and total. The Cloudflare replay also passed Arabic-script movie filtering without an interface switch, exact typed movie selection, unsupported Roxy Cinemas Boxpark handling with nearby VOX alternatives, unavailable Korean-language grounding, and browser back and forward navigation. Browser error and warning logs were empty. Acoustic voice was not exercised.
 
 ## Fresh schedule data
 
@@ -67,7 +67,7 @@ The protected voice connection remains WebRTC, typed chat remains WebSocket, and
 
 The target dashboard has the correct bilingual languages, English and Arabic voice setup, Detect language off, agent language override on, text-only override on, `{{voxi_session_opening}}`, EU target, and all eight exact client tools. The exact repository prompt for contract `2026-07-21.2`, prompt value SHA-256 `6424e871a383c06e683850aaa40da85e9c437dc9a6c9ed226888d9853fe88043`, was published, reloaded, and verified with all three new repository rules present. The dashboard showed a clean saved state.
 
-The automated browser could not complete microphone permission, so no live acoustic English or Arabic result is claimed. A real HTTPS-browser microphone and TTS pass remains required after deployment.
+The automated browser could not complete microphone permission, so no live acoustic English or Arabic result is claimed. A real HTTPS-browser microphone and TTS pass remains required.
 
 ## Evidence
 
@@ -75,12 +75,13 @@ The automated browser could not complete microphone permission, so no live acous
 - [Arabic checkout continuity screenshot](../evidence/screenshots/local-arabic-checkout-continuity-2026-07-21.png)
 - [Al Quoz action routing screenshot](../evidence/screenshots/local-al-quoz-action-routing-2026-07-21.png)
 - [Final Arabic checkout and FAQ continuity screenshot](../evidence/screenshots/local-final-arabic-checkout-2026-07-21.jpg)
+- [Cloudflare Arabic checkout restored screenshot](../evidence/screenshots/cloudflare-arabic-checkout-restored-2026-07-21.jpg)
 - [Generated snapshot manifest](../src/generated/voxSnapshotManifest.js)
 - [Versioned ElevenLabs contract](../config/elevenlabs-agent-contract.json)
 - [ElevenLabs publication checklist](../ELEVENLABS_AGENT_SETUP.md)
 
 ## Readiness decision
 
-The current local candidate is ready for leadership review with the transaction and acoustic-voice boundaries disclosed. Deployment remains conditional on a final complete validation and production build, deployment of the exact tested commit, and critical Cloudflare text and visual replay. ElevenLabs contract `2026-07-21.2` is already published and dashboard-verified.
+The deployed candidate is ready for leadership review with the transaction and acoustic-voice boundaries disclosed. The complete validation, production build, commit-specific Cloudflare deployment, production asset checks, and critical Cloudflare text and visual replay passed. ElevenLabs contract `2026-07-21.2` is published and dashboard-verified.
 
 Live ticket sales remain blocked until licensed provider APIs are implemented and verified.
