@@ -57,7 +57,7 @@ The current site uses Cloudflare Pages Git integration:
 - Build command: `npm ci && npm run validate && npm run build`
 - Output directory: `dist`
 
-The July 21 feature build was deployed from `main` at commit `98e543f4b14019723b084e9eb0602a541d6f3358`. Cloudflare reported a successful deployment, and the production domain served the expected bundle and versioned showtime snapshot. See [FINAL_VALIDATION_REPORT_2026-07-21.md](./FINAL_VALIDATION_REPORT_2026-07-21.md) for the live replay evidence and remaining external boundaries.
+The 22 July corrective release was deployed from `main` at commit `bc34e3e0ea53b27aa5e276e2e682f4b3389b8131`. Cloudflare serves `/assets/index-Cc1yKhu_.js` and the versioned showtime snapshot. The complete local validator, production build, mounted-browser replay, Cloudflare asset-parity check, and final hosted replay passed. See [FINAL_VALIDATION_REPORT_2026-07-22.md](./FINAL_VALIDATION_REPORT_2026-07-22.md) for the tested journeys and remaining external boundaries.
 
 Snapshot mode requires no secret environment variables. If `VITE_VISTA_BASE` is enabled later, it must point only to a public-safe server gateway. Every `VITE_*` value is embedded in the browser bundle.
 
@@ -138,17 +138,19 @@ Live sold-out status, seat inventory, holds, authoritative pricing, payment, off
 
 Current July 22 validation status:
 
-- Local and Cloudflare mounted 420 px English and Arabic text journeys: PASS.
+- Final corrective local and Cloudflare mounted 420 px English and Arabic text journeys: PASS.
 - Repository WebRTC, WebSocket, bilingual transport, location, availability, continuity, and punctuation checks: PASS.
 - Local movie-result rendering: approximately 334 to 368 ms in sampled mounted-browser runs.
 - Final Arabic mounted journey: Ezma `17:55`, A6 and A7, two seats, AED 84, food FAQ pause, and exact checkout restore all passed with empty browser error and warning logs.
-- Cold-load budget: PASS at 230,379 of 230,400 initial JavaScript Brotli bytes.
+- Final corrective cold-load budget: PASS at 230,223 of 230,400 initial JavaScript Brotli bytes, bundle `/assets/index-Cc1yKhu_.js`.
 - ElevenLabs contract `2026-07-22.1`: PUBLISHED AND DASHBOARD-VERIFIED.
 - Real microphone recognition and TTS: BLOCKED by the in-app browser permission timeout and still requires manual acceptance.
-- Cloudflare validation of the July 21 feature build: PASS for the expected bundle, versioned snapshot, headers, bilingual discovery, exact movie and showtime selection, seat and checkout continuity, FAQ restoration, grounded unsupported locations, unavailable-language handling, navigation, and empty browser logs.
+- Cloudflare validation of corrective commit `bc34e3e0ea53b27aa5e276e2e682f4b3389b8131`: PASS for the expected bundle and snapshot, Afghan clarification, IMAX refinement, guest-authorized seats, two-seat AED 84 checkout, FAB FAQ restoration, device-only payment summary and QR, cancellation by title, bilingual discovery and voice transport, grounded unsupported locations, bank offers, 420 px layout, and browser navigation.
+- Final fresh-tab browser logs: PASS with no errors or warnings. The expected WebSocket-close warning occurred only during the intentional language restart in the earlier long-running replay.
+- First Supergirl cards appeared within 1.733 seconds, including a 1.4-second observation wait.
 - Live customer transaction readiness: BLOCKED by external inventory, payment, ticket, cancellation, and refund APIs.
 
-The authoritative evidence and readiness decision are in [FINAL_VALIDATION_REPORT_2026-07-21.md](./FINAL_VALIDATION_REPORT_2026-07-21.md). A shorter synchronized summary is in [docs/end-to-end-test-report.md](./docs/end-to-end-test-report.md).
+The authoritative evidence and readiness decision are in [FINAL_VALIDATION_REPORT_2026-07-22.md](./FINAL_VALIDATION_REPORT_2026-07-22.md). A shorter historical summary is in [docs/end-to-end-test-report.md](./docs/end-to-end-test-report.md).
 
 ## Main files
 
