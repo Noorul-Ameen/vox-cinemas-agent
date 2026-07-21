@@ -8,9 +8,9 @@ StackBlitz: <https://stackblitz.com/github/Noorul-Ameen/vox-cinemas-agent>
 
 ## Current product coverage
 
-- Official VOX UAE public-site schedule snapshot for 21 July to 12 August 2026.
-- 12,247 deduplicated sessions, 45 scheduled films, and 22 cinemas.
-- 874 sessions on 21 July and 1,338 sessions on 22 July.
+- Official VOX UAE public-site schedule snapshot for 22 July to 12 August 2026.
+- 11,699 deduplicated sessions, 45 scheduled films, and 22 cinemas.
+- 1,361 sessions on 22 July and 1,376 sessions on 23 July.
 - Official movie posters, 14 experience-media records, and 21 current offer-media records with source provenance and explicit fallbacks.
 - Progressive movie discovery using cinema, city, date, time, genre, language, experience, movie, and audience criteria already supplied by the guest.
 - Exact-time and nearest-time showtime handling.
@@ -87,11 +87,11 @@ The product also supports:
 
 Text chat uses the SDK text-only WebSocket path. Voice uses protected WebRTC and self-hosted primary ElevenLabs AudioWorklets under `public/elevenlabs/`. The CSP permits the SDK-required secondary `blob:` worklet and continues to block `data:` scripts.
 
-Repository tests validate transport contracts, startup timeouts, explicit agent-language overrides, bilingual copy, state preservation, and protected configuration. ElevenLabs contract `2026-07-21.2` was published and read back from the signed-in target dashboard with the expected first message and new repository rules. The latest automated local voice attempt ended in the bounded microphone-permission timeout, so real microphone recognition and TTS remain a manual HTTPS-browser check. See [ELEVENLABS_AGENT_SETUP.md](./ELEVENLABS_AGENT_SETUP.md).
+Repository tests validate transport contracts, startup timeouts, explicit agent-language overrides, bilingual copy, state preservation, and protected configuration. ElevenLabs contract `2026-07-22.1` was published and read back from the signed-in target dashboard with the expected first message and repository rules. The latest automated local voice attempt ended in the bounded microphone-permission timeout, so real microphone recognition and TTS remain a manual HTTPS-browser check. See [ELEVENLABS_AGENT_SETUP.md](./ELEVENLABS_AGENT_SETUP.md).
 
 ## Schedule data and refresh
 
-The current extraction completed at `2026-07-21T11:52:23.208Z`. It uses official VOX UAE public-site routes under:
+The current extraction completed at `2026-07-21T20:11:33.705Z`. It uses official VOX UAE public-site routes under:
 
 - `https://uae.voxcinemas.com`
 - `https://uae-apife.voxcinemas.com`
@@ -100,13 +100,13 @@ The extractor starts on the current UAE date, discovers official advertised prog
 
 Current crawl facts:
 
-- 12,322 raw rows
-- 12,247 unique sessions
-- 75 duplicates removed
-- 23 programming dates, from 21 July to 12 August 2026
+- 11,771 raw rows
+- 11,699 unique sessions
+- 72 duplicates removed
+- 22 programming dates, from 22 July to 12 August 2026
 - 45 films and 22 cinemas
 - No missing official movie posters in the promoted snapshot
-- 14 fresh experience-media records and no retained experience records
+- 5 fresh experience-media records and 9 retained first-party records after a partial experience-media response
 - 21 fresh offer-media records and no retained offer records
 
 The workflow `.github/workflows/refresh-vox-showtimes.yml` runs daily at 01:30 UTC, which is 05:30 UAE, and on Thursday at 06:30 UTC, which is 10:30 UAE. It supports manual dispatch. The transactional refresh validates freshness, coverage, completeness, source IDs, poster and media provenance, generated client imports, all repository validators, and the production build before promoting files.
@@ -115,7 +115,7 @@ The workflow `.github/workflows/refresh-vox-showtimes.yml` runs daily at 01:30 U
 npm run refresh:data
 ```
 
-The deployed candidate uses versioned snapshot `20260721-2cd3483aeb62e458`. It does not silently cycle to stale dates. When a requested date is not covered, the UI shows an honest unavailable state. Past showtimes are filtered with UAE time and a 06:00 programming-day cutoff. The snapshot was verified as JSON on the Cloudflare production domain.
+The release candidate uses versioned snapshot `20260721-a101604217549f5f`. It does not silently cycle to stale dates. When a requested date is not covered, the UI shows an honest unavailable state. Past showtimes are filtered with UAE time and a 06:00 programming-day cutoff.
 
 Live sold-out status, seat inventory, holds, authoritative pricing, payment, official admission QR, refunds, and provider cancellation require a licensed server integration and are not represented as live in snapshot mode.
 
@@ -136,14 +136,14 @@ Live sold-out status, seat inventory, holds, authoritative pricing, payment, off
 
 `scripts/validate_converter.py` separately validates the current flat extraction and the legacy compact fixture.
 
-Current July 21 validation status:
+Current July 22 validation status:
 
 - Local and Cloudflare mounted 420 px English and Arabic text journeys: PASS.
 - Repository WebRTC, WebSocket, bilingual transport, location, availability, continuity, and punctuation checks: PASS.
 - Local movie-result rendering: approximately 334 to 368 ms in sampled mounted-browser runs.
 - Final Arabic mounted journey: Ezma `17:55`, A6 and A7, two seats, AED 84, food FAQ pause, and exact checkout restore all passed with empty browser error and warning logs.
 - Cold-load budget: PASS at 230,379 of 230,400 initial JavaScript Brotli bytes.
-- ElevenLabs contract `2026-07-21.2`: PUBLISHED AND DASHBOARD-VERIFIED.
+- ElevenLabs contract `2026-07-22.1`: PUBLISHED AND DASHBOARD-VERIFIED.
 - Real microphone recognition and TTS: BLOCKED by the in-app browser permission timeout and still requires manual acceptance.
 - Cloudflare validation of the July 21 feature build: PASS for the expected bundle, versioned snapshot, headers, bilingual discovery, exact movie and showtime selection, seat and checkout continuity, FAQ restoration, grounded unsupported locations, unavailable-language handling, navigation, and empty browser logs.
 - Live customer transaction readiness: BLOCKED by external inventory, payment, ticket, cancellation, and refund APIs.

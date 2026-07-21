@@ -1,8 +1,10 @@
 export const isResumeOnlyTurn = (value) => /^(?:continue|resume|go on|carry on|متابعة|تابع|اكمل|أكمل)(?:\s+(?:please|من فضلك))?[.!?،]*$/iu.test(String(value || "").trim());
 
+export const isAffirmativeContinuationTurn = (value) => /^(?:yes(?:\s*[,]?\s*proceed)?|proceed|نعم(?:\s*[،]?\s*(?:تابع|استمر|تفضل))?|تابع|استمر|تفضل)(?:\s+(?:please|من فضلك))?[.!?؟،]*$/iu.test(String(value || "").trim());
+
 export const isResumeCheckoutTurn = (value) => /^(?:(?:return|go|take me|back)\s+(?:me\s+)?(?:back\s+)?to\s+(?:the\s+)?(?:checkout|payment)|(?:back|return|resume|continue|complete|finish)\s+(?:the\s+)?(?:checkout|payment)|(?:checkout|payment)\s+(?:again|please)|(?:العودة|ارجع|أرجع|عد)\s+(?:إلى|الى|ل)\s*(?:الدفع|صفحة الدفع)|(?:متابعة|استكمال|اكمال|إكمال)\s+(?:الدفع|عملية الدفع)|(?:الدفع|صفحة الدفع)\s+(?:مرة أخرى|من فضلك))[.!?،]*$/iu.test(String(value || "").trim());
 
-export function pausedResumeTarget(value) {
+export function pausedResumeTarget(value, { affirmativeRecoveryPending = false } = {}) {
   const text = String(value || "").trim();
   if (!text) return null;
   if (isResumeCheckoutTurn(text)) return "checkout";
@@ -13,5 +15,6 @@ export function pausedResumeTarget(value) {
   if (/\b(?:continue|resume|go back|take me back|return)\s+(?:to\s+)?where\s+i\s+(?:was|stopped|left off)|\b(?:go|take me|return)\s+back\s+to\s+(?:my\s+)?(?:previous|last)\s+(?:step|screen)|(?:تابع|أكمل|ارجع|أرجع|عد)\s+(?:إلى|الى)?\s*(?:من\s+)?حيث\s+توقفت/iu.test(text)) return "last";
   if (/\b(?:continue|resume)\s+(?:my|the|this)?\s*(?:booking|journey)|(?:متابعة|استكمال|اكمال|إكمال)\s+(?:حجزي|الحجز)/iu.test(text)) return "journey";
   if (isResumeOnlyTurn(text)) return "last";
+  if (affirmativeRecoveryPending && isAffirmativeContinuationTurn(text)) return "last";
   return null;
 }

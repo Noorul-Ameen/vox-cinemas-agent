@@ -1,5 +1,6 @@
-import { resolveCinemaCandidate } from "./cinemaRouting.js";
+import { CINEMA_ALIASES, resolveCinemaCandidate } from "./cinemaRouting.js";
 import { resolveFilmCandidate } from "./fuzzyResolvers.js";
+import { stripLanguageControlCommand } from "./languageSwitch.js";
 
 export const DISCOVERY_PREFERENCE_KEYS = Object.freeze([
   "cinemaId",
@@ -15,6 +16,8 @@ export const DISCOVERY_PREFERENCE_KEYS = Object.freeze([
   "movieId",
   "movieTitle",
   "audience",
+  "openChoice",
+  "recommendationIntent",
 ]);
 
 export const EMPTY_DISCOVERY_PREFERENCES = Object.freeze(
@@ -79,6 +82,12 @@ const GENRE_ALIASES = Object.freeze([
   ["Family", ["family", "عائلي", "العائلة"]],
   ["Crime", ["crime", "جريمة"]],
   ["Sports", ["sports", "sport", "رياضي"]],
+  ["Fantasy", ["fantasy", "خيال", "فانتازيا"]],
+  ["Mystery", ["mystery", "mysteries", "غموض"]],
+  ["Biography", ["biography", "biographical", "سيرة ذاتية"]],
+  ["War", ["war", "war movie", "حرب"]],
+  ["Western", ["western", "cowboy", "رعاة البقر"]],
+  ["Film Noir", ["film noir", "noir"]],
 ]);
 
 const LANGUAGE_ALIASES = Object.freeze([
@@ -94,6 +103,25 @@ const LANGUAGE_ALIASES = Object.freeze([
   ["Telugu", ["telugu", "تيلوغو"]],
   ["Tamil", ["tamil", "تاميل"]],
   ["Hindi", ["hindi", "هندي"]],
+  ["French", ["french", "francais", "français", "فرنسي", "فرنسية"]],
+  ["German", ["german", "deutsch", "ألماني", "الماني"]],
+  ["Italian", ["italian", "italiano", "إيطالي", "ايطالي"]],
+  ["Japanese", ["japanese", "ياباني"]],
+  ["Chinese", ["chinese", "mandarin", "cantonese", "صيني", "ماندرين", "كانتوني"]],
+  ["Urdu", ["urdu", "أردو", "اردو"]],
+  ["Bengali", ["bengali", "bangla", "بنغالي"]],
+  ["Marathi", ["marathi", "ماراثي"]],
+  ["Gujarati", ["gujarati", "غوجاراتي"]],
+  ["Nepali", ["nepali", "نيبالي"]],
+  ["Russian", ["russian", "روسي"]],
+  ["Portuguese", ["portuguese", "portugues", "português", "برتغالي"]],
+  ["Dutch", ["dutch", "هولندي"]],
+  ["Persian", ["persian", "farsi", "فارسي"]],
+  ["Dari", ["dari", "دری", "داري"]],
+  ["Pashto", ["pashto", "pushto", "پښتو", "بشتو"]],
+  ["Indonesian", ["indonesian", "bahasa indonesia", "إندونيسي", "اندونيسي"]],
+  ["Thai", ["thai", "تايلندي"]],
+  ["Vietnamese", ["vietnamese", "فيتنامي"]],
 ]);
 
 const EXPERIENCE_ALIASES = Object.freeze([
@@ -112,6 +140,10 @@ const EXPERIENCE_ALIASES = Object.freeze([
   ["GOLD", ["gold", "ذهبي"]],
   ["KIDS", ["kids cinema", "kids experience"]],
   ["MAX", ["max"]],
+  ["DOLBY CINEMA", ["dolby cinema", "dolby", "دولبي سينما", "دولبي"]],
+  ["SCREENX", ["screenx", "screen x"]],
+  ["D-BOX", ["d box", "dbox"]],
+  ["ICE IMMERSIVE", ["ice immersive"]],
 ]);
 
 const normalizeText = (value) => String(value ?? "")
@@ -273,6 +305,15 @@ function findMovieInText(text, movies) {
     .sort((left, right) => right.title.length - left.title.length || movieTitle(left.movie).localeCompare(movieTitle(right.movie)))[0]?.movie || null;
 }
 
+const REPLACEMENT_MOVIE_DISCOVERY = /\b(?:any\s+(?:new|different)\s+(?:movie|film)|(?:new|different)\s+(?:movies?|films?))\b|(?:اي|أي)\s+فيلم\s+(?:جديد|مختلف)|فيلم\s+(?:جديد|مختلف)|(?:افلام|أفلام)\s+(?:جديدة|مختلفة|اخرى|أخرى)/iu;
+const SUGGESTED_MOVIE_LIST = /\b(?:suggest|recommend)\b[\s\S]{0,48}\b(?:movies|films)\b|(?:اقترح|رشح)[\s\S]{0,48}(?:افلام|أفلام)/iu;
+
+const UNSUPPORTED_AFGHAN_LANGUAGE = /\bafghan(?:i)?\b|(?:\u0623|\u0627)\u0641\u063a\u0627\u0646\u064a(?:\u0629|\u0647)?/iu;
+
+function isReplacementMovieDiscovery(text) {
+  return REPLACEMENT_MOVIE_DISCOVERY.test(text) || SUGGESTED_MOVIE_LIST.test(text);
+}
+
 function explicitClears(text) {
   const clear = new Set();
   if (/\b(?:start over|reset everything|clear all filters)\b|ابدأ من جديد|امسح كل/.test(text)) {
@@ -287,9 +328,30 @@ function explicitClears(text) {
   if (/\b(?:any genre|no genre preference)\b|اي نوع|أي نوع/.test(text)) ["genre", "audience"].forEach((key) => clear.add(key));
   if (/\b(?:any language|no language preference)\b|اي لغة|أي لغة/.test(text)) clear.add("language");
   if (/\b(?:any (?:format|experience)|regular is fine|no (?:format|experience) preference)\b|اي تجربة|أي تجربة/.test(text)) clear.add("experience");
-  if (/\b(?:any movie|another movie|other movies|something else)\b|فيلم آخر|فيلم اخر/.test(text)) ["movieId", "movieTitle"].forEach((key) => clear.add(key));
+  if (/\b(?:any movie|another movie|other movies|something else)\b|فيلم آخر|فيلم اخر/.test(text) || isReplacementMovieDiscovery(text)) {
+    ["movieId", "movieTitle"].forEach((key) => clear.add(key));
+  }
+  if (isReplacementMovieDiscovery(text)) {
+    ["preferredTime", "timeBand"].forEach((key) => clear.add(key));
+  }
   if (/\b(?:not for kids|no kids)\b|ليس للاطفال|مش للاطفال/.test(text)) clear.add("audience");
+  if (/\b(?:not educational|no educational (?:filter|preference)|without (?:an )?educational (?:filter|preference)|show (?:the )?(?:family|other) options instead)\b|بدون تفضيل تعليمي|ليس تعليميا/.test(text)) clear.add("recommendationIntent");
   return clear;
+}
+
+/**
+ * Recognize an explicit request to continue without another movie preference.
+ * Previously supplied filters remain active. For example, "anything is fine"
+ * after "French movies" means any French movie, not any language.
+ */
+export function isOpenDiscoveryChoiceReply(input) {
+  const text = normalizeText(input);
+  if (!text) return false;
+  if (REPLACEMENT_MOVIE_DISCOVERY.test(text)) return true;
+  // The preference can share a turn with a cinema, date, or time. Recognize
+  // an unambiguous open-choice phrase before applying the exact-reply matrix.
+  if (/\b(?:anything(?:\s+(?:is|would be))?\s+(?:fine|okay|ok|good)|anything\s+(?:works|will\s+do)|whatever\s+(?:works|is\s+fine)|no\s+(?:particular|specific)\s+preference|any\s+(?:suitable\s+|available\s+)?(?:movie|film)|show\s+me\s+(?:anything|whatever)(?:\s+(?:available|suitable))?|surprise\s+me|you\s+(?:choose|pick|decide)|your\s+choice)\b|(?:\u0627\u064a|\u0623\u064a)\s+\u0634\u064a(?:\u0621|\u0626)(?:\s+\u0645\u0646\u0627\u0633\u0628)?|(?:\u0627\u064a|\u0623\u064a)\s+\u0641\u064a\u0644\u0645|\u0639\u0644\u0649\s+\u0630\u0648\u0642\u0643|\u0627\u062e\u062a\u0627\u0631\s+(?:\u0627\u0646\u062a|\u0623\u0646\u062a)|\u0641\u0627\u062c\u0626\u0646\u064a/iu.test(text)) return true;
+  return /^(?:(?:yes|okay|ok|sure|please)\s+)?(?:anything(?:\s+(?:is|would be))?\s+(?:fine|okay|ok|good)|anything\s+(?:works|will\s+do|goes|available|suitable)|(?:i\s+m\s+)?(?:fine|okay|ok)\s+with\s+anything|whatever(?:\s+(?:is|you have|s available|you recommend))?(?:\s+(?:fine|works))?|no\s+(?:other\s+|particular\s+|specific\s+)?preference|i\s+(?:do not|don t)\s+(?:mind|have\s+a\s+preference)|you\s+(?:choose|pick|decide)|your\s+choice|surprise\s+me|any\s+(?:suitable\s+|available\s+)?(?:movie|film)(?:\s+is\s+fine)?|show\s+me\s+(?:anything|whatever)(?:\s+(?:available|suitable))?|(?:اي|أي)\s+شي(?:ء|ئ)(?:\s+مناسب)?|(?:اي|أي)\s+فيلم|ما\s+عندي\s+تفضيل|(?:لا|ما)\s+فرق|على\s+ذوقك|اختار\s+(?:انت|أنت)|فاجئني)$/iu.test(text);
 }
 
 export function createDiscoveryPreferences(seed = {}) {
@@ -316,12 +378,19 @@ export function extractDiscoveryPreferencePatch(input, {
   now = new Date(),
   timeZone = "Asia/Dubai",
 } = {}) {
-  const text = normalizeText(input);
+  const discoveryInput = stripLanguageControlCommand(input);
+  const text = normalizeText(discoveryInput);
   const patch = {};
   const clear = explicitClears(text);
   if (!text) return { patch, clear: [...clear], provided: [], hasDiscoverySignal: false };
 
-  const cinema = resolveCinemaCandidate(cinemas, input);
+  const openChoice = isOpenDiscoveryChoiceReply(discoveryInput);
+  if (openChoice) {
+    patch.openChoice = true;
+    clear.add("recommendationIntent");
+  }
+
+  const cinema = resolveCinemaCandidate(cinemas, discoveryInput);
   if (cinema) {
     patch.cinemaId = String(cinema.id ?? cinema.ID ?? "").trim() || null;
     patch.cinemaName = String(cinema.name ?? cinema.Name ?? "").trim() || null;
@@ -336,7 +405,7 @@ export function extractDiscoveryPreferencePatch(input, {
     }
   }
 
-  const dateResult = canonicalDateSignal(input, { now, timeZone });
+  const dateResult = canonicalDateSignal(discoveryInput, { now, timeZone });
   if (dateResult) Object.assign(patch, dateResult);
 
   const timeBand = timeBandFromText(text);
@@ -354,9 +423,13 @@ export function extractDiscoveryPreferencePatch(input, {
     patch.movieId = movieIdentity(movie) || null;
     patch.movieTitle = movieTitle(movie) || null;
   }
+  const matchedTitle = movie ? normalizeText(movieTitle(movie)) : "";
+  const facetText = matchedTitle
+    ? ` ${text} `.replace(` ${matchedTitle} `, " ").replace(/\s+/g, " ").trim()
+    : text;
 
   const catalogGenres = (movies || []).flatMap((item) => item?.genres || item?.Genres || [item?.genre || item?.Genre]).filter(Boolean);
-  const genre = findAliasValue(text, [
+  const genre = findAliasValue(facetText, [
     ...dynamicAliasGroups(knownGenres),
     ...dynamicAliasGroups(catalogGenres),
     ...GENRE_ALIASES,
@@ -364,17 +437,26 @@ export function extractDiscoveryPreferencePatch(input, {
   if (genre) patch.genre = genre;
 
   const catalogLanguages = (movies || []).flatMap((item) => item?.languages || item?.Languages || [item?.languageName, item?.language]).filter(Boolean);
-  const language = findAliasValue(text, [
+  const language = findAliasValue(facetText, [
     ...dynamicAliasGroups(knownLanguages),
     ...dynamicAliasGroups(catalogLanguages),
     ...LANGUAGE_ALIASES,
   ]);
   if (language) patch.language = language;
 
-  const kidsFamilyRequest = /\b(?:kids?|children|childrens|family|families|family friendly)\b|أطفال|اطفال|عائلي|العائلة/.test(text);
-  const explicitKidsExperience = /\b(?:kids?\s+(?:cinema|experience|format)|in\s+kids|kids?\s+(?:at|showtime))\b|(?:سينما|تجربة|صيغة)\s+(?:الأطفال|الاطفال)/.test(text);
+  // Afghan and Afghani describe a nationality, not a supported VOX catalog
+  // language. Preserve the criterion as a structured clarification signal and
+  // prevent it from being guessed as a movie title.
+  if (UNSUPPORTED_AFGHAN_LANGUAGE.test(facetText)) {
+    delete patch.language;
+    clear.add("language");
+    patch.recommendationIntent = "unsupported_language_afghan";
+  }
+
+  const kidsFamilyRequest = /\b(?:kids?|children|childrens|family|families|family friendly)\b|أطفال|اطفال|عائلي|العائلة/.test(facetText);
+  const explicitKidsExperience = /\b(?:kids?\s+(?:cinema|experience|format)|in\s+kids|kids?\s+(?:at|showtime))\b|(?:سينما|تجربة|صيغة)\s+(?:الأطفال|الاطفال)/.test(facetText);
   const catalogExperiences = (movies || []).flatMap((item) => item?.experiences || item?.Experiences || []).filter(Boolean);
-  const experience = findAliasValue(text, [
+  const experience = findAliasValue(facetText, [
     ...dynamicAliasGroups(knownExperiences),
     ...dynamicAliasGroups(catalogExperiences),
     ...EXPERIENCE_ALIASES,
@@ -390,6 +472,9 @@ export function extractDiscoveryPreferencePatch(input, {
     if (patch.genre === "Family") delete patch.genre;
   }
 
+  const educationalRequest = /\b(?:educational|educative|learning focused|informative for (?:kids?|children|families))\b|تعليمي|تثقيفي/.test(facetText);
+  if (educationalRequest && !patch.recommendationIntent) patch.recommendationIntent = "educational";
+
   // Genre and audience are two ways guests narrow the same content choice.
   // A later turn that supplies only one replaces the stale value from the
   // other dimension ("family movies" -> "action movies"), instead of
@@ -403,6 +488,13 @@ export function extractDiscoveryPreferencePatch(input, {
     clear.add("movieTitle");
   }
 
+  const suppliedNarrowingPreference = Boolean(
+    patch.movieId || patch.movieTitle || patch.preferredTime || patch.timeBand
+    || patch.genre || patch.language || patch.experience || patch.audience
+  );
+  if (suppliedNarrowingPreference && !openChoice) clear.add("openChoice");
+  if (patch.genre || patch.language) clear.add("recommendationIntent");
+
   for (const key of Object.keys(patch)) clear.delete(key);
   const provided = [...new Set([...Object.keys(patch), ...clear])].sort();
   return {
@@ -413,7 +505,7 @@ export function extractDiscoveryPreferencePatch(input, {
   };
 }
 
-const DISCOVERY_ACTION_PATTERN = /\b(?:book|booking|i want|i need|show me|find me|find|watch|see|playing|showing|available|prefer|instead|change|switch|make that)\b|(?:أريد|اريد|أحتاج|احتاج|احجز|حجز|اعرض|ابحث|أشاهد|اشاهد|يعرض|متاح|أفضّل|افضل|بدلاً|بدلا|غيّر|غير)/iu;
+const DISCOVERY_ACTION_PATTERN = /\b(?:book|booking|i want|i need|show me|find me|find|suggest|recommend|watch|see|playing|showing|available|prefer|instead|change|switch|make that)\b|(?:أريد|اريد|أحتاج|احتاج|احجز|حجز|اعرض|ابحث|اقترح|رشح|أشاهد|اشاهد|يعرض|متاح|أفضّل|افضل|بدلاً|بدلا|غيّر|غير)/iu;
 const INFORMATION_QUESTION_PATTERN = /^\s*(?:what\s+(?:is|are|does|do|can)|is|are|does|do|can|could|would|how|where|why|when|tell me|explain|ما|هل|كيف|أين|اين|متى|اشرح|أخبرني)/iu;
 const INFORMATION_TOPIC_PATTERN = /\b(?:accessible|accessibility|wheelchair|parking|park|food|snacks?|menu|policy|refund|age limit|rating|facilit(?:y|ies)|opening hours?|close|closing|open|loyalty|gift card|prayer room|toilet|restroom)\b|(?:ذوي الإعاقة|كرسي متحرك|مواقف|طعام|وجبات|سياسة|استرداد|تصنيف عمري|مرافق|ساعات العمل|يفتح|يغلق|ولاء|بطاقة هدايا|دورة مياه)/iu;
 
@@ -457,17 +549,18 @@ export function shouldTreatAsDiscoveryFilterTurn(input, {
  * tomorrow" deliberately return null so they can continue as normal filters.
  */
 export function unresolvedMovieTitleCandidate(input, signal = {}) {
-  const value = String(input || "").trim();
+  const value = stripLanguageControlCommand(input);
   const patch = signal.patch || {};
   const clear = new Set(signal.clear || []);
-  if (!value || patch.movieTitle || patch.movieId || clear.has("movieTitle") || clear.has("movieId")) return null;
+  if (!value || patch.movieTitle || patch.movieId || patch.openChoice === true || patch.recommendationIntent || clear.has("movieTitle") || clear.has("movieId")) return null;
   if (/^\s*(?:ما|ماذا|أي|اي)\s+(?:(?:هي|هو)\s+)?(?:الأفلام|الافلام|أفلام|افلام)(?:\s|$)/iu.test(value)) return null;
   if (/^(?:أريد|اريد)\s+فيلم(?:ا[\u064b-\u065f]*)?\s+(?:في|حوالي)(?:\s|$)/iu.test(value)) return null;
 
   const direct = value.match(/\b(?:movie|film)\s+(?:called|named)\s+(.+)/iu)
     || value.match(/\b(?:watch|see)\s+(.+)/iu)
+    || value.match(/\b(?:suggest|recommend)(?:\s+me)?\s+(.+)/iu)
     || value.match(/\b(?:tickets?\s+for|book(?:\s+me)?|show\s+me|i\s+(?:want|need))\s+(.+)/iu)
-    || value.match(/(?:فيلم\s+(?:اسمه|يدعى)|أشاهد|اشاهد|(?:أريد|اريد)\s+فيلم(?:ا[\u064b-\u065f]*)?)\s+(.+)/iu);
+    || value.match(/(?:فيلم\s+(?:اسمه|يدعى)|أشاهد|اشاهد|(?:أريد|اريد)\s+فيلم(?:ا[\u064b-\u065f]*)?|(?:اقترح|رشح)(?:\s+لي)?)\s+(.+)/iu);
   let candidateSource = direct?.[1] || "";
   if (candidateSource && direct) {
     candidateSource = /^(?:at|in|on|في|حوالي)(?:\s|$)/iu.test(candidateSource.trim())
@@ -489,6 +582,9 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
     candidateSource = removePhrase(candidateSource, knownLocation);
     candidateSource = removePhrase(candidateSource, withoutBrand);
   }
+  for (const alias of CINEMA_ALIASES[String(patch.cinemaId || "")] || []) {
+    candidateSource = removePhrase(candidateSource, alias);
+  }
   const removeCanonicalAliases = (source, canonical, groups) => {
     if (!canonical) return source;
     let next = removePhrase(source, canonical);
@@ -503,7 +599,7 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
   candidateSource = candidateSource
     .replace(/\b\d{4}-\d{2}-\d{2}\b|\b(?:today|tomorrow|tonight|day after tomorrow|morning|afternoon|evening|late at night)\b|(?:اليوم|غدا|غداً|الليلة|بعد غد|صباح|بعد الظهر|مساء)/giu, " ")
     .replace(/\b\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?)?|\b\d{1,2}\s*(?:a\.?m\.?|p\.?m\.?)\b/giu, " ")
-    .replace(/\b(?:at|in|on|around|near|after|before|with|for|please|movie|film|cinema|showtime)\b|(?:(?:أريد|اريد|أحتاج|احتاج|اعرض)|فيلم(?:ا[\u064b-\u065f]*)?|في|حوالي|بعد|قبل|مع|سينما|موعد عرض|الساعة|من فضلك)/giu, " ")
+    .replace(/\b(?:at|in|on|around|near|after|before|with|for|please|suggest|recommend|movie|film|cinema|showtime)\b|(?:(?:أريد|اريد|أحتاج|احتاج|اعرض|اقترح|رشح)|فيلم(?:ا[\u064b-\u065f]*)?|في|حوالي|بعد|قبل|مع|سينما|موعد عرض|الساعة|من فضلك)/giu, " ")
     .replace(/^\s*(?:to\s+)?(?:a|an|the)\s+/iu, "")
     .replace(/^\s*(?:a|an|the)\s+/iu, "")
     .replace(/\s+(?:movies?|films?)\s*$/iu, "")
@@ -568,7 +664,7 @@ export function mergeDiscoveryPreferences(current, update = {}) {
   const changedKeys = DISCOVERY_PREFERENCE_KEYS.filter((key) => previous[key] !== next[key]);
   const clearedKeys = changedKeys.filter((key) => previous[key] != null && next[key] == null);
   const resultKeys = new Set(changedKeys.filter((key) => key !== "dateSignal"));
-  const movieSelectionKeys = new Set(["cinemaId", "cinemaName", "city", "date", "genre", "language", "experience", "movieId", "movieTitle", "audience"]);
+  const movieSelectionKeys = new Set(["cinemaId", "cinemaName", "city", "date", "genre", "language", "experience", "movieId", "movieTitle", "audience", "openChoice", "recommendationIntent"]);
   const sessionSelectionKeys = new Set([...movieSelectionKeys, "preferredTime", "timeBand"]);
   const intersects = (keys) => [...resultKeys].some((key) => keys.has(key));
 
@@ -598,7 +694,7 @@ function fieldIsPresent(preferences, field) {
   if (field === "time") return Boolean(preferences.preferredTime || preferences.timeBand);
   if (field === "movie") return Boolean(preferences.movieId || preferences.movieTitle);
   if (field === "movieOrPreference") {
-    return Boolean(preferences.movieId || preferences.movieTitle || preferences.genre || preferences.language || preferences.experience || preferences.audience);
+    return Boolean(preferences.movieId || preferences.movieTitle || preferences.genre || preferences.language || preferences.experience || preferences.audience || preferences.openChoice || preferences.recommendationIntent);
   }
   return Boolean(preferences[field]);
 }

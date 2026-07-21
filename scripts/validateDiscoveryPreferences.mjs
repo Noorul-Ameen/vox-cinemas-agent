@@ -4,6 +4,7 @@ import {
   extractDiscoveryPreferencePatch,
   filterDiscoveryResults,
   getMissingDiscoveryCriteria,
+  isOpenDiscoveryChoiceReply,
   mergeDiscoveryPreferences,
   parseAndMergeDiscoveryPreferences,
   resolveDiscoveryMovieCandidate,
@@ -15,6 +16,7 @@ import {
   buildMovieSelectionGroundingContext,
   isAmbiguousMovieSelectionUtterance,
 } from "../src/lib/discoveryResultContext.js";
+import { buildDiscoveryNoResultsMessage } from "../src/lib/discoveryNoResults.js";
 
 const NOW = new Date("2026-07-14T08:00:00Z");
 const cinemas = [
@@ -36,6 +38,239 @@ const sessions = [
   { sessionId: "r2", scheduledFilmId: "race", cinemaId: "0002", programmingDate: "2026-07-16", time: "18:00", exp: "STANDARD" },
   { sessionId: "r3", scheduledFilmId: "race", cinemaId: "0002", programmingDate: "2026-07-17", time: "19:15", exp: "KIDS" },
 ];
+
+const reportedFrenchJourneyMovies = [
+  { id: "french-film", title: "French Fixture", genres: ["Drama"], languageName: "French", experiences: ["STANDARD"] },
+  { id: "english-film", title: "English Fixture", genres: ["Drama"], languageName: "English", experiences: ["STANDARD"] },
+];
+const reportedFrenchJourneySessions = [
+  { sessionId: "fr-23", scheduledFilmId: "french-film", cinemaId: "0002", programmingDate: "2026-07-23", time: "18:00", exp: "STANDARD" },
+  { sessionId: "en-23", scheduledFilmId: "english-film", cinemaId: "0002", programmingDate: "2026-07-23", time: "18:30", exp: "STANDARD" },
+];
+
+const frenchTurn = parseAndMergeDiscoveryPreferences({}, "French", { cinemas, movies, now: NOW });
+assert.equal(frenchTurn.preferences.language, "French", "a bare supported movie language must be retained even when the current catalog has no matching title");
+assert.equal(frenchTurn.preferences.movieTitle, null, "French must be treated as a movie-language filter, not an unresolved title");
+assert.deepEqual(
+  getMissingDiscoveryCriteria(frenchTurn.preferences, ["cinema", "date", "movieOrPreference"]),
+  ["cinema", "date"],
+  "after French, only cinema and date remain missing",
+);
+
+const frenchAtMoeTurn = parseAndMergeDiscoveryPreferences(frenchTurn.preferences, "MOE", { cinemas, movies, now: NOW });
+assert.equal(frenchAtMoeTurn.preferences.cinemaId, "0002", "MOE must resolve to Mall of the Emirates");
+assert.equal(frenchAtMoeTurn.preferences.cinemaName, "Mall of the Emirates");
+assert.equal(frenchAtMoeTurn.preferences.language, "French", "selecting MOE must retain the earlier French-language preference");
+assert.deepEqual(
+  getMissingDiscoveryCriteria(frenchAtMoeTurn.preferences, ["cinema", "date", "movieOrPreference"]),
+  ["date"],
+  "after French and MOE, only the date remains missing",
+);
+
+// The context-bound bare-day conversion from "23" to this ISO date is
+// exercised in validateDiscoveryPromptProgression.mjs. This merge represents
+// the authoritative date committed by that route.
+const frenchAtMoeOn23 = mergeDiscoveryPreferences(frenchAtMoeTurn.preferences, {
+  patch: { date: "2026-07-23", dateSignal: "explicit" },
+}).preferences;
+
+const afghanPreferenceTurn = parseAndMergeDiscoveryPreferences({}, "Show me Afghan movies", { cinemas, movies, now: NOW });
+assert.equal(afghanPreferenceTurn.update.hasDiscoverySignal, true, "an unsupported Afghan content preference must still be captured as a discovery criterion");
+assert.equal(afghanPreferenceTurn.preferences.recommendationIntent, "unsupported_language_afghan", "Afghan must be retained as the exact unsupported-language clarification intent");
+assert.equal(afghanPreferenceTurn.preferences.language, null, "Afghan is a nationality clarification and must not be invented as a supported catalog language");
+assert.equal(afghanPreferenceTurn.preferences.movieTitle, null, "Afghan must not be treated as a movie title");
+assert.equal(unresolvedMovieTitleCandidate("Show me Afghan movies", afghanPreferenceTurn.update), null, "an unsupported Afghan preference must not be queued as a deferred title");
+assert.deepEqual(
+  getMissingDiscoveryCriteria(afghanPreferenceTurn.preferences, ["cinema", "date", "movieOrPreference"]),
+  ["cinema", "date"],
+  "an unsupported retained preference must lead to clarification instead of another generic preference question",
+);
+const afghanAtMoeTurn = parseAndMergeDiscoveryPreferences(afghanPreferenceTurn.preferences, "MOE", { cinemas, movies, now: NOW });
+const afghanAtMoeOn23 = mergeDiscoveryPreferences(afghanAtMoeTurn.preferences, {
+  patch: { date: "2026-07-23", dateSignal: "explicit" },
+}).preferences;
+assert.equal(afghanAtMoeOn23.recommendationIntent, "unsupported_language_afghan", "cinema and date replies must not discard the unsupported Afghan preference awaiting clarification");
+assert.equal(afghanAtMoeOn23.cinemaId, "0002");
+assert.equal(afghanAtMoeOn23.date, "2026-07-23");
+for (const supportedLanguage of ["Tamil", "Hindi", "English"]) {
+  const clarified = parseAndMergeDiscoveryPreferences(afghanAtMoeOn23, supportedLanguage, { cinemas, movies, now: NOW });
+  assert.equal(clarified.preferences.language, supportedLanguage, `${supportedLanguage}: the explicit supported language must replace the Afghan clarification`);
+  assert.equal(clarified.preferences.recommendationIntent, null, `${supportedLanguage}: an explicit supported language must clear the Afghan clarification intent`);
+  assert.equal(clarified.preferences.cinemaId, "0002", `${supportedLanguage}: resolving the clarification must retain the cinema`);
+  assert.equal(clarified.preferences.date, "2026-07-23", `${supportedLanguage}: resolving the clarification must retain the date`);
+}
+
+const openChoiceTurn = parseAndMergeDiscoveryPreferences(frenchAtMoeOn23, "anything is fine", { cinemas, movies, now: NOW });
+assert.equal(isOpenDiscoveryChoiceReply("anything is fine"), true);
+assert.equal(openChoiceTurn.preferences.openChoice, true, "anything is fine must satisfy the open preference prompt deterministically");
+assert.equal(openChoiceTurn.preferences.language, "French", "anything is fine must not silently erase the previously supplied French filter");
+assert.equal(openChoiceTurn.preferences.cinemaId, "0002", "anything is fine must retain Mall of the Emirates");
+assert.equal(openChoiceTurn.preferences.date, "2026-07-23", "anything is fine must retain the selected date");
+assert.equal(openChoiceTurn.preferences.movieTitle, null, "anything is fine must never become a movie title");
+assert.equal(unresolvedMovieTitleCandidate("anything is fine", openChoiceTurn.update), null, "the open-choice reply must not be queued as an unresolved movie title");
+assert.deepEqual(
+  getMissingDiscoveryCriteria(openChoiceTurn.preferences, ["cinema", "date", "movieOrPreference"]),
+  [],
+  "French, MOE, 23, and an open choice must complete discovery requirements without another repeated question",
+);
+
+const combinedOpenChoiceTurn = parseAndMergeDiscoveryPreferences(createDiscoveryPreferences(), "anything is fine at MOE on 23", {
+  cinemas,
+  movies,
+  now: NOW,
+});
+assert.equal(isOpenDiscoveryChoiceReply("anything is fine at MOE on 23"), true, "an open choice must be recognized when cinema and date share the turn");
+assert.equal(isOpenDiscoveryChoiceReply("\u0623\u064a \u0634\u064a\u0621 \u0645\u0646\u0627\u0633\u0628 \u0641\u064a \u0645\u0648\u0644 \u0627\u0644\u0625\u0645\u0627\u0631\u0627\u062a \u064a\u0648\u0645 23"), true, "an Arabic open choice must be recognized when cinema and date share the turn");
+for (const combinedReply of [
+  "Any movie at Mall of the Emirates on 23",
+  "Surprise me at Mall of the Emirates on 23",
+  "You choose at Mall of the Emirates on 23",
+  "Show me anything available at Mall of the Emirates on 23",
+]) assert.equal(isOpenDiscoveryChoiceReply(combinedReply), true, `${combinedReply}: a combined open choice must not trigger another preference question`);
+assert.equal(combinedOpenChoiceTurn.preferences.openChoice, true, "the combined turn must satisfy the preference requirement");
+assert.equal(combinedOpenChoiceTurn.preferences.cinemaId, "0002", "the combined turn must retain its cinema");
+assert.equal(combinedOpenChoiceTurn.preferences.movieTitle, null, "the combined open choice must not become a deferred title");
+
+const retainedFrenchResults = filterDiscoveryResults({
+  movies: reportedFrenchJourneyMovies,
+  sessions: reportedFrenchJourneySessions,
+  cinemas,
+  preferences: openChoiceTurn.preferences,
+});
+assert.deepEqual(retainedFrenchResults.movies.map((movie) => movie.id), ["french-film"], "the completed journey must still filter results by French");
+assert.deepEqual(retainedFrenchResults.sessions.map((session) => session.sessionId), ["fr-23"]);
+
+const broadenedLanguageTurn = parseAndMergeDiscoveryPreferences(openChoiceTurn.preferences, "any language", { cinemas, movies, now: NOW });
+assert.equal(broadenedLanguageTurn.preferences.language, null, "only an explicit any-language reply may clear the retained French filter");
+assert.equal(broadenedLanguageTurn.preferences.openChoice, true, "broadening language must retain the guest's open movie choice");
+assert.equal(broadenedLanguageTurn.preferences.cinemaId, "0002");
+assert.equal(broadenedLanguageTurn.preferences.date, "2026-07-23");
+const broadenedLanguageResults = filterDiscoveryResults({
+  movies: reportedFrenchJourneyMovies,
+  sessions: reportedFrenchJourneySessions,
+  cinemas,
+  preferences: broadenedLanguageTurn.preferences,
+});
+assert.deepEqual(broadenedLanguageResults.movies.map((movie) => movie.id), ["french-film", "english-film"], "explicitly clearing language must broaden the same cinema and date results");
+
+for (const reply of [
+  "Anything is fine",
+  "Anything works",
+  "Anything will do",
+  "I'm okay with anything",
+  "Whatever works",
+  "Whatever you recommend",
+  "No particular preference",
+  "I don't mind",
+  "You choose",
+  "Your choice",
+  "Surprise me",
+  "Show me anything available",
+  "Any suitable movie is fine",
+  "أي شيء مناسب",
+  "ما عندي تفضيل",
+  "اختار أنت",
+  "على ذوقك",
+  "فاجئني",
+]) {
+  const signal = extractDiscoveryPreferencePatch(reply, { cinemas, movies, now: NOW });
+  assert.equal(isOpenDiscoveryChoiceReply(reply), true, `${reply}: must be recognized as an open discovery choice`);
+  assert.equal(signal.patch.openChoice, true, `${reply}: must satisfy a preference prompt without inventing a criterion`);
+  assert.equal(signal.patch.movieTitle, undefined, `${reply}: must not become a movie title`);
+  assert.equal(unresolvedMovieTitleCandidate(reply, signal), null, `${reply}: must not be retained as an unresolved title`);
+}
+
+for (const [request, expectedLanguage] of [
+  ["French movies", "French"],
+  ["movies in Urdu", "Urdu"],
+  ["Japanese-language films", "Japanese"],
+  ["show me Mandarin movies", "Chinese"],
+]) {
+  const signal = extractDiscoveryPreferencePatch(request, { cinemas, movies, now: NOW });
+  assert.equal(signal.patch.language, expectedLanguage, `${request}: an unavailable but recognized language must remain a filter`);
+  assert.equal(unresolvedMovieTitleCandidate(request, signal), null, `${request}: a language request must not become a deferred title`);
+}
+
+const titleFacetMovies = [
+  { id: "french-exit", title: "French Exit", genres: ["Drama"], languageName: "English", experiences: ["STANDARD"] },
+  { id: "family-plan", title: "The Family Plan", genres: ["Action"], languageName: "English", experiences: ["STANDARD"] },
+];
+const frenchTitleOnly = extractDiscoveryPreferencePatch("Book French Exit", { cinemas, movies: titleFacetMovies, now: NOW });
+assert.equal(frenchTitleOnly.patch.movieId, "french-exit");
+assert.equal(frenchTitleOnly.patch.language, undefined, "a language word inside an exact movie title must not become an extra filter");
+const frenchTitleWithLanguage = extractDiscoveryPreferencePatch("Book French Exit in French", { cinemas, movies: titleFacetMovies, now: NOW });
+assert.equal(frenchTitleWithLanguage.patch.movieId, "french-exit");
+assert.equal(frenchTitleWithLanguage.patch.language, "French", "an explicit language outside the exact title must still be retained");
+const familyTitleOnly = extractDiscoveryPreferencePatch("Book The Family Plan", { cinemas, movies: titleFacetMovies, now: NOW });
+assert.equal(familyTitleOnly.patch.movieId, "family-plan");
+assert.equal(familyTitleOnly.patch.audience, undefined, "an audience word inside an exact title must not become an extra filter");
+
+const educationalFamily = parseAndMergeDiscoveryPreferences({}, "I want educational family movies", { cinemas, movies, now: NOW });
+assert.equal(educationalFamily.preferences.audience, "kids_family", "a family requirement must survive an educational clarification");
+assert.equal(educationalFamily.preferences.recommendationIntent, "educational", "educational must be retained as a clarification intent, not invented as a published genre");
+assert.equal(educationalFamily.preferences.genre, null, "educational must not silently become Documentary");
+assert.equal(unresolvedMovieTitleCandidate("I want educational family movies", educationalFamily.update), null, "educational wording must never become a movie title");
+const documentaryClarification = parseAndMergeDiscoveryPreferences(educationalFamily.preferences, "Documentary", { cinemas, movies, now: NOW });
+assert.equal(documentaryClarification.preferences.genre, "Documentary");
+assert.equal(documentaryClarification.preferences.recommendationIntent, null, "an explicit Documentary answer must resolve the educational clarification");
+assert.equal(documentaryClarification.preferences.audience, null, "a later genre-only answer follows the established genre-versus-audience replacement rule");
+const relaxedEducational = parseAndMergeDiscoveryPreferences(educationalFamily.preferences, "anything is fine", { cinemas, movies, now: NOW });
+assert.equal(relaxedEducational.preferences.recommendationIntent, null, "an open answer must remove only the unresolved educational clarification");
+assert.equal(relaxedEducational.preferences.audience, "kids_family", "an open answer must keep the already supplied family requirement");
+
+for (const [request, expected] of [
+  ["I want Dolby Cinema", "DOLBY CINEMA"],
+  ["Show me ScreenX movies", "SCREENX"],
+  ["Anything in D-BOX", "D-BOX"],
+  ["Show Film Noir movies", "Film Noir"],
+]) {
+  const signal = extractDiscoveryPreferencePatch(request, { cinemas, movies, now: NOW });
+  const actual = expected === "Film Noir" ? signal.patch.genre : signal.patch.experience;
+  assert.equal(actual, expected, `${request}: an explicit unavailable criterion must be retained for honest zero-result handling`);
+  assert.equal(unresolvedMovieTitleCandidate(request, signal), null, `${request}: an explicit criterion must not become a deferred movie title`);
+}
+
+const combinedDolbyCinemaAlias = extractDiscoveryPreferencePatch("Dolby Cinema at MOE", { cinemas, movies: [], now: NOW });
+assert.equal(combinedDolbyCinemaAlias.patch.experience, "DOLBY CINEMA", "a combined Dolby request must retain the experience");
+assert.equal(combinedDolbyCinemaAlias.patch.cinemaId, "0002", "MOE must resolve to Mall of the Emirates in a combined criterion request");
+assert.equal(unresolvedMovieTitleCandidate("Dolby Cinema at MOE", combinedDolbyCinemaAlias), null, "a resolved cinema alias must not also be retained as a deferred movie title");
+
+const arabicDolbyCinema = extractDiscoveryPreferencePatch("أريد أفلام في دولبي سينما", { cinemas, movies: [], now: NOW });
+assert.equal(arabicDolbyCinema.patch.experience, "DOLBY CINEMA", "an Arabic Dolby Cinema criterion must resolve as an experience");
+assert.equal(unresolvedMovieTitleCandidate("أريد أفلام في دولبي سينما", arabicDolbyCinema), null, "an Arabic experience criterion must not become a deferred movie title");
+
+const switchArabicFrenchMovies = extractDiscoveryPreferencePatch("Switch to Arabic and show me French movies at Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW });
+assert.equal(switchArabicFrenchMovies.patch.language, "French", "the requested movie language must remain French when the interface switches to Arabic");
+assert.equal(switchArabicFrenchMovies.patch.cinemaId, "0002");
+assert.equal(switchArabicFrenchMovies.patch.date, "2026-07-15");
+const switchEnglishArabicMovies = extractDiscoveryPreferencePatch("Switch to English and show me Arabic movies at Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW });
+assert.equal(switchEnglishArabicMovies.patch.language, "Arabic", "the requested movie language must remain Arabic when the interface switches to English");
+
+const unavailableFrenchResults = filterDiscoveryResults({
+  movies,
+  sessions,
+  cinemas,
+  preferences: { cinemaId: "0002", cinemaName: "Mall of the Emirates", date: "2026-07-15", language: "French" },
+});
+assert.equal(unavailableFrenchResults.movies.length, 0);
+assert.equal(unavailableFrenchResults.noResultsReason, "no_language_match");
+const unavailableFrenchMessage = buildDiscoveryNoResultsMessage({
+  preferences: unavailableFrenchResults.preferences,
+  cinemaName: "Mall of the Emirates",
+  date: "2026-07-15",
+  noResultsReason: unavailableFrenchResults.noResultsReason,
+  locale: "en",
+});
+assert.match(unavailableFrenchMessage, /^No French-language movies are available at Mall of the Emirates on 15 July 2026\./);
+assert.match(unavailableFrenchMessage, /change the date, cinema, or movie language/i);
+assert.doesNotMatch(unavailableFrenchMessage, /[\u2013\u2014]/u, "the grounded empty-state response must use standard punctuation only");
+
+for (const reply of ["yes", "no", "maybe later", "thank you", "...", "🤷"]) {
+  const signal = extractDiscoveryPreferencePatch(reply, { cinemas, movies, now: NOW });
+  const merged = mergeDiscoveryPreferences(frenchAtMoeOn23, signal);
+  assert.equal(signal.hasDiscoverySignal, false, `${reply}: conversational noise must not invent a discovery filter`);
+  assert.deepEqual(merged.preferences, frenchAtMoeOn23, `${reply}: conversational noise must leave retained discovery state unchanged`);
+}
 
 const combined = extractDiscoveryPreferencePatch(
   "I want Toy Story 5 at Mall of the Emirates tomorrow at 6:00 PM in IMAX",
@@ -339,6 +574,52 @@ const clearedTime = parseAndMergeDiscoveryPreferences({ ...changedExperience.pre
 assert.equal(clearedTime.preferences.preferredTime, null);
 assert.equal(clearedTime.preferences.experience, "IMAX");
 assert.deepEqual(clearedTime.clearedKeys, ["preferredTime"]);
+
+const replacementMovieSeed = {
+  cinemaId: "0002",
+  cinemaName: "Mall of the Emirates",
+  city: "Dubai",
+  date: "2026-07-23",
+  movieId: "toy",
+  movieTitle: "Toy Story 5",
+  genre: "Animation",
+  language: "English",
+  experience: "IMAX",
+};
+for (const [request, retainedTime] of [
+  ["Show me new movies", { preferredTime: "09:30" }],
+  ["Show me different movies", { timeBand: "evening" }],
+]) {
+  const replacement = parseAndMergeDiscoveryPreferences({ ...replacementMovieSeed, ...retainedTime }, request, { cinemas, movies, now: NOW });
+  assert.equal(replacement.preferences.movieId, null, `${request}: the previous movie id must be cleared`);
+  assert.equal(replacement.preferences.movieTitle, null, `${request}: the previous movie title must be cleared`);
+  assert.equal(replacement.preferences.preferredTime, null, `${request}: the previous exact time must be cleared`);
+  assert.equal(replacement.preferences.timeBand, null, `${request}: the previous time band must be cleared`);
+  assert.deepEqual(
+    {
+      cinemaId: replacement.preferences.cinemaId,
+      cinemaName: replacement.preferences.cinemaName,
+      city: replacement.preferences.city,
+      date: replacement.preferences.date,
+      genre: replacement.preferences.genre,
+      language: replacement.preferences.language,
+      experience: replacement.preferences.experience,
+    },
+    {
+      cinemaId: replacementMovieSeed.cinemaId,
+      cinemaName: replacementMovieSeed.cinemaName,
+      city: replacementMovieSeed.city,
+      date: replacementMovieSeed.date,
+      genre: replacementMovieSeed.genre,
+      language: replacementMovieSeed.language,
+      experience: replacementMovieSeed.experience,
+    },
+    `${request}: cinema, date, and unrelated filters must survive the replacement request`,
+  );
+  assert.equal(replacement.invalidates.sessionSelection, true, `${request}: the old session must be invalidated`);
+  assert.equal(replacement.invalidates.seatSelection, true, `${request}: old seats must be invalidated`);
+  assert.equal(replacement.invalidates.pricing, true, `${request}: old pricing must be invalidated`);
+}
 
 const suppliedWins = mergeDiscoveryPreferences(
   { genre: "Comedy", language: "Arabic" },

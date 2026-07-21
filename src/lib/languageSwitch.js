@@ -45,7 +45,18 @@ const YES_ENGLISH = new Set([
 
 const NO = new Set(["no", "no thanks", "no thank you", "لا", "لأ", "لا شكرا", "لا شكرًا"]);
 
+const COMBINED_LANGUAGE_PREFIX = /^\s*(?:please\s+)?(?:switch(?:\s+(?:the\s+)?language)?\s+to|change(?:\s+the)?\s+language\s+to|set(?:\s+the)?\s+language\s+to|speak(?:\s+in)?|continue(?:\s+in)?|reply\s+in|respond\s+in)\s+(arabic|english)\s*(?:,|;|\band\b|\bthen\b)\s*/iu;
+
+export function stripLanguageControlCommand(text) {
+  const raw = String(text || "").trim();
+  const match = raw.match(COMBINED_LANGUAGE_PREFIX);
+  return match ? raw.slice(match[0].length).trim() : raw;
+}
+
 export function explicitLanguageRequest(text) {
+  const raw = String(text || "").trim();
+  const combined = raw.match(COMBINED_LANGUAGE_PREFIX);
+  if (combined && stripLanguageControlCommand(raw)) return combined[1].toLowerCase() === "arabic" ? "ar" : "en";
   const value = tidy(text);
   if (/^can you speak arabic$/.test(value) || /^هل (يمكنك|تستطيع) التحدث بالعربية$/.test(value)) return null;
   if (/^can you speak english$/.test(value) || /^هل (يمكنك|تستطيع) التحدث بالانجليزية$/.test(value)) return null;

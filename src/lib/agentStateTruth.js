@@ -82,6 +82,93 @@ function historyGuidance(locale) {
     : "Your current on-device booking summaries are shown. Select one to view its details, or use its Cancel booking button.";
 }
 
+const normalizeMatchText = (value) => String(value || "")
+  .normalize("NFKC")
+  .toLowerCase()
+  .replace(/[^\p{L}\p{N}:]+/gu, " ")
+  .replace(/\s+/g, " ")
+  .trim();
+
+function visibleMovieTitles(stage) {
+  if (stage?.view !== "movies" || !Array.isArray(stage?.movies)) return [];
+  return [...new Set(stage.movies
+    .map((movie) => clean(movie?.title || movie?.name))
+    .filter(Boolean))];
+}
+
+function overloadedMovieListing(value, stage) {
+  const titles = visibleMovieTitles(stage);
+  if (titles.length < 2) return false;
+  const normalizedValue = ` ${normalizeMatchText(value)} `;
+  const mentionedTitles = titles.filter((title) => {
+    const normalizedTitle = normalizeMatchText(title);
+    return normalizedTitle && normalizedValue.includes(` ${normalizedTitle} `);
+  });
+  if (mentionedTitles.length > 5) return true;
+
+  const timeMentions = String(value || "").match(/\b(?:(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:a\.?\s*m\.?|p\.?\s*m\.?)|(?:[01]?\d|2[0-3]):[0-5]\d)\b/giu) || [];
+  // A many-time answer with one named title can be a legitimate detail reply.
+  // Zero or multiple named titles while the movie grid is visible means the
+  // agent is narrating the grid instead of asking for one movie choice.
+  return timeMentions.length >= 6 && mentionedTitles.length !== 1;
+}
+
+function conciseMovieChoiceGuidance(stage, locale) {
+  const titles = visibleMovieTitles(stage);
+  const shownTitles = titles.slice(0, 5);
+  const titleList = shownTitles.join(locale === "ar" ? "، " : ", ");
+  if (locale === "ar") {
+    return `تظهر الآن ${titles.length} من خيارات الأفلام.${titleList ? ` من العناوين الظاهرة: ${titleList}.` : ""} أي فيلم تود اختياره؟`;
+  }
+  return `${titles.length} movie ${titles.length === 1 ? "option is" : "options are"} shown.${titleList ? ` Visible titles include ${titleList}.` : ""} Which movie would you like?`;
+}
+
+function discoveryStepGuidance(stage, locale) {
+  const view = stage?.view;
+  if (view === "discovery") {
+    const supplied = clean(stage?.question || stage?.error);
+    if (supplied) return supplied;
+    const missing = stage?.missing?.[0];
+    if (locale === "ar") {
+      if (missing === "cinema") return "اختر موقع VOX Cinemas UAE للمتابعة.";
+      if (missing === "date") return "اختر تاريخاً للمتابعة.";
+      return "أجب عن سؤال تفضيلات الفيلم الظاهر للمتابعة.";
+    }
+    if (missing === "cinema") return "Choose a VOX Cinemas UAE location to continue.";
+    if (missing === "date") return "Choose a date to continue.";
+    return "Answer the displayed movie preference question to continue.";
+  }
+
+  if (view === "movies") {
+    const movies = Array.isArray(stage?.movies) ? stage.movies.filter(Boolean) : [];
+    if (!movies.length) {
+      const supplied = clean(stage?.error || stage?.notice);
+      if (supplied) return supplied;
+      return locale === "ar"
+        ? "لا توجد خيارات أفلام ظاهرة الآن. غيّر أحد التفضيلات أو حاول مرة أخرى."
+        : "No movie options are currently shown. Change one preference or try again.";
+    }
+    if (locale === "ar") return `تظهر الآن ${movies.length} من خيارات الأفلام. اختر فيلماً من الخيارات الظاهرة للمتابعة.`;
+    return `${movies.length} movie ${movies.length === 1 ? "option is" : "options are"} shown. Choose one of the displayed movies to continue.`;
+  }
+
+  if (view === "showtimes") {
+    const sessions = Array.isArray(stage?.sessions) ? stage.sessions.filter(Boolean) : [];
+    const title = clean(stage?.movie?.title);
+    if (!sessions.length) {
+      const supplied = clean(stage?.error || stage?.notice);
+      if (supplied) return supplied;
+      return locale === "ar"
+        ? `لا توجد مواعيد عرض ظاهرة الآن${title ? ` لفيلم ${title}` : ""}. اختر فيلماً أو تاريخاً آخر.`
+        : `No showtime options are currently shown${title ? ` for ${title}` : ""}. Choose another movie or date.`;
+    }
+    if (locale === "ar") return `تظهر الآن ${sessions.length} من مواعيد العرض${title ? ` لفيلم ${title}` : ""}. اختر موعد عرض ظاهراً للمتابعة.`;
+    return `${sessions.length} showtime ${sessions.length === 1 ? "option is" : "options are"} shown${title ? ` for ${title}` : ""}. Choose one displayed showtime to continue.`;
+  }
+
+  return null;
+}
+
 function wrongDiscoveryQuestion(value, stage) {
   if (stage?.view !== "discovery" || !stage?.missing?.[0] || !stage.question) return false;
   const asksCinema = /\b(?:which|what)\b[\s\S]{0,30}\b(?:cinema|location)\b|\bwhere\b[\s\S]{0,30}\b(?:watch|cinema|location)\b|(?:أي|اي|ما)\s+(?:سينما|موقع)|وين[\s\S]{0,20}(?:سينما|موقع)/iu.test(value);
@@ -110,6 +197,8 @@ function staleProgressionQuestion(value, stage, pendingOrder, locale) {
 export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, locale = "en" } = {}) {
   const value = clean(text);
   if (!value) return value;
+
+  if (overloadedMovieListing(value, stage)) return conciseMovieChoiceGuidance(stage, locale);
 
   if (wrongDiscoveryQuestion(value, stage)) return clean(stage.question);
   const progressionCorrection = staleProgressionQuestion(value, stage, pendingOrder, locale);
@@ -194,6 +283,8 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
     || booking.bookingStatus === "summary_saved"
   ));
   if (isSavedSummary) return savedSummaryGuidance(booking, locale);
+  const visibleDiscoveryStep = discoveryStepGuidance(stage, locale);
+  if (visibleDiscoveryStep) return visibleDiscoveryStep;
   if (stage?.view !== "booking") {
     return clean(stage?.question || stage?.error) || (locale === "ar"
       ? "لم يتم تأكيد الحجز بعد. تابع من الخطوة الظاهرة على الشاشة."

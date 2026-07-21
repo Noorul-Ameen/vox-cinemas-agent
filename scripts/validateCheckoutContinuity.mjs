@@ -87,9 +87,13 @@ for (const [label, source, messageVariable] of [
 ]) {
   assert.match(source, new RegExp(`pausedResumeTarget\\(${messageVariable}\\)`), `${label} routing must classify explicit paused-step restoration`);
   assert.match(source, /restorePausedJourney\(/, `${label} routing must restore and revalidate the exact paused checkout`);
+  const discoveryBoundary = source.indexOf("routeDiscoveryTurn") >= 0
+    ? source.indexOf("routeDiscoveryTurn")
+    : source.indexOf("pendingVoiceDiscoveryTurnRef.current = {");
+  assert.ok(discoveryBoundary >= 0, `${label} routing must expose its discovery transition boundary`);
   assert.ok(
-    source.indexOf("restorePausedJourney(") < source.indexOf("routeDiscoveryTurn"),
-    `${label} checkout restoration must happen before discovery can replace the panel`,
+    source.indexOf("restorePausedJourney(") < discoveryBoundary,
+    `${label} checkout restoration must happen before discovery can replace the panel or queue a voice discovery tool`,
   );
 }
 

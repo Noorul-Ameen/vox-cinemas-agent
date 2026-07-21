@@ -76,7 +76,7 @@ The exact target agent is now published and matches that contract:
 - English and Arabic are configured, and Detect language is off.
 - All eight exact client-tool names and descriptions are present, with Wait for response on every tool.
 - First-message override is off and text-only override is on.
-- ElevenLabs forces Agent language override on and disables its toggle when Arabic is configured. The widget sends no language override, so the forced dashboard state remains compatible with the repository contract.
+- ElevenLabs forces Agent language override on and disables its toggle when Arabic is configured. The widget sends an explicit English or Arabic agent-language override for both text and voice, which keeps the selected interface and conversation language aligned.
 
 Local live text smoke reached status `Text chat` and returned: "I'm Voxi, the warm, confident bilingual AI assistant for VOX Cinemas UAE." A FAB follow-up returned: "The FAB offer is for 2D tickets only." The Cloudflare widget also reached text chat and returned grounded Voxi identity responses in English and Arabic.
 

@@ -57,7 +57,7 @@ const OUTSIDE_UAE_RULES = Object.freeze([
   { key: "united_states", label: "United States", aliases: ["united states", "usa", "new york", "los angeles", "امريكا", "أمريكا", "نيويورك"] },
 ]);
 
-const NON_LOCATION_CLAUSE = /^(?:arabic|english|hindi|tamil|malayalam|kannada|spanish|korean|عربي|العربية|انجليزي|الانجليزية|هندي|تاميل|action|comedy|drama|horror|thriller|romance|documentary|animation|family|kids|اكشن|كوميدي|دراما|رعب|رومانسي|وثائقي|عائلي|اطفال|imax|4dx|screenx|theatre|premier|standard|vip|3d|2d|original|dubbed|subtitled|the morning|morning|the afternoon|afternoon|the evening|evening|night|late night|dinner time)$/iu;
+const NON_LOCATION_CLAUSE = /^(?:arabic|english|hindi|tamil|malayalam|kannada|spanish|korean|عربي|العربية|انجليزي|الانجليزية|هندي|تاميل|action|comedy|drama|horror|thriller|romance|documentary|animation|family|kids|اكشن|كوميدي|دراما|رعب|رومانسي|وثائقي|عائلي|اطفال|imax|4dx|screenx|dolby(?: cinema| atmos)?|دولبي(?: سينما| أتموس)?|private cinema|kids cinema|theatre pods in imax|theater pods in imax|d box|ice immersive|theatre|premier|standard|vip|3d|2d|original|dubbed|subtitled|the morning|morning|the afternoon|afternoon|the evening|evening|night|late night|dinner time)$/iu;
 const LOCATION_EVIDENCE = /\b(?:mall|cinemas?|theatres?|theaters?|resort|hotel|park|boxpark|street|road|district|city|town|airport|island|plaza|centre|center|beach)\b|(?:مول|سينما|فندق|منتجع|حديقة|شارع|طريق|منطقة|مدينة|مطار|جزيرة|بلازا|سنتر|شاطئ)/iu;
 
 function genericLocationClause(input) {

@@ -176,6 +176,10 @@ assert.match(promptSource, /After a microphone voice yes\/no answer[\s\S]*call s
 assert.match(promptSource, /Typed yes\/no cancellation decisions are handled locally by the widget and are not sent as a new agent turn/, "the agent prompt must distinguish widget-local typed cancellation decisions");
 assert.match(promptSource, /During an eligible retryable cancellation error[\s\S]*spoken no or keep-booking answer must also call show_booking_for_cancellation exactly once with the same active booking reference and wait for its response[\s\S]*Speak only the returned message once so the tool owns the acknowledgement/, "the prompt must route a spoken retryable-error decline through one authoritative tool response");
 assert.match(promptSource, /spoken yes during an error does not authorize a destructive retry/, "the prompt must reject destructive retries from an error-state yes answer");
+assert.match(promptSource, /Treat Afghan or Afghani movie wording as ambiguous[\s\S]*Afghan-produced, Dari-language, or Pashto-language movies/, "the prompt must clarify Afghan origin versus supported movie languages without inventing availability");
+assert.match(promptSource, /A request for new movies, different movies, another movie[\s\S]*Never continue with the old title or old showtime/, "the prompt must replace stale movie and time filters on an explicit alternative request");
+assert.match(promptSource, /When a short hour such as "9" uniquely matches one visible showtime[\s\S]*Never restart movie discovery/, "the prompt must ground short-hour choices in visible showtimes and clarify ambiguity in place");
+assert.match(promptSource, /Never tell the guest that the booking process is paused[\s\S]*Do not apply that short reply as a global restore/, "the prompt must keep one-shot paused-journey recovery customer-safe and state-scoped");
 const promptHash = createHash("sha256").update(normalizeSource(VOXI_AGENT_PROMPT), "utf8").digest("hex");
 assert.equal(promptHash, contract.prompt.sha256, "the exported ElevenLabs prompt value changed without a contract version update");
 

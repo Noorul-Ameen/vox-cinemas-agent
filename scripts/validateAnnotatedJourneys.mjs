@@ -85,6 +85,107 @@ assert.equal(
   "Ezma is selected. Choose one of the displayed showtimes.",
   "a delayed movie question must not contradict an already rendered showtime step",
 );
+
+const deiraMovieCards = Array.from({ length: 11 }, (_, index) => ({ id: `deira-${index + 1}`, title: `Deira Movie ${index + 1}` }));
+const conciseEnglishMovieChoice = "11 movie options are shown. Visible titles include Deira Movie 1, Deira Movie 2, Deira Movie 3, Deira Movie 4, Deira Movie 5. Which movie would you like?";
+const manyTitleReply = `Available movies include ${deiraMovieCards.slice(0, 8).map((movie) => movie.title).join(", ")}.`;
+assert.equal(
+  guardAgentStateClaim(manyTitleReply, { stage: { view: "movies", movies: deiraMovieCards }, locale: "en" }),
+  conciseEnglishMovieChoice,
+  "a response naming more than five visible movies must become one concise grounded choice question",
+);
+
+const manyTimeReply = "Available showtimes are 09:00, 09:30, 10:00, 10:30, 11:00, 11:30, 12:00, and 12:30.";
+assert.equal(
+  guardAgentStateClaim(manyTimeReply, { stage: { view: "movies", movies: deiraMovieCards }, locale: "en" }),
+  conciseEnglishMovieChoice,
+  "a response narrating many showtimes before one movie is selected must become the concise visible-movie choice",
+);
+
+const conciseArabicMovieChoice = "تظهر الآن 11 من خيارات الأفلام. من العناوين الظاهرة: Deira Movie 1، Deira Movie 2، Deira Movie 3، Deira Movie 4، Deira Movie 5. أي فيلم تود اختياره؟";
+assert.equal(
+  guardAgentStateClaim(`الأفلام المتاحة هي ${deiraMovieCards.slice(0, 7).map((movie) => movie.title).join("، ")}.`, {
+    stage: { view: "movies", movies: deiraMovieCards },
+    locale: "ar",
+  }),
+  conciseArabicMovieChoice,
+  "an Arabic response naming too many visible movies must use the same five-title grounded cap",
+);
+assert.equal(
+  guardAgentStateClaim("مواعيد العرض هي 09:00، 09:30، 10:00، 10:30، 11:00، 11:30، 12:00، و12:30.", {
+    stage: { view: "movies", movies: deiraMovieCards },
+    locale: "ar",
+  }),
+  conciseArabicMovieChoice,
+  "an Arabic many-time narration on the movie grid must become one concise movie-choice question",
+);
+
+const safeShortMovieReply = "Deira Movie 1 is a family adventure suitable for a relaxed outing.";
+assert.equal(
+  guardAgentStateClaim(safeShortMovieReply, { stage: { view: "movies", movies: deiraMovieCards }, locale: "en" }),
+  safeShortMovieReply,
+  "a short single-movie detail must pass through unchanged",
+);
+const safeSingleMovieTimes = "Deira Movie 1 is showing at 09:00, 09:30, 10:00, 10:30, 11:00, 11:30, and 12:00.";
+assert.equal(
+  guardAgentStateClaim(safeSingleMovieTimes, { stage: { view: "movies", movies: deiraMovieCards }, locale: "en" }),
+  safeSingleMovieTimes,
+  "a legitimate single-movie time answer must not be truncated solely because it contains several times",
+);
+const safeArabicMovieReply = "Deira Movie 1 فيلم عائلي مناسب.";
+assert.equal(
+  guardAgentStateClaim(safeArabicMovieReply, { stage: { view: "movies", movies: deiraMovieCards }, locale: "ar" }),
+  safeArabicMovieReply,
+  "a short Arabic single-movie detail must pass through unchanged",
+);
+
+const movieStepTransactionCorrection = guardAgentStateClaim(
+  "Your booking is confirmed and payment was successful.",
+  { stage: { view: "movies", movies: deiraMovieCards }, locale: "en" },
+);
+assert.equal(
+  movieStepTransactionCorrection,
+  "11 movie options are shown. Choose one of the displayed movies to continue.",
+  "an unsafe transaction claim after replacement discovery must describe the visible movie cards",
+);
+assert.doesNotMatch(movieStepTransactionCorrection, /booking|payment|reservation|confirmed/i, "a movie-step correction must contain no stale transaction copy");
+
+assert.equal(
+  guardAgentStateClaim("Your reservation is ready.", {
+    stage: {
+      view: "showtimes",
+      movie: { title: "Deira Movie 1" },
+      sessions: [{ sessionId: "d1", time: "09:30" }, { sessionId: "d2", time: "11:45" }],
+    },
+    locale: "en",
+  }),
+  "2 showtime options are shown for Deira Movie 1. Choose one displayed showtime to continue.",
+  "an unsafe transaction claim on showtimes must describe only the selected movie and visible showtime step",
+);
+
+const visibleDiscoveryQuestion = "What date would you like to go?";
+assert.equal(
+  guardAgentStateClaim("Your booking has been completed.", {
+    stage: { view: "discovery", missing: ["date"], question: visibleDiscoveryQuestion },
+    locale: "en",
+  }),
+  visibleDiscoveryQuestion,
+  "an unsafe transaction claim on discovery must return the exact visible question before any booking copy",
+);
+
+assert.match(
+  guardAgentStateClaim("Your booking is confirmed.", { stage: { view: "movies", movies: deiraMovieCards.slice(0, 2) }, locale: "ar" }),
+  /2[\s\S]*خيارات الأفلام[\s\S]*اختر فيلماً/u,
+  "the visible-movie correction must remain grounded in Arabic mode",
+);
+
+const groundedMovieReply = "11 movie options are shown. Choose one of the displayed movies to continue.";
+assert.equal(
+  guardAgentStateClaim(groundedMovieReply, { stage: { view: "movies", movies: deiraMovieCards }, locale: "en" }),
+  groundedMovieReply,
+  "safe grounded movie guidance must pass through unchanged",
+);
+
 assert.match(
   guardAgentStateClaim("Which showtime would you like?", {
     stage: { view: "seatmap", movie: { title: "Ezma" }, session: { sessionId: "s1", time: "15:35" } },

@@ -193,13 +193,13 @@ assert.doesNotMatch(typedCancellationDecisionFlow, /sendUserMessage|queuePending
 assert.match(voiceMessageFlow, /normalizeElevenLabsMessageEvent\(message\)/, "SDK events must be normalized from the documented ElevenLabs onMessage contract");
 for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMessageFlow]]) {
   assert.match(flow, /isDirectCinemaSelectionUtterance\(/, `${label} must identify a direct cinema reply before FAQ rendering`);
-  assert.match(flow, /directCinemaSelection\s*\|\|\s*directMovieSelection\s*\|\|\s*directShowtimeSelection\s*\|\|\s*directCancellation\s*\|\|\s*directSeatSelection\s*\|\|\s*discoveryFilterTurn\s*\?\s*\{\s*matches:\s*\[\],\s*context:\s*""\s*\}\s*:\s*prepareFaqContext/, `${label} must not let generic FAQ tags swallow direct cinema, movie, showtime, seat, cancellation, or filter actions`);
+  assert.match(flow, /directCinemaSelection\s*\|\|\s*directMovieSelection\s*\|\|\s*directShowtimeSelection\s*\|\|\s*ambiguousShowtimeSelection\s*\|\|\s*directCancellation\s*\|\|\s*directSeatSelection\s*\|\|\s*discoveryFilterTurn\s*\?\s*\{\s*matches:\s*\[\],\s*context:\s*""\s*\}\s*:\s*prepareFaqContext/, `${label} must not let generic FAQ tags swallow direct cinema, movie, showtime, seat, cancellation, or filter actions`);
   assert.match(flow, /dismissStaleTransactionalView\(/, `${label} turns must dismiss a stale booking/history panel when the turn is unrelated`);
   assert.ok(flow.indexOf("dismissStaleTransactionalView(") < flow.indexOf("prepareFaqContext("), `${label} turns must clear hidden transactional context before an FAQ panel replaces it`);
   assert.match(flow, /classifyBookingHistoryRequest\(/, `${label} must use the shared bilingual current/history classifier`);
   assert.match(flow, /openHistory\(\{\s*notifyAgent:\s*false,\s*forceOpen:\s*true,\s*activeOnly:\s*historyRequest\.activeOnly,\s*preserveReturn:\s*bookingOpenedFromHistoryRef\.current\s*\}\)/, `${label} must apply active-only scope while preserving the original parent of a history-selected booking`);
   assert.match(flow, /cancellationReply:\s*decision\s*!==\s*null/, `${label} cancellation confirmations must keep the active booking panel`);
-  assert.match(flow, /const bookingContext = decision === null && !directCancellation && !faq\.matches\.length/, `${label} cancellation replies and target selections must not fall through into retained movie discovery`);
+  assert.match(flow, /const bookingContext = decision === null && !directCancellation && !ambiguousShowtimeSelection && !faq\.matches\.length/, `${label} cancellation replies and target selections must not fall through into retained movie discovery`);
   assert.match(flow, /isDirectCancellationRequest\(/, `${label} must classify contextual cancellation before stale-view cleanup`);
   assert.match(flow, /resolveCancellationContinuation\(\{\s*text:\s*(?:safeMessage|value),\s*stage:\s*stageRef\.current,\s*storedBookings:\s*readBookings\(\)\s*\}\)/, `${label} must resolve a title or reference only against the displayed cancellation candidates`);
   assert.match(flow, /cancellationContinuation\.handled\s*\|\|\s*isDirectCancellationRequest/, `${label} must keep a displayed target selection in cancellation routing without requiring the cancellation keyword again`);
@@ -215,9 +215,16 @@ for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMes
     assert.doesNotMatch(flow, /source:\s*["']voice_local["']/, "microphone cancellation decisions must never create a competing local transcript response");
   }
   assert.match(flow, /applyDiscoveryPreferencesFromText\([^,]+,\s*details\.cinema\s*\?\s*\{\s*cinemaId:\s*details\.cinema\.id,\s*cinemaName:\s*details\.cinema\.name\s*\}\s*:\s*\{\}\)/, `${label} must retain a cinema already recognized in the guest's turn`);
-  assert.match(flow, /routeDiscoveryTurn\((?:safeMessage|value),\s*\{\s*cinemaOverride:\s*details\.cinema,\s*dateOverride:\s*requestedDate,\s*preferencesAlreadyApplied:\s*true/, `${label} must use the same all-criteria discovery router for text and speech transcripts`);
+  if (label === "typed") {
+    assert.match(flow, /routeDiscoveryTurn\(value,\s*\{\s*cinemaOverride:\s*details\.cinema,\s*dateOverride:\s*requestedDate,\s*preferencesAlreadyApplied:\s*true/, "typed discovery must complete the shared all-criteria router before forwarding the turn");
+  } else {
+    assert.match(flow, /pendingVoiceDiscoveryTurnRef\.current\s*=\s*\{[\s\S]*text:\s*safeMessage[\s\S]*cinemaId:\s*details\.cinema\?\.id[\s\S]*date:\s*requestedDate/, "voice discovery must retain the exact transcript and resolved criteria for the wait-enabled movie tool");
+    assert.match(flow, /Call show_movie_selection exactly once now and wait for its response before speaking/, "voice discovery must wait for authoritative rendering before answering");
+    assert.doesNotMatch(flow, /void\s+routeDiscoveryTurn/, "voice discovery must not race a local background route against spoken output");
+  }
   assert.match(flow, /isDiscoveryRequest\((?:safeMessage|value)\)/, `${label} must recognize progressive discovery replies without requiring an agent tool round-trip`);
-  assert.match(flow, /Ask only the first missing item and do not list unfiltered movies/, `${label} must constrain the agent response to the widget's filtered result`);
+  if (label === "typed") assert.match(flow, /Ask only the first missing item and do not list unfiltered movies/, "typed responses must stay constrained to the completed widget result");
+  else assert.match(flow, /Do not make an availability claim, describe options, or ask for another criterion before the tool returns/, "voice responses must remain silent on availability until the tool result exists");
   assert.match(flow, /buildMovieSelectionGroundingContext\(/, `${label} must ground ambiguous movie references in the visible selection state`);
   const groundingIndex = flow.indexOf("buildMovieSelectionGroundingContext(");
   const groundingUpdateIndex = flow.indexOf("conversation.sendContextualUpdate?.(movieSelectionGrounding)", groundingIndex);
@@ -242,7 +249,7 @@ assert.match(staleViewHandler, /historyRequested[\s\S]*actionIntent === "booking
 assert.match(staleViewHandler, /cancellationReply[\s\S]*Boolean\(cancellationFlowRef\.current\)/, "pending yes/no cancellation turns must preserve the active booking panel");
 assert.match(staleViewHandler, /startsNewBooking[\s\S]*return false[\s\S]*pauseRichRenderingForTopicChange/, "an unrelated booking/history turn must hide the panel without clearing its resumable state");
 assert.doesNotMatch(staleViewHandler, /clearSeatSelection|clearPendingOrder|bookingRef\.current\s*=\s*null/, "topic-only cleanup must not discard valid booking context");
-assert.match(app, /import \{ isResumeCheckoutTurn, isResumeOnlyTurn, pausedResumeTarget \} from "\.\/lib\/pausedJourneyRouting\.js"/, "App must use the executable paused-stage continuation router");
+assert.match(app, /import \{[^}]*isResumeCheckoutTurn[^}]*isResumeOnlyTurn[^}]*pausedResumeTarget[^}]*\} from "\.\/lib\/pausedJourneyRouting\.js"/, "App must use the executable paused-stage continuation router");
 assert.match(app, /bookingContext && !resumeOnlyTurn[\s\S]*routeDiscoveryTurn/, "a continuation turn must not restart movie discovery");
 assert.match(app, /const restorePausedJourney[\s\S]*selectRestorableRichStage[\s\S]*restorePausedRichStage/, "text and voice continuation turns must restore the correct saved rich step");
 

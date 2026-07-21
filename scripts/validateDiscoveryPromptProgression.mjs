@@ -72,6 +72,29 @@ const resolveDatePromptReply = Function(`${helperSource}; return resolveDateProm
 
 const datePrompt = { view: "discovery", missing: ["date"] };
 const published = ["2026-07-16", "2026-07-17", "2026-07-18"];
+const reportedJourneyDates = ["2026-07-21", "2026-07-22", "2026-07-23", "2026-07-24"];
+
+assert.equal(
+  resolveDatePromptReply("23", reportedJourneyDates, datePrompt),
+  "2026-07-23",
+  "bare day 23 must resolve deterministically while the French to MOE journey is asking for its date",
+);
+assert.equal(
+  resolveDatePromptReply("anything is fine at MOE on 23", reportedJourneyDates, { view: "empty", missing: [] }),
+  "2026-07-23",
+  "an embedded day with an explicit date marker must resolve before the date prompt is rendered",
+);
+assert.equal(
+  resolveDatePromptReply("Anything is fine at Mall of the Emirates for the 23rd", reportedJourneyDates, { view: "empty", missing: [] }),
+  "2026-07-23",
+  "natural for-the-day wording must resolve inside a combined request",
+);
+assert.equal(resolveDatePromptReply("For the 23rd", reportedJourneyDates, datePrompt), "2026-07-23", "for-the-day wording must resolve while the date prompt is visible");
+assert.equal(
+  resolveDatePromptReply("I need 23 tickets", reportedJourneyDates, { view: "empty", missing: [] }),
+  null,
+  "an embedded ticket target must not be interpreted as a programming date",
+);
 
 assert.equal(
   resolveDatePromptReply("17", published, datePrompt),
@@ -167,6 +190,21 @@ assert.equal(
   guardMovieDisplayClaim(falseDisplayClaim, { view: "movies", movies: [{ id: "imax-1", title: "Verified IMAX Film" }] }, "en"),
   falseDisplayClaim,
   "a displayed-movies claim may pass through only when at least one local movie card is rendered",
+);
+const openChoiceStage = {
+  view: "movies",
+  movies: [{ id: "one", title: "One" }, { id: "two", title: "Two" }],
+  preferences: { openChoice: true },
+};
+assert.equal(
+  guardMovieDisplayClaim("Two movies are displayed. What genre or time would you prefer?", openChoiceStage, "en"),
+  "2 matching movie options are displayed. Choose a movie to continue.",
+  "the agent must not ask for a preference again after an open choice has already produced movie cards",
+);
+assert.equal(
+  guardMovieDisplayClaim("\u064a\u0648\u062c\u062f \u0641\u064a\u0644\u0645\u0627\u0646. \u0647\u0644 \u062a\u0641\u0636\u0644 \u0646\u0648\u0639\u0627\u064b \u0623\u0648 \u0648\u0642\u062a\u0627\u064b \u0645\u0639\u064a\u0646\u0627\u064b\u061f", openChoiceStage, "ar"),
+  "\u062a\u0645 \u0639\u0631\u0636 2 \u0645\u0646 \u062e\u064a\u0627\u0631\u0627\u062a \u0627\u0644\u0623\u0641\u0644\u0627\u0645 \u0627\u0644\u0645\u0637\u0627\u0628\u0642\u0629. \u0627\u062e\u062a\u0631 \u0641\u064a\u0644\u0645\u0627\u064b \u0644\u0644\u0645\u062a\u0627\u0628\u0639\u0629.",
+  "the Arabic agent must not ask for a preference again after an open choice has already produced movie cards",
 );
 
 const onMessageStart = Math.max(app.indexOf("onMessage: async (message) =>"), app.indexOf("onMessage: (message) =>"));
@@ -271,5 +309,57 @@ const discoveryRoute = app.slice(app.indexOf("const routeDiscoveryTurn"), app.in
 assert.match(discoveryRoute, /const directCinemaReply = Boolean\(cinemaOverride && isDirectCinemaSelectionUtterance/, "a direct cinema-only reply must be identified before unresolved movie-title handling");
 assert.match(discoveryRoute, /rawTurn && !locationIntent && !directCinemaReply && !dateOnlyReply/, "location, cinema, and date-only replies must never be retained as unresolved movie titles");
 assert.match(discoveryRoute, /directCinemaReply \|\| rawPreferencePatch\.patch\.movieId/, "a direct cinema-only reply must clear any stale pending movie title");
+assert.match(
+  discoveryRoute,
+  /const shouldVerifyCinemaList = Boolean\(preferences\.date && \([\s\S]{0,260}preferences\.openChoice/,
+  "a dated city request with an open movie choice must verify each cinema before showing the picker",
+);
 
-console.log(`Validated bare day 17 parsing, live bare-day progression, and grounded IMAX rendering for ${mall.name} on ${selectedMallDate}.`);
+const missingCriteriaStart = app.indexOf("const discoveryMissingCriteria");
+const missingCriteriaEnd = app.indexOf("const discoveryQuestion", missingCriteriaStart);
+assert.ok(missingCriteriaStart >= 0 && missingCriteriaEnd > missingCriteriaStart, "the discovery missing-criteria integration must remain inspectable");
+const missingCriteriaSource = app.slice(missingCriteriaStart, missingCriteriaEnd);
+assert.match(missingCriteriaSource, /preferences\.openChoice/, "an explicit open choice such as anything is fine must satisfy the preference requirement");
+assert.match(
+  missingCriteriaSource,
+  /preferences\.recommendationIntent\s*===\s*["']unsupported_language_afghan["'][\s\S]*missing\.push\(["']unsupported_language_afghan["']\)/,
+  "the retained Afghan intent must remain an explicit missing clarification instead of becoming a catalog filter",
+);
+const discoveryQuestionEnd = app.indexOf("const showDiscoveryPrompt", missingCriteriaEnd);
+assert.ok(discoveryQuestionEnd > missingCriteriaEnd, "the discovery clarification question must remain inspectable");
+const discoveryQuestionSource = app.slice(missingCriteriaEnd, discoveryQuestionEnd);
+assert.match(
+  discoveryQuestionSource,
+  /field\s*===\s*["']unsupported_language_afghan["'][\s\S]*(?:Afghan|أفغان)/iu,
+  "the discovery prompt must ask a specific Afghan language clarification",
+);
+const routeAfghanClarification = discoveryRoute.indexOf('missing.includes("unsupported_language_afghan")');
+const routeAvailabilityLoad = discoveryRoute.indexOf("await loadDiscoveryForCinema");
+assert.ok(
+  routeAfghanClarification >= 0 && routeAvailabilityLoad > routeAfghanClarification,
+  "the conversational route must display the Afghan clarification before loading availability",
+);
+const loaderAfghanClarification = discoveryLoader.indexOf('freshMissing.includes("unsupported_language_afghan")');
+const loaderAvailabilityFilter = discoveryLoader.indexOf("filterDiscoveryResults({ movies");
+assert.ok(
+  loaderAfghanClarification >= 0 && loaderAvailabilityFilter > loaderAfghanClarification,
+  "the availability loader must stop for the Afghan clarification before filtering any movie catalog",
+);
+assert.match(discoveryRoute, /openChoice|isOpenDiscoveryChoiceReply/, "the discovery route must recognize an open-choice reply without treating it as an unknown title");
+
+const voiceGateStart = app.indexOf("if (bookingContext && !directMovieSelection", app.indexOf("const conversationOptions"));
+const voiceGateEnd = app.indexOf("if (directMovieSelection)", voiceGateStart);
+assert.ok(voiceGateStart >= 0 && voiceGateEnd > voiceGateStart, "the spoken discovery response gate must remain inspectable");
+const voiceGateSource = app.slice(voiceGateStart, voiceGateEnd);
+assert.match(voiceGateSource, /pendingVoiceDiscoveryTurnRef\.current\s*=\s*\{/, "a spoken discovery request must be retained until the authoritative tool runs");
+assert.match(voiceGateSource, /Call show_movie_selection exactly once now and wait for its response before speaking/, "voice must wait for the existing client tool before making an availability claim");
+assert.doesNotMatch(voiceGateSource, /void\s+routeDiscoveryTurn/, "voice must not race a fire-and-forget discovery request against the agent response");
+
+const movieToolStart = app.indexOf("show_movie_selection: async");
+const movieToolEnd = app.indexOf("show_showtimes: async", movieToolStart);
+const movieToolSource = app.slice(movieToolStart, movieToolEnd);
+assert.match(movieToolSource, /const pendingVoiceTurn = pendingVoiceDiscoveryTurnRef\.current/, "show_movie_selection must consume the pending spoken request");
+assert.match(movieToolSource, /await routeDiscoveryTurn\(pendingVoiceTurn\.text/, "the wait-enabled tool must complete local filtering before returning to the voice agent");
+assert.match(movieToolSource, /voiceAvailabilityGate:\s*"completed"/, "the tool result must explicitly report completion of the voice availability gate");
+
+console.log(`Validated bare day 17 and 23 parsing, open-choice progression, live bare-day progression, and grounded IMAX rendering for ${mall.name} on ${selectedMallDate}.`);

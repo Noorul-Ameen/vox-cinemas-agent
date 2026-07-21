@@ -68,6 +68,7 @@ export function buildAuthoritativeDiscoveryContext(result, { maxMovies = 8, maxS
       preferences.audience === "kids_family" ? "kids/family" : null,
       preferences.preferredTime || preferences.timeBand,
       preferences.movieTitle,
+      preferences.openChoice === true ? "any suitable movie" : null,
     ].map(clean).filter(Boolean);
     return `Authoritative widget result${scope ? ` for ${scope}` : ""}: ZERO matching movie cards or showtimes are displayed, and no movie is selected.${retained.length ? ` Retained filters: ${retained.join(", ")}.` : ""} State that no movies match all retained preferences and ask which single preference the guest wants to change. Do not say that options, choices, or a movie list are on screen; do not congratulate a choice or ask for a showtime; do not call show_showtimes; and do not invent or name an alternative movie, showtime, cinema, or date.`;
   }

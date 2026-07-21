@@ -123,9 +123,13 @@ const syntheticAlternate = {
 };
 const duplicateGroup = deduplicateSessionPresentation([selectableSession, syntheticAlternate]);
 assert.equal(duplicateGroup.length, 1, "indistinguishable presentation rows are grouped");
-assert.deepEqual(duplicateGroup[0].sessionIds, [selectableSession.sessionId, syntheticAlternate.sessionId], "every authoritative source ID remains available");
+assert.deepEqual(
+  duplicateGroup[0].sessionIds,
+  [...selectableSession.sessionIds, syntheticAlternate.sessionId],
+  "every authoritative source ID remains available even when the source presentation already contains duplicates",
+);
 assert.equal(duplicateGroup[0].sessionId, selectableSession.sessionId, "the stable first source ID remains the selectable ID");
-assert.equal(duplicateGroup[0].duplicateCount, 1);
+assert.equal(duplicateGroup[0].duplicateCount, selectableSession.duplicateCount + 1);
 
 const plan = await getSeatPlan(sourceSession.CinemaId, selectableSession.sessionId);
 assert.ok(plan.length > 0);

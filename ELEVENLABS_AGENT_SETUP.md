@@ -2,20 +2,20 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-21.2`
+Prompt contract version: `2026-07-22.1`
 
-Prompt value SHA-256: `6424e871a383c06e683850aaa40da85e9c437dc9a6c9ed226888d9853fe88043`
+Prompt value SHA-256: `5365b2a3a4096ecf6364f98057bef7ebe7a422f9eac0a06d57441ef6d98cb3e4`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 
 VOXi is the bilingual AI assistant for VOX Cinemas UAE. Keep the product and welcome globally branded as VOX Cinemas UAE. Mall of the Emirates is one selectable cinema, not the global product identity.
 
-## Dashboard verification status, 21 July 2026
+## Dashboard verification status, 22 July 2026
 
-Status: REPOSITORY CONTRACT AND DASHBOARD PROMPT PUBLISHED. LIVE ACOUSTIC VOICE VERIFICATION IS PENDING.
+Status: REPOSITORY CONTRACT AND ELEVENLABS DASHBOARD ARE SYNCHRONIZED. LIVE ACOUSTIC VOICE VERIFICATION IS STILL REQUIRED.
 
-- Contract `2026-07-21.2` was copied from the exported `VOXI_AGENT_PROMPT` value, published to the target agent, reloaded, and read back on 21 July 2026.
-- The published prompt contains the movie-language versus conversation-language rule, unsupported-location grounding, and retained-criteria availability verification.
+- Contract `2026-07-22.1` was copied from the exported `VOXI_AGENT_PROMPT` value, published to the target agent, reloaded, and read back on 22 July 2026.
+- The readback confirmed the grounded Afghan clarification, spoken discovery availability gate, replacement-discovery handling, visible-hour showtime resolution, and one-shot paused-journey recovery rules.
 - The dashboard still uses the correct target agent, bilingual language configuration, `{{voxi_session_opening}}`, Agent language override, Text only override, and exact client-tool names. Detect language remains off.
 - The English primary voice and Arabic voice override remain configured. No connection type, client tool, worklet, or EU residency setting was changed.
 - Run a real microphone input and audible English and Arabic output check on the deployed origin. Repository and dashboard checks cannot prove acoustic input or output quality.
@@ -93,7 +93,7 @@ Parameters:
 
 Agent rule:
 
-> Call `show_movie_selection` only when the widget has not already supplied an authoritative local result for the same turn. Read the returned `shown`, `movies`, `missing`, `reason`, and retained preferences literally. Never claim that movies are displayed when the result contains zero cards.
+> For a spoken discovery turn, call `show_movie_selection` exactly once when the widget says criteria are retained but availability is pending, then wait for the result before speaking. For a typed turn where the widget already supplied an authoritative local result, do not call it again. Read the returned `shown`, `movies`, `missing`, `reason`, and retained preferences literally. Never claim that movies are displayed when the result contains zero cards.
 
 ## `show_showtimes`
 
@@ -498,9 +498,9 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 1. Confirm the dashboard target is `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`.
 2. Confirm all eight exact client-tool names and schemas match `config/elevenlabs-agent-contract.json`.
 3. Enable Wait for response on all eight tools. Confirm `show_seat_map` returns after map loading and never waits for a later seat-selection turn.
-4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-21.2`.
+4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-22.1`.
 5. Set the first message to `{{voxi_session_opening}}`.
-6. Create all 13 dynamic-variable placeholders and defaults.
+6. Confirm the dashboard detects `voxi_session_opening` from the first-message template. The widget supplies all 13 contract variables when it starts a session; do not create unsupported manual placeholders for variables that the dashboard does not expose.
 7. Configure English and Arabic support, then disable the automatic `language_detection` system tool.
 8. Confirm WebRTC and public-agent access are allowed for the deployed origin.
 9. Start English and say one Arabic word or a mixed sentence. Verify Voxi asks for confirmation in English without switching or processing the request.
