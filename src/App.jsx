@@ -22,7 +22,8 @@ import { normalizeElevenLabsMessageEvent } from "./lib/conversationMessage.js";
 import { guardAgentStateClaim } from "./lib/agentStateTruth.js";
 import { isCheckoutSeatEditTurn } from "./lib/checkoutConversationRouting.js";
 import { normalizeCustomerFacingFields, normalizeCustomerFacingText } from "./lib/customerFacingText.js";
-import { explicitLanguageRequest, resolveLanguageSignal } from "./lib/languageSwitch.js";
+import { conversationLanguageContinuityContext, explicitLanguageRequest, resolveLanguageSignal } from "./lib/languageSwitch.js";
+import { nearbyCinemasForCinema, resolveLocationIntent } from "./lib/locationRouting.js";
 import { buildTransportHandoff, createConversationJourney, inferIntent, journeyDynamicVariables, journeyReducer, syncJourney } from "./lib/conversationJourney.js";
 import { resolveProgrammingDateSelection, resolveVisibleSelectionProgrammingDate } from "./lib/programmingDateSelection.js";
 import {
@@ -42,10 +43,13 @@ import {
 import { isResumeCheckoutTurn, isResumeOnlyTurn, pausedResumeTarget } from "./lib/pausedJourneyRouting.js";
 import { createDiscoveryPreferences, extractDiscoveryPreferencePatch, filterDiscoveryResults, getMissingDiscoveryCriteria, mergeDiscoveryPreferences, parseAndMergeDiscoveryPreferences, resolveDiscoveryMovieCandidate, shouldTreatAsDiscoveryFilterTurn, unresolvedMovieTitleCandidate } from "./lib/discoveryPreferences.js";
 import { buildAuthoritativeDiscoveryContext, buildMovieSelectionGroundingContext } from "./lib/discoveryResultContext.js";
+import { resolveVisibleMovieSelectionTurn } from "./lib/movieSelectionRouting.js";
+import { resolveVisibleShowtimeSelectionTurn } from "./lib/showtimeSelectionRouting.js";
 import { normalizeSeatIds, resolveSeatSelectionTurn, resolveSeatToolInput } from "./lib/seatRouting.js";
 import { filterBookableSessions } from "./lib/showtimeAvailability.js";
 import { startTransportWithRetirement } from "./lib/transportStart.js";
-import { ELEVENLABS_WORKLET_PATHS, VOICE_MIC_PERMISSION_TIMEOUT_MS, VOICE_TRANSPORT_START_TIMEOUT_MS, voiceStartupErrorKey } from "./lib/voiceStartup.js";
+import { conversationSessionOverrides } from "./lib/transportLanguage.js";
+import { ELEVENLABS_WORKLET_PATHS, VOICE_MIC_PERMISSION_TIMEOUT_MS, VOICE_TRANSPORT_START_TIMEOUT_MS, requireMicrophoneCapture, voiceStartupErrorKey } from "./lib/voiceStartup.js";
 import {
   VOICE_CANCELLATION_DECISION_TTL_MS,
   advanceVoiceCancellationUserTurn,
@@ -76,6 +80,23 @@ const DISCOVERY_MOVIE_CATALOG = vista.getDiscoveryMovieCatalog();
 const stripVox = (name) => String(name || "").replace(/^VOX\s*[\u2014-]\s*/, "");
 const norm = (value) => String(value ?? "").toLowerCase().trim();
 const hasMeaningfulTurnContent = (value) => /[\p{L}\p{N}]/u.test(String(value || ""));
+const authoritativeJourneyDate = ({ stage, discoveryPreferences, pendingOrder, booking } = {}) => (
+  stage?.session?.date
+  || stage?.order?.performanceDate
+  || stage?.order?.sourceDate
+  || stage?.order?.date
+  || pendingOrder?.performanceDate
+  || pendingOrder?.sourceDate
+  || pendingOrder?.date
+  || stage?.booking?.performanceDate
+  || stage?.booking?.sourceDate
+  || stage?.booking?.date
+  || booking?.performanceDate
+  || booking?.sourceDate
+  || booking?.date
+  || discoveryPreferences?.date
+  || null
+);
 const isExplicitJourneyCancellationTurn = (value) => /\b(?:cancel|stop|abandon|end)\s+(?:this|my|the|current)?\s*(?:booking\s+)?(?:journey|process|flow|checkout)\b|(?:ألغ|الغ|أوقف|انه|أنهِ)\s+(?:رحلة|عملية|مسار)\s+(?:الحجز|الدفع)/iu.test(String(value || ""));
 const isExplicitConversationEndTurn = (value) => /^(?:end|close|stop)\s+(?:the\s+)?(?:chat|conversation|session)|^(?:goodbye|bye|that(?:'|’)s all|thank you,? bye)|^(?:انه|أنهِ|اغلق|أغلق)\s+(?:المحادثة|الجلسة)|^(?:مع السلامة|وداعا)[.!?،]*$/iu.test(String(value || "").trim());
 const localizedValue = (value, locale) => typeof value === "string" ? value : value?.[locale] || value?.en || "";
@@ -567,6 +588,7 @@ export default function App() {
   const cancellationPausedRef = useRef(false);
   const renderTopicRef = useRef("general_enquiry");
   const restoredStageToolGuardRef = useRef(null);
+  const deterministicUiStageGuardRef = useRef(null);
 
   // Current-value refs make client-tool calls deterministic even when the SDK
   // invokes a handler between React renders.
@@ -606,6 +628,7 @@ export default function App() {
   const hasDisplayedWelcomeRef = useRef(false);
   const continuationSessionRef = useRef(false);
   const pendingLanguageSwitchRef = useRef(null);
+  const languageTransportRestartRef = useRef(null);
   const disconnectReasonRef = useRef("ended");
   const suppressDisconnectNoticeRef = useRef(false);
   const requestEpochRef = useRef(0);
@@ -770,10 +793,11 @@ export default function App() {
   useEffect(() => { pausedJourneyRef.current = pausedJourney; }, [pausedJourney]);
 
   useEffect(() => {
+    const journeyScheduleDate = authoritativeJourneyDate({ stage, discoveryPreferences, pendingOrder, booking });
     const next = syncJourney(journeyRef.current, {
       locale,
       cinema,
-      scheduleDate,
+      scheduleDate: journeyScheduleDate,
       stage,
       selectedSeats,
       ticketQuantity: selectedSeats.length || pendingOrder?.seats?.length || booking?.seats?.length || null,
@@ -785,7 +809,7 @@ export default function App() {
     dispatchJourney({ type: "sync", payload: {
       locale,
       cinema,
-      scheduleDate,
+      scheduleDate: journeyScheduleDate,
       stage,
       selectedSeats,
       ticketQuantity: selectedSeats.length || pendingOrder?.seats?.length || booking?.seats?.length || null,
@@ -793,7 +817,7 @@ export default function App() {
       booking,
       transportConversationId: transportConversationIdRef.current,
     } });
-  }, [booking, cinema, locale, pendingOrder, scheduleDate, selectedSeats, stage]);
+  }, [booking, cinema, discoveryPreferences, locale, pendingOrder, selectedSeats, stage]);
 
   const say = useCallback((role, text) => {
     const at = new Date().toISOString();
@@ -1201,6 +1225,25 @@ export default function App() {
     });
   };
 
+  const preserveDeterministicUiStageForTool = (toolName) => {
+    const guard = deterministicUiStageGuardRef.current;
+    if (!guard) return null;
+    const stale = guard.journeyId !== bookingJourneyIdRef.current
+      || stageRef.current.view !== guard.view;
+    if (stale) {
+      deterministicUiStageGuardRef.current = null;
+      return null;
+    }
+    return JSON.stringify({
+      shown: guard.view,
+      alreadyShown: true,
+      advancedByGuest: true,
+      blockedTool: toolName,
+      reason: "deterministic_ui_stage_already_advanced",
+      instruction: `The guest's UI selection already advanced the widget to ${guard.view}. Do not replace or reopen an earlier panel. Acknowledge the visible step and wait for the next guest selection.`,
+    });
+  };
+
   const preserveActiveCancellationForTool = (toolName) => {
     const flow = cancellationFlowRef.current;
     if (!flow?.bookingRef || !["checking", "route_confirmation", "final_confirmation", "processing"].includes(flow.phase)) return null;
@@ -1374,30 +1417,26 @@ export default function App() {
     }
 
     const metadata = filterDiscoveryResults({ movies, sessions: null, cinemas: CINEMAS, preferences });
-    const sessionGroups = await Promise.all(metadata.movies.map(async (movie) => {
-      try {
-        const rows = await vista.getSessions(target.id, movie.id, requestedDate);
-        return { movie, rows: rows.map((session) => ({ ...session, cinemaId: target.id, scheduledFilmId: movie.id, movieId: movie.id })), failed: false };
-      } catch (error) {
-        console.error("VOXi showtime request failed", {
-          operation: "getSessions",
-          cinemaId: target.id,
-          movieId: movie.id,
-          programmingDate: requestedDate,
-          code: error?.code || null,
-          status: error?.status || null,
-        });
-        return { movie, rows: [], failed: true, error };
-      }
-    }));
-    if (!requestIsCurrent(epoch, revision, target.id, requestedDate)) return { shown: false, stale: true, reason: "The booking criteria changed while showtimes were loading." };
-    const failedGroups = sessionGroups.filter((group) => group.failed);
-    if (metadata.movies.length && failedGroups.length === metadata.movies.length) {
-      const reason = "Showtime availability could not be loaded. Please retry.";
+    let cinemaDateSessions = [];
+    try {
+      cinemaDateSessions = metadata.movies.length
+        ? await vista.getCinemaDateSessions(target.id, requestedDate)
+        : [];
+    } catch (error) {
+      console.error("VOXi showtime request failed", {
+        operation: "getCinemaDateSessions",
+        cinemaId: target.id,
+        programmingDate: requestedDate,
+        code: error?.code || null,
+        status: error?.status || null,
+      });
+      if (!requestIsCurrent(epoch, revision, target.id, requestedDate)) return { shown: false, stale: true, reason: "The booking criteria changed while showtimes were loading." };
+      const reason = localeRef.current === "ar" ? "تعذر تحميل مواعيد العرض. حاول مرة أخرى." : "Showtime availability could not be loaded. Please retry.";
       showStage({ view: "movies", movies: [], error: reason });
-      return { shown: false, reason, retryAvailable: true, failedMovieCount: failedGroups.length };
+      return { shown: false, reason, retryAvailable: true };
     }
-    const availability = filterCurrentSessions(sessionGroups.flatMap((group) => group.rows));
+    if (!requestIsCurrent(epoch, revision, target.id, requestedDate)) return { shown: false, stale: true, reason: "The booking criteria changed while showtimes were loading." };
+    const availability = filterCurrentSessions(cinemaDateSessions);
     const result = filterDiscoveryResults({
       movies,
       sessions: availability.available,
@@ -1414,6 +1453,32 @@ export default function App() {
       ...movie,
       relevantSessions: discoverySessionsRef.current.get(movie.id) || [],
     }));
+    if (!enrichedMovies.length) {
+      const nearbyCandidates = nearbyCinemasForCinema(CINEMAS, target.id, 4);
+      if (nearbyCandidates.length) {
+        const alternatives = await findAvailableCinemasForCriteria(preferences, nearbyCandidates);
+        if (!requestIsCurrent(epoch, revision, target.id, requestedDate)) return { shown: false, stale: true, reason: "The booking criteria changed while alternatives were loading." };
+        if (alternatives.cinemas.length) {
+          const notice = localeRef.current === "ar"
+            ? `لا توجد عروض تطابق جميع تفضيلاتك في ${stripVox(target.name)}. تعرض القائمة بدائل قريبة تم التحقق منها للتاريخ والتفضيلات نفسها.`
+            : `No showtimes match all of your preferences at ${stripVox(target.name)}. These nearby alternatives were verified for the same date and preferences.`;
+          cinemaReturnRef.current = { view: "movies", movies: [], error: localeRef.current === "ar" ? "لا توجد نتائج مطابقة في السينما المطلوبة." : "No matching results at the requested cinema." };
+          showStage({ view: "cinemas", cinemas: alternatives.cinemas, notice, preferences });
+          resetClarificationFailures();
+          return {
+            shown: "verified alternative cinema picker",
+            cinema: { id: target.id, name: target.name },
+            selectedDate: requestedDate,
+            preferences,
+            movies: [],
+            alternatives: alternatives.cinemas.map(({ id, name }) => ({ id, name, verified: true })),
+            availabilityStatus: result.noResultsReason || "no_results_for_criteria",
+            failedCinemaCount: alternatives.failedCinemaCount,
+            reason: notice,
+          };
+        }
+      }
+    }
     const requestedTime = result.time.requestedTime;
     let notice = result.time.usedNearestFallback
       ? (localeRef.current === "ar"
@@ -1424,12 +1489,6 @@ export default function App() {
           ? `تتوفر عروض عند ${requestedTime} مع أقرب الخيارات المناسبة.`
           : `Showtimes at ${requestedTime} are available, with the closest suitable options.`)
         : null;
-    if (failedGroups.length) {
-      const partialNotice = localeRef.current === "ar"
-        ? `تعذر التحقق من مواعيد ${failedGroups.length} من الأفلام؛ النتائج المعروضة جزئية.`
-        : `Showtimes for ${failedGroups.length} movie${failedGroups.length === 1 ? "" : "s"} could not be verified, so these results are partial.`;
-      notice = [notice, partialNotice].filter(Boolean).join(" ");
-    }
     const error = !enrichedMovies.length
       ? (localeRef.current === "ar" ? "لا توجد أفلام تطابق جميع تفضيلاتك في هذا الموقع والتاريخ." : "No movies match all of your preferences at this cinema and date.")
       : null;
@@ -1443,29 +1502,38 @@ export default function App() {
       movies: enrichedMovies.map((movie) => ({ id: movie.id, title: movie.title, showtimes: (movie.relevantSessions || []).map((session) => ({ sessionId: session.sessionId, time: session.time, experience: session.exp })) })),
       time: result.time,
       expiredSessionCount: availability.expired.length,
-      failedMovieCount: failedGroups.length,
+      failedMovieCount: 0,
       reason: error,
     };
   };
 
-  const findAvailableCinemasForMovie = async (preferences) => {
-    const candidates = filterDiscoveryResults({ cinemas: CINEMAS, preferences: { ...preferences, cinemaId: null, cinemaName: null } }).cinemas;
+  const findAvailableCinemasForCriteria = async (preferences, candidateCinemas = CINEMAS) => {
+    const candidates = Array.isArray(candidateCinemas) ? candidateCinemas : [];
     const matches = await Promise.all(candidates.map(async (candidate) => {
       try {
-        const movies = await vista.getScheduledFilms(candidate.id, preferences.date);
-        const metadata = filterDiscoveryResults({ movies, cinemas: CINEMAS, preferences: { ...preferences, cinemaId: candidate.id } });
+        const candidatePreferences = {
+          ...preferences,
+          cinemaId: candidate.id,
+          cinemaName: candidate.name,
+          city: null,
+        };
+        const [movies, sessions] = await Promise.all([
+          vista.getScheduledFilms(candidate.id, preferences.date),
+          vista.getCinemaDateSessions(candidate.id, preferences.date),
+        ]);
+        const metadata = filterDiscoveryResults({ movies, cinemas: CINEMAS, preferences: candidatePreferences });
         if (!metadata.movies.length) return null;
-        const groups = await Promise.all(metadata.movies.map(async (movie) => (await vista.getSessions(candidate.id, movie.id, preferences.date))
-          .map((session) => ({ ...session, cinemaId: candidate.id, scheduledFilmId: movie.id, movieId: movie.id }))));
-        const availability = filterCurrentSessions(groups.flat());
-        const filtered = filterDiscoveryResults({ movies, sessions: availability.available, cinemas: CINEMAS, preferences: { ...preferences, cinemaId: candidate.id } });
-        return filtered.movies.length ? candidate : null;
+        const availability = filterCurrentSessions(sessions);
+        const filtered = filterDiscoveryResults({ movies, sessions: availability.available, cinemas: CINEMAS, preferences: candidatePreferences });
+        return filtered.movies.length ? { cinema: candidate, movieCount: filtered.movies.length, sessionCount: filtered.sessions.length } : null;
       } catch (error) {
         return { failed: true, candidate, error };
       }
     }));
+    const verified = matches.filter((match) => match && !match.failed);
     return {
-      cinemas: matches.filter((match) => match && !match.failed),
+      cinemas: verified.map((match) => match.cinema),
+      matches: verified,
       failedCinemaCount: matches.filter((match) => match?.failed).length,
       checkedCinemaCount: candidates.length,
     };
@@ -1473,6 +1541,7 @@ export default function App() {
 
   const routeDiscoveryTurn = async (text, { cinemaOverride = null, dateOverride = null, preferencesAlreadyApplied = false } = {}) => {
     const rawTurn = String(text || "").trim();
+    const locationIntent = resolveLocationIntent(CINEMAS, rawTurn);
     const rawPreferencePatch = extractDiscoveryPreferencePatch(rawTurn, {
       cinemas: CINEMAS,
       movies: [...DISCOVERY_MOVIE_CATALOG, ...filmsRef.current].filter(Boolean),
@@ -1492,7 +1561,7 @@ export default function App() {
       rawTurn,
       dateOverride || rawPreferencePatch.patch.date || requestedProgrammingDate(rawTurn),
     );
-    const likelyUnresolvedTitle = rawTurn && !directCinemaReply && !dateOnlyReply && !rawPreferencePatch.patch.movieTitle && (
+    const likelyUnresolvedTitle = rawTurn && !locationIntent && !directCinemaReply && !dateOnlyReply && !rawPreferencePatch.patch.movieTitle && (
       unresolvedMovieTitleCandidate(rawTurn, rawPreferencePatch)
       || plausibleBareTitleReply
     );
@@ -1510,7 +1579,7 @@ export default function App() {
     const merged = preferencesAlreadyApplied
       ? { preferences: discoveryPreferencesRef.current }
       : applyDiscoveryPreferencesFromText(text, overrides);
-    const preferences = Object.keys(overrides).length && preferencesAlreadyApplied
+    let preferences = Object.keys(overrides).length && preferencesAlreadyApplied
       ? commitDiscoveryPreferences({ patch: overrides }).preferences
       : merged.preferences;
     const rejectsCurrentCinema = rawPreferencePatch.clear.includes("cinemaId")
@@ -1526,6 +1595,81 @@ export default function App() {
       sessionsFilmRef.current = "";
       clearSeatSelection();
     }
+    const requiresAlternativeLocation = locationIntent && ["area", "unsupported_venue", "unknown_venue", "unknown_location", "outside_scope"].includes(locationIntent.kind);
+    if (requiresAlternativeLocation && !cinemaOverride) {
+      preferences = commitDiscoveryPreferences({ clear: ["cinemaId", "cinemaName", "city"] }).preferences;
+      cinemaRef.current = null;
+      setCinema(null);
+      filmsRef.current = [];
+      filmsCinemaRef.current = "";
+      filmsDateRef.current = "";
+      sessionsRef.current = [];
+      sessionsFilmRef.current = "";
+      clearSeatSelection();
+
+      if (locationIntent.kind === "outside_scope") {
+        const notice = localeRef.current === "ar"
+          ? `تغطي هذه الخدمة مواقع ڤوكس سينما داخل الإمارات فقط، ولا يوجد موقع إماراتي في ${locationIntent.label}. اختر مدينة أو سينما داخل الإمارات للمتابعة.`
+          : `This service covers VOX Cinemas UAE only, and there is no UAE cinema in ${locationIntent.label}. Choose a UAE city or cinema to continue.`;
+        cinemaReturnRef.current = { view: "empty" };
+        showStage({ view: "cinemas", cinemas: CINEMAS, notice, preferences });
+        return { shown: "UAE cinema picker", cinemas: CINEMAS.map(({ id, name }) => ({ id, name })), missing: ["cinema"], preferences, locationStatus: "outside_scope", reason: notice };
+      }
+
+      const suggested = locationIntent.cinemas || [];
+      if (!suggested.length) {
+        const notice = localeRef.current === "ar"
+          ? `لا توجد سينما VOX في ${locationIntent.label}. أخبرني بالمدينة أو المنطقة لأعرض أقرب الخيارات، أو اختر موقعاً من قائمة سينمات الإمارات.`
+          : `There is no VOX cinema at ${locationIntent.label}. Tell me the city or area so I can show the closest options, or choose from the UAE cinema list.`;
+        cinemaReturnRef.current = { view: "empty" };
+        showStage({ view: "cinemas", cinemas: CINEMAS, notice, preferences });
+        return {
+          shown: "UAE cinema picker",
+          cinemas: CINEMAS.map(({ id, name }) => ({ id, name })),
+          alternatives: [],
+          missing: ["cinema"],
+          preferences,
+          locationStatus: locationIntent.kind,
+          requestedLocation: locationIntent.label,
+          reason: notice,
+        };
+      }
+      const hasNarrowingCriteria = Boolean(preferences.movieId || preferences.movieTitle || preferences.preferredTime || preferences.timeBand
+        || preferences.genre || preferences.language || preferences.experience || preferences.audience);
+      let visibleCinemas = suggested;
+      let verified = false;
+      let failedCinemaCount = 0;
+      if (preferences.date && hasNarrowingCriteria && suggested.length) {
+        const scanEpoch = beginAsyncRequest();
+        showStage({ view: "loading", label: localeRef.current === "ar" ? "جارٍ التحقق من أقرب الخيارات المتاحة..." : "Checking nearby availability..." });
+        const scanRevision = stageRevisionRef.current;
+        const availability = await findAvailableCinemasForCriteria(preferences, suggested);
+        if (requestEpochRef.current !== scanEpoch || stageRevisionRef.current !== scanRevision) return { shown: false, stale: true, reason: "The location request changed while nearby availability was loading." };
+        visibleCinemas = availability.cinemas.length ? availability.cinemas : suggested;
+        verified = availability.cinemas.length > 0;
+        failedCinemaCount = availability.failedCinemaCount;
+      }
+      const notice = verified
+        ? (localeRef.current === "ar"
+          ? `لا توجد سينما ڤوكس في ${locationIntent.label}. تعرض القائمة مواقع بديلة قريبة تم التحقق من مطابقتها لتفضيلاتك في التاريخ المحدد.`
+          : `There is no VOX cinema at ${locationIntent.label}. These nearby alternatives were verified against your preferences for the selected date.`)
+        : (localeRef.current === "ar"
+          ? `لا توجد سينما ڤوكس في ${locationIntent.label}. هذه مواقع ڤوكس بديلة قريبة، ولكن لم يتم العثور على تطابق مؤكد مع جميع تفضيلاتك حتى الآن.`
+          : `There is no VOX cinema at ${locationIntent.label}. These are nearby VOX alternatives, but no match for every retained preference has been verified yet.`);
+      cinemaReturnRef.current = { view: "empty" };
+      showStage({ view: "cinemas", cinemas: visibleCinemas, notice, preferences, retryAvailable: failedCinemaCount > 0 });
+      return {
+        shown: verified ? "verified nearby cinema picker" : "nearby cinema picker",
+        cinemas: visibleCinemas.map(({ id, name }) => ({ id, name })),
+        alternatives: visibleCinemas.map(({ id, name }) => ({ id, name, verified })),
+        missing: ["cinema"],
+        preferences,
+        locationStatus: locationIntent.kind,
+        requestedLocation: locationIntent.label,
+        failedCinemaCount,
+        reason: notice,
+      };
+    }
     const target = resolveCinema(preferences.cinemaId || preferences.cinemaName) || cinemaOverride || (rejectsCurrentCinema ? null : cinemaRef.current);
     const missing = discoveryMissingCriteria({
       ...preferences,
@@ -1534,11 +1678,15 @@ export default function App() {
     });
     if (!target) {
       let cinemas = filterDiscoveryResults({ cinemas: CINEMAS, preferences }).cinemas;
-      if ((preferences.movieId || preferences.movieTitle) && preferences.date) {
+      const shouldVerifyCinemaList = Boolean(preferences.date && (
+        preferences.movieId || preferences.movieTitle || preferences.preferredTime || preferences.timeBand
+        || preferences.genre || preferences.language || preferences.experience || preferences.audience
+      ));
+      if (shouldVerifyCinemaList) {
         const scanEpoch = beginAsyncRequest();
         showStage({ view: "loading", label: localeRef.current === "ar" ? "جارٍ التحقق من المواقع المتاحة…" : "Checking available cinemas…" });
         const scanRevision = stageRevisionRef.current;
-        const availability = await findAvailableCinemasForMovie(preferences);
+        const availability = await findAvailableCinemasForCriteria(preferences, cinemas);
         if (requestEpochRef.current !== scanEpoch || stageRevisionRef.current !== scanRevision) return { shown: false, stale: true, reason: "The discovery request changed while cinema availability was loading." };
         cinemas = availability.cinemas;
         if (availability.failedCinemaCount) {
@@ -1549,12 +1697,11 @@ export default function App() {
           return { shown: cinemas.length ? "partial filtered cinema picker" : false, cinemas, partial: true, failedCinemaCount: availability.failedCinemaCount, reason, preferences };
         }
         if (!cinemas.length) {
-          const title = preferences.movieTitle || "that movie";
           const question = localeRef.current === "ar"
-            ? `لا يتوفر ${title} في أي موقع من ڤوكس سينما الإمارات في ${preferences.date}. اختر فيلماً أو تاريخاً آخر.`
-            : `${title} is not available at any VOX Cinemas UAE location on ${preferences.date}. Choose another movie or date.`;
-          showStage({ view: "discovery", missing: ["movie_or_date"], question, preferences, errorCode: "movie_unavailable_for_date" });
-          return { shown: "movie unavailable clarification", cinemas: [], missing: ["movie_or_date"], preferences, reason: question };
+            ? `لا يوجد موقع من ڤوكس سينما الإمارات يطابق جميع تفضيلاتك في ${preferences.date}. غيّر تفضيلاً واحداً أو اختر تاريخاً آخر.`
+            : `No VOX Cinemas UAE location matches all of your preferences on ${preferences.date}. Change one preference or choose another date.`;
+          showStage({ view: "discovery", missing: ["preference_or_date"], question, preferences, errorCode: "criteria_unavailable_for_date" });
+          return { shown: "criteria unavailable clarification", cinemas: [], missing: ["preference_or_date"], preferences, availabilityStatus: "unavailable_all_checked_cinemas", reason: question };
         }
       }
       cinemaReturnRef.current = { view: "empty" };
@@ -1816,6 +1963,8 @@ export default function App() {
     directCancellation,
     directSeatSelection,
     directCinemaSelection,
+    directMovieSelection,
+    directShowtimeSelection,
     resumeTarget,
     languageControlTurn,
     localOfferTurn,
@@ -1829,6 +1978,8 @@ export default function App() {
       || directCancellation
       || directSeatSelection
       || directCinemaSelection
+      || directMovieSelection
+      || directShowtimeSelection
       || resumeTarget
       || languageControlTurn
       || localOfferTurn
@@ -2401,11 +2552,73 @@ export default function App() {
 
     const snapshot = entry.snapshot;
     const validation = {};
+    if (entry.view === "movies") {
+      const pausedCinema = snapshot.pausedContext?.cinema || cinemaRef.current;
+      const pausedDate = snapshot.pausedContext?.scheduleDate || scheduleDateRef.current;
+      const preferences = snapshot.pausedContext?.discoveryPreferences || snapshot.preferences || discoveryPreferencesRef.current;
+      try {
+        const [latestMovies, latestSessions] = await Promise.all([
+          vista.getScheduledFilms(pausedCinema?.id, pausedDate),
+          vista.getCinemaDateSessions(pausedCinema?.id, pausedDate),
+        ]);
+        const availability = filterCurrentSessions(latestSessions);
+        const refreshed = filterDiscoveryResults({
+          movies: latestMovies,
+          sessions: availability.available,
+          cinemas: CINEMAS,
+          preferences: {
+            ...preferences,
+            cinemaId: pausedCinema?.id || preferences?.cinemaId,
+            cinemaName: pausedCinema?.name || preferences?.cinemaName,
+            date: pausedDate || preferences?.date,
+          },
+          timeToleranceMinutes: 45,
+          nearestLimit: 4,
+        });
+        snapshot.movies = refreshed.movies.map((movie) => ({
+          ...movie,
+          relevantSessions: refreshed.sessions.filter((session) => String(session.movieId || session.scheduledFilmId) === String(movie.id)),
+        }));
+        snapshot.discovery = refreshed;
+        snapshot.expiredSessionCount = availability.expired.length;
+        snapshot.error = snapshot.movies.length
+          ? null
+          : (localeRef.current === "ar" ? "لم تعد هناك أفلام تطابق جميع تفضيلاتك في هذا الموقع والتاريخ." : "No current movies match all of your preferences at this cinema and date.");
+        snapshot.notice = refreshed.time.usedNearestFallback
+          ? (localeRef.current === "ar"
+            ? `لا يوجد عرض عند ${refreshed.time.requestedTime}. أقرب الأوقات المناسبة: ${refreshed.time.closestTimes.join("، ")}.`
+            : `No showtime is available at ${refreshed.time.requestedTime}. Showing the closest suitable times: ${refreshed.time.closestTimes.join(", ")}.`)
+          : null;
+        if (snapshot.pausedContext) {
+          snapshot.pausedContext.movies = snapshot.movies;
+          snapshot.pausedContext.sessions = refreshed.sessions;
+          snapshot.pausedContext.discoveryPreferences = preferences;
+        }
+      } catch {
+        return { restored: false, reason: "movie_revalidation_failed", target: "movies", source };
+      }
+    }
     if (["showtimes", "seatmap"].includes(entry.view)) {
       const sessionSource = entry.view === "showtimes" ? snapshot.sessions || [] : [snapshot.session].filter(Boolean);
-      validation.session = entry.view === "showtimes"
-        ? filterCurrentSessions(sessionSource).available.length > 0
-        : filterCurrentSessions(sessionSource.map((session) => ({ ...session, date: session.date || snapshot.pausedContext?.scheduleDate }))).available.length > 0;
+      const pausedCinemaId = snapshot.pausedContext?.cinema?.id || cinemaRef.current?.id;
+      const pausedMovieId = snapshot.movie?.id || snapshot.pausedContext?.movie?.id || discoveryPreferencesRef.current?.movieId;
+      const pausedDate = snapshot.pausedContext?.scheduleDate || snapshot.session?.date || scheduleDateRef.current;
+      try {
+        const latestSessions = await vista.getSessions(pausedCinemaId, pausedMovieId, pausedDate);
+        const availableLatest = filterCurrentSessions(latestSessions.map((session) => ({ ...session, date: session.date || pausedDate }))).available;
+        const capturedSessionIds = new Set(sessionSource.map((session) => String(session?.sessionId || session?.id || "")).filter(Boolean));
+        const currentSessions = availableLatest.filter((session) => capturedSessionIds.has(String(session?.sessionId || session?.id || "")));
+        validation.session = currentSessions.length > 0;
+        if (entry.view === "showtimes") {
+          snapshot.sessions = currentSessions;
+          if (snapshot.pausedContext) snapshot.pausedContext.sessions = currentSessions;
+        } else if (currentSessions[0]) {
+          snapshot.session = currentSessions[0];
+          if (snapshot.pausedContext) snapshot.pausedContext.session = currentSessions[0];
+        }
+      } catch {
+        validation.session = false;
+      }
       if (entry.view === "seatmap") {
         try {
           const plan = await vista.getSeatPlan(snapshot.pausedContext?.cinema?.id || cinemaRef.current?.id, snapshot.session?.sessionId);
@@ -2445,7 +2658,12 @@ export default function App() {
         snapshot.pausedContext.booking = refreshedBooking;
       }
     }
-    const restored = restorePausedRichStage(pausedJourneyRef.current, {
+    const revalidatedPausedModel = capturePausedRichStage(pausedJourneyRef.current, snapshot, {
+      sessionId: appConversationIdRef.current,
+      journeyId: bookingJourneyIdRef.current,
+      contextVersion: entry.contextVersion ?? stageRevisionRef.current,
+    });
+    const restored = restorePausedRichStage(revalidatedPausedModel, {
       view: entry.view,
       validation,
       sessionId: appConversationIdRef.current,
@@ -2660,11 +2878,26 @@ export default function App() {
       if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_movie_selection");
       if (checkoutGuard) return checkoutGuard;
+      const uiStageGuard = preserveDeterministicUiStageForTool("show_movie_selection");
+      if (uiStageGuard) return uiStageGuard;
       dismissPendingCancellation("new_journey");
       const requested = resolveCinema(cinemaId) || resolveCinema(cinemaName);
       const target = requested || cinemaRef.current;
       if ((cinemaId || cinemaName) && !requested) {
-        return JSON.stringify({ shown: false, reason: `No matching VOX Cinemas UAE location was found for ${cinemaName || cinemaId}. Ask the guest to choose from the cinema picker.` });
+        const suppliedLocation = cinemaName || cinemaId;
+        const locationIntent = resolveLocationIntent(CINEMAS, suppliedLocation);
+        if (locationIntent) {
+          const routed = await routeDiscoveryTurn([suppliedLocation, toolDate || displayDate || date].filter(Boolean).join(" "));
+          return JSON.stringify(routed);
+        }
+        cinemaRef.current = null;
+        setCinema(null);
+        clearSeatSelection();
+        const reason = localeRef.current === "ar"
+          ? `لم يتم العثور على موقع ڤوكس سينما الإمارات باسم ${suppliedLocation}. اختر موقعاً من القائمة.`
+          : `No VOX Cinemas UAE location was found for ${suppliedLocation}. Choose a location from the cinema picker.`;
+        showStage({ view: "cinemas", cinemas: CINEMAS, notice: reason, preferences: discoveryPreferencesRef.current });
+        return JSON.stringify({ shown: "cinema picker", cinemas: CINEMAS.map(({ id, name }) => ({ id, name })), reason, retainedPreferences: discoveryPreferencesRef.current });
       }
       if (!target) {
         cinemaReturnRef.current = { view: "empty" };
@@ -2724,6 +2957,8 @@ export default function App() {
       if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_showtimes");
       if (checkoutGuard) return checkoutGuard;
+      const uiStageGuard = preserveDeterministicUiStageForTool("show_showtimes");
+      if (uiStageGuard) return uiStageGuard;
       dismissPendingCancellation("new_journey");
       if (!cinemaRef.current) {
         showStage({ view: "cinemas" });
@@ -2818,6 +3053,8 @@ export default function App() {
       if (cancellationGuard) return cancellationGuard;
       const checkoutGuard = preserveActiveCheckoutForTool("show_seat_map");
       if (checkoutGuard) return checkoutGuard;
+      const uiStageGuard = preserveDeterministicUiStageForTool("show_seat_map");
+      if (uiStageGuard) return uiStageGuard;
       dismissPendingCancellation("new_journey");
       if (!cinemaRef.current) {
         showStage({ view: "cinemas" });
@@ -3589,6 +3826,39 @@ export default function App() {
     },
   };
 
+  const routeVisibleMovieSelection = async (movie) => {
+    if (!movie) return null;
+    const rawResult = await clientTools.show_showtimes({ movieId: movie.id, movieTitle: movie.title });
+    let result = rawResult;
+    try {
+      result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+    } catch {}
+    if (stageRef.current.view === "showtimes" && norm(stageRef.current.movie?.title) === norm(movie.title)) {
+      deterministicUiStageGuardRef.current = { view: "showtimes", journeyId: bookingJourneyIdRef.current, advancedAt: Date.now() };
+    }
+    return { movie, result };
+  };
+
+  const routeVisibleShowtimeSelection = async (session) => {
+    if (!session) return null;
+    const current = stageRef.current;
+    const movie = current.movie;
+    const rawResult = await clientTools.show_seat_map({
+      movieTitle: movie?.title,
+      sessionId: session.sessionId,
+      showtime: session.time,
+      date: session.date || filmsDateRef.current || scheduleDateRef.current,
+    });
+    let result = rawResult;
+    try {
+      result = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
+    } catch {}
+    if (stageRef.current.view === "seatmap" && String(stageRef.current.session?.sessionId) === String(session.sessionId)) {
+      deterministicUiStageGuardRef.current = { view: "seatmap", journeyId: bookingJourneyIdRef.current, advancedAt: Date.now() };
+    }
+    return { movie, session, result };
+  };
+
   const showBookingForAuthorizedCancellation = (args, source) => {
     cancellationIntentAuthorizationRef.current = { source };
     try {
@@ -3851,6 +4121,8 @@ export default function App() {
     setPausedJourney(freshPausedJourney);
     cancellationPausedRef.current = false;
     renderTopicRef.current = "general_enquiry";
+    restoredStageToolGuardRef.current = null;
+    deterministicUiStageGuardRef.current = null;
     journeyRef.current = createConversationJourney(appConversationIdRef.current);
     dispatchJourney({ type: "reset", sessionId: appConversationIdRef.current });
     lastSentTextRef.current = null;
@@ -3922,7 +4194,10 @@ export default function App() {
       const safeMessage = sanitized.safeText;
       if (role === "user") {
         if (!hasMeaningfulTurnContent(safeMessage)) return;
+        const languageContinuityContext = conversationLanguageContinuityContext(safeMessage, localeRef.current);
+        if (languageContinuityContext) conversation.sendContextualUpdate?.(languageContinuityContext);
         beginMeaningfulCancellationUserTurn();
+        deterministicUiStageGuardRef.current = null;
         const requestedResumeTarget = pausedResumeTarget(safeMessage);
         if (!requestedResumeTarget) restoredStageToolGuardRef.current = null;
         const movieSelectionGrounding = buildMovieSelectionGroundingContext({ text: safeMessage, stage: stageVisibleRef.current ? stageRef.current : { view: "empty" } });
@@ -4004,6 +4279,12 @@ export default function App() {
           view: stageRef.current.view,
           cinemaMatch: resolveCinema(safeMessage),
         });
+        const directMovieSelection = decision === null && !activeCheckout
+          ? resolveVisibleMovieSelectionTurn({ text: safeMessage, stage: stageRef.current })
+          : null;
+        const directShowtimeSelection = decision === null && !activeCheckout && !directMovieSelection
+          ? resolveVisibleShowtimeSelectionTurn({ text: safeMessage, stage: stageRef.current })
+          : null;
         const actionIntent = classifyFaqActionIntent(safeMessage);
         const hasBookingContext = ["booking", "history"].includes(stageRef.current.view);
         const directCancellation = decision === null && (
@@ -4016,6 +4297,8 @@ export default function App() {
           && !historyRequest.requested
           && !directSeatSelection
           && !directCinemaSelection
+          && !directMovieSelection
+          && !directShowtimeSelection
           && !checkoutResumeTurn
           ? resolveLocalOfferTextTurn(safeMessage, { locale: localeRef.current })
           : null;
@@ -4042,12 +4325,12 @@ export default function App() {
         const checkoutFaq = activeCheckout && !localOfferTurn && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection
           ? prepareFaqContext(safeMessage)
           : { matches: [], context: "" };
-        const discoveryFilterTurn = checkoutFaq.matches.length ? false : isDiscoveryFilterTurn(safeMessage);
+        const discoveryFilterTurn = checkoutFaq.matches.length || directMovieSelection || directShowtimeSelection ? false : isDiscoveryFilterTurn(safeMessage);
         const faq = localOfferTurn
           ? { matches: [], context: "" }
           : checkoutFaq.matches.length
           ? checkoutFaq
-          : directCinemaSelection || directCancellation || directSeatSelection || discoveryFilterTurn
+          : directCinemaSelection || directMovieSelection || directShowtimeSelection || directCancellation || directSeatSelection || discoveryFilterTurn
             ? { matches: [], context: "" }
             : prepareFaqContext(safeMessage);
         const explicitDiscoveryTurn = !faq.matches.length && (actionIntent === "booking" || directCinemaSelection || isDiscoveryRequest(safeMessage));
@@ -4060,6 +4343,8 @@ export default function App() {
           directCancellation,
           directSeatSelection,
           directCinemaSelection,
+          directMovieSelection,
+          directShowtimeSelection,
           resumeTarget: requestedResumeTarget,
           languageControlTurn: isLanguageControlTurn(safeMessage),
           localOfferTurn,
@@ -4077,7 +4362,7 @@ export default function App() {
           || isDiscoveryRequest(safeMessage)
           || isCinemaSelectionTurn({ view: stageRef.current.view, intent: journeyRef.current.intent, actionIntent, cinemaMatch: details.cinema })
         );
-        const discoveryUpdate = bookingContext && !isLanguageControlTurn(safeMessage)
+        const discoveryUpdate = bookingContext && !directMovieSelection && !directShowtimeSelection && !isLanguageControlTurn(safeMessage)
           ? applyDiscoveryPreferencesFromText(safeMessage, details.cinema ? { cinemaId: details.cinema.id, cinemaName: details.cinema.name } : {})
           : null;
         const quantityOnlyTurn = Boolean(details.requestedSeatTarget && !discoveryUpdate?.update?.hasDiscoverySignal);
@@ -4092,7 +4377,7 @@ export default function App() {
           showUnavailableProgrammingDate(unavailableDate);
           conversation.sendContextualUpdate?.(`The guest requested ${unavailableDate}, but it is not published for the selected cinema. Do not substitute another date. Available dates: ${availableDates.join(", ")}.`);
         }
-        if (bookingContext && !resumeOnlyTurn && !quantityOnlyTurn && !isLanguageControlTurn(safeMessage) && !unavailableDate && !directSeatSelection && !directCancellation && !historyRequest.requested) {
+        if (bookingContext && !directMovieSelection && !directShowtimeSelection && !resumeOnlyTurn && !quantityOnlyTurn && !isLanguageControlTurn(safeMessage) && !unavailableDate && !directSeatSelection && !directCancellation && !historyRequest.requested) {
           const normalizedCinemaTurn = details.cinema ? normalizeCinemaAsrForAgent(safeMessage, details.cinema) : safeMessage;
           conversation.sendContextualUpdate?.("The widget is applying the guest's retained cinema, date, time, genre, language, experience, movie, and audience criteria now. No movie selection is confirmed by this filter turn. Do not call a discovery or showtime tool concurrently, do not say 'great choice', and do not describe on-screen options until the widget supplies the authoritative outcome.");
           void routeDiscoveryTurn(safeMessage, {
@@ -4106,6 +4391,24 @@ export default function App() {
             conversation.sendContextualUpdate?.(`The widget applied all supplied discovery criteria. Visible result: ${result?.shown || "none"}; movie count: ${count}; missing: ${(result?.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${retained.preferredTime || retained.timeBand || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; movie: ${retained.movieTitle || "not supplied"}. ${buildAuthoritativeDiscoveryContext(result)} Ask only the first missing item and do not list unfiltered movies.${normalizedCinemaTurn !== safeMessage ? ` Authoritative speech-recognition correction: “${safeMessage}” means “${normalizedCinemaTurn}”.` : ""}${result?.time?.usedNearestFallback ? ` No exact ${result.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}`);
           }).catch((error) => {
             conversation.sendContextualUpdate?.(`Filtered discovery could not be completed: ${error?.message || "unknown error"}. Do not claim that movie results are displayed.`);
+          });
+        }
+        if (directMovieSelection) {
+          conversation.sendContextualUpdate?.(`The guest explicitly selected ${directMovieSelection.title} from the visible movie cards. The widget is loading that movie's verified showtimes now. Do not restart discovery or substitute another movie.`);
+          void routeVisibleMovieSelection(directMovieSelection).then((selection) => {
+            const showtimes = Array.isArray(selection?.result?.showtimes) ? selection.result.showtimes : [];
+            conversation.sendContextualUpdate?.(`The widget completed the explicit movie selection for ${directMovieSelection.title}. ${showtimes.length ? `${showtimes.length} verified showtime option(s) are displayed.` : `No bookable showtime is displayed${selection?.result?.reason ? `: ${selection.result.reason}` : "."}`} Do not call show_showtimes again for this turn. Describe only the displayed result and ask for a showtime only when one is visible.`);
+          }).catch((error) => {
+            conversation.sendContextualUpdate?.(`The showtime view for ${directMovieSelection.title} could not be loaded: ${error?.message || "unknown error"}. Do not claim that showtimes are displayed.`);
+          });
+        }
+        if (directShowtimeSelection) {
+          conversation.sendContextualUpdate?.(`Session ${directShowtimeSelection.sessionId} at ${directShowtimeSelection.time} was chosen. Load its seats locally. Do not restart or call show_seat_map.`);
+          void routeVisibleShowtimeSelection(directShowtimeSelection).then((selection) => {
+            const shown = selection?.result?.shown;
+            conversation.sendContextualUpdate?.(`${directShowtimeSelection.time}: ${shown === "seat map" ? "Verified seat map displayed." : `No seat map${selection?.result?.reason ? `: ${selection.result.reason}` : "."}`} Do not call show_seat_map. Ask for seats only if visible.`);
+          }).catch((error) => {
+            conversation.sendContextualUpdate?.(`Seat map failed for ${directShowtimeSelection.time}: ${error?.message || "unknown error"}. Do not claim visible seats.`);
           });
         }
         if (checkoutResumeTurn) conversation.sendContextualUpdate?.("The existing unpaid checkout was requested. Continue only from the widget result and do not restart movie, showtime, or seat selection.");
@@ -4145,6 +4448,7 @@ export default function App() {
       if (languageSignal.nextLocale && languageSignal.nextLocale !== localeRef.current) {
         localeRef.current = languageSignal.nextLocale;
         setLocale(languageSignal.nextLocale);
+        if (role === "user") void languageTransportRestartRef.current?.(languageSignal.nextLocale);
       }
       if (role === "agent" && isAgentWelcome(safeMessage)) {
         const pendingTyped = pendingTypedMessagesRef.current.at(-1) || lastSentTextRef.current;
@@ -4441,14 +4745,27 @@ export default function App() {
         const activeLocale = localeRef.current;
         const continuation = continuationSessionRef.current;
         const previousTransportId = transportConversationIdRef.current;
-        const handoffJourney = { ...journeyRef.current, locale: activeLocale, transportConversationId: previousTransportId };
+        const activeJourneyStage = stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null };
+        const journeyScheduleDate = authoritativeJourneyDate({
+          stage: activeJourneyStage,
+          discoveryPreferences: discoveryPreferencesRef.current,
+          pendingOrder: pendingOrderRef.current,
+          booking: bookingRef.current,
+        });
+        const handoffJourney = syncJourney({ ...journeyRef.current, locale: activeLocale, transportConversationId: previousTransportId }, {
+          locale: activeLocale,
+          cinema: cinemaRef.current,
+          scheduleDate: journeyScheduleDate,
+          stage: activeJourneyStage,
+          selectedSeats: seatsRef.current,
+          pendingOrder: pendingOrderRef.current,
+          booking: bookingRef.current,
+        });
         const startedConversationId = await startTransportWithGuards({
           agentId: import.meta.env.VITE_AGENT_ID,
           connectionType: "websocket",
           textOnly: true,
-          overrides: {
-            conversation: { textOnly: true },
-          },
+          overrides: conversationSessionOverrides(activeLocale, { textOnly: true }),
           dynamicVariables: {
             ...journeyDynamicVariables(handoffJourney, { continuation }),
             voxi_session_opening: continuation
@@ -4463,8 +4780,8 @@ export default function App() {
         const journeyPayload = {
           locale: activeLocale,
           cinema: cinemaRef.current,
-          scheduleDate: scheduleDateRef.current,
-          stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
+          scheduleDate: journeyScheduleDate,
+          stage: activeJourneyStage,
           selectedSeats: seatsRef.current,
           ticketQuantity: pendingOrderRef.current?.seats?.length || seatsRef.current.length || null,
           pendingOrder: pendingOrderRef.current,
@@ -4524,7 +4841,8 @@ export default function App() {
       try {
         // Permission is checked before ending text chat so a denial never
         // removes the guest's working, microphone-free conversation.
-        const permissionRequest = navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaDevices = requireMicrophoneCapture(navigator.mediaDevices);
+        const permissionRequest = mediaDevices.getUserMedia({ audio: true });
         let permissionTimer;
         let permissionStream;
         try {
@@ -4554,12 +4872,28 @@ export default function App() {
         const activeLocale = localeRef.current;
         const continuation = continuationSessionRef.current;
         const previousTransportId = transportConversationIdRef.current;
-        const handoffJourney = { ...journeyRef.current, locale: activeLocale, transportConversationId: previousTransportId };
+        const activeJourneyStage = stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null };
+        const journeyScheduleDate = authoritativeJourneyDate({
+          stage: activeJourneyStage,
+          discoveryPreferences: discoveryPreferencesRef.current,
+          pendingOrder: pendingOrderRef.current,
+          booking: bookingRef.current,
+        });
+        const handoffJourney = syncJourney({ ...journeyRef.current, locale: activeLocale, transportConversationId: previousTransportId }, {
+          locale: activeLocale,
+          cinema: cinemaRef.current,
+          scheduleDate: journeyScheduleDate,
+          stage: activeJourneyStage,
+          selectedSeats: seatsRef.current,
+          pendingOrder: pendingOrderRef.current,
+          booking: bookingRef.current,
+        });
         const startedConversationId = await startTransportWithGuards({
           agentId: import.meta.env.VITE_AGENT_ID,
           connectionType: "webrtc",
           textOnly: false,
           workletPaths: ELEVENLABS_WORKLET_PATHS,
+          overrides: conversationSessionOverrides(activeLocale),
           dynamicVariables: {
             ...journeyDynamicVariables(handoffJourney, { continuation }),
             voxi_session_opening: continuation
@@ -4574,8 +4908,8 @@ export default function App() {
         const journeyPayload = {
           locale: activeLocale,
           cinema: cinemaRef.current,
-          scheduleDate: scheduleDateRef.current,
-          stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
+          scheduleDate: journeyScheduleDate,
+          stage: activeJourneyStage,
           selectedSeats: seatsRef.current,
           ticketQuantity: pendingOrderRef.current?.seats?.length || seatsRef.current.length || null,
           pendingOrder: pendingOrderRef.current,
@@ -4597,6 +4931,7 @@ export default function App() {
           journey: journeyRef.current,
           messages: messagesRef.current,
         })}${continuation ? `\n\n${buildTransportHandoff(handoffJourney, messagesRef.current)}` : ""}\n\n${serializeFaqContext(VOX_FAQ_ENTRIES, { locale: activeLocale, maxChars: 14_000 })}`);
+        return true;
       } catch (error) {
         console.error("Voice conversation could not start", error);
         switchingSessionRef.current = false;
@@ -4621,6 +4956,49 @@ export default function App() {
       if (sessionStartRef.current === entry) sessionStartRef.current = null;
     }
   }, [conversation, say, startTransportWithGuards, t]);
+
+  const restartActiveTransportForLanguage = useCallback(async (nextLocale) => {
+    const activeStart = sessionStartRef.current;
+    if (activeStart) await activeStart.promise;
+    const activeMode = sessionModeRef.current;
+    if (!activeMode) return false;
+
+    switchingSessionRef.current = true;
+    setStartingMode(activeMode);
+    try {
+      await conversation.endSession();
+    } catch (error) {
+      console.warn("Conversation transport could not close for a language change", error);
+    }
+    requestedSessionModeRef.current = null;
+    sessionModeRef.current = null;
+    setSessionMode(null);
+
+    const restarted = activeMode === "voice"
+      ? await startVoiceSession()
+      : await startTextSession();
+    if (!restarted) {
+      switchingSessionRef.current = false;
+      setStartingMode(null);
+      return false;
+    }
+
+    const next = nextLocale === "ar" ? "Arabic" : "English";
+    conversation.sendContextualUpdate?.(`The guest explicitly selected ${next}. The transport restarted as a continuation with ${next} speech recognition and voice. Preserve the active task and do not repeat the welcome message. ${buildVoxiContext({
+      locale: nextLocale,
+      cinema: cinemaRef.current,
+      scheduleDate: scheduleDateRef.current,
+      stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
+      selectedSeats: seatsRef.current,
+      requestedSeatTarget: requestedSeatTargetRef.current,
+      discoveryPreferences: discoveryPreferencesRef.current,
+      offer: lastOfferRef.current,
+      journey: { ...journeyRef.current, locale: nextLocale },
+      messages: messagesRef.current,
+    })}`);
+    return true;
+  }, [conversation, startTextSession, startVoiceSession]);
+  languageTransportRestartRef.current = restartActiveTransportForLanguage;
 
   const endVoiceSession = useCallback(async () => {
     switchingSessionRef.current = true;
@@ -4652,8 +5030,13 @@ export default function App() {
       return;
     }
     beginMeaningfulCancellationUserTurn();
+    deterministicUiStageGuardRef.current = null;
+    if (!sessionModeRef.current) setTransportEnabled(true);
     const requestedResumeTarget = pausedResumeTarget(value);
     if (!requestedResumeTarget) restoredStageToolGuardRef.current = null;
+    const languageContinuityContext = conversationLanguageContinuityContext(value, localeRef.current);
+    const retryLanguageContinuityAfterStart = Boolean(languageContinuityContext && !isConnected);
+    if (languageContinuityContext) conversation.sendContextualUpdate?.(languageContinuityContext);
     const movieSelectionGrounding = buildMovieSelectionGroundingContext({ text: value, stage: stageVisibleRef.current ? stageRef.current : { view: "empty" } });
     const retryMovieSelectionGroundingAfterStart = Boolean(movieSelectionGrounding && !isConnected);
     if (movieSelectionGrounding) conversation.sendContextualUpdate?.(movieSelectionGrounding);
@@ -4668,11 +5051,14 @@ export default function App() {
     });
     const languageControlTurn = Boolean(languageSignal.nextLocale || explicitLanguageRequest(value));
     pendingLanguageSwitchRef.current = languageSignal.pendingLocale;
+    let languageRestartPromise = null;
     if (languageSignal.nextLocale && languageSignal.nextLocale !== localeRef.current) {
       localeRef.current = languageSignal.nextLocale;
       setLocale(languageSignal.nextLocale);
+      languageRestartPromise = restartActiveTransportForLanguage(languageSignal.nextLocale);
     }
     const localMessage = say("user", value);
+    if (languageRestartPromise) await languageRestartPromise;
     if (checkoutPaymentActiveRef.current) {
       setInput("");
       queuePendingEcho(value);
@@ -4773,6 +5159,12 @@ export default function App() {
       view: stageRef.current.view,
       cinemaMatch: resolveCinema(value),
     });
+    const directMovieSelection = decision === null && !activeCheckout
+      ? resolveVisibleMovieSelectionTurn({ text: value, stage: stageRef.current })
+      : null;
+    const directShowtimeSelection = decision === null && !activeCheckout && !directMovieSelection
+      ? resolveVisibleShowtimeSelectionTurn({ text: value, stage: stageRef.current })
+      : null;
     const actionIntent = classifyFaqActionIntent(value);
     const hasBookingContext = ["booking", "history"].includes(stageRef.current.view);
     const directCancellation = decision === null && (
@@ -4785,6 +5177,8 @@ export default function App() {
       && !historyRequest.requested
       && !directSeatSelection
       && !directCinemaSelection
+      && !directMovieSelection
+      && !directShowtimeSelection
       && !checkoutResumeTurn
       && !languageControlTurn
       ? resolveLocalOfferTextTurn(value, { locale: localeRef.current })
@@ -4814,10 +5208,10 @@ export default function App() {
     const checkoutFaq = activeCheckout && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection
       ? prepareFaqContext(value)
       : { matches: [], context: "" };
-    const discoveryFilterTurn = checkoutFaq.matches.length ? false : isDiscoveryFilterTurn(value);
+    const discoveryFilterTurn = checkoutFaq.matches.length || directMovieSelection || directShowtimeSelection ? false : isDiscoveryFilterTurn(value);
     const faq = checkoutFaq.matches.length
       ? checkoutFaq
-      : directCinemaSelection || directCancellation || directSeatSelection || discoveryFilterTurn
+      : directCinemaSelection || directMovieSelection || directShowtimeSelection || directCancellation || directSeatSelection || discoveryFilterTurn
         ? { matches: [], context: "" }
         : prepareFaqContext(value);
     const explicitDiscoveryTurn = !faq.matches.length && (actionIntent === "booking" || directCinemaSelection || isDiscoveryRequest(value));
@@ -4830,6 +5224,8 @@ export default function App() {
       directCancellation,
       directSeatSelection,
       directCinemaSelection,
+      directMovieSelection,
+      directShowtimeSelection,
       resumeTarget: requestedResumeTarget,
       languageControlTurn,
       localOfferTurn,
@@ -4847,7 +5243,7 @@ export default function App() {
       || isDiscoveryRequest(value)
       || isCinemaSelectionTurn({ view: stageRef.current.view, intent: journeyRef.current.intent, actionIntent, cinemaMatch: details.cinema })
     );
-    const discoveryUpdate = bookingContext && !languageControlTurn
+    const discoveryUpdate = bookingContext && !directMovieSelection && !directShowtimeSelection && !languageControlTurn
       ? applyDiscoveryPreferencesFromText(value, details.cinema ? { cinemaId: details.cinema.id, cinemaName: details.cinema.name } : {})
       : null;
     const quantityOnlyTurn = Boolean(details.requestedSeatTarget && !discoveryUpdate?.update?.hasDiscoverySignal);
@@ -4868,7 +5264,7 @@ export default function App() {
       ? routeCancellationTurn(value, { continuation: cancellationContinuation })
       : null;
     const seatRoutePromise = directSeatSelection ? routeSeatSelectionTurn(value, seatTurn) : null;
-    if (bookingContext && !resumeOnlyTurn && !unavailableDate && !quantityOnlyTurn && !languageControlTurn && !directSeatSelection && !directCancellation && !historyRequest.requested) {
+    if (bookingContext && !resumeOnlyTurn && !unavailableDate && !directMovieSelection && !directShowtimeSelection && !quantityOnlyTurn && !languageControlTurn && !directSeatSelection && !directCancellation && !historyRequest.requested) {
       discoveryRouteResult = await routeDiscoveryTurn(value, {
         cinemaOverride: details.cinema,
         dateOverride: requestedDate,
@@ -4876,11 +5272,28 @@ export default function App() {
       });
       if (discoveryRouteResult?.stale) discoveryRouteResult = null;
     }
+    let directMovieRouteResult = null;
+    if (directMovieSelection) {
+      try {
+        directMovieRouteResult = await routeVisibleMovieSelection(directMovieSelection);
+      } catch (error) {
+        directMovieRouteResult = { movie: directMovieSelection, result: { showtimes: [], reason: error?.message || "Showtimes could not be loaded." } };
+      }
+    }
+    let directShowtimeRouteResult = null;
+    if (directShowtimeSelection) {
+      try {
+        directShowtimeRouteResult = await routeVisibleShowtimeSelection(directShowtimeSelection);
+      } catch (error) {
+        directShowtimeRouteResult = { session: directShowtimeSelection, result: { shown: false, reason: error?.message || "The seat map could not be loaded." } };
+      }
+    }
     queuePendingEcho(agentFacingValue);
     const transition = sessionStartRef.current;
     if (transition) await transition.promise;
     const ready = sessionModeRef.current ? true : await startTextSession(localMessage.id);
     if (ready && conversation.sendUserMessage) {
+      if (retryLanguageContinuityAfterStart) conversation.sendContextualUpdate?.(languageContinuityContext);
       if (retryMovieSelectionGroundingAfterStart) conversation.sendContextualUpdate?.(movieSelectionGrounding);
       if (requestedDate) conversation.sendContextualUpdate?.(`The guest explicitly selected programming date ${requestedDate}; the widget retained it with all other criteria. Do not ask for the date again or fall back to another date.`);
       if (unavailableDate) conversation.sendContextualUpdate?.(`The guest requested ${unavailableDate}, but it is not published for the selected cinema. Do not substitute another date. Available dates: ${availableDates.join(", ")}.`);
@@ -4888,6 +5301,14 @@ export default function App() {
         const retained = discoveryPreferencesRef.current;
         const movieCount = Array.isArray(discoveryRouteResult.movies) ? discoveryRouteResult.movies.length : 0;
         conversation.sendContextualUpdate?.(`The widget applied every supplied discovery criterion. Visible result: ${discoveryRouteResult.shown || "none"}; movie count: ${movieCount}; missing: ${(discoveryRouteResult.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${retained.preferredTime || retained.timeBand || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; movie: ${retained.movieTitle || "not supplied"}. ${buildAuthoritativeDiscoveryContext(discoveryRouteResult)} Ask only the first missing item and do not list unfiltered movies.${discoveryRouteResult.time?.usedNearestFallback ? ` No exact ${discoveryRouteResult.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}`);
+      }
+      if (directMovieRouteResult) {
+        const showtimes = Array.isArray(directMovieRouteResult.result?.showtimes) ? directMovieRouteResult.result.showtimes : [];
+        conversation.sendContextualUpdate?.(`The guest explicitly selected ${directMovieSelection.title} from the visible movie cards. The widget has already completed that selection. ${showtimes.length ? `${showtimes.length} verified showtime option(s) are displayed.` : `No bookable showtime is displayed${directMovieRouteResult.result?.reason ? `: ${directMovieRouteResult.result.reason}` : "."}`} Do not call show_showtimes again for this turn. Describe only the current widget result and ask for a showtime only when one is visible.`);
+      }
+      if (directShowtimeRouteResult) {
+        const shown = directShowtimeRouteResult.result?.shown;
+        conversation.sendContextualUpdate?.(`Session ${directShowtimeSelection.sessionId} at ${directShowtimeSelection.time}: ${shown === "seat map" ? "verified seat map displayed." : `no seat map${directShowtimeRouteResult.result?.reason ? `: ${directShowtimeRouteResult.result.reason}` : "."}`} Do not call show_seat_map. Ask for seats only if visible.`);
       }
       if (details.requestedSeatTarget) conversation.sendContextualUpdate?.(`The guest would like ${details.requestedSeatTarget} tickets. Treat this only as a target and guide them to select ${details.requestedSeatTarget} seats. The number of selected seats is the actual ticket count and controls pricing.`);
       if (checkoutResumeTurn) conversation.sendContextualUpdate?.("The existing unpaid checkout was requested. Continue only from the widget result and do not restart movie, showtime, or seat selection.");
@@ -4917,7 +5338,7 @@ export default function App() {
       pendingTypedMessagesRef.current = pendingTypedMessagesRef.current.filter((item) => item.text !== agentFacingValue);
       lastSentTextRef.current = pendingTypedMessagesRef.current.at(-1) || null;
     }
-  }, [conversation, input, isConnected, prepareFaqContext, say, setLocale, startTextSession, updateIntentFromText]);
+  }, [conversation, input, isConnected, prepareFaqContext, restartActiveTransportForLanguage, say, setLocale, startTextSession, updateIntentFromText]);
 
   const sendUiTurn = (text, { display = true, context = "" } = {}) => {
     if (display) say("user", text);
@@ -4978,6 +5399,7 @@ export default function App() {
       ? (localeRef.current === "ar" ? `لا يوجد عرض عند ${filteredTime.requestedTime}. هذه أقرب الأوقات المناسبة.` : `No exact ${filteredTime.requestedTime} showtime is available. These are the closest suitable times.`)
       : null;
     showStage({ view: "showtimes", movie, sessions, notice, expiredSessionCount: availability.expired.length });
+    deterministicUiStageGuardRef.current = { view: "showtimes", journeyId: bookingJourneyIdRef.current, advancedAt: Date.now() };
     sendUiTurn(movie.title, { context: `The guest selected ${movie.title} through the UI and its showtimes are already displayed. Do not call show_showtimes again. Acknowledge briefly and ask them to choose a showtime.` });
   };
 
@@ -5011,6 +5433,7 @@ export default function App() {
     planRef.current = plan;
     planContextRef.current = { cinemaId, sessionId: session.sessionId };
     showStage({ view: "seatmap", movie, session, plan, planMeta });
+    deterministicUiStageGuardRef.current = { view: "seatmap", journeyId: bookingJourneyIdRef.current, advancedAt: Date.now() };
     sendUiTurn(`${session.time} ${session.exp}`, { context: `The guest selected session ${session.sessionId}: ${session.time} ${session.exp} on ${session.date}, and the seat map is already displayed. Inventory verified: ${planMeta?.verified === true ? "yes" : "no"}. ${planMeta?.warning || ""} Do not call show_seat_map again. Acknowledge briefly, disclose any data warning, and ask them to select seats. ${requestedSeatTargetRef.current ? `Their conversational target is ${requestedSeatTargetRef.current} seats, but selected seats alone determine ticket count and price.` : "Do not ask for a separate ticket quantity."}` });
   };
 
@@ -5803,26 +6226,12 @@ export default function App() {
     return result;
   };
 
-  const changeLanguage = (nextLocale) => {
+  const changeLanguage = async (nextLocale) => {
     if (nextLocale === locale) return;
     pendingLanguageSwitchRef.current = null;
     localeRef.current = nextLocale;
     setLocale(nextLocale);
-    const next = nextLocale === "ar" ? "Arabic" : "English";
-    if (isConnected && conversation.sendContextualUpdate) {
-      conversation.sendContextualUpdate(`The guest explicitly selected ${next}. This visible selector action is confirmed. Preserve the active task and continue in ${next} without repeating the welcome message. ${buildVoxiContext({
-        locale: nextLocale,
-        cinema: cinemaRef.current,
-        scheduleDate: scheduleDateRef.current,
-        stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
-        selectedSeats: seatsRef.current,
-        requestedSeatTarget: requestedSeatTargetRef.current,
-        discoveryPreferences: discoveryPreferencesRef.current,
-        offer: lastOfferRef.current,
-        journey: { ...journeyRef.current, locale: nextLocale },
-        messages: messagesRef.current,
-      })} ${serializeFaqContext(VOX_FAQ_ENTRIES, { locale: nextLocale, maxChars: 14_000 })}`);
-    }
+    await restartActiveTransportForLanguage(nextLocale);
   };
 
   const scrollRef = useRef(null);

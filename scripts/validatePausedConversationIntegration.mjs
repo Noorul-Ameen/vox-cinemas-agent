@@ -26,6 +26,8 @@ assert.doesNotMatch(pause, /clearSeatSelection|clearPendingOrder|bookingRef\.cur
 const restore = between("const restorePausedJourney", "const pausedRestoreContext");
 assert.match(restore, /\["checkout", "seatmap", "showtimes", "movies"\]/, "continue my booking must prefer the furthest valid booking step");
 assert.match(restore, /revalidatePausedCheckout/, "checkout restoration must revalidate current data");
+assert.match(restore, /entry\.view === "movies"[\s\S]*vista\.getScheduledFilms[\s\S]*vista\.getCinemaDateSessions/, "movie-card restoration must refresh the current catalog and embedded showtimes");
+assert.match(restore, /\["showtimes", "seatmap"\][\s\S]*vista\.getSessions[\s\S]*capturedSessionIds/, "showtime and seat-map restoration must intersect the paused session with the current catalog");
 assert.match(restore, /vista\.getSeatPlan/, "seat restoration must revalidate seat availability");
 assert.match(restore, /readBookings\(\)/, "history and cancellation restoration must revalidate stored bookings");
 assert.match(restore, /entry\.view === "cancellation"[\s\S]*readBookings\(\{ strict: true \}\)[\s\S]*planPausedCancellationRestoration/, "cancellation restoration must strictly re-read the booking and plan against the live flow");

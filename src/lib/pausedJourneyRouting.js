@@ -10,7 +10,7 @@ export function pausedResumeTarget(value) {
   if (/\b(?:show|open|return|go|back)\s+(?:me\s+)?(?:back\s+)?(?:to\s+)?(?:the\s+)?showtimes?\s*(?:again|please)?|(?:اعرض|أعرض|اظهر|أظهر|ارجع|أرجع|عد)\s+(?:إلى|الى|ل)?\s*(?:مواعيد العرض|العروض)/iu.test(text)) return "showtimes";
   if (/\b(?:continue|resume|return to)\s+(?:my|the|this)?\s*cancell?ation|(?:متابعة|استكمال|اكمال|إكمال)\s+(?:طلب\s+)?(?:الإلغاء|الالغاء)/iu.test(text)) return "cancellation";
   if (/\b(?:show|open|return to)\s+(?:my|the)?\s*(?:booking history|bookings?)\s*(?:again|please)?|(?:اعرض|أعرض|افتح|أظهر)\s+(?:سجل\s+)?حجوزي\s*(?:مرة أخرى)?/iu.test(text)) return "history";
-  if (/\bcontinue\s+where\s+i\s+(?:stopped|left off)|(?:تابع|أكمل)\s+من\s+حيث\s+توقفت/iu.test(text)) return "last";
+  if (/\b(?:continue|resume|go back|take me back|return)\s+(?:to\s+)?where\s+i\s+(?:was|stopped|left off)|\b(?:go|take me|return)\s+back\s+to\s+(?:my\s+)?(?:previous|last)\s+(?:step|screen)|(?:تابع|أكمل|ارجع|أرجع|عد)\s+(?:إلى|الى)?\s*(?:من\s+)?حيث\s+توقفت/iu.test(text)) return "last";
   if (/\b(?:continue|resume)\s+(?:my|the|this)?\s*(?:booking|journey)|(?:متابعة|استكمال|اكمال|إكمال)\s+(?:حجزي|الحجز)/iu.test(text)) return "journey";
   if (isResumeOnlyTurn(text)) return "last";
   return null;

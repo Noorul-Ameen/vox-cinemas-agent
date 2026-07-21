@@ -40,7 +40,7 @@ const compactMovie = (movie) => movie ? {
 } : null;
 const compactCinema = (cinema) => cinema ? { id: cinema.id || null, name: cinema.name || null } : null;
 const compactSession = (session, fallbackDate) => session ? {
-  id: session.sessionId || null,
+  id: session.sessionId || session.id || null,
   date: session.date || fallbackDate || null,
   time: session.time || session.showtime || null,
   experience: session.exp || session.experience || null,
@@ -85,23 +85,29 @@ export function inferIntent({ view, text = "", previousIntent = null } = {}) {
   return previousIntent;
 }
 
-export function syncJourney(current, {
-  locale,
-  cinema,
-  scheduleDate,
-  stage,
-  selectedSeats,
-  ticketQuantity,
-  pendingOrder,
-  booking,
-  intent,
-  transportConversationId,
-  previousTransportConversationId,
-} = {}) {
+export function syncJourney(current, payload = {}) {
+  const {
+    locale,
+    cinema,
+    scheduleDate,
+    stage,
+    selectedSeats,
+    ticketQuantity,
+    pendingOrder,
+    booking,
+    intent,
+    transportConversationId,
+    previousTransportConversationId,
+  } = payload;
+  const hasCinemaInput = Object.prototype.hasOwnProperty.call(payload, "cinema");
+  const hasScheduleDateInput = Object.prototype.hasOwnProperty.call(payload, "scheduleDate");
+  const hasSelectedSeatsInput = Object.prototype.hasOwnProperty.call(payload, "selectedSeats");
+  const hasIntentInput = Object.prototype.hasOwnProperty.call(payload, "intent");
   const view = stage?.view || "empty";
   const activeOrder = stage?.order || pendingOrder || null;
   const activeBooking = stage?.booking || (view === "booking" ? booking : null) || null;
-  const clearsMovie = view === "movies";
+  const clearsUpstream = ["empty", "discovery", "cinemas"].includes(view) && stage?.paused !== true;
+  const clearsMovie = clearsUpstream || view === "movies";
   const clearsSession = clearsMovie || view === "showtimes";
   const movie = stage?.movie
     || (activeOrder ? { id: activeOrder.movieId, title: activeOrder.movieTitle, posterUrl: activeOrder.posterUrl } : null)
@@ -111,11 +117,15 @@ export function syncJourney(current, {
     || (activeOrder ? { sessionId: activeOrder.sessionId, date: activeOrder.date, time: activeOrder.showtime, experience: activeOrder.experience, screen: activeOrder.screen } : null)
     || (activeBooking ? { sessionId: activeBooking.sessionId, date: activeBooking.date, time: activeBooking.showtime, experience: activeBooking.experience, screen: activeBooking.screen } : null)
     || (clearsSession ? null : current.session);
-  const seats = cloneSeats(clearsSession && !activeOrder && !activeBooking
-    ? []
-    : view === "seatmap" && !activeOrder && !activeBooking
-      ? selectedSeats
-    : activeOrder?.seats?.length ? activeOrder.seats : activeBooking?.seats?.length ? activeBooking.seats : selectedSeats?.length ? selectedSeats : current.seats);
+  const seats = cloneSeats(activeOrder?.seats?.length
+    ? activeOrder.seats
+    : activeBooking?.seats?.length
+      ? activeBooking.seats
+      : clearsSession
+        ? []
+        : hasSelectedSeatsInput
+          ? selectedSeats
+          : current.seats);
   // Ticket quantity is an output of seat selection, never an independent
   // booking input. Legacy stored quantities are ignored when seats disagree.
   const quantity = cloneSeats(activeOrder?.seats?.length
@@ -129,6 +139,13 @@ export function syncJourney(current, {
   const activeCinema = cinema
     || (activeOrder?.cinemaId || activeOrder?.cinemaName ? { id: activeOrder.cinemaId, name: activeOrder.cinemaName } : null)
     || (activeBooking?.cinemaId || activeBooking?.cinemaName ? { id: activeBooking.cinemaId, name: activeBooking.cinemaName } : null);
+  const nextCinema = activeCinema
+    ? compactCinema(activeCinema)
+    : hasCinemaInput || clearsUpstream
+      ? null
+      : current.cinema;
+  const nextScheduleDate = session?.date
+    || (hasScheduleDateInput ? scheduleDate || null : clearsUpstream ? null : current.scheduleDate);
   const bookingStatus = activeBooking
     ? bookingSummaryStatus(activeBooking)
     : activeOrder
@@ -143,8 +160,8 @@ export function syncJourney(current, {
   return {
     ...current,
     locale: locale || current.locale,
-    cinema: compactCinema(activeCinema) || current.cinema,
-    scheduleDate: session?.date || scheduleDate || current.scheduleDate,
+    cinema: nextCinema,
+    scheduleDate: nextScheduleDate,
     movie: compactMovie(movie),
     session: compactSession(session, scheduleDate),
     ticketQuantity: quantity,
@@ -157,7 +174,7 @@ export function syncJourney(current, {
     refundRoute: activeBooking?.refundRoute || (bookingStatus?.startsWith("cancelled") ? current.refundRoute : null),
     refundStatus: activeBooking?.refundStatus || (bookingStatus?.startsWith("cancelled") ? current.refundStatus : null),
     refundReference: activeBooking?.refundReference || (bookingStatus?.startsWith("cancelled") ? current.refundReference : null),
-    intent: intent || inferIntent({ view, previousIntent: current.intent }),
+    intent: hasIntentInput ? intent : inferIntent({ view, previousIntent: current.intent }),
     transportConversationId: transportConversationId === undefined ? current.transportConversationId : transportConversationId,
     previousTransportConversationId: previousTransportConversationId === undefined ? current.previousTransportConversationId : previousTransportConversationId,
     lastActivityAt: new Date().toISOString(),

@@ -77,6 +77,23 @@ assert.equal(
   "the agent must ask the first locally missing criterion",
 );
 
+assert.equal(
+  guardAgentStateClaim("What movie would you like to watch?", {
+    stage: { view: "showtimes", movie: { title: "Ezma" }, sessions: [{ sessionId: "s1", time: "15:35" }] },
+    locale: "en",
+  }),
+  "Ezma is selected. Choose one of the displayed showtimes.",
+  "a delayed movie question must not contradict an already rendered showtime step",
+);
+assert.match(
+  guardAgentStateClaim("Which showtime would you like?", {
+    stage: { view: "seatmap", movie: { title: "Ezma" }, session: { sessionId: "s1", time: "15:35" } },
+    locale: "en",
+  }),
+  /seat map is open/i,
+  "a delayed showtime question must not replace an already rendered seat map",
+);
+
 const checkoutStage = { view: "checkout", order: { checkoutId: "checkout-1", seats: ["E1"], movieTitle: "The Odyssey" } };
 const pendingOrder = { checkoutId: "checkout-1", seats: ["E1"], movieTitle: "The Odyssey" };
 assert.match(
@@ -99,6 +116,14 @@ assert.match(
   /shown in checkout/i,
   "a stale seat-map claim must be aligned with the visible checkout",
 );
+const hiddenCheckoutGuidance = guardAgentStateClaim("Checkout is displayed. Complete your booking on the screen.", {
+  stage: { view: "offers" },
+  pendingOrder,
+  locale: "en",
+});
+assert.match(hiddenCheckoutGuidance, /preserved but is not currently shown/i, "an FAQ or offer panel must not be described as visible checkout");
+assert.match(hiddenCheckoutGuidance, /return to checkout/i, "a hidden checkout must provide the deterministic restore path");
+assert.doesNotMatch(hiddenCheckoutGuidance, /shown in checkout/i, "hidden-checkout guidance must not claim that checkout is on screen");
 
 const savedBooking = {
   view: "booking",

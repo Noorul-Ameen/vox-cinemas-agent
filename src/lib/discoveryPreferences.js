@@ -82,9 +82,12 @@ const GENRE_ALIASES = Object.freeze([
 ]);
 
 const LANGUAGE_ALIASES = Object.freeze([
+  ["Kannada", ["kannada", "kan", "كانادا"]],
   ["Malayalam", ["malayalam", "مالايالامية", "مالايالام"]],
   ["English", ["english", "إنجليزي", "انجليزي", "الإنجليزية", "الانجليزية"]],
   ["Arabic", ["arabic", "عربي", "عربية", "العربية"]],
+  ["Spanish", ["spanish", "espanol", "español", "إسباني", "اسباني"]],
+  ["Korean", ["korean", "كوري", "الكورية"]],
   ["Punjabi", ["punjabi", "بنجابي"]],
   ["Tagalog", ["tagalog", "filipino", "تاغالوغ"]],
   ["Turkish", ["turkish", "تركي"]],
@@ -869,8 +872,13 @@ export function filterDiscoveryResults({
 
   let noResultsReason = null;
   if (!filteredMovies.length && !filteredSessions.length) {
+    const suppliedContentCriteria = [criteria.experience, criteria.language, criteria.genre, criteria.audience, criteria.movieId || criteria.movieTitle].filter(Boolean);
     if (criteria.preferredTime && baseSessions.length) noResultsReason = "no_suitable_time";
+    else if (suppliedContentCriteria.length > 1) noResultsReason = "no_results_for_criteria";
     else if (criteria.experience) noResultsReason = "no_experience_match";
+    else if (criteria.language) noResultsReason = "no_language_match";
+    else if (criteria.genre) noResultsReason = "no_genre_match";
+    else if (criteria.audience) noResultsReason = "no_audience_match";
     else if (criteria.movieId || criteria.movieTitle) noResultsReason = "movie_unavailable_for_criteria";
     else noResultsReason = "no_results_for_criteria";
   }

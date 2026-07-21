@@ -176,7 +176,7 @@ for (const informationQuestion of [
 
 assert.doesNotMatch(app, /const routeRecognizedCinema/, "the obsolete direct-cinema router must not bypass the shared retained-criteria filter path");
 const discoveryRouter = sliceBetween(app, "const routeDiscoveryTurn", "const clearConversationState", "shared discovery router");
-const discoveryLoader = sliceBetween(app, "const loadDiscoveryForCinema", "const findAvailableCinemasForMovie", "filtered discovery loader");
+const discoveryLoader = sliceBetween(app, "const loadDiscoveryForCinema", "const findAvailableCinemasForCriteria", "filtered discovery loader");
 assert.match(discoveryRouter, /discoveryMissingCriteria\(/, "the shared discovery router must ask only for missing requirements");
 assert.match(discoveryRouter, /loadDiscoveryForCinema\(target,\s*preferences\.date,\s*preferences,\s*combinedRawTurn\)/, "the shared discovery router must apply retained cinema, date, and narrowing criteria together");
 assert.match(discoveryRouter, /requestEpochRef\.current\s*!==\s*scanEpoch/, "cross-cinema discovery must suppress obsolete async results");
@@ -193,7 +193,7 @@ assert.doesNotMatch(typedCancellationDecisionFlow, /sendUserMessage|queuePending
 assert.match(voiceMessageFlow, /normalizeElevenLabsMessageEvent\(message\)/, "SDK events must be normalized from the documented ElevenLabs onMessage contract");
 for (const [label, flow] of [["SDK voice", voiceMessageFlow], ["typed", typedMessageFlow]]) {
   assert.match(flow, /isDirectCinemaSelectionUtterance\(/, `${label} must identify a direct cinema reply before FAQ rendering`);
-  assert.match(flow, /directCinemaSelection\s*\|\|\s*directCancellation\s*\|\|\s*directSeatSelection\s*\|\|\s*discoveryFilterTurn\s*\?\s*\{\s*matches:\s*\[\],\s*context:\s*""\s*\}\s*:\s*prepareFaqContext/, `${label} must not let generic FAQ tags swallow direct cinema, seat, cancellation, or filter actions`);
+  assert.match(flow, /directCinemaSelection\s*\|\|\s*directMovieSelection\s*\|\|\s*directShowtimeSelection\s*\|\|\s*directCancellation\s*\|\|\s*directSeatSelection\s*\|\|\s*discoveryFilterTurn\s*\?\s*\{\s*matches:\s*\[\],\s*context:\s*""\s*\}\s*:\s*prepareFaqContext/, `${label} must not let generic FAQ tags swallow direct cinema, movie, showtime, seat, cancellation, or filter actions`);
   assert.match(flow, /dismissStaleTransactionalView\(/, `${label} turns must dismiss a stale booking/history panel when the turn is unrelated`);
   assert.ok(flow.indexOf("dismissStaleTransactionalView(") < flow.indexOf("prepareFaqContext("), `${label} turns must clear hidden transactional context before an FAQ panel replaces it`);
   assert.match(flow, /classifyBookingHistoryRequest\(/, `${label} must use the shared bilingual current/history classifier`);

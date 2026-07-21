@@ -4,8 +4,9 @@ const LOCATION_FILLER_WORDS = new Set([
   "سينما", "فوكس", "في", "من", "اريد", "أريد", "اختار", "اختر",
 ]);
 
-const BROAD_CITY_HINT = /\b(?:abu\s+dhabi|dubai|sharjah|ajman|fujairah)\b|(?:ابوظبي|أبوظبي|دبي|الشارقة|عجمان|الفجيرة)/i;
+const BROAD_CITY_HINT = /\b(?:ras\s+al[ -]khaimah|abu\s+dhabi|al[ -]ain|dubai|sharjah|ajman|fujairah)\b|(?:رأس الخيمة|راس الخيمة|ابوظبي|أبوظبي|العين|دبي|الشارقة|عجمان|الفجيرة)/i;
 const EXPLICIT_VENUE_HINT = /\b(?:mall|center|centre|festival|mercato|burjuman|kempinski|megaplex|cineplex|hyatt|towers?|galleria|maryah|reem|wafi|yas|mirdif|deira|shindagha|jimi|hamra|zahia|nation|palm|jumeirah)\b|(?:مول|سنتر|فستيفال|ميركاتو|برجمان|كمبينسكي|ميجابلكس|حياة|تاورز|غاليريا|مارية|الريم|وافي|ياس|مردف|ديرة|الشندغة|الجيمي|الحمرا|الزاهية|نيشن|نخلة|جميرا)/i;
+const KNOWN_UNSUPPORTED_VENUE = /\b(?:abu\s+dhabi\s+marina\s+mall|marina\s+mall\s+abu\s+dhabi|the\s+dubai\s+mall|dubai\s+mall|ibn\s+battuta(?:\s+mall)?)\b|(?:مارينا مول أبوظبي|مارينا مول ابوظبي|دبي مول|مول دبي|مول ابن بطوطة)/i;
 
 export const CINEMA_ALIASES = Object.freeze({
   "0036": ["abu dhabi mall", "أبوظبي مول", "ابوظبي مول"],
@@ -111,6 +112,7 @@ export function resolveCinemaCandidate(cinemas, input, aliases = CINEMA_ALIASES)
   const list = Array.isArray(cinemas) ? cinemas : [];
   const query = normalizeCinemaText(input);
   if (!query) return null;
+  if (KNOWN_UNSUPPORTED_VENUE.test(query)) return null;
   // A city is not a cinema. Several UAE cities contain multiple VOX venues,
   // while a city with one current catalog entry may gain another later. Never
   // turn “book in Abu Dhabi” into Abu Dhabi Mall without a venue-level signal.

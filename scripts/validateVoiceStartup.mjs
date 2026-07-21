@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { ELEVENLABS_WORKLET_PATHS, VOICE_MIC_PERMISSION_TIMEOUT_MS, VOICE_TRANSPORT_START_TIMEOUT_MS, voiceStartupErrorKey } from "../src/lib/voiceStartup.js";
+import { ELEVENLABS_WORKLET_PATHS, VOICE_MIC_PERMISSION_TIMEOUT_MS, VOICE_TRANSPORT_START_TIMEOUT_MS, requireMicrophoneCapture, voiceStartupErrorKey } from "../src/lib/voiceStartup.js";
 
 const [app, transport, headers, strings, rawWorklet, concatWorklet] = await Promise.all([
   readFile(new URL("../src/App.jsx", import.meta.url), "utf8"),
@@ -26,13 +26,20 @@ assert.match(scriptDirective, /blob:/, "ElevenLabs 0.7.1 WebRTC output capture r
 assert.doesNotMatch(scriptDirective, /data:/, "data: scripts must remain blocked");
 
 assert.equal(voiceStartupErrorKey({ name: "NotAllowedError" }), "app.voicePermissionError");
+assert.equal(voiceStartupErrorKey(new Error("Microphone permission timed out")), "app.voicePermissionError");
 assert.equal(voiceStartupErrorKey({ name: "NotFoundError" }), "app.voiceDeviceError");
+assert.equal(voiceStartupErrorKey({ name: "NotSupportedError", message: "Microphone capture API is unavailable" }), "app.voiceUnsupportedError");
 assert.equal(voiceStartupErrorKey(new Error("Failed to load rawAudioProcessor worklet module")), "app.voiceComponentError");
 assert.equal(voiceStartupErrorKey(new Error("WebRTC connection timed out")), "app.voiceTimeoutError");
 assert.equal(voiceStartupErrorKey(new Error("Origin is unauthorized (403)")), "app.voiceServiceError");
 assert.equal(voiceStartupErrorKey(new Error("unexpected")), "app.voiceStartError");
 
-for (const key of ["voicePermissionError", "voiceDeviceError", "voiceComponentError", "voiceServiceError", "voiceTimeoutError"]) {
+assert.throws(() => requireMicrophoneCapture(undefined), (error) => error?.name === "NotSupportedError");
+const supportedMediaDevices = { getUserMedia() {} };
+assert.equal(requireMicrophoneCapture(supportedMediaDevices), supportedMediaDevices);
+assert.match(app, /requireMicrophoneCapture\(navigator\.mediaDevices\)/);
+
+for (const key of ["voicePermissionError", "voiceDeviceError", "voiceUnsupportedError", "voiceComponentError", "voiceServiceError", "voiceTimeoutError"]) {
   assert.equal((strings.match(new RegExp(`"app\\.${key}"`, "g")) || []).length, 2, `${key} must exist in English and Arabic`);
 }
 

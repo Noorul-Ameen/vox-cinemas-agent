@@ -61,14 +61,21 @@ const scheduledFilmsBlock = vistaSource.slice(
   vistaSource.indexOf("export async function getScheduledFilms"),
   vistaSource.indexOf("function normalizeSession"),
 );
+const cinemaDateSessionsBlock = vistaSource.slice(
+  vistaSource.indexOf("async function loadCinemaDateSessionCatalog"),
+  vistaSource.indexOf("export async function getSessions"),
+);
 const sessionsBlock = vistaSource.slice(
   vistaSource.indexOf("export async function getSessions"),
   vistaSource.indexOf("export async function getSeatPlan"),
 );
 assert.doesNotMatch(scheduledFilmsBlock, /delay\s*\(/, "snapshot movie discovery must not add an artificial delay");
+assert.doesNotMatch(cinemaDateSessionsBlock, /delay\s*\(/, "cinema-date session discovery must not add an artificial delay");
 assert.doesNotMatch(sessionsBlock, /delay\s*\(/, "snapshot showtime discovery must not add an artificial delay");
 assert.match(scheduledFilmsBlock, /fetchSnapshotSessions\(/, "scheduled films must load only the requested snapshot shard");
-assert.match(sessionsBlock, /fetchSnapshotSessions\(/, "movie showtimes must reuse the requested snapshot shard");
+assert.match(cinemaDateSessionsBlock, /fetchSnapshotSessions\(/, "the cinema-date loader must load only the requested snapshot shard");
+assert.match(sessionsBlock, /getCinemaDateSessionCatalog\(/, "movie showtimes must reuse the normalized cinema-date catalog");
+assert.doesNotMatch(sessionsBlock, /fetchSnapshotSessions|fetchLiveSessions/, "per-film showtimes must not start a second source fetch path");
 assert.doesNotMatch(vistaSource, /from\s+["']\.\/mockVistaData\.js["']/, "the runtime client must not import the complete session snapshot");
 assert.match(vistaSource, /cache:\s*["']force-cache["']/, "versioned snapshot shards must use the browser asset cache");
 

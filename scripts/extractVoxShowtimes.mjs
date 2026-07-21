@@ -24,7 +24,7 @@ const STAGGER_MS = 220;
 const RETRIES = 3;
 const BACKOFF_MS = 900;
 const TIMEOUT_MS = 30000;
-const LANGUAGE_NAMES = { ENG: "English", ARA: "Arabic", HIN: "Hindi", MAL: "Malayalam", TAM: "Tamil", TEL: "Telugu", TUR: "Turkish", KOR: "Korean" };
+const LANGUAGE_NAMES = { ENG: "English", EN: "English", ARA: "Arabic", AR: "Arabic", HIN: "Hindi", HI: "Hindi", MAL: "Malayalam", ML: "Malayalam", TAM: "Tamil", TM: "Tamil", TA: "Tamil", TEL: "Telugu", TE: "Telugu", TUR: "Turkish", TR: "Turkish", KOR: "Korean", KO: "Korean", KAN: "Kannada", KN: "Kannada", SPA: "Spanish", ES: "Spanish" };
 const BROWSER_HEADERS = {
   accept: "application/json",
   "accept-language": "en-US,en;q=0.9",

@@ -249,7 +249,7 @@ if (dateStripRender.includes('"discovery"')) {
   assert.match(dateStripRender, /stage\.missing\?*\.includes\("date"\)/, "a discovery prompt may show the date strip only while date itself is still the missing criterion");
 }
 
-const discoveryLoader = app.slice(app.indexOf("const loadDiscoveryForCinema"), app.indexOf("const findAvailableCinemasForMovie"));
+const discoveryLoader = app.slice(app.indexOf("const loadDiscoveryForCinema"), app.indexOf("const findAvailableCinemasForCriteria"));
 assert.ok(
   discoveryLoader.indexOf('showStage({ view: "movies", movies: enrichedMovies')
     < discoveryLoader.indexOf('shown: enrichedMovies.length ? "filtered movie list" : "empty filtered movie list"'),
@@ -269,7 +269,7 @@ assert.match(
 
 const discoveryRoute = app.slice(app.indexOf("const routeDiscoveryTurn"), app.indexOf("useEffect(() =>", app.indexOf("const routeDiscoveryTurn")));
 assert.match(discoveryRoute, /const directCinemaReply = Boolean\(cinemaOverride && isDirectCinemaSelectionUtterance/, "a direct cinema-only reply must be identified before unresolved movie-title handling");
-assert.match(discoveryRoute, /rawTurn && !directCinemaReply && !dateOnlyReply/, "cinema and date-only replies must never be retained as unresolved movie titles");
+assert.match(discoveryRoute, /rawTurn && !locationIntent && !directCinemaReply && !dateOnlyReply/, "location, cinema, and date-only replies must never be retained as unresolved movie titles");
 assert.match(discoveryRoute, /directCinemaReply \|\| rawPreferencePatch\.patch\.movieId/, "a direct cinema-only reply must clear any stale pending movie title");
 
 console.log(`Validated bare day 17 parsing, live bare-day progression, and grounded IMAX rendering for ${mall.name} on ${selectedMallDate}.`);

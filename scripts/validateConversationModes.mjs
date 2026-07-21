@@ -18,13 +18,14 @@ function sliceBetween(source, startMarker, endMarker, label) {
 const textStartup = sliceBetween(app, "const startTextSession", "const startVoiceSession", "text startup");
 assert.match(textStartup, /connectionType:\s*["']websocket["']/, "text chat must explicitly use WebSocket");
 assert.match(textStartup, /textOnly:\s*true/, "text chat must explicitly enable the SDK text-only path");
-assert.match(textStartup, /conversation:\s*\{\s*textOnly:\s*true\s*\}/, "text chat must request the server-side text-only override");
+assert.match(textStartup, /overrides:\s*conversationSessionOverrides\(activeLocale,\s*\{\s*textOnly:\s*true\s*\}\)/, "text chat must request the server-side text-only and selected-language overrides");
 assert.doesNotMatch(textStartup, /getUserMedia/, "text chat must never request microphone permission");
 
 const voiceStartup = sliceBetween(app, "const startVoiceSession", "const endVoiceSession", "voice startup");
 assert.match(voiceStartup, /connectionType:\s*["']webrtc["']/, "the protected voice connection must remain WebRTC");
-assert.match(voiceStartup, /navigator\.mediaDevices\.getUserMedia\(\{\s*audio:\s*true\s*\}\)/, "voice startup must remain explicitly permission-gated");
+assert.match(voiceStartup, /requireMicrophoneCapture\(navigator\.mediaDevices\)[\s\S]*mediaDevices\.getUserMedia\(\{\s*audio:\s*true\s*\}\)/, "voice startup must remain explicitly permission-gated and handle unsupported browsers");
 assert.match(voiceStartup, /agentId:\s*import\.meta\.env\.VITE_AGENT_ID/, "voice startup must retain the configured public agent ID");
+assert.match(voiceStartup, /overrides:\s*conversationSessionOverrides\(activeLocale\)/, "voice startup must initialize ElevenLabs with the selected language");
 
 const typedMessageFlow = sliceBetween(app, "const sendText", "const sendUiTurn", "typed message flow");
 assert.doesNotMatch(typedMessageFlow, /sessionModeRef\.current\s*===\s*["']voice["']\)\s*return/, "typing must not be disabled during an active voice session");
@@ -40,6 +41,10 @@ assert.match(app, /t\("app\.brand"\)/, "the header must render VOX Cinemas UAE b
 assert.doesNotMatch(app, /DEFAULT_CINEMA|item\.id\s*===\s*["']0002["']/, "the UAE product must not silently default to Mall of the Emirates");
 assert.match(app, /const \[cinema, setCinema\] = useState\(null\)/, "a clean launch must begin without a selected cinema");
 assert.match(app, /shown:\s*["']cinema picker["']/, "movie discovery without a cinema must display the UAE cinema picker");
+assert.match(app, /deterministicUiStageGuardRef\.current\s*=\s*\{\s*view:\s*["']showtimes["']/, "a movie-card click must guard the rendered showtime step from delayed model tools");
+assert.match(app, /deterministicUiStageGuardRef\.current\s*=\s*\{\s*view:\s*["']seatmap["']/, "a showtime click must guard the rendered seat map from delayed model tools");
+assert.ok((app.match(/preserveDeterministicUiStageForTool\(["']show_(?:movie_selection|showtimes|seat_map)["']\)/g) || []).length === 3, "all earlier-stage display tools must respect deterministic UI progression");
+assert.doesNotMatch(app, /Date\.now\(\)\s*-\s*guard\.advancedAt\s*>/, "deterministic UI protection must last until the next user turn or real stage change, not an arbitrary timer");
 
 assert.doesNotMatch(app, /\\u0*600[^\n]*\\u0*6ff/i, "Arabic-script detection must not auto-switch the interface language");
 const messageHandler = sliceBetween(app, "onMessage:", "onError:", "conversation message handler");

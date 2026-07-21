@@ -68,6 +68,14 @@ function cancelledSummaryGuidance(booking, locale) {
   return `The booking summary${title ? ` for ${title}` : ""}${ref ? ` with reference ${ref}` : ""} is marked cancelled on this device. No refund was processed and no cancellation was sent to the cinema.`;
 }
 
+function preservedCheckoutGuidance(pendingOrder, locale) {
+  const seats = Array.isArray(pendingOrder?.seats) ? pendingOrder.seats.filter(Boolean) : [];
+  if (locale === "ar") {
+    return `تم حفظ خطوة الدفع غير المكتملة${seats.length ? ` للمقاعد ${seats.join("، ")}` : ""}، لكنها غير معروضة الآن. اطلب العودة إلى الدفع لعرضها، أو اطلب تعديل المقاعد. لم يتم تأكيد الحجز بعد.`;
+  }
+  return `Your unpaid checkout${seats.length ? ` for seats ${seats.join(", ")}` : ""} is preserved but is not currently shown. Ask to return to checkout to display it, or ask to edit seats. The booking is not confirmed yet.`;
+}
+
 function historyGuidance(locale) {
   return locale === "ar"
     ? "ملخصات حجوزاتك المحفوظة على هذا الجهاز ظاهرة الآن. اختر حجزاً لعرض التفاصيل، أو استخدم زر إلغاء الحجز الخاص به."
@@ -85,11 +93,27 @@ function wrongDiscoveryQuestion(value, stage) {
   return false;
 }
 
+function staleProgressionQuestion(value, stage, pendingOrder, locale) {
+  const asksMovie = /\b(?:what|which)\s+(?:movie|film)\b|\bwhat\b[\s\S]{0,35}\b(?:like|want)\s+to\s+(?:watch|see)\b|(?:أي|اي|ما)\s+(?:فيلم|الفيلم)|ماذا\s+(?:تريد|تفضل)[\s\S]{0,25}(?:تشاهد|مشاهدة)/iu.test(value);
+  const asksShowtime = /\b(?:what|which)\s+(?:showtime|time|session)\b|\bwhen\b[\s\S]{0,30}\b(?:watch|see|go)\b|(?:أي|اي|ما)\s+(?:وقت|موعد|عرض)|متى[\s\S]{0,25}(?:العرض|تشاهد)/iu.test(value);
+  if (stage?.view === "showtimes" && asksMovie) {
+    const title = clean(stage.movie?.title);
+    return locale === "ar"
+      ? `${title ? `تم اختيار ${title}. ` : "تم اختيار الفيلم. "}اختر أحد مواعيد العرض الظاهرة.`
+      : `${title ? `${title} is selected. ` : "The movie is selected. "}Choose one of the displayed showtimes.`;
+  }
+  if (stage?.view === "seatmap" && (asksMovie || asksShowtime)) return seatMapGuidance(locale);
+  if (stage?.view === "checkout" && (asksMovie || asksShowtime)) return checkoutGuidance(stage, pendingOrder, locale);
+  return null;
+}
+
 export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, locale = "en" } = {}) {
   const value = clean(text);
   if (!value) return value;
 
   if (wrongDiscoveryQuestion(value, stage)) return clean(stage.question);
+  const progressionCorrection = staleProgressionQuestion(value, stage, pendingOrder, locale);
+  if (progressionCorrection) return progressionCorrection;
 
   if (stage?.view === "history"
     && stage?.purpose === "cancellation_target_selection"
@@ -101,9 +125,12 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
       : "Choose one of the current bookings shown, by movie title or booking reference.";
   }
 
-  const editableCheckout = stage?.view === "checkout" || Boolean(pendingOrder?.checkoutId);
+  const visibleCheckout = stage?.view === "checkout";
+  const preservedCheckout = !visibleCheckout && Boolean(pendingOrder?.checkoutId);
+  const editableCheckout = visibleCheckout || preservedCheckout;
   const editableSeatMap = stage?.view === "seatmap";
   if (seatEditRefusal(value) && editableCheckout) {
+    if (preservedCheckout) return preservedCheckoutGuidance(pendingOrder, locale);
     return locale === "ar"
       ? "يمكنك تغيير المقاعد قبل إكمال الدفع. اختر تعديل المقاعد على الشاشة، أو قل تعديل المقاعد."
       : "You can change seats before completing checkout. Choose Edit seats on screen, or say edit seats.";
@@ -111,11 +138,12 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
   if (seatEditRefusal(value) && editableSeatMap) return seatMapGuidance(locale);
 
   if (editableCheckout && mismatchedCheckoutFacts(value, stage, pendingOrder)) {
-    return checkoutGuidance(stage, pendingOrder, locale);
+    return visibleCheckout ? checkoutGuidance(stage, pendingOrder, locale) : preservedCheckoutGuidance(pendingOrder, locale);
   }
 
   if (seatMapDisplayClaim(value) && stage?.view !== "seatmap") {
-    if (editableCheckout) return checkoutGuidance(stage, pendingOrder, locale);
+    if (visibleCheckout) return checkoutGuidance(stage, pendingOrder, locale);
+    if (preservedCheckout) return preservedCheckoutGuidance(pendingOrder, locale);
     if (stage?.view === "showtimes") {
       return locale === "ar"
         ? "اختر موعد عرض محدداً من الخيارات الظاهرة لفتح خريطة المقاعد."
@@ -128,6 +156,7 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
 
 
   if (checkoutDisplayClaim(value) && stage?.view !== "checkout") {
+    if (preservedCheckout) return preservedCheckoutGuidance(pendingOrder, locale);
     if (editableSeatMap) return seatMapGuidance(locale);
     const booking = stage?.booking || null;
     if (booking?.cancelled || String(booking?.bookingStatus || "").startsWith("cancelled")) {
@@ -147,7 +176,8 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
     || checkoutInstructionClaim(value);
   if (!transactionClaim) return value;
   if (stage?.view === "history") return historyGuidance(locale);
-  if (editableCheckout) return checkoutGuidance(stage, pendingOrder, locale);
+  if (visibleCheckout) return checkoutGuidance(stage, pendingOrder, locale);
+  if (preservedCheckout) return preservedCheckoutGuidance(pendingOrder, locale);
   if (editableSeatMap) return seatMapGuidance(locale);
 
   const booking = stage?.booking || null;

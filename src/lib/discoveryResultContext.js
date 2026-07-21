@@ -47,6 +47,13 @@ export function buildAuthoritativeDiscoveryContext(result, { maxMovies = 8, maxS
   const movies = Array.isArray(result.movies) ? result.movies.slice(0, maxMovies) : [];
   const scope = [cinema, date].filter(Boolean).join(" on ");
   const missing = Array.isArray(result.missing) ? result.missing.filter(Boolean) : [];
+  const alternatives = Array.isArray(result.alternatives) ? result.alternatives.filter((item) => clean(item?.name)) : [];
+
+  if (!movies.length && alternatives.length) {
+    const verified = alternatives.filter((item) => item.verified === true);
+    const names = alternatives.map((item) => clean(item.name));
+    return `Authoritative widget state: the requested location or cinema has no matching result. A cinema picker is displayed with ${names.join(", ")}.${verified.length ? ` These locations were verified for all retained date and movie criteria: ${verified.map((item) => clean(item.name)).join(", ")}.` : " These are location alternatives only; matching movies have not been verified."} Ask the guest to choose one displayed cinema. Do not claim that the requested location has a VOX cinema, do not auto-select an alternative, and do not name any cinema outside this supplied list.`;
+  }
 
   if (!movies.length && missing.length) {
     return `Authoritative widget state${scope ? ` for ${scope}` : ""}: no movie result is displayed yet because required information is missing (${missing.join(", ")}), and no movie is selected. Ask only for ${missing[0]}; do not say that movie options are on screen and do not advance to showtimes.`;

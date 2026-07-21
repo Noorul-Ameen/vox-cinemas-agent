@@ -2,30 +2,23 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-18.1`
+Prompt contract version: `2026-07-21.2`
 
-Prompt source SHA-256: `8245375a8cde647f9c62e7ee357b67ac4c4f6df08dc1c0a3cc967e2d9ce177b0`
+Prompt value SHA-256: `6424e871a383c06e683850aaa40da85e9c437dc9a6c9ed226888d9853fe88043`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 
 VOXi is the bilingual AI assistant for VOX Cinemas UAE. Keep the product and welcome globally branded as VOX Cinemas UAE. Mall of the Emirates is one selectable cinema, not the global product identity.
 
-## Live dashboard status, 17 July 2026
+## Dashboard verification status, 21 July 2026
 
-Status: PUBLISHED AND VERIFIED FOR LOCAL LIVE TEXT.
+Status: REPOSITORY CONTRACT AND DASHBOARD PROMPT PUBLISHED. LIVE ACOUSTIC VOICE VERIFICATION IS PENDING.
 
-- The exact target agent is published as `VOXi - VOX Cinemas UAE`.
-- Its EU public token endpoint returns HTTP 200.
-- The dashboard prompt matches `VOXI_AGENT_PROMPT` after ignoring editor-only surrounding whitespace.
-- The first message is exactly `{{voxi_session_opening}}`.
-- English and Arabic are configured, and Detect language is off.
-- All eight exact client-tool names and descriptions are present, with Wait for response on every tool.
-- First-message override is off and text-only override is on.
-- ElevenLabs forces Agent language override on and disables its toggle when Arabic is configured. The widget sends no language override, so this forced dashboard state is compatible with the repository contract.
-- Local live text reached status `Text chat` and returned: "I'm Voxi, the warm, confident bilingual AI assistant for VOX Cinemas UAE."
-- A FAB follow-up returned: "The FAB offer is for 2D tickets only."
-- The Cloudflare widget also connected to the published agent and returned grounded English and Arabic identity responses.
-- Voice startup reached the permission gate, but the controlled in-app browser and Chrome test surface did not expose a microphone permission state. The bounded timeout returned safely to text chat, and no live audio was captured.
+- Contract `2026-07-21.2` was copied from the exported `VOXI_AGENT_PROMPT` value, published to the target agent, reloaded, and read back on 21 July 2026.
+- The published prompt contains the movie-language versus conversation-language rule, unsupported-location grounding, and retained-criteria availability verification.
+- The dashboard still uses the correct target agent, bilingual language configuration, `{{voxi_session_opening}}`, Agent language override, Text only override, and exact client-tool names. Detect language remains off.
+- The English primary voice and Arabic voice override remain configured. No connection type, client tool, worklet, or EU residency setting was changed.
+- Run a real microphone input and audible English and Arabic output check on the deployed origin. Repository and dashboard checks cannot prove acoustic input or output quality.
 
 ## Dashboard baseline
 
@@ -38,7 +31,7 @@ Configure the target agent with these settings:
 - Configure the dashboard first-message field as `{{voxi_session_opening}}`.
 - Copy the complete `VOXI_AGENT_PROMPT` value from `src/lib/voxiSession.js` into the dashboard system prompt.
 - Disable the ElevenLabs `language_detection` system tool. VOXi uses explicit language selection and confirmation, not automatic detected-language switching.
-- ElevenLabs forces the Agent language override permission on and disables its toggle when Arabic is configured. Leave that dashboard state unchanged. The widget does not send an `agent.language` override.
+- ElevenLabs forces the Agent language override permission on and disables its toggle when Arabic is configured. Leave that dashboard state unchanged. The widget sends `overrides.agent.language` as `en` or `ar` from the explicit selector or confirmed language command.
 - Do not enable or depend on an `agent.firstMessage` client override.
 - Keep voice on WebRTC and keep `serverLocation: "eu-residency"` in the web client.
 - Configure all eight tools below as client tools with the exact case-sensitive names and parameter identifiers.
@@ -479,8 +472,8 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 
 ## Language and first-message behavior
 
-- The web client supplies the selected locale through `preferred_language` and its contextual journey.
-- The client intentionally does not send an `agent.language` override.
+- The web client supplies the selected locale through `preferred_language`, its contextual journey, and `overrides.agent.language` at transport start.
+- Changing language during an active text or voice session restarts the same transport mode as a continuation so speech recognition and voice use the newly selected language.
 - The client intentionally does not send an `agent.firstMessage` override because unauthorized overrides terminate the session.
 - The dashboard first message must be exactly `{{voxi_session_opening}}`.
 - A first transport receives the localized welcome. A continuation receives a short acknowledgement without a new greeting.
@@ -505,7 +498,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 1. Confirm the dashboard target is `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`.
 2. Confirm all eight exact client-tool names and schemas match `config/elevenlabs-agent-contract.json`.
 3. Enable Wait for response on all eight tools. Confirm `show_seat_map` returns after map loading and never waits for a later seat-selection turn.
-4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-18.1`.
+4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-21.2`.
 5. Set the first message to `{{voxi_session_opening}}`.
 6. Create all 13 dynamic-variable placeholders and defaults.
 7. Configure English and Arabic support, then disable the automatic `language_detection` system tool.

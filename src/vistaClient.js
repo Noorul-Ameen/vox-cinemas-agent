@@ -35,8 +35,9 @@ const configuredLiveProgrammingDays = Number.parseInt(ENV.VITE_VISTA_PROGRAMMING
 const LIVE_PROGRAMMING_DAYS = Number.isInteger(configuredLiveProgrammingDays)
   ? Math.min(31, Math.max(1, configuredLiveProgrammingDays))
   : DEFAULT_LIVE_PROGRAMMING_DAYS;
-const liveSessionCache = new Map();
+const liveSessionCache = createExpiringPromiseCache({ ttlMs: LIVE_SESSION_CACHE_MS });
 const snapshotShardCache = new Map();
+const cinemaDateSessionCache = new Map();
 const snapshotSessionIndex = new Map();
 const snapshotFilmsById = new Map(FILMS.map((film) => [String(film.ScheduledFilmId || ""), film]));
 
@@ -44,6 +45,45 @@ const HEADERS = Object.freeze({
   Accept: "application/json",
 });
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export function createExpiringPromiseCache({ ttlMs, now = () => Date.now() } = {}) {
+  const configuredTtl = Number(ttlMs);
+  const maxAge = Number.isFinite(configuredTtl) ? Math.max(0, configuredTtl) : Infinity;
+  const entries = new Map();
+  const currentTime = () => {
+    const value = Number(now());
+    return Number.isFinite(value) ? value : Date.now();
+  };
+
+  return Object.freeze({
+    get(key, loader) {
+      if (typeof loader !== "function") throw new TypeError("A cache loader function is required.");
+      const requestedAt = currentTime();
+      const cached = entries.get(key);
+      if (cached && (!cached.settled || requestedAt - cached.at < maxAge)) return cached.promise;
+
+      let entry;
+      const promise = Promise.resolve()
+        .then(loader)
+        .then((value) => {
+          if (entries.get(key) === entry) {
+            entry.settled = true;
+            entry.at = currentTime();
+          }
+          return value;
+        }, (error) => {
+          if (entries.get(key) === entry) entries.delete(key);
+          throw error;
+        });
+      entry = { at: requestedAt, settled: false, promise };
+      entries.set(key, entry);
+      return promise;
+    },
+    clear() {
+      entries.clear();
+    },
+  });
+}
 
 export class VistaClientError extends Error {
   constructor(message, {
@@ -449,17 +489,29 @@ export function getDiscoveryMovieCatalog() {
   return USE_MOCK ? uniqueFilms(FILMS).map(normalizeFilm) : [];
 }
 
+export function normalizeMovieLanguage(value) {
+  const language = normalizeCustomerFacingText(value);
+  return ({
+    ENG: "English", EN: "English", ARA: "Arabic", AR: "Arabic", HIN: "Hindi", HI: "Hindi",
+    MAL: "Malayalam", ML: "Malayalam", TAM: "Tamil", TM: "Tamil", TA: "Tamil", TEL: "Telugu", TE: "Telugu",
+    TUR: "Turkish", TR: "Turkish", KOR: "Korean", KO: "Korean", KAN: "Kannada", KN: "Kannada",
+    SPA: "Spanish", ES: "Spanish",
+  })[language.toUpperCase()] || language;
+}
+
 function normalizeFilm(film) {
   const rawGenres = rawField(film, "Genres", "genres");
   const rawSubtitles = rawField(film, "Subtitles", "subtitles");
+  const rawLanguage = normalizeCustomerFacingText(rawField(film, "LanguageName", "languageName", "Language", "language"));
+  const languageName = normalizeMovieLanguage(rawLanguage);
   return {
     id: rawField(film, "ScheduledFilmId", "scheduledFilmId", "id"),
     title: normalizeCustomerFacingText(rawField(film, "Title", "title")),
     rating: normalizeCustomerFacingText(rawField(film, "Rating", "rating")),
     runtime: Number(rawField(film, "RunTime", "runtime")) || 0,
     genre: normalizeCustomerFacingText(rawField(film, "genre", "Genre")),
-    language: normalizeCustomerFacingText(rawField(film, "Language", "language")),
-    languageName: normalizeCustomerFacingText(rawField(film, "LanguageName", "languageName")),
+    language: languageName,
+    languageName,
     synopsis: normalizeCustomerFacingText(rawField(film, "Synopsis", "synopsis")),
     genres: Array.isArray(rawGenres) && rawGenres.length
       ? rawGenres.map(normalizeCustomerFacingText)
@@ -567,15 +619,13 @@ async function fetchSnapshotSessions(cinemaId, sourceDate) {
 
 async function fetchLiveSessions(cinemaId, displayDate) {
   const key = `${cinemaId}:${displayDate}`;
-  const cached = liveSessionCache.get(key);
-  if (cached && Date.now() - cached.at < LIVE_SESSION_CACHE_MS) return cached.value;
-  const operation = "getSessions";
-  const url = buildODataUrl("Sessions", buildProgrammingDateFilter(cinemaId, displayDate));
-  const raw = payloadArray(await requestJson(url, { operation }), operation)
-    .filter((session) => String(rawField(session, "CinemaId", "cinemaId") || "") === cinemaId)
-    .filter((session) => programmingDateForSession(session) === displayDate);
-  liveSessionCache.set(key, { at: Date.now(), value: raw });
-  return raw;
+  return liveSessionCache.get(key, async () => {
+    const operation = "getSessions";
+    const url = buildODataUrl("Sessions", buildProgrammingDateFilter(cinemaId, displayDate));
+    return payloadArray(await requestJson(url, { operation }), operation)
+      .filter((session) => String(rawField(session, "CinemaId", "cinemaId") || "") === cinemaId)
+      .filter((session) => programmingDateForSession(session) === displayDate);
+  });
 }
 
 export async function getScheduledFilms(cinemaId, displayDate = demoDate()) {
@@ -679,24 +729,86 @@ export function deduplicateSessionPresentation(sessions) {
   return [...groups.values()];
 }
 
+function cinemaDateSessionCacheKey(cinemaId, displayDate) {
+  return `${USE_MOCK ? "snapshot" : "live"}:${cinemaId}:${displayDate}`;
+}
+
+async function loadCinemaDateSessionCatalog(cinemaId, displayDate) {
+  let value = [];
+  if (USE_MOCK) {
+    const sourceDate = sourceDateForDemoDate(displayDate);
+    if (sourceDate && snapshotDatesForCinema(cinemaId).includes(sourceDate)) {
+      value = await fetchSnapshotSessions(cinemaId, sourceDate);
+    }
+  } else {
+    value = await fetchLiveSessions(cinemaId, displayDate);
+  }
+
+  const normalized = value
+    .map((session) => normalizeSession(session, displayDate))
+    .sort((left, right) => left.time.localeCompare(right.time) || left.sessionId.localeCompare(right.sessionId));
+  const rawCountsByFilm = new Map();
+  for (const session of normalized) {
+    rawCountsByFilm.set(session.scheduledFilmId, (rawCountsByFilm.get(session.scheduledFilmId) || 0) + 1);
+  }
+  const sessions = deduplicateSessionPresentation(normalized);
+  const status = getScheduleStatus({ cinemaId, displayDate });
+  const result = withMeta(sessions, {
+    mode: USE_MOCK ? "snapshot" : "live",
+    verified: !USE_MOCK,
+    cinemaId,
+    scheduledFilmId: null,
+    displayDate,
+    rawCount: normalized.length,
+    displayCount: sessions.length,
+    deduplicatedCount: normalized.length - sessions.length,
+    empty: sessions.length === 0,
+    reason: sessions.length ? null : status.reason || "no_sessions_for_date",
+  });
+  return Object.freeze({ sessions: Object.freeze(result), rawCountsByFilm });
+}
+
+async function getCinemaDateSessionCatalog(cinemaId, displayDate) {
+  const key = cinemaDateSessionCacheKey(cinemaId, displayDate);
+  const cached = cinemaDateSessionCache.get(key);
+  if (cached && (USE_MOCK || Date.now() - cached.at < LIVE_SESSION_CACHE_MS)) return cached.promise;
+
+  const entry = {
+    at: Date.now(),
+    promise: loadCinemaDateSessionCatalog(cinemaId, displayDate),
+  };
+  cinemaDateSessionCache.set(key, entry);
+  try {
+    return await entry.promise;
+  } catch (error) {
+    if (cinemaDateSessionCache.get(key) === entry) cinemaDateSessionCache.delete(key);
+    throw error;
+  }
+}
+
+/**
+ * Load every normalized, presentation-deduplicated session for one cinema and
+ * programming date. Concurrent consumers share both the source request and the
+ * normalization pass. Snapshot results remain cached by their immutable
+ * versioned URL; live results follow the existing short session cache window.
+ */
+export async function getCinemaDateSessions(cinemaId, displayDate = demoDate()) {
+  const id = requireText(cinemaId, "cinemaId");
+  const requestedDate = requireDate(displayDate, "getCinemaDateSessions");
+  return (await getCinemaDateSessionCatalog(id, requestedDate)).sessions;
+}
+
 export async function getSessions(cinemaId, scheduledFilmId, displayDate = demoDate()) {
   const id = requireText(cinemaId, "cinemaId");
   const requestedDate = requireDate(displayDate, "getSessions");
   const requestedFilm = String(scheduledFilmId || "");
-  let value = [];
-  if (USE_MOCK) {
-    const sourceDate = sourceDateForDemoDate(requestedDate);
-    if (sourceDate && snapshotDatesForCinema(id).includes(sourceDate)) {
-      value = await fetchSnapshotSessions(id, sourceDate);
-    }
-  } else {
-    value = await fetchLiveSessions(id, requestedDate);
-  }
-  const mapped = value
-    .filter((session) => !requestedFilm || String(rawField(session, "ScheduledFilmId", "scheduledFilmId") || "") === requestedFilm)
-    .map((session) => normalizeSession(session, requestedDate))
-    .sort((left, right) => left.time.localeCompare(right.time) || left.sessionId.localeCompare(right.sessionId));
-  const result = deduplicateSessionPresentation(mapped);
+  const catalog = await getCinemaDateSessionCatalog(id, requestedDate);
+  const result = requestedFilm
+    ? catalog.sessions.filter((session) => session.scheduledFilmId === requestedFilm)
+    : [...catalog.sessions];
+  const rawCount = requestedFilm
+    ? catalog.rawCountsByFilm.get(requestedFilm) || 0
+    : getResultMeta(catalog.sessions)?.rawCount || 0;
   const status = getScheduleStatus({ cinemaId: id, displayDate: requestedDate });
   return withMeta(result, {
     mode: USE_MOCK ? "snapshot" : "live",
@@ -704,9 +816,9 @@ export async function getSessions(cinemaId, scheduledFilmId, displayDate = demoD
     cinemaId: id,
     scheduledFilmId: requestedFilm || null,
     displayDate: requestedDate,
-    rawCount: mapped.length,
+    rawCount,
     displayCount: result.length,
-    deduplicatedCount: mapped.length - result.length,
+    deduplicatedCount: rawCount - result.length,
     empty: result.length === 0,
     reason: result.length ? null : status.reason || "no_sessions_for_date",
   });
@@ -1033,6 +1145,7 @@ export async function refundBooking(ref, { booking = null, now = new Date(), req
 export function clearVistaSessionCache() {
   liveSessionCache.clear();
   snapshotShardCache.clear();
+  cinemaDateSessionCache.clear();
   snapshotSessionIndex.clear();
 }
 

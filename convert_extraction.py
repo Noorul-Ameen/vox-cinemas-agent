@@ -32,7 +32,7 @@ PALETTE = [
     ("#6A2E7A", "#B44BC7"), ("#7A2E2E", "#C74B4B"),
 ]
 ALLOWED_SLOTS = {"Morning", "Afternoon", "Primetime", "LateNight"}
-LANGUAGE_NAMES = {"ENG": "English", "ARA": "Arabic", "HIN": "Hindi", "MAL": "Malayalam", "TAM": "Tamil", "TEL": "Telugu", "TUR": "Turkish", "KOR": "Korean"}
+LANGUAGE_NAMES = {"ENG": "English", "EN": "English", "ARA": "Arabic", "AR": "Arabic", "HIN": "Hindi", "HI": "Hindi", "MAL": "Malayalam", "ML": "Malayalam", "TAM": "Tamil", "TM": "Tamil", "TA": "Tamil", "TEL": "Telugu", "TE": "Telugu", "TUR": "Turkish", "TR": "Turkish", "KOR": "Korean", "KO": "Korean", "KAN": "Kannada", "KN": "Kannada", "SPA": "Spanish", "ES": "Spanish"}
 
 
 def read_json(path: Path):

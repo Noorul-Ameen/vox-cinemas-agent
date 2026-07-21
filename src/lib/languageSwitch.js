@@ -8,29 +8,39 @@ const tidy = (value) => String(value || "")
   .trim();
 
 const DIRECT_ARABIC = [
-  /^(speak|continue|switch)( in| to)? arabic$/,
-  /^arabic( please)?$/,
-  /^(عربي|كمل عربي|تمام بالعربي)$/,
-  /^(تكلم|تحدث|كمل|استمر)( باللغة)? العربية$/,
-  /^(حول|غير)( اللغة)? (الي )?العربية$/,
+  /^(?:please )?(?:speak|continue|switch)(?: in| to)? arabic(?: please)?$/,
+  /^(?:could|would|will|can) you (?:please )?(?:continue|switch)(?: in| to)? arabic(?: please)?$/,
+  /^(?:please )?(?:use|talk to me in|talk with me in|speak with me in|reply in|respond in|answer in) arabic(?: please)?$/,
+  /^(?:please )?(?:change|set|switch)(?: the)? language to arabic(?: please)?$/,
+  /^(?:please )?(?:change|switch) to arabic(?: please)?$/,
+  /^(تكلم|تحدث|كمل|اكمل|استمر)(?: باللغة العربية| بالعربية| بالعربي| عربي| العربية)$/,
+  /^(?:تكلم|تحدث) معي (?:باللغة العربية|بالعربية|بالعربي)$/,
+  /^(?:استخدم|استعمل)(?: اللغة)? (?:العربية|العربي)$/,
+  /^(?:اريد|ابي|ابغى) (?:التحدث|الكلام|ان اتحدث) بالعربية$/,
+  /^(?:حول|غير|بدل)(?: اللغة)? (?:الي العربية|للعربية|للعربي|العربية)$/,
 ];
 
 const DIRECT_ENGLISH = [
-  /^(speak|continue|switch)( in| to)? english$/,
-  /^english( please)?$/,
-  /^(إنجليزي|انجليزي|كمل إنجليزي|كمل انجليزي)$/,
-  /^(تكلم|تحدث|كمل|استمر)( باللغة)? الانجليزية$/,
-  /^(حول|غير)( اللغة)? (الي )?الانجليزية$/,
+  /^(?:please )?(?:speak|continue|switch)(?: in| to)? english(?: please)?$/,
+  /^(?:could|would|will|can) you (?:please )?(?:continue|switch)(?: in| to)? english(?: please)?$/,
+  /^(?:please )?(?:use|talk to me in|talk with me in|speak with me in|reply in|respond in|answer in) english(?: please)?$/,
+  /^(?:please )?(?:change|set|switch)(?: the)? language to english(?: please)?$/,
+  /^(?:please )?(?:change|switch) to english(?: please)?$/,
+  /^(تكلم|تحدث|كمل|اكمل|استمر)(?: باللغة الانجليزية| بالانجليزية| بالانجليزي| انجليزي| الانجليزية)$/,
+  /^(?:تكلم|تحدث) معي (?:باللغة الانجليزية|بالانجليزية|بالانجليزي)$/,
+  /^(?:استخدم|استعمل)(?: اللغة)? (?:الانجليزية|الانجليزي)$/,
+  /^(?:اريد|ابي|ابغى) (?:التحدث|الكلام|ان اتحدث) بالانجليزية$/,
+  /^(?:حول|غير|بدل)(?: اللغة)? (?:الي الانجليزية|للانجليزية|للانجليزي|الانجليزية)$/,
 ];
 
 const YES_ARABIC = new Set([
   "yes", "yes arabic", "continue arabic", "continue in arabic", "arabic", "arabic please",
-  "نعم", "إي", "اي", "أيوه", "ايوه", "تمام بالعربي", "عربي", "كمل عربي",
+  "نعم", "اي", "ايوه", "نعم بالعربية", "نعم بالعربي", "تمام بالعربي", "عربي", "كمل عربي", "كمل بالعربي", "اكمل بالعربية", "اكمل بالعربي",
 ]);
 
 const YES_ENGLISH = new Set([
   "yes", "yes english", "continue english", "continue in english", "speak english", "english", "english please", "switch to english",
-  "نعم بالإنجليزية", "نعم بالانجليزية", "كمل إنجليزي", "كمل انجليزي",
+  "نعم بالانجليزية", "نعم بالانجليزي", "كمل انجليزي", "كمل بالانجليزي", "اكمل بالانجليزية", "اكمل بالانجليزي",
 ]);
 
 const NO = new Set(["no", "no thanks", "no thank you", "لا", "لأ", "لا شكرا", "لا شكرًا"]);
@@ -46,9 +56,25 @@ export function explicitLanguageRequest(text) {
 
 function offeredLanguage(text, currentLocale) {
   const value = tidy(text);
-  if (currentLocale === "en" && /(?:would you like|do you want).*(?:continue|speak).*arabic/.test(value)) return "ar";
-  if (currentLocale === "ar" && /هل تريد.*(?:اتابع|نكمل|استمر).*(?:بالانجليزية|باللغة الانجليزية)/.test(value)) return "en";
+  if (currentLocale === "en"
+    && /(?:would you (?:like|prefer)|do you want|shall i|should i|can i).*(?:continue|speak|switch|reply|respond|answer).*arabic/.test(value)) return "ar";
+  if (currentLocale === "ar"
+    && /(?:(?:هل تريد|هل تفضل|اتريد)(?: ان)?\s+(?:اتابع|نكمل|استمر|اتحدث|اتكلم|استخدم|ارد|اجيب|احول|اغير)|هل\s+(?:استمر|اتابع|اتكلم|اتحدث|احول|اغير))(?:\s+(?:الي|ل))?.*(?:بالانجليزية|باللغة الانجليزية|الانجليزية)/.test(value)) return "en";
   return null;
+}
+
+export function conversationLanguageContinuityContext(text, currentLocale) {
+  if (explicitLanguageRequest(text)) return "";
+  const source = String(text || "");
+  const hasArabicScript = /\p{Script=Arabic}/u.test(source);
+  const hasLatinScript = /[A-Za-z]/u.test(source);
+  if (currentLocale === "en" && hasArabicScript) {
+    return "UI language: English. Arabic script is not a switch. Reply in English, keep the journey, and treat Arabic as a film filter when relevant.";
+  }
+  if (currentLocale === "ar" && hasLatinScript && !hasArabicScript) {
+    return "UI language: Arabic. Latin script is not a switch. Reply in Arabic and keep the journey.";
+  }
+  return "";
 }
 
 function confirmed(text, targetLocale) {
