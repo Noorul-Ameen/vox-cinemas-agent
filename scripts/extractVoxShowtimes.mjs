@@ -6,9 +6,17 @@
  * token. Both are discovered at runtime and are deliberately never logged or saved.
  */
 
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { createAtomicAssetTransaction } from "./lib/atomicAssetTransaction.mjs";
+import {
+  MOVIE_INFORMATION_FORMAT,
+  MOVIE_INFORMATION_PAGE_URL,
+  MOVIE_INFORMATION_SOURCE_URL,
+  validateMovieInformationCatalog,
+} from "./lib/movieInformationCatalogValidation.mjs";
 
 const SITE = "https://uae.voxcinemas.com";
 const API_HOST = "https://uae-apife.voxcinemas.com";
@@ -24,6 +32,10 @@ const STAGGER_MS = 220;
 const RETRIES = 3;
 const BACKOFF_MS = 900;
 const TIMEOUT_MS = 30000;
+const MOVIE_DETAIL_WORKERS = 4;
+const MOVIE_DETAIL_RETRIES = 2;
+const MOVIE_DETAIL_TIMEOUT_MS = 12000;
+const MOVIE_DETAIL_TOTAL_TIMEOUT_MS = 120000;
 const LANGUAGE_NAMES = { ENG: "English", EN: "English", ARA: "Arabic", AR: "Arabic", HIN: "Hindi", HI: "Hindi", MAL: "Malayalam", ML: "Malayalam", TAM: "Tamil", TM: "Tamil", TA: "Tamil", TEL: "Telugu", TE: "Telugu", TUR: "Turkish", TR: "Turkish", KOR: "Korean", KO: "Korean", KAN: "Kannada", KN: "Kannada", SPA: "Spanish", ES: "Spanish" };
 const BROWSER_HEADERS = {
   accept: "application/json",
@@ -66,19 +78,28 @@ const absoluteSiteUrl = (value, fallback = "") => {
 };
 
 export function parseArgs(argv) {
-  const args = { startDate: null, output: "data/vox_showtimes_full.json", maxDays: 31, workers: DEFAULT_WORKERS };
+  const args = {
+    startDate: null,
+    output: "data/vox_showtimes_full.json",
+    movieInformationOutput: "data/vox_movie_information_catalog.json",
+    previousMovieInformation: null,
+    maxDays: 31,
+    workers: DEFAULT_WORKERS,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
-    if (["--start-date", "--output", "--max-days", "--workers"].includes(flag)) {
+    if (["--start-date", "--output", "--movie-information-output", "--previous-movie-information", "--max-days", "--workers"].includes(flag)) {
       const value = argv[index + 1];
       if (!value) throw new Error(`${flag} requires a value`);
       if (flag === "--start-date") args.startDate = value;
       if (flag === "--output") args.output = value;
+      if (flag === "--movie-information-output") args.movieInformationOutput = value;
+      if (flag === "--previous-movie-information") args.previousMovieInformation = value;
       if (flag === "--max-days") args.maxDays = Number(value);
       if (flag === "--workers") args.workers = Number(value);
       index += 1;
     } else if (flag === "--help") {
-      console.log("node scripts/extractVoxShowtimes.mjs [--start-date YYYY-MM-DD] [--max-days 31] [--workers 2] [--output FILE]");
+      console.log("node scripts/extractVoxShowtimes.mjs [--start-date YYYY-MM-DD] [--max-days 31] [--workers 2] [--output FILE] [--movie-information-output FILE] [--previous-movie-information FILE]");
       process.exit(0);
     } else throw new Error(`Unknown argument: ${flag}`);
   }
@@ -105,9 +126,9 @@ export function isIsoDate(value) {
   return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-async function fetchWithTimeout(url, options = {}) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = TIMEOUT_MS) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try { return await fetch(url, { ...options, signal: controller.signal }); }
   finally { clearTimeout(timeout); }
 }
@@ -160,7 +181,7 @@ async function discoverPublicApiKey() {
   return discovered;
 }
 
-class VoxClient {
+export class VoxClient {
   constructor() {
     this.apiKey = "";
     this.token = "";
@@ -226,7 +247,204 @@ function normalizeImages(matrixImages, catalogImage) {
   };
 }
 
-export async function getCatalog(client) {
+function officialMoviePage(value) {
+  const route = text(value).replace(/^\/+|\/+$/gu, "");
+  if (!route) return "";
+  return absoluteSiteUrl(route.startsWith("movies/") ? `/${route}` : `/movies/${route}`);
+}
+
+export function normalizeMovieInformationCatalog(contentCatalog, fetchedAt = new Date().toISOString()) {
+  const source = Array.isArray(contentCatalog) ? contentCatalog : contentCatalog?.movies || [];
+  const movies = source.map((movie) => {
+    const code = text(movie.hoCode || movie.code || movie.id);
+    const language = text(movie.language);
+    const movieUrl = text(movie.urlDetails || movie.movieUrl);
+    return {
+      code,
+      title: text(movie.title),
+      rating: text(movie.rating),
+      language,
+      languageName: text(movie.languageName) || LANGUAGE_NAMES[language] || language,
+      runtime: Number(movie.runtime ?? movie.runTime ?? movie.duration) || 0,
+      genres: list(movie.genres),
+      synopsis: text(movie.description || movie.synopsis),
+      subtitles: list(movie.subtitles),
+      released: text(movie.releaseDate),
+      movieUrl,
+      sourcePageUrl: officialMoviePage(movieUrl),
+      sourceUrl: MOVIE_INFORMATION_SOURCE_URL,
+    };
+  }).filter((movie) => movie.code && movie.title)
+    .sort((left, right) => left.title.localeCompare(right.title) || left.code.localeCompare(right.code));
+
+  return normalizeCustomerFacingPunctuation({
+    format: MOVIE_INFORMATION_FORMAT,
+    extractedAt: fetchedAt,
+    region: REGION,
+    sourceUrl: MOVIE_INFORMATION_SOURCE_URL,
+    sourcePageUrl: MOVIE_INFORMATION_PAGE_URL,
+    movies,
+  });
+}
+
+function decodeHtmlText(value) {
+  return String(value || "")
+    .replace(/<!--[\s\S]*?-->/gu, " ")
+    .replace(/<style\b[\s\S]*?<\/style>/giu, " ")
+    .replace(/<script\b[\s\S]*?<\/script>/giu, " ")
+    .replace(/<[^>]+>/gu, " ")
+    .replace(/&nbsp;|&#160;/giu, " ")
+    .replace(/&amp;/giu, "&")
+    .replace(/&#(\d+);/gu, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function durationMinutes(hours, minutes) {
+  const hourValue = Number(hours) || 0;
+  const minuteValue = Number(minutes) || 0;
+  const total = hourValue * 60 + minuteValue;
+  return total > 0 && total < 600 ? total : 0;
+}
+
+export function parseOfficialMovieRuntime(html) {
+  const visibleText = decodeHtmlText(html);
+  const hourMinute = visibleText.match(/\bRunning\s*Time\s*:?[\s-]*(?:(\d{1,2})\s*h(?:ours?)?)?\s*(\d{1,2})\s*m(?:in(?:ute)?s?)?\b/iu);
+  if (hourMinute) return durationMinutes(hourMinute[1], hourMinute[2]);
+  const minutesOnly = visibleText.match(/\bRunning\s*Time\s*:?[\s-]*(\d{2,3})\s*(?:minutes?|mins?)\b/iu);
+  if (minutesOnly) return durationMinutes(0, minutesOnly[1]);
+  const serialized = String(html || "").match(/"(?:runningTime|runtime)"\s*:\s*"(?:(\d{1,2})\s*h)?\s*(\d{1,3})\s*m(?:in(?:ute)?s?)?"/iu);
+  return serialized ? durationMinutes(serialized[1], serialized[2]) : 0;
+}
+
+async function fetchOfficialMovieDetailPage(url, { deadline = Date.now() + MOVIE_DETAIL_TOTAL_TIMEOUT_MS } = {}) {
+  let lastError;
+  for (let attempt = 0; attempt < MOVIE_DETAIL_RETRIES; attempt += 1) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) throw new Error("movie detail enrichment deadline exceeded");
+    try {
+      const response = await fetchWithTimeout(url, {
+        headers: { ...BROWSER_HEADERS, accept: "text/html,application/xhtml+xml" },
+      }, Math.min(MOVIE_DETAIL_TIMEOUT_MS, remainingMs));
+      if (response.ok) return await response.text();
+      if (response.status < 500 && response.status !== 429) throw new Error(`HTTP ${response.status}`);
+      lastError = new Error(`HTTP ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    if (attempt + 1 < MOVIE_DETAIL_RETRIES) {
+      const remainingAfterAttempt = deadline - Date.now();
+      if (remainingAfterAttempt <= 0) break;
+      await sleep(Math.min(BACKOFF_MS * 2 ** attempt, remainingAfterAttempt));
+    }
+  }
+  throw new Error(lastError?.message || "official movie detail page request failed");
+}
+
+export async function enrichMovieInformationRuntimes(
+  catalog,
+  {
+    workers = MOVIE_DETAIL_WORKERS,
+    totalTimeoutMs = MOVIE_DETAIL_TOTAL_TIMEOUT_MS,
+    fetchPage = fetchOfficialMovieDetailPage,
+  } = {},
+) {
+  const movies = (catalog?.movies || []).map((movie) => ({
+    ...movie,
+    runtimeStatus: Number(movie.runtime) > 0 ? "content_api" : "not_published",
+    runtimeSourceUrl: Number(movie.runtime) > 0 ? MOVIE_INFORMATION_SOURCE_URL : "",
+    runtimeVerifiedAt: Number(movie.runtime) > 0 ? catalog.extractedAt : "",
+  }));
+  const pending = movies
+    .map((movie, index) => ({ movie, index }))
+    .filter(({ movie }) => !Number(movie.runtime) && movie.sourcePageUrl);
+  const deadline = Date.now() + totalTimeoutMs;
+  let cursor = 0;
+  let enrichedCount = 0;
+  let failedCount = 0;
+  let timedOutCount = 0;
+
+  async function worker(workerIndex) {
+    if (workerIndex) await sleep(workerIndex * 80);
+    while (cursor < pending.length) {
+      const pendingIndex = cursor;
+      cursor += 1;
+      const { movie, index } = pending[pendingIndex];
+      if (Date.now() >= deadline) {
+        movies[index] = { ...movie, runtimeStatus: "deadline_exceeded" };
+        timedOutCount += 1;
+        continue;
+      }
+      try {
+        const html = await fetchPage(movie.sourcePageUrl, { deadline });
+        const runtime = parseOfficialMovieRuntime(html);
+        if (runtime) {
+          movies[index] = {
+            ...movie,
+            runtime,
+            runtimeStatus: "official_detail_page",
+            runtimeSourceUrl: movie.sourcePageUrl,
+            runtimeVerifiedAt: catalog.extractedAt,
+          };
+          enrichedCount += 1;
+        } else {
+          movies[index] = { ...movie, runtimeStatus: "not_published" };
+        }
+      } catch (error) {
+        const deadlineExceeded = Date.now() >= deadline || /deadline|abort/iu.test(String(error?.message || ""));
+        movies[index] = { ...movie, runtimeStatus: deadlineExceeded ? "deadline_exceeded" : "fetch_failed" };
+        if (deadlineExceeded) timedOutCount += 1;
+        else failedCount += 1;
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(workers, MOVIE_DETAIL_WORKERS)) }, (_, index) => worker(index)));
+  return normalizeCustomerFacingPunctuation({
+    ...catalog,
+    movies,
+    detailPageRuntimeEnrichment: {
+      requestedCount: pending.length,
+      enrichedCount,
+      failedCount,
+      timedOutCount,
+      retainedCount: 0,
+      workers: Math.max(1, Math.min(workers, MOVIE_DETAIL_WORKERS)),
+      retries: MOVIE_DETAIL_RETRIES,
+      totalTimeoutMs,
+      source: "official VOX UAE movie detail pages",
+    },
+  });
+}
+
+export function retainPreviouslyVerifiedRuntimes(catalog, previousCatalog) {
+  const previousByCode = new Map((previousCatalog?.movies || []).map((movie) => [movie.code, movie]));
+  let retainedCount = 0;
+  const movies = (catalog?.movies || []).map((movie) => {
+    if (Number(movie.runtime) > 0) return movie;
+    const previous = previousByCode.get(movie.code);
+    const runtimeSourceUrl = String(previous?.runtimeSourceUrl || "");
+    if (!Number(previous?.runtime) || !/^https:\/\/uae\.voxcinemas\.com\/movies\//u.test(runtimeSourceUrl)) return movie;
+    retainedCount += 1;
+    return {
+      ...movie,
+      runtime: previous.runtime,
+      runtimeStatus: "retained_official_detail_page",
+      runtimeSourceUrl,
+      runtimeVerifiedAt: previous.runtimeVerifiedAt || previousCatalog.extractedAt || "",
+    };
+  });
+  return {
+    ...catalog,
+    movies,
+    detailPageRuntimeEnrichment: {
+      ...(catalog.detailPageRuntimeEnrichment || {}),
+      retainedCount,
+    },
+  };
+}
+
+export async function getCatalogBundle(client, fetchedAt = new Date().toISOString()) {
   const [nowShowing, advanceBooking, contentCatalog] = await Promise.all([
     client.fetchJson(`${BASE}/groups/api/MovieMatrix/NowShowingByFilter?region=${REGION}`, "now-showing matrix"),
     client.fetchJson(`${BASE}/groups/api/MovieMatrix/AdvanceBookingByFilter?Region=${REGION}`, "advance-booking matrix"),
@@ -269,7 +487,17 @@ export async function getCatalog(client) {
       });
     }
   }
-  return [...byCode.values()].sort((a, b) => a.title.localeCompare(b.title));
+  const movieInformationCatalog = await enrichMovieInformationRuntimes(
+    normalizeMovieInformationCatalog(contentCatalog, fetchedAt),
+  );
+  return {
+    catalogCandidates: [...byCode.values()].sort((a, b) => a.title.localeCompare(b.title)),
+    movieInformationCatalog,
+  };
+}
+
+export async function getCatalog(client) {
+  return (await getCatalogBundle(client)).catalogCandidates;
 }
 
 async function runJobs(jobs, workers, task) {
@@ -446,7 +674,20 @@ export async function main() {
   const client = new VoxClient();
   console.error(`Discovering official VOX UAE availability from ${startDate} (safety cap ${args.maxDays} days, ${args.workers} workers)`);
   const fetchedAt = new Date().toISOString();
-  const catalogCandidates = await getCatalog(client);
+  const bundle = await getCatalogBundle(client, fetchedAt);
+  const { catalogCandidates } = bundle;
+  let { movieInformationCatalog } = bundle;
+  const movieInformationDestination = resolve(args.movieInformationOutput);
+  const previousMovieInformationPath = resolve(args.previousMovieInformation || args.movieInformationOutput);
+  if (existsSync(previousMovieInformationPath)) {
+    try {
+      const previousMovieInformation = JSON.parse(await readFile(previousMovieInformationPath, "utf8"));
+      movieInformationCatalog = retainPreviouslyVerifiedRuntimes(movieInformationCatalog, previousMovieInformation);
+    } catch (error) {
+      console.error(`Previous movie runtime metadata was not retained: ${error.message}`);
+    }
+  }
+  validateMovieInformationCatalog(movieInformationCatalog, { now: new Date(fetchedAt) });
   const datesByCode = await discoverAvailableDates(client, catalogCandidates, startDate, args.maxDays, args.workers);
   const responses = await crawlSessions(client, catalogCandidates, datesByCode, args.workers);
   const [experiencesPayload, offersPayload] = await Promise.all([
@@ -459,6 +700,8 @@ export async function main() {
   const missingOfficialPosterCodes = catalog.filter((movie) => !movie.posterUrl).map((movie) => movie.code).sort();
   const programmingDates = [...new Set(sessions.map((session) => session.programmingDate))].sort();
   const discoveredProgrammingDates = [...new Set([...datesByCode.values()].flat())].sort();
+  const extractedExperienceMedia = experienceMedia(experiencesPayload, fetchedAt);
+  const extractedOfferMedia = offerMedia(offersPayload, fetchedAt);
   const output = normalizeCustomerFacingPunctuation({
     extractedAt: fetchedAt,
     region: REGION,
@@ -466,8 +709,8 @@ export async function main() {
     catalog,
     cinemas,
     sessions,
-    experienceMedia: experienceMedia(experiencesPayload, fetchedAt),
-    offerMedia: offerMedia(offersPayload, fetchedAt),
+    experienceMedia: extractedExperienceMedia,
+    offerMedia: extractedOfferMedia,
     crawl: {
       startDate,
       maxDays: args.maxDays,
@@ -484,8 +727,8 @@ export async function main() {
       missingOfficialPosterCodes,
       retainedMoviePosterCodes: [],
       retainedMoviePosterCount: 0,
-      freshExperienceMediaCount: experienceMedia.length,
-      freshOfferMediaCount: offerMedia.length,
+      freshExperienceMediaCount: extractedExperienceMedia.length,
+      freshOfferMediaCount: extractedOfferMedia.length,
       experienceMediaPartialResponse: false,
       offerMediaPartialResponse: false,
       retainedExperienceMediaCount: 0,
@@ -502,11 +745,39 @@ export async function main() {
   });
   validate(output);
   const destination = resolve(args.output);
+  if (destination === movieInformationDestination) throw new Error("Schedule and movie-information outputs must use different files");
   const temporary = `${destination}.tmp-${process.pid}`;
-  await mkdir(dirname(destination), { recursive: true });
-  await writeFile(temporary, `${JSON.stringify(output, null, 2)}\n`, "utf8");
-  await rename(temporary, destination);
+  const movieInformationTemporary = `${movieInformationDestination}.tmp-${process.pid}`;
+  const backup = `${destination}.backup-${process.pid}`;
+  const movieInformationBackup = `${movieInformationDestination}.backup-${process.pid}`;
+  const transaction = createAtomicAssetTransaction([
+    [destination, temporary, backup],
+    [movieInformationDestination, movieInformationTemporary, movieInformationBackup],
+  ]);
+  await Promise.all([
+    mkdir(dirname(destination), { recursive: true }),
+    mkdir(dirname(movieInformationDestination), { recursive: true }),
+  ]);
+  try {
+    await Promise.all([
+      writeFile(temporary, `${JSON.stringify(output, null, 2)}\n`, "utf8"),
+      writeFile(movieInformationTemporary, `${JSON.stringify(movieInformationCatalog, null, 2)}\n`, "utf8"),
+    ]);
+    await transaction.promote();
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  } finally {
+    await Promise.all([
+      rm(temporary, { force: true }).catch(() => {}),
+      rm(movieInformationTemporary, { force: true }).catch(() => {}),
+      rm(backup, { force: true }).catch(() => {}),
+      rm(movieInformationBackup, { force: true }).catch(() => {}),
+    ]);
+  }
   console.error(`Wrote ${sessions.length} sessions (${duplicates} duplicates removed), ${catalog.length} scheduled films, ${Object.keys(cinemas).length} cinemas, ${output.experienceMedia.length} experiences and ${output.offerMedia.length} active offers to ${destination}`);
+  console.error(`Wrote ${movieInformationCatalog.movies.length} official information-only movie records to ${movieInformationDestination}`);
   console.error(`Coverage: ${programmingDates[0]} through ${programmingDates.at(-1)} (${programmingDates.length} published programming dates)`);
 }
 

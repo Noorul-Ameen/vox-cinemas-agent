@@ -42,6 +42,14 @@ const odyssey = Object.freeze({
   genres: ["Adventure"],
   language: "English",
 });
+const minions = Object.freeze({
+  id: "minions",
+  title: "Minions & Monsters",
+  rating: "PG",
+  genres: ["Animation", "Comedy", "Family"],
+  language: "English",
+});
+const wake = Object.freeze({ id: "wake", title: "Wake", rating: "18TC", language: "English", genres: ["Horror"] });
 
 function assertNoForbiddenDash(value, message) {
   assert.doesNotMatch(String(value ?? ""), FORBIDDEN_DASH, message);
@@ -195,6 +203,43 @@ assert.equal(
   "moana",
   "an exact visible title must resolve without selecting it",
 );
+for (const query of ["Can I take a 10-year-old?", "Could I bring my child?", "How long is it?", "Show me the trailer."]) {
+  assert.equal(
+    resolveMovieForInformationQuestion({ query, movies: [ezma, wake, moana] }).movie,
+    null,
+    `${query}: generic information words must not fuzzily resolve to Wake or another title`,
+  );
+}
+assert.equal(
+  resolveMovieForInformationQuestion({
+    query: "\u0647\u0644 \u064a\u0645\u0643\u0646\u0646\u064a \u0627\u0635\u0637\u062d\u0627\u0628 \u0637\u0641\u0644 \u0639\u0645\u0631\u0647 10 \u0633\u0646\u0648\u0627\u062a\u061f",
+    movies: [ezma, wake, moana],
+  }).movie,
+  null,
+  "a generic Arabic suitability question must wait for a movie title",
+);
+assert.equal(
+  resolveMovieForInformationQuestion({
+    query: "Can my child watch Minions?",
+    movies: [ezma, moana, odyssey, minions],
+  }).movie?.id,
+  "minions",
+  "an unambiguous partial title must ground child suitability against the full catalog",
+);
+assert.equal(
+  resolveMovieForInformationQuestion({
+    query: "Is Minions and Monsters suitable for children?",
+    movies: [minions],
+  }).movie?.id,
+  "minions",
+  "spoken and and an ampersand in the authoritative title must be equivalent",
+);
+const minionsAmbiguity = resolveMovieForInformationQuestion({
+  query: "Can my child watch Minions?",
+  movies: [minions, { ...minions, id: "minions-return", title: "Minions Return" }],
+});
+assert.equal(minionsAmbiguity.movie, null, "a partial title shared by two catalog entries must not be guessed");
+assert.deepEqual(minionsAmbiguity.candidates.map((movie) => movie.id), ["minions", "minions-return"]);
 assert.equal(
   resolveMovieForInformationQuestion({
     query: "What is this movie's age rating?",
@@ -269,6 +314,15 @@ assert.match(unknownAnswer, /does not provide a verified age rating/i);
 assert.match(unknownAnswer, /cannot confirm child admission/i);
 assert.doesNotMatch(unknownAnswer, /rated (?:G|PG|PG13|PG15|15\+|18\+|21\+|18TC)/i, "unknown metadata must not be inferred from title or genre");
 
+const minionsChildAnswer = buildMovieRatingAnswer({
+  query: "Can my child watch Minions?",
+  movie: minions,
+  locale: "en",
+});
+assert.match(minionsChildAnswer, /Minions & Monsters is rated PG/i);
+assert.match(minionsChildAnswer, /parental guidance/i);
+assertNoForbiddenDash(minionsChildAnswer, "the Minions child-suitability answer must contain no Unicode dash punctuation");
+
 const ambiguousAnswer = buildMovieRatingAnswer({ query: "What is its rating?", movie: ezma, locale: "en" });
 assert.match(ambiguousAnswer, /age rating[\s\S]*review score/i);
 assert.match(ambiguousAnswer, /will not invent a review score/i);
@@ -312,9 +366,9 @@ assert.equal(
   false,
   "a direct rating question must not become a discovery filter mutation",
 );
-assert.match(appSource, /resolveMovieInformation\(safeMessage\)/, "voice routing must resolve information before exact movie selection");
-assert.match(appSource, /resolveMovieInformation\(value\)/, "text routing must resolve information before exact movie selection");
-const directSelectionDeclarations = [...appSource.matchAll(/const directMovieSelection\s*=([\s\S]{0,360}?);/g)];
+assert.match(appSource, /resolveMovieInformation\(safeMessage, \{ isCurrent: voiceTurnIsCurrent \}\)/, "voice routing must resolve information with the current guest-turn guard before exact movie selection");
+assert.match(appSource, /resolveMovieInformation\(value, \{ isCurrent: typedTurnIsCurrent \}\)/, "text routing must resolve information with the current guest-turn guard before exact movie selection");
+const directSelectionDeclarations = [...appSource.matchAll(/(?:const|let) directMovieSelection\s*=([\s\S]{0,360}?);/g)];
 assert.ok(directSelectionDeclarations.length >= 2, "text and voice must each declare guarded direct movie selection");
 for (const [index, match] of directSelectionDeclarations.entries()) {
   assert.match(
@@ -335,8 +389,10 @@ assert.match(
   /movies:\s*enrichedMovies\.map\([\s\S]{0,500}\brating\s*:/,
   "show_movie_selection results must expose each visible movie's rating",
 );
-const showtimesToolStart = appSource.indexOf("show_showtimes:");
-const showtimesToolSource = appSource.slice(showtimesToolStart, appSource.indexOf("show_seat_map:", showtimesToolStart));
+const showtimesToolStart = appSource.indexOf("show_showtimes: async");
+const showtimesToolEnd = appSource.indexOf("show_seat_map: async", showtimesToolStart);
+assert.ok(showtimesToolStart >= 0 && showtimesToolEnd > showtimesToolStart, "show_showtimes client-tool implementation must be present");
+const showtimesToolSource = appSource.slice(showtimesToolStart, showtimesToolEnd);
 assert.match(showtimesToolSource, /\bmovieRating\s*:/, "show_showtimes results must expose the selected movie's rating");
 assert.match(discoveryContextSource, /movie\?\.rating|movie\.rating/, "authoritative discovery context must read each movie's published rating");
 const discoveryRatingContext = buildAuthoritativeDiscoveryContext({

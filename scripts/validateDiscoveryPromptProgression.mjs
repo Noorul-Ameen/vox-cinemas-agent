@@ -7,6 +7,7 @@ import {
   parseAndMergeDiscoveryPreferences,
 } from "../src/lib/discoveryPreferences.js";
 import { buildAuthoritativeDiscoveryContext } from "../src/lib/discoveryResultContext.js";
+import { discoveryQuestionForLocale, localizedStageMessage, localizeDiscoveryStage } from "../src/lib/discoveryPromptLocalization.js";
 import * as vista from "../src/vistaClient.js";
 import { installPublicAssetFetch } from "./lib/installPublicAssetFetch.mjs";
 
@@ -162,7 +163,7 @@ assert.equal(
 );
 
 const guardSource = readNamedFunction(app, "guardMovieDisplayClaim");
-const guardMovieDisplayClaim = Function(`${guardSource}; return guardMovieDisplayClaim;`)();
+const guardMovieDisplayClaim = Function("localizedStageMessage", `${guardSource}; return guardMovieDisplayClaim;`)(localizedStageMessage);
 const falseDisplayClaim = "I've displayed the IMAX movies available at VOX Cinemas, Mall of the Emirates, for July 17th. Please let me know which movie you'd like to see!";
 const guardedMissingDate = guardMovieDisplayClaim(falseDisplayClaim, {
   view: "discovery",
@@ -311,7 +312,7 @@ assert.match(discoveryRoute, /rawTurn && !locationIntent && !directCinemaReply &
 assert.match(discoveryRoute, /directCinemaReply \|\| rawPreferencePatch\.patch\.movieId/, "a direct cinema-only reply must clear any stale pending movie title");
 assert.match(
   discoveryRoute,
-  /const shouldVerifyCinemaList = Boolean\(preferences\.date && \([\s\S]{0,260}preferences\.openChoice/,
+  /const shouldVerifyCinemaList = Boolean\(preferences\.date && \([\s\S]{0,260}hasDiscoveryTimePreference\(preferences\)[\s\S]{0,260}preferences\.openChoice/,
   "a dated city request with an open movie choice must verify each cinema before showing the picker",
 );
 
@@ -320,6 +321,13 @@ const missingCriteriaEnd = app.indexOf("const discoveryQuestion", missingCriteri
 assert.ok(missingCriteriaStart >= 0 && missingCriteriaEnd > missingCriteriaStart, "the discovery missing-criteria integration must remain inspectable");
 const missingCriteriaSource = app.slice(missingCriteriaStart, missingCriteriaEnd);
 assert.match(missingCriteriaSource, /preferences\.openChoice/, "an explicit open choice such as anything is fine must satisfy the preference requirement");
+assert.match(missingCriteriaSource, /hasDiscoveryTimePreference\(preferences\)/, "a complete time range must satisfy the discovery preference requirement without another question");
+assert.match(discoveryRoute, /const hasNarrowingCriteria = Boolean\([\s\S]{0,220}hasDiscoveryTimePreference\(preferences\)/, "nearby cinema verification must apply a retained time range");
+assert.ok((app.match(/preferred time:\s*\$\{formatDiscoveryTimePreference\(retained\)/g) || []).length >= 2, "typed and spoken agent grounding must report the retained time range");
+const discoveryPromptStart = app.indexOf("function DiscoveryPrompt");
+const discoveryPromptEnd = app.indexOf("function LanguageSelector", discoveryPromptStart);
+assert.ok(discoveryPromptStart >= 0 && discoveryPromptEnd > discoveryPromptStart, "the discovery prompt must remain inspectable");
+assert.match(app.slice(discoveryPromptStart, discoveryPromptEnd), /formatDiscoveryTimePreference\(preferences, \{ locale \}\)/, "the visible discovery chips must display a retained time range in the active language");
 assert.match(
   missingCriteriaSource,
   /preferences\.recommendationIntent\s*===\s*["']unsupported_language_afghan["'][\s\S]*missing\.push\(["']unsupported_language_afghan["']\)/,
@@ -330,9 +338,25 @@ assert.ok(discoveryQuestionEnd > missingCriteriaEnd, "the discovery clarificatio
 const discoveryQuestionSource = app.slice(missingCriteriaEnd, discoveryQuestionEnd);
 assert.match(
   discoveryQuestionSource,
-  /field\s*===\s*["']unsupported_language_afghan["'][\s\S]*(?:Afghan|أفغان)/iu,
-  "the discovery prompt must ask a specific Afghan language clarification",
+  /discoveryQuestionForLocale\(missing, requestedLocale\)/,
+  "the discovery prompt must resolve its copy from the active conversation language",
 );
+assert.match(discoveryQuestionForLocale(["unsupported_language_afghan"], "en"), /Afghan-produced.*Dari-language.*Pashto-language/i, "the English discovery prompt must ask a specific Afghan language clarification");
+assert.match(discoveryQuestionForLocale(["unsupported_language_afghan"], "ar"), /أفغانية.*الدارية.*البشتوية/u, "the Arabic discovery prompt must ask a specific Afghan language clarification");
+const retainedEnglishDatePrompt = {
+  view: "discovery",
+  missing: ["date"],
+  question: discoveryQuestionForLocale(["date"], "en"),
+  preferences: { cinemaId: mall.id, cinemaName: mall.name, experience: "IMAX" },
+};
+const retainedArabicDatePrompt = localizeDiscoveryStage(retainedEnglishDatePrompt, "ar");
+assert.equal(retainedArabicDatePrompt.question, discoveryQuestionForLocale(["date"], "ar"), "an English date prompt must localize immediately when the retained journey switches to Arabic");
+assert.deepEqual(retainedArabicDatePrompt.preferences, retainedEnglishDatePrompt.preferences, "localizing a retained prompt must preserve every discovery preference");
+assert.equal(localizeDiscoveryStage(retainedArabicDatePrompt, "en").question, retainedEnglishDatePrompt.question, "the retained date prompt must localize back to English without rebuilding discovery");
+assert.match(discoveryQuestionSource, /cinemaReturnRef\.current\s*=\s*localizeDiscoveryStage/, "a pending cinema-return discovery prompt must follow the selected conversation language");
+assert.match(discoveryQuestionSource, /historyReturnRef\.current\s*=\s*localizeDiscoveryStage/, "a pending history-return discovery prompt must follow the selected conversation language");
+assert.match(discoveryQuestionSource, /offersReturnRef\.current\s*=\s*localizeDiscoveryStage/, "a pending offers-return discovery prompt must follow the selected conversation language");
+assert.match(app, /question=\{discoveryQuestion\(stage\.missing, locale\)\}/, "the visible retained discovery heading must always derive from the active render locale");
 const routeAfghanClarification = discoveryRoute.indexOf('missing.includes("unsupported_language_afghan")');
 const routeAvailabilityLoad = discoveryRoute.indexOf("await loadDiscoveryForCinema");
 assert.ok(
@@ -351,15 +375,17 @@ const voiceGateStart = app.indexOf("if (bookingContext && !directMovieSelection"
 const voiceGateEnd = app.indexOf("if (directMovieSelection)", voiceGateStart);
 assert.ok(voiceGateStart >= 0 && voiceGateEnd > voiceGateStart, "the spoken discovery response gate must remain inspectable");
 const voiceGateSource = app.slice(voiceGateStart, voiceGateEnd);
-assert.match(voiceGateSource, /pendingVoiceDiscoveryTurnRef\.current\s*=\s*\{/, "a spoken discovery request must be retained until the authoritative tool runs");
-assert.match(voiceGateSource, /Call show_movie_selection exactly once now and wait for its response before speaking/, "voice must wait for the existing client tool before making an availability claim");
+assert.match(voiceGateSource, /const routePromise = routeDiscoveryTurn\(safeMessage/, "spoken discovery must run the same local authoritative router as typed discovery");
+assert.match(voiceGateSource, /pendingVoiceDiscoveryTurnRef\.current\s*=\s*\{[\s\S]*routePromise/, "a spoken discovery request must expose one shared promise to a concurrent client-tool call");
+assert.match(voiceGateSource, /voiceDiscoveryResult = await routePromise/, "voice must await the authoritative render before publishing availability context");
+assert.match(voiceGateSource, /Do not call show_movie_selection for this turn/, "the agent must not reopen an already rendered spoken result");
 assert.doesNotMatch(voiceGateSource, /void\s+routeDiscoveryTurn/, "voice must not race a fire-and-forget discovery request against the agent response");
 
 const movieToolStart = app.indexOf("show_movie_selection: async");
 const movieToolEnd = app.indexOf("show_showtimes: async", movieToolStart);
 const movieToolSource = app.slice(movieToolStart, movieToolEnd);
 assert.match(movieToolSource, /const pendingVoiceTurn = pendingVoiceDiscoveryTurnRef\.current/, "show_movie_selection must consume the pending spoken request");
-assert.match(movieToolSource, /await routeDiscoveryTurn\(pendingVoiceTurn\.text/, "the wait-enabled tool must complete local filtering before returning to the voice agent");
+assert.match(movieToolSource, /pendingVoiceTurn\.routePromise[\s\S]*await pendingVoiceTurn\.routePromise[\s\S]*await routeDiscoveryTurn\(pendingVoiceTurn\.text/, "the tool must join an in-flight local route and only create one when no shared promise exists");
 assert.match(movieToolSource, /voiceAvailabilityGate:\s*"completed"/, "the tool result must explicitly report completion of the voice availability gate");
 
 console.log(`Validated bare day 17 and 23 parsing, open-choice progression, live bare-day progression, and grounded IMAX rendering for ${mall.name} on ${selectedMallDate}.`);

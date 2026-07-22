@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolveCinemaCandidate } from "../src/lib/cinemaRouting.js";
 import { filterDiscoveryResults } from "../src/lib/discoveryPreferences.js";
+import { localizedStageMessage } from "../src/lib/discoveryPromptLocalization.js";
 import { nearbyCinemasForCinema, resolveLocationIntent } from "../src/lib/locationRouting.js";
 import { installPublicAssetFetch } from "./lib/installPublicAssetFetch.mjs";
 import * as vista from "../src/vistaClient.js";
@@ -113,7 +114,17 @@ assert.ok(sourceCinema, "the catalog must contain at least one curated nearby-ci
 assert.ok(nearbyCinemasForCinema(cinemas, sourceCinema.id).every((cinema) => cinema.id !== sourceCinema.id), "nearby alternatives must never repeat the selected cinema");
 
 const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
-assert.match(appSource, /noticeByLocale\?\.\[locale\] \|\| stage\.notice/, "location notices must update when the customer explicitly switches the interface language");
+const localizedLocationStage = {
+  view: "cinemas",
+  notice: "No matching location was found.",
+  noticeByLocale: {
+    en: "No matching location was found.",
+    ar: "لم يتم العثور على موقع مطابق.",
+  },
+};
+assert.equal(localizedStageMessage(localizedLocationStage, "notice", "ar"), localizedLocationStage.noticeByLocale.ar, "location notices must update to Arabic when the customer switches the interface language");
+assert.equal(localizedStageMessage(localizedLocationStage, "notice", "en"), localizedLocationStage.noticeByLocale.en, "the retained location notice must switch back to English");
+assert.match(appSource, /CinemaPicker[\s\S]{0,260}notice=\{localizedStageMessage\(stage, "notice", locale\)\}/, "the cinema renderer must resolve retained notices through the shared locale helper");
 assert.match(appSource, /showStage\(\{ view: "cinemas", cinemas: visibleCinemas, notice, noticeByLocale/, "nearby-cinema stages must retain both English and Arabic notice copy");
 
 console.log(`Validated location routing and availability against rolling snapshot date ${programmingDate}.`);

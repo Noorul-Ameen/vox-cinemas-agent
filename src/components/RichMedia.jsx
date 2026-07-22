@@ -4,7 +4,9 @@ import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 import { getExperienceMedia, getMoviePosterUrl, getSupportedImageUrl } from "../mediaData.js";
 import { isCurrentBooking } from "../lib/cancellationRouting.js";
-import BookingQRCode from "./BookingQRCode.jsx";
+import RetryableLazy from "./RetryableLazy.jsx";
+
+const loadBookingQRCode = () => import("./BookingQRCode.jsx");
 
 export function Poster({ tint, title, small, posterUrl }) {
   const { t } = useI18n();
@@ -67,6 +69,18 @@ function Header({ icon, title, sub, onBack }) {
       </div>
     </div>
   );
+}
+
+function uniqueDisplayParts(...values) {
+  const seen = new Set();
+  return values.filter((value) => {
+    const label = String(value || "").trim();
+    if (!label) return false;
+    const key = label.toLocaleUpperCase("en");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function InlineState({ title, onRetry, error = false }) {
@@ -179,8 +193,8 @@ export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRet
                 <div dir="ltr" style={{ flexShrink: 0, fontSize: 24, fontWeight: 700, color: C.text }}>{s.time}</div>
                 <ExperienceThumbnail experience={s.exp} media={s.experienceMedia || s.media} />
                 <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
-                  <div dir="ltr" title={s.exp} style={{ overflow: "hidden", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: expColor(s.exp), textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.exp}</div>
-                  <div dir="ltr" title={s.screen} style={{ overflow: "hidden", fontSize: 11, color: C.muted, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.screen}</div>
+                  <div dir="ltr" title={uniqueDisplayParts(s.exp, s.screen)[0]} style={{ overflow: "hidden", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: expColor(s.exp), textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{uniqueDisplayParts(s.exp, s.screen)[0]}</div>
+                  {uniqueDisplayParts(s.exp, s.screen).slice(1).map((label) => <div key={label} dir="ltr" title={label} style={{ overflow: "hidden", fontSize: 11, color: C.muted, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</div>)}
                 </div>
               </div>
               <div style={{ display: "flex", flexShrink: 0, alignItems: "center", gap: 8 }}>
@@ -230,7 +244,7 @@ export function SeatMap({ movie, session, plan = [], selected = [], requestedTar
   }
   return (
     <div>
-      <Header icon={<Armchair size={16} />} title={<span><bdi dir="auto">{movie.title}</bdi> · <span dir="ltr">{session.time}</span></span>} sub={<span><span dir="ltr">{session.exp} · {session.screen}</span> · {t("seats.tap")}</span>} onBack={onBack} />
+      <Header icon={<Armchair size={16} />} title={<span><bdi dir="auto">{movie.title}</bdi> · <span dir="ltr">{session.time}</span></span>} sub={<span><span dir="ltr">{uniqueDisplayParts(session.exp, session.screen).join(" · ")}</span> · {t("seats.tap")}</span>} onBack={onBack} />
       {notice && <div role="note" style={{ marginBottom: 16, border: `1px solid ${C.warning}`, borderRadius: 10, background: C.warningSoft, padding: "9px 11px", color: C.warning, fontSize: 10, lineHeight: 1.45 }}>{notice === true ? t("seats.demoNotice") : notice}</div>}
       {!notice && pricing?.demo === true && <div role="note" style={{ marginBottom: 16, border: `1px solid ${C.warning}`, borderRadius: 10, background: C.warningSoft, padding: "9px 11px", color: C.warning, fontSize: 10, lineHeight: 1.45 }}>{t("seats.demoPricingNotice")}</div>}
       {pricing?.mode === "quote_required" && <div role="note" style={{ marginBottom: 16, border: `1px solid ${C.border}`, borderRadius: 10, background: C.surfaceAlt, padding: "9px 11px", color: C.text, fontSize: 10, lineHeight: 1.45 }}>{t("seats.quoteRequiredNotice")}</div>}
@@ -272,7 +286,7 @@ export function SeatMap({ movie, session, plan = [], selected = [], requestedTar
       </div>
       <div style={{ marginTop: 24, display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: 12, border: `1px solid ${C.border}`, background: C.surfaceAlt, padding: "12px 16px" }}>
         <div>
-          <div style={{ fontSize: 12, color: C.muted }}>{selected.length ? <>{t("seats.countLabel", { count: selected.length })} <span dir="ltr">{selected.join(", ")}</span></> : t("seats.none")}</div>
+          <div style={{ fontSize: 12, color: C.muted }}>{selected.length ? <>{t(selected.length === 1 ? "seats.oneCountLabel" : "seats.manyCountLabel", { count: selected.length })} <span dir="ltr">{selected.join(", ")}</span></> : t("seats.none")}</div>
           <div role="status" style={{ fontSize: 9, color: C.muted }}>{quoteState?.seatKey === selectedKey && quoteState.loading ? t("seats.pricingUpdating") : exactQuote ? t("seats.priceUpdated") : hasDemoEstimate ? t("seats.demoEstimateLabel") : t("seats.quoteRequiredLabel")}</div>
           {Number.isFinite(total) && <div dir="ltr" style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{formatCurrency(total, totalCurrency)}</div>}
           {exactQuote && Number.isFinite(quotedSubtotal) && <div style={{ marginTop: 3, color: C.muted, fontSize: 9 }}>{t("seats.subtotal")}: <span dir="ltr">{formatCurrency(quotedSubtotal, totalCurrency)}</span>{Number.isFinite(quotedFeeTotal) && quotedFeeTotal > 0 ? <> · {t("seats.fees")}: <span dir="ltr">{formatCurrency(quotedFeeTotal, totalCurrency)}</span></> : null}</div>}
@@ -308,7 +322,10 @@ export function BookingCard({
   const cinemaName = booking.cinemaName || t("booking.unknownCinema");
   const storedPerformanceDate = booking.performanceDate || booking.sourceDate || booking.date;
   const performanceDate = storedPerformanceDate ? formatDate(storedPerformanceDate) : t("booking.unknownDate");
-  const sessionSummary = [booking.experience, booking.screen, booking.showtime].filter(Boolean).join(" · ");
+  const sessionSummaryParts = [booking.experience, booking.screen, booking.showtime]
+    .filter(Boolean)
+    .filter((value, index, values) => values.findIndex((candidate) => String(candidate).trim().toLowerCase() === String(value).trim().toLowerCase()) === index);
+  const sessionSummary = sessionSummaryParts.join(" · ");
   const headerTitle = isDemoCancellation
     ? t("booking.cancelledLocal")
     : isCancelled
@@ -415,7 +432,11 @@ export function BookingCard({
             onRetry={onRequestCancel}
           />
         )}
-        {!cancellationActive && <BookingQRCode booking={{ ...booking, cancelled: isCancelled }} />}
+        {!cancellationActive && (
+          <React.Suspense fallback={<div role="status" style={{ color: C.muted, fontSize: 10 }}>{t("booking.qrLoading")}</div>}>
+            <RetryableLazy loader={loadBookingQRCode} loadingFallback={<div role="status" style={{ color: C.muted, fontSize: 10 }}>{t("booking.qrLoading")}</div>} errorTitle={t("error.title")} retryLabel={t("error.retry")} booking={{ ...booking, cancelled: isCancelled }} />
+          </React.Suspense>
+        )}
         {isCurrent && !cancellationActive ? (
           <button type="button" onClick={onRequestCancel} disabled={!onRequestCancel} style={{ ...cardFootBtn, color: C.danger, opacity: onRequestCancel ? 1 : 0.45, cursor: onRequestCancel ? "pointer" : "not-allowed" }}>
             <RotateCcw size={14} /> {t(isDemo ? "booking.cancelDemo" : "booking.cancelRefund")}

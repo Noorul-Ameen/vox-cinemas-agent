@@ -10,13 +10,22 @@ class ErrorBoundary extends React.Component {
   constructor(p) { super(p); this.state = { err: null }; }
   static getDerivedStateFromError(err) { return { err }; }
   componentDidCatch(err, info) { console.error("Widget error:", err, info); }
+  retry = () => {
+    const message = String(this.state.err?.message || this.state.err || "");
+    const chunkLoadFailed = /failed to fetch dynamically imported module|loading chunk|importing a module script failed|chunkloaderror/i.test(message);
+    if (chunkLoadFailed && typeof window !== "undefined") {
+      window.location.reload();
+      return;
+    }
+    this.setState({ err: null });
+  };
   render() {
     if (this.state.err) {
       return (
         <div dir={this.props.dir} style={{ maxWidth: 420, margin: "40px auto", border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface, boxShadow: `0 18px 48px ${C.shadow}`, padding: 24, color: C.text, fontFamily: "system-ui" }}>
           <h3 style={{ color: C.danger }}>{this.props.t("error.title")}</h3>
           <p dir="auto" style={{ color: C.muted, fontSize: 14 }}>{String(this.state.err?.message || this.state.err)}</p>
-          <button onClick={() => this.setState({ err: null })}
+          <button onClick={this.retry}
             style={{ marginTop: 12, background: C.primary, color: C.onPrimary, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer" }}>
             {this.props.t("error.retry")}
           </button>

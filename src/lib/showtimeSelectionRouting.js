@@ -1,4 +1,5 @@
 import { extractDiscoveryPreferencePatch } from "./discoveryPreferences.js";
+import { parseSpokenShowtimeHourChoice } from "./spokenShowtimeChoice.js";
 
 const INFORMATION_ONLY = /^\s*(?:(?:what|which|when|is there|are there|do you have|tell me)\b|(?:ماذا|متى|ما|هل يوجد|هل توجد)(?=\s|$))|[?؟]\s*$/iu;
 const HOUR_ONLY_CHOICE = /^\s*(?:(?:at|around|about|near|approximately|by|الساعة|حوالي)\s*)?(\d{1,2})\s*(a\s*m|p\s*m|صباحا|صباح|مساء|ليلا)?\s*(?:please|من فضلك)?[.!،]*$/iu;
@@ -33,12 +34,26 @@ export function visibleShowtimeSelectionCandidates({ text, stage } = {}) {
 
   const signal = extractDiscoveryPreferencePatch(value, { expectingTime: true });
   const requestedTime = signal.patch.preferredTime;
-  if (!requestedTime) return [];
 
   const experience = signal.patch.experience?.toUpperCase();
   const visibleSessions = experience
     ? stage.sessions.filter((session) => String(session.exp || session.experience).toUpperCase() === experience)
     : stage.sessions;
+  const spokenHourChoice = parseSpokenShowtimeHourChoice(value);
+  if (spokenHourChoice) {
+    const possibleHours = new Set(spokenHourChoice.hours);
+    const hourMatches = visibleSessions.filter((session) => {
+      const sessionTime = visibleSessionTime(session);
+      return sessionTime
+        && possibleHours.has(sessionTime.hour)
+        && (!spokenHourChoice.minuteSpecified || sessionTime.minute === spokenHourChoice.minute);
+    });
+    if (spokenHourChoice.minuteSpecified) return hourMatches;
+    const onTheHourMatches = hourMatches.filter((session) => visibleSessionTime(session)?.minute === 0);
+    return onTheHourMatches.length ? onTheHourMatches : hourMatches;
+  }
+
+  if (!requestedTime) return [];
   const hourOnlyChoice = value.match(HOUR_ONLY_CHOICE);
   if (hourOnlyChoice) {
     const possibleHours = new Set(possibleHoursForChoice(hourOnlyChoice));

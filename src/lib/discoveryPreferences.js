@@ -9,6 +9,8 @@ export const DISCOVERY_PREFERENCE_KEYS = Object.freeze([
   "date",
   "dateSignal",
   "preferredTime",
+  "timeRangeStart",
+  "timeRangeEnd",
   "timeBand",
   "genre",
   "language",
@@ -24,6 +26,23 @@ export const EMPTY_DISCOVERY_PREFERENCES = Object.freeze(
   Object.fromEntries(DISCOVERY_PREFERENCE_KEYS.map((key) => [key, null])),
 );
 
+export function hasDiscoveryTimePreference(preferences = {}) {
+  return Boolean(
+    preferences.preferredTime
+    || (preferences.timeRangeStart && preferences.timeRangeEnd)
+    || preferences.timeBand
+  );
+}
+
+export function formatDiscoveryTimePreference(preferences = {}, { locale = "en" } = {}) {
+  if (preferences.timeRangeStart && preferences.timeRangeEnd) {
+    return locale === "ar"
+      ? `${preferences.timeRangeStart} إلى ${preferences.timeRangeEnd}`
+      : `${preferences.timeRangeStart} to ${preferences.timeRangeEnd}`;
+  }
+  return preferences.preferredTime || preferences.timeBand || "";
+}
+
 const PREFERENCE_KEY_SET = new Set(DISCOVERY_PREFERENCE_KEYS);
 const TIME_BANDS = Object.freeze({
   morning: [360, 720],
@@ -31,6 +50,100 @@ const TIME_BANDS = Object.freeze({
   evening: [1020, 1440],
   late: [1260, 1800],
 });
+
+const ENGLISH_CLOCK_HOURS = Object.freeze({
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+});
+const ARABIC_CLOCK_HOURS = Object.freeze({
+  "واحد": 1,
+  "واحدة": 1,
+  "الواحدة": 1,
+  "اثنان": 2,
+  "اثنين": 2,
+  "اثنتان": 2,
+  "اثنتين": 2,
+  "اتنين": 2,
+  "الثانية": 2,
+  "ثلاثة": 3,
+  "ثلاثه": 3,
+  "الثالثة": 3,
+  "اربعة": 4,
+  "أربعة": 4,
+  "اربع": 4,
+  "الرابعة": 4,
+  "خمسة": 5,
+  "خمسه": 5,
+  "الخامسة": 5,
+  "ستة": 6,
+  "سته": 6,
+  "السادسة": 6,
+  "سبعة": 7,
+  "سبعه": 7,
+  "السابعة": 7,
+  "ثمانية": 8,
+  "ثمانيه": 8,
+  "الثامنة": 8,
+  "تسعة": 9,
+  "تسعه": 9,
+  "التاسعة": 9,
+  "عشرة": 10,
+  "عشره": 10,
+  "العاشرة": 10,
+  "احد عشر": 11,
+  "أحد عشر": 11,
+  "احدى عشرة": 11,
+  "إحدى عشرة": 11,
+  "الحادية عشرة": 11,
+  "اثنا عشر": 12,
+  "إثنا عشر": 12,
+  "اثني عشر": 12,
+  "اثنتا عشرة": 12,
+  "الثانية عشرة": 12,
+});
+
+const ARABIC_INDIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
+const EASTERN_ARABIC_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
+const normalizeClockDigits = (value) => String(value ?? "").replace(/[٠-٩۰-۹]/gu, (digit) => {
+  const arabicIndic = ARABIC_INDIC_DIGITS.indexOf(digit);
+  if (arabicIndic >= 0) return String(arabicIndic);
+  return String(EASTERN_ARABIC_DIGITS.indexOf(digit));
+});
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const WORD_CLOCK_HOURS = Object.freeze({ ...ENGLISH_CLOCK_HOURS, ...ARABIC_CLOCK_HOURS });
+const CLOCK_HOUR_TOKEN = `(?:${Object.keys(WORD_CLOCK_HOURS)
+  .sort((left, right) => right.length - left.length)
+  .map(escapeRegex)
+  .join("|")}|[0-9]|1[0-9]|2[0-3])`;
+const DAY_PART_TOKEN = "(?:a\\s*m|p\\s*m|night|evening|morning|afternoon|صباحا|صباح|مساء|ليلا)";
+
+function clockHour(value) {
+  const key = normalizeClockDigits(value).toLowerCase().trim();
+  const hour = WORD_CLOCK_HOURS[key] ?? Number(key);
+  return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : null;
+}
+
+function hourForDayPart(hour, dayPart) {
+  const part = String(dayPart || "").toLowerCase();
+  if (/night|ليلا/u.test(part)) {
+    if (hour === 12) return 0;
+    if (hour >= 1 && hour <= 5) return hour;
+    return hour < 12 ? hour + 12 : hour;
+  }
+  if (/p\s*m|evening|afternoon|مساء/u.test(part)) return hour === 12 ? 12 : hour < 12 ? hour + 12 : hour;
+  if (/a\s*m|morning|صباح/u.test(part)) return hour === 12 ? 0 : hour;
+  return hour;
+}
 
 const CINEMA_CITY_BY_ID = Object.freeze({
   "0001": "Dubai",
@@ -149,7 +262,9 @@ const EXPERIENCE_ALIASES = Object.freeze([
 const normalizeText = (value) => String(value ?? "")
   .normalize("NFKC")
   .toLowerCase()
+  .replace(/[٠-٩۰-۹]/gu, (digit) => normalizeClockDigits(digit))
   .replace(/[\u064b-\u065f\u0670]/g, "")
+  .replace(/&/g, " and ")
   .replace(/[_\u2013\u2014-]+/g, " ")
   .replace(/[^\p{L}\p{N}:]+/gu, " ")
   .replace(/\s+/g, " ")
@@ -245,32 +360,67 @@ function canonicalDateSignal(input, { now = new Date(), timeZone = "Asia/Dubai" 
 
 function timeBandFromText(text) {
   if (/\blate(?:\s+at)?\s+night\b|\bafter midnight\b|آخر الليل|بعد منتصف الليل/.test(text)) return "late";
-  if (/\btonight\b|\bevening\b|الليلة|مساء/.test(text)) return "evening";
+  if (/\btonight\b|\bevening\b|\b(?:at|in the)\s+night\b|\bnight\b|الليلة|مساء|ليلا/.test(text)) return "evening";
   if (/\bafternoon\b|بعد الظهر/.test(text)) return "afternoon";
   if (/\bmorning\b|صباح/.test(text)) return "morning";
   return null;
+}
+
+function timeRangeFromText(text, timeBand) {
+  const endpoint = `(${CLOCK_HOUR_TOKEN})(?::([0-5]\\d))?\\s*(?:(?:at|in\\s+the)\\s+)?(${DAY_PART_TOKEN})?`;
+  const rangePattern = new RegExp(
+    `(?:^|\\s)(?:(?:around|between|from|من|بين)\\s+)?${endpoint}\\s*(?:to|through|until|and|إلى|الى|حتى|و)\\s*${endpoint}(?=\\s|$)`,
+    "u",
+  );
+  const match = text.match(rangePattern);
+  if (!match) return null;
+
+  let startHour = clockHour(match[1]);
+  let endHour = clockHour(match[4]);
+  const startMinute = Number(match[2] || 0);
+  const endMinute = Number(match[5] || 0);
+  if (startHour == null || endHour == null || startMinute > 59 || endMinute > 59) return null;
+
+  // A meridiem or day-part supplied on only one endpoint applies to the whole
+  // spoken range ("8 to 10 PM" and "from 8 PM to 10").
+  const startDayPart = match[3] || match[6] || timeBand;
+  const endDayPart = match[6] || match[3] || timeBand;
+  startHour = hourForDayPart(startHour, startDayPart);
+  endHour = hourForDayPart(endHour, endDayPart);
+
+  return {
+    start: `${pad2(startHour)}:${pad2(startMinute)}`,
+    end: `${pad2(endHour)}:${pad2(endMinute)}`,
+  };
 }
 
 function preferredTimeFromText(text, timeBand, { expectingTime = false } = {}) {
   if (/\bnoon\b|منتصف النهار/.test(text)) return "12:00";
   if (/\bmidnight\b|منتصف الليل/.test(text)) return "00:00";
 
-  const meridiemMatch = text.match(/(?:\b(?:at|around|about|near|approximately|by)\s*)?(\d{1,2})(?::(\d{2}))?\s*(a\s*m|p\s*m)\b/);
-  const arabicMatch = text.match(/(?:الساعة|حوالي)\s*(\d{1,2})(?::(\d{2}))?\s*(صباحا|صباح|مساء|ليلا)?/);
-  const twentyFourHourMatch = text.match(/(?:\b(?:at|around|about|near|approximately|by|showtime|time)\s*)\b([01]?\d|2[0-3]):([0-5]\d)\b/);
-  const contextualHourMatch = text.match(/\b(?:at|around|about|near|approximately|by)\s+(\d{1,2})(?::(\d{2}))?\b/);
+  const markedClockPattern = new RegExp(
+    `(?:^|\\s)(?:(?:at|around|about|near|approximately|by|الساعة|حوالي)\\s+)?(${CLOCK_HOUR_TOKEN})(?::([0-5]\\d))?\\s*(?:(?:at|in\\s+the)\\s+)?(${DAY_PART_TOKEN})(?=\\s|$)`,
+    "u",
+  );
+  const contextualClockPattern = new RegExp(
+    `(?:^|\\s)(?:at|around|about|near|approximately|by|الساعة|حوالي)\\s+(${CLOCK_HOUR_TOKEN})(?::([0-5]\\d))?(?=\\s|$)`,
+    "u",
+  );
+  const markedClockMatch = text.match(markedClockPattern);
+  const twentyFourHourMatch = text.match(/(?:\b(?:at|around|about|near|approximately|by|showtime|time)\s*)?\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  const contextualHourMatch = text.match(contextualClockPattern);
   const standaloneClockMatch = text.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
-  const expectedBareHourMatch = expectingTime ? text.match(/^(\d{1,2})(?::(\d{2}))?$/) : null;
-  const match = meridiemMatch || arabicMatch || twentyFourHourMatch || contextualHourMatch || standaloneClockMatch || expectedBareHourMatch;
+  const expectedBarePattern = new RegExp(`^(${CLOCK_HOUR_TOKEN})(?::([0-5]\\d))?$`, "u");
+  const expectedBareHourMatch = expectingTime ? text.match(expectedBarePattern) : null;
+  const match = markedClockMatch || twentyFourHourMatch || contextualHourMatch || standaloneClockMatch || expectedBareHourMatch;
   if (!match) return null;
 
-  let hour = Number(match[1]);
+  let hour = clockHour(match[1]);
   const minute = Number(match[2] || 0);
-  if (!Number.isInteger(hour) || hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  if (hour == null || minute < 0 || minute > 59) return null;
   const marker = String(match[3] || "");
-  if (/p\s*m|مساء|ليلا/.test(marker) && hour < 12) hour += 12;
-  if (/a\s*m|صباح/.test(marker) && hour === 12) hour = 0;
-  if (!marker && hour <= 6 && timeBand === "evening") hour += 12;
+  hour = hourForDayPart(hour, marker);
+  if (!marker && timeBand) hour = hourForDayPart(hour, timeBand);
   return `${pad2(hour)}:${pad2(minute)}`;
 }
 
@@ -298,20 +448,98 @@ function movieTitle(movie) {
   return String(movie?.title ?? movie?.Title ?? movie?.name ?? "").trim();
 }
 
+function uniqueMovieCatalog(movies) {
+  const seen = new Set();
+  return (Array.isArray(movies) ? movies : []).filter((movie) => {
+    const identity = movieIdentity(movie);
+    const title = normalizeText(movieTitle(movie));
+    const key = identity ? `id:${normalizeText(identity)}` : `title:${title}`;
+    if (!title || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+const TITLE_CONNECTOR_TOKENS = new Set(["a", "an", "and", "of", "the"]);
+const TITLE_PARTIAL_BLOCKLIST = new Set([
+  "action", "adventure", "animation", "arabic", "comedy", "documentary", "drama", "english",
+  "family", "fantasy", "french", "german", "hindi", "horror", "imax", "italian", "kids",
+  "malayalam", "movie", "movies", "musical", "mystery", "premier", "romance", "screenx",
+  "showtime", "showtimes", "standard", "tamil", "telugu", "theatre", "thriller", "tonight",
+  "tomorrow", "urdu", "western",
+]);
+
+function distinctiveTitleTokens(value) {
+  return normalizeText(value).split(" ").filter((token) => (
+    token.length >= 4
+    && !TITLE_CONNECTOR_TOKENS.has(token)
+    && !TITLE_PARTIAL_BLOCKLIST.has(token)
+  ));
+}
+
+function hasNaturalTitleReference(text) {
+  const words = normalizeText(text).split(" ").filter(Boolean);
+  return words.length <= 5
+    || /\b(?:book|called|named|rated|rating|see|show|suitable|tell|watch|what|which)\b/.test(text)
+    || /\b(?:i want|i need|tickets for|movie|film)\b/.test(text);
+}
+
 function findMovieInText(text, movies) {
-  return (Array.isArray(movies) ? movies : [])
+  const titleSearchText = text.replace(/\b(?:i want|i need)\s+to\s+go(?:\s+for)?\b/g, "i want");
+  const entries = uniqueMovieCatalog(movies)
     .map((movie) => ({ movie, title: normalizeText(movieTitle(movie)) }))
-    .filter(({ title }) => title.length >= 2 && phraseInText(text, title))
-    .sort((left, right) => right.title.length - left.title.length || movieTitle(left.movie).localeCompare(movieTitle(right.movie)))[0]?.movie || null;
+    .filter(({ title }) => title.length >= 2);
+  const exact = entries
+    .filter(({ title }) => phraseInText(titleSearchText, title))
+    .sort((left, right) => right.title.length - left.title.length || movieTitle(left.movie).localeCompare(movieTitle(right.movie)));
+  if (exact.length) return exact[0].movie;
+  if (!hasNaturalTitleReference(titleSearchText)) return null;
+
+  // A guest often says only the distinctive portion of a published title,
+  // such as "Minions" for "Minions & Monsters". Accept that shorthand only
+  // when it identifies one catalog movie. This is deliberately separate from
+  // the protected fuzzy resolver and never guesses on a tie.
+  const partial = entries.map((entry) => {
+    const matched = distinctiveTitleTokens(entry.title).filter((token) => phraseInText(titleSearchText, token));
+    return { ...entry, matched, score: matched.reduce((total, token) => total + token.length, 0) };
+  }).filter(({ matched }) => matched.length > 0)
+    .sort((left, right) => right.matched.length - left.matched.length || right.score - left.score || right.title.length - left.title.length);
+  if (!partial.length) return null;
+  const best = partial[0];
+  const tied = partial.filter((entry) => entry.matched.length === best.matched.length && entry.score === best.score);
+  return tied.length === 1 ? best.movie : null;
+}
+
+function withoutResolvedCinemaPhrase(text, cinema) {
+  if (!cinema) return text;
+  const cinemaId = String(cinema.id ?? cinema.ID ?? "").trim();
+  const normalizedName = normalizeText(cinema.name ?? cinema.Name ?? "");
+  const phrases = [
+    normalizedName,
+    normalizedName.replace(/^vox\s+/, ""),
+    ...(CINEMA_ALIASES[cinemaId] || []).map(normalizeText),
+  ]
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length);
+  let remaining = ` ${text} `;
+  for (const phrase of new Set(phrases)) {
+    remaining = remaining.split(` ${phrase} `).join(" ");
+  }
+  return remaining.replace(/\s+/g, " ").trim();
 }
 
 const REPLACEMENT_MOVIE_DISCOVERY = /\b(?:any\s+(?:new|different)\s+(?:movie|film)|(?:new|different)\s+(?:movies?|films?))\b|(?:اي|أي)\s+فيلم\s+(?:جديد|مختلف)|فيلم\s+(?:جديد|مختلف)|(?:افلام|أفلام)\s+(?:جديدة|مختلفة|اخرى|أخرى)/iu;
 const SUGGESTED_MOVIE_LIST = /\b(?:suggest|recommend)\b[\s\S]{0,48}\b(?:movies|films)\b|(?:اقترح|رشح)[\s\S]{0,48}(?:افلام|أفلام)/iu;
+const EXPLICIT_CONTENT_REPLACEMENT = /\b(?:i\s+ve\s+|i\s+have\s+|i\s+)?changed?\s+my\s+mind\b|(?:غيرت|غيّرت)\s+رأيي/iu;
 
 const UNSUPPORTED_AFGHAN_LANGUAGE = /\bafghan(?:i)?\b|(?:\u0623|\u0627)\u0641\u063a\u0627\u0646\u064a(?:\u0629|\u0647)?/iu;
 
 function isReplacementMovieDiscovery(text) {
   return REPLACEMENT_MOVIE_DISCOVERY.test(text) || SUGGESTED_MOVIE_LIST.test(text);
+}
+
+function isExplicitContentReplacement(text) {
+  return EXPLICIT_CONTENT_REPLACEMENT.test(text);
 }
 
 function explicitClears(text) {
@@ -324,15 +552,23 @@ function explicitClears(text) {
     ["cinemaId", "cinemaName", "city"].forEach((key) => clear.add(key));
   }
   if (/\b(?:any|another)\s+(?:date|day)\b|اي يوم|أي يوم/.test(text)) ["date", "dateSignal"].forEach((key) => clear.add(key));
-  if (/\b(?:any time|whenever|no time preference)\b|اي وقت|أي وقت/.test(text)) ["preferredTime", "timeBand"].forEach((key) => clear.add(key));
+  if (/\b(?:any time|whenever|no time preference)\b|اي وقت|أي وقت/.test(text)) {
+    ["preferredTime", "timeRangeStart", "timeRangeEnd", "timeBand"].forEach((key) => clear.add(key));
+  }
   if (/\b(?:any genre|no genre preference)\b|اي نوع|أي نوع/.test(text)) ["genre", "audience"].forEach((key) => clear.add(key));
   if (/\b(?:any language|no language preference)\b|اي لغة|أي لغة/.test(text)) clear.add("language");
   if (/\b(?:any (?:format|experience)|regular is fine|no (?:format|experience) preference)\b|اي تجربة|أي تجربة/.test(text)) clear.add("experience");
+  if (isExplicitContentReplacement(text)) {
+    // A content change retains the guest's established place, date, and time,
+    // but cannot safely intersect with an earlier movie or content facet.
+    ["movieId", "movieTitle", "genre", "language", "experience", "audience", "openChoice", "recommendationIntent"]
+      .forEach((key) => clear.add(key));
+  }
   if (/\b(?:any movie|another movie|other movies|something else)\b|فيلم آخر|فيلم اخر/.test(text) || isReplacementMovieDiscovery(text)) {
     ["movieId", "movieTitle"].forEach((key) => clear.add(key));
   }
   if (isReplacementMovieDiscovery(text)) {
-    ["preferredTime", "timeBand"].forEach((key) => clear.add(key));
+    ["preferredTime", "timeRangeStart", "timeRangeEnd", "timeBand"].forEach((key) => clear.add(key));
   }
   if (/\b(?:not for kids|no kids)\b|ليس للاطفال|مش للاطفال/.test(text)) clear.add("audience");
   if (/\b(?:not educational|no educational (?:filter|preference)|without (?:an )?educational (?:filter|preference)|show (?:the )?(?:family|other) options instead)\b|بدون تفضيل تعليمي|ليس تعليميا/.test(text)) clear.add("recommendationIntent");
@@ -382,7 +618,8 @@ export function extractDiscoveryPreferencePatch(input, {
   const text = normalizeText(discoveryInput);
   const patch = {};
   const clear = explicitClears(text);
-  if (!text) return { patch, clear: [...clear], provided: [], hasDiscoverySignal: false };
+  const replacementIntent = isExplicitContentReplacement(text) ? "content" : null;
+  if (!text) return { patch, clear: [...clear], provided: [], hasDiscoverySignal: false, replacementIntent };
 
   const openChoice = isOpenDiscoveryChoiceReply(discoveryInput);
   if (openChoice) {
@@ -409,16 +646,29 @@ export function extractDiscoveryPreferencePatch(input, {
   if (dateResult) Object.assign(patch, dateResult);
 
   const timeBand = timeBandFromText(text);
-  const preferredTime = preferredTimeFromText(text, timeBand, { expectingTime });
-  if (preferredTime) {
+  const timeRange = timeRangeFromText(text, timeBand);
+  const preferredTime = timeRange ? null : preferredTimeFromText(text, timeBand, { expectingTime });
+  if (timeRange) {
+    patch.timeRangeStart = timeRange.start;
+    patch.timeRangeEnd = timeRange.end;
+    clear.add("preferredTime");
+    clear.add("timeBand");
+  } else if (preferredTime) {
     patch.preferredTime = preferredTime;
+    clear.add("timeRangeStart");
+    clear.add("timeRangeEnd");
     clear.add("timeBand");
   } else if (timeBand) {
     patch.timeBand = timeBand;
     clear.add("preferredTime");
+    clear.add("timeRangeStart");
+    clear.add("timeRangeEnd");
   }
 
-  const movie = findMovieInText(text, movies);
+  // A cinema name can share distinctive words with a film title. Once the
+  // cinema has been grounded, do not let that same phrase create a second,
+  // unrelated movie constraint when cinema-specific results are reparsed.
+  const movie = findMovieInText(withoutResolvedCinemaPhrase(text, cinema), movies);
   if (movie) {
     patch.movieId = movieIdentity(movie) || null;
     patch.movieTitle = movieTitle(movie) || null;
@@ -489,7 +739,7 @@ export function extractDiscoveryPreferencePatch(input, {
   }
 
   const suppliedNarrowingPreference = Boolean(
-    patch.movieId || patch.movieTitle || patch.preferredTime || patch.timeBand
+    patch.movieId || patch.movieTitle || patch.preferredTime || patch.timeRangeStart || patch.timeRangeEnd || patch.timeBand
     || patch.genre || patch.language || patch.experience || patch.audience
   );
   if (suppliedNarrowingPreference && !openChoice) clear.add("openChoice");
@@ -502,6 +752,7 @@ export function extractDiscoveryPreferencePatch(input, {
     clear: [...clear].sort(),
     provided,
     hasDiscoverySignal: provided.length > 0,
+    replacementIntent,
   };
 }
 
@@ -538,8 +789,8 @@ export function shouldTreatAsDiscoveryFilterTurn(input, {
   const patch = parsed.patch || {};
   const satisfiesMissing = (fields.has("cinema") && (patch.cinemaId || patch.cinemaName || patch.city))
     || (fields.has("date") && patch.date)
-    || (fields.has("preference") && (patch.movieTitle || patch.genre || patch.language || patch.experience || patch.audience || patch.preferredTime || patch.timeBand))
-    || (fields.has("time") && (patch.preferredTime || patch.timeBand));
+    || (fields.has("preference") && (patch.movieTitle || patch.genre || patch.language || patch.experience || patch.audience || patch.preferredTime || patch.timeRangeStart || patch.timeRangeEnd || patch.timeBand))
+    || (fields.has("time") && (patch.preferredTime || (patch.timeRangeStart && patch.timeRangeEnd) || patch.timeBand));
   return Boolean(parsed.hasDiscoverySignal || satisfiesMissing);
 }
 
@@ -563,6 +814,7 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
     || value.match(/(?:فيلم\s+(?:اسمه|يدعى)|أشاهد|اشاهد|(?:أريد|اريد)\s+فيلم(?:ا[\u064b-\u065f]*)?|(?:اقترح|رشح)(?:\s+لي)?)\s+(.+)/iu);
   let candidateSource = direct?.[1] || "";
   if (candidateSource && direct) {
+    candidateSource = candidateSource.replace(/^\s*to\s+go(?:\s+for)?\s+/iu, "");
     candidateSource = /^(?:at|in|on|في|حوالي)(?:\s|$)/iu.test(candidateSource.trim())
       ? ""
       : candidateSource.split(/\b(?:at|in|on|tomorrow|today|tonight|around|near|after|before|with)\b|(?:\sفي\s|\sغدا|\sغداً|\sاليوم|\sالليلة|\sحوالي|\sبعد|\sقبل|\sمع)/iu)[0].trim();
@@ -620,9 +872,17 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
  * catalog is available, while rejecting tied or weak fuzzy guesses.
  */
 export function resolveDiscoveryMovieCandidate(movies, candidate) {
-  const list = Array.isArray(movies) ? movies : [];
+  const list = uniqueMovieCatalog(movies);
   const query = normalizeText(candidate);
   if (!query) return null;
+  const exact = list.filter((movie) => normalizeText(movieTitle(movie)) === query);
+  if (exact.length === 1) return exact[0];
+  const partial = list.filter((movie) => {
+    const title = normalizeText(movieTitle(movie));
+    if (!title || query.length < 4) return false;
+    return phraseInText(title, query);
+  });
+  if (partial.length === 1) return partial[0];
   const resolved = resolveFilmCandidate(list, candidate);
   if (!resolved) return null;
 
@@ -665,7 +925,7 @@ export function mergeDiscoveryPreferences(current, update = {}) {
   const clearedKeys = changedKeys.filter((key) => previous[key] != null && next[key] == null);
   const resultKeys = new Set(changedKeys.filter((key) => key !== "dateSignal"));
   const movieSelectionKeys = new Set(["cinemaId", "cinemaName", "city", "date", "genre", "language", "experience", "movieId", "movieTitle", "audience", "openChoice", "recommendationIntent"]);
-  const sessionSelectionKeys = new Set([...movieSelectionKeys, "preferredTime", "timeBand"]);
+  const sessionSelectionKeys = new Set([...movieSelectionKeys, "preferredTime", "timeRangeStart", "timeRangeEnd", "timeBand"]);
   const intersects = (keys) => [...resultKeys].some((key) => keys.has(key));
 
   return {
@@ -691,7 +951,7 @@ export function parseAndMergeDiscoveryPreferences(current, input, options = {}) 
 function fieldIsPresent(preferences, field) {
   if (field === "cinema") return Boolean(preferences.cinemaId || preferences.cinemaName);
   if (field === "location") return Boolean(preferences.cinemaId || preferences.cinemaName || preferences.city);
-  if (field === "time") return Boolean(preferences.preferredTime || preferences.timeBand);
+  if (field === "time") return Boolean(preferences.preferredTime || (preferences.timeRangeStart && preferences.timeRangeEnd) || preferences.timeBand);
   if (field === "movie") return Boolean(preferences.movieId || preferences.movieTitle);
   if (field === "movieOrPreference") {
     return Boolean(preferences.movieId || preferences.movieTitle || preferences.genre || preferences.language || preferences.experience || preferences.audience || preferences.openChoice || preferences.recommendationIntent);
@@ -923,20 +1183,66 @@ export function filterDiscoveryResults({
     });
   }
 
+  const hasTimeRange = Boolean(criteria.timeRangeStart && criteria.timeRangeEnd);
+  const requestedTimeLabel = hasTimeRange
+    ? `${criteria.timeRangeStart} to ${criteria.timeRangeEnd}`
+    : criteria.preferredTime;
   const timeMetadata = {
-    requested: Boolean(criteria.preferredTime),
-    requestedTime: criteria.preferredTime,
+    requested: Boolean(criteria.preferredTime || hasTimeRange),
+    requestedTime: requestedTimeLabel,
+    requestedRange: hasTimeRange,
+    rangeStart: hasTimeRange ? criteria.timeRangeStart : null,
+    rangeEnd: hasTimeRange ? criteria.timeRangeEnd : null,
+    rangeSessionCount: 0,
     exactTimeMatch: false,
     exactSessionCount: 0,
     usedNearestFallback: false,
-    matchKind: criteria.preferredTime ? "unavailable" : "not_requested",
+    matchKind: criteria.preferredTime || hasTimeRange ? "unavailable" : "not_requested",
     closestDeltaMinutes: null,
     toleranceMinutes: timeToleranceMinutes,
     closestTimes: [],
   };
 
   let filteredSessions = sortChronologically(baseSessions, programmingDayCutoffHour);
-  if (criteria.preferredTime && baseSessions.length) {
+  if (hasTimeRange && baseSessions.length) {
+    const rangeStart = toMinutes(criteria.timeRangeStart, programmingDayCutoffHour);
+    let rangeEnd = toMinutes(criteria.timeRangeEnd, programmingDayCutoffHour);
+    if (rangeStart != null && rangeEnd != null && rangeEnd < rangeStart) rangeEnd += 1440;
+    const ranked = rangeStart == null || rangeEnd == null ? [] : baseSessions
+      .map((session) => {
+        const minutes = toMinutes(sessionTime(session), programmingDayCutoffHour);
+        const delta = minutes == null
+          ? Infinity
+          : minutes < rangeStart
+            ? rangeStart - minutes
+            : minutes > rangeEnd
+              ? minutes - rangeEnd
+              : 0;
+        return { session, minutes, delta };
+      })
+      .filter((item) => Number.isFinite(item.delta))
+      .sort((left, right) => left.delta - right.delta
+        || left.minutes - right.minutes
+        || sessionStableId(left.session).localeCompare(sessionStableId(right.session)));
+    const inRange = ranked.filter((item) => item.delta === 0);
+    timeMetadata.rangeSessionCount = inRange.length;
+    timeMetadata.closestDeltaMinutes = ranked[0]?.delta ?? null;
+
+    if (inRange.length) {
+      filteredSessions = sortChronologically(inRange.map((item) => item.session), programmingDayCutoffHour);
+      timeMetadata.matchKind = "range";
+    } else {
+      const withinTolerance = ranked.filter((item) => item.delta <= timeToleranceMinutes);
+      const candidates = withinTolerance.length ? withinTolerance : ranked;
+      filteredSessions = candidates
+        .filter((item) => item.delta <= maxFallbackMinutes)
+        .slice(0, Math.max(1, nearestLimit))
+        .map((item) => item.session);
+      timeMetadata.usedNearestFallback = filteredSessions.length > 0;
+      timeMetadata.matchKind = filteredSessions.length ? "nearest" : "unavailable";
+    }
+    timeMetadata.closestTimes = [...new Set(filteredSessions.map(sessionTime).filter(Boolean))];
+  } else if (criteria.preferredTime && baseSessions.length) {
     const requestedMinutes = toMinutes(criteria.preferredTime, programmingDayCutoffHour);
     const ranked = requestedMinutes == null ? [] : baseSessions
       .map((session) => ({
@@ -983,7 +1289,7 @@ export function filterDiscoveryResults({
   let noResultsReason = null;
   if (!filteredMovies.length && !filteredSessions.length) {
     const suppliedContentCriteria = [criteria.experience, criteria.language, criteria.genre, criteria.audience, criteria.movieId || criteria.movieTitle].filter(Boolean);
-    if (criteria.preferredTime && baseSessions.length) noResultsReason = "no_suitable_time";
+    if ((criteria.preferredTime || hasTimeRange) && baseSessions.length) noResultsReason = "no_suitable_time";
     else if (suppliedContentCriteria.length > 1) noResultsReason = "no_results_for_criteria";
     else if (criteria.experience) noResultsReason = "no_experience_match";
     else if (criteria.language) noResultsReason = "no_language_match";

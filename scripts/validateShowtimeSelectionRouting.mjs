@@ -54,6 +54,127 @@ assert.deepEqual(
   "a question about a time must not be converted into showtime candidates",
 );
 
+const spokenLateHourStage = {
+  view: "showtimes",
+  sessions: [
+    { sessionId: "late-ten", time: "22:00", exp: "PREMIER" },
+    { sessionId: "late-eleven", time: "23:00", exp: "THEATRE" },
+    { sessionId: "late-nine", time: "21:20", exp: "IMAX" },
+  ],
+};
+
+const englishHourWords = [
+  ["one", 13],
+  ["two", 14],
+  ["three", 15],
+  ["four", 16],
+  ["five", 17],
+  ["six", 18],
+  ["seven", 19],
+  ["eight", 20],
+  ["nine", 21],
+  ["ten", 22],
+  ["eleven", 23],
+  ["twelve", 12],
+];
+for (const [word, hour] of englishHourWords) {
+  const sessionId = `word-${word}`;
+  const wordStage = {
+    view: "showtimes",
+    sessions: [{ sessionId, time: `${String(hour).padStart(2, "0")}:25`, exp: "PREMIER" }],
+  };
+  assert.equal(
+    resolveVisibleShowtimeSelectionTurn({ text: word, stage: wordStage })?.sessionId,
+    sessionId,
+    `${word}: a bare English number-word hour must ground against the only visible 24-hour session`,
+  );
+  assert.equal(
+    resolveVisibleShowtimeSelectionTurn({ text: `${word} PM`, stage: wordStage })?.sessionId,
+    sessionId,
+    `${word} PM: an English number-word hour with meridiem must ground against the visible 24-hour session`,
+  );
+}
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "ten", stage: spokenLateHourStage })?.sessionId, "late-ten");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "eleven", stage: spokenLateHourStage })?.sessionId, "late-eleven");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "eleven PM", stage: spokenLateHourStage })?.sessionId, "late-eleven");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "the eleven one", stage: spokenLateHourStage })?.sessionId, "late-eleven");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "nine PM", stage: spokenLateHourStage })?.sessionId, "late-nine");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "eleven p m", stage: spokenLateHourStage })?.sessionId, "late-eleven");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "eleven pee em", stage: spokenLateHourStage })?.sessionId, "late-eleven");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "nine p.m.", stage: spokenLateHourStage })?.sessionId, "late-nine");
+assert.equal(
+  resolveVisibleShowtimeSelectionTurn({
+    text: "eleven ay em",
+    stage: { view: "showtimes", sessions: [{ sessionId: "morning-eleven", time: "11:10", exp: "PREMIER" }] },
+  })?.sessionId,
+  "morning-eleven",
+);
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "22:00", stage: spokenLateHourStage })?.sessionId, "late-ten");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "23:00", stage: spokenLateHourStage })?.sessionId, "late-eleven");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "ten at night", stage: spokenLateHourStage })?.sessionId, "late-ten");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "الساعة ١٠ مساء", stage: spokenLateHourStage })?.sessionId, "late-ten");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "الساعة عشرة مساء", stage: spokenLateHourStage })?.sessionId, "late-ten");
+
+const afterMidnightStage = {
+  view: "showtimes",
+  sessions: [
+    { sessionId: "midnight", time: "00:00", exp: "PREMIER" },
+    { sessionId: "one-at-night", time: "01:20", exp: "THEATRE" },
+    { sessionId: "five-at-night", time: "05:15", exp: "IMAX" },
+  ],
+};
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "twelve at night", stage: afterMidnightStage })?.sessionId, "midnight");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "one at night", stage: afterMidnightStage })?.sessionId, "one-at-night");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "five at night", stage: afterMidnightStage })?.sessionId, "five-at-night");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "الساعة اثنا عشر ليلا", stage: afterMidnightStage })?.sessionId, "midnight");
+assert.equal(resolveVisibleShowtimeSelectionTurn({ text: "الساعة واحدة ليلا", stage: afterMidnightStage })?.sessionId, "one-at-night");
+
+const spokenHourAmbiguityStage = {
+  view: "showtimes",
+  sessions: [
+    { sessionId: "morning-eleven", time: "11:00", exp: "PREMIER" },
+    { sessionId: "late-ten-imax", time: "22:00", exp: "IMAX" },
+    { sessionId: "late-ten-theatre", time: "22:00", exp: "THEATRE" },
+    { sessionId: "late-eleven-imax", time: "23:00", exp: "IMAX" },
+    { sessionId: "late-eleven-theatre", time: "23:00", exp: "THEATRE" },
+  ],
+};
+assert.equal(
+  resolveVisibleShowtimeSelectionTurn({ text: "eleven", stage: spokenHourAmbiguityStage }),
+  null,
+  "a word-form hour must preserve AM, PM, and experience ambiguity",
+);
+assert.deepEqual(
+  visibleShowtimeSelectionCandidates({ text: "the eleven one", stage: spokenHourAmbiguityStage }).map((session) => session.sessionId),
+  ["morning-eleven", "late-eleven-imax", "late-eleven-theatre"],
+  "a conversational word-form choice must expose every matching visible candidate",
+);
+assert.equal(
+  resolveVisibleShowtimeSelectionTurn({ text: "eleven PM", stage: spokenHourAmbiguityStage }),
+  null,
+  "an explicit PM hour must remain unresolved when multiple experiences share the visible time",
+);
+assert.deepEqual(
+  visibleShowtimeSelectionCandidates({ text: "22:00", stage: spokenHourAmbiguityStage }).map((session) => session.sessionId),
+  ["late-ten-imax", "late-ten-theatre"],
+  "an explicit 22:00 choice must preserve visible experience ambiguity",
+);
+assert.equal(
+  resolveVisibleShowtimeSelectionTurn({ text: "22:00", stage: spokenHourAmbiguityStage }),
+  null,
+  "an explicit 22:00 choice must not guess between visible experiences",
+);
+assert.deepEqual(
+  visibleShowtimeSelectionCandidates({ text: "23:00", stage: spokenHourAmbiguityStage }).map((session) => session.sessionId),
+  ["late-eleven-imax", "late-eleven-theatre"],
+  "an explicit 24-hour time must stay grounded in every visible matching experience",
+);
+assert.deepEqual(
+  visibleShowtimeSelectionCandidates({ text: "What is at eleven?", stage: spokenHourAmbiguityStage }),
+  [],
+  "a word-form information question must not select a showtime",
+);
+
 for (const informationTurn of ["ما الساعة 9", "ماذا يعرض الساعة 9", "هل يوجد عرض الساعة 9"]) {
   assert.deepEqual(
     visibleShowtimeSelectionCandidates({ text: informationTurn, stage: uniqueHourStage }),

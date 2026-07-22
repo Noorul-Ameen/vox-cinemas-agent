@@ -24,6 +24,9 @@ assert.match(pause, /cancellationPausedRef\.current = true[\s\S]*suspendCancella
 assert.doesNotMatch(pause, /clearSeatSelection|clearPendingOrder|bookingRef\.current\s*=\s*null/, "topic changes must not discard valid booking state");
 
 const restore = between("const restorePausedJourney", "const pausedRestoreContext");
+assert.match(restore, /restoreRequestEpoch = requestEpochRef\.current[\s\S]*restoreSessionEpoch = sessionEpochRef\.current[\s\S]*restoreStageRevision = stageRevisionRef\.current[\s\S]*restoreJourneyId = bookingJourneyIdRef\.current[\s\S]*restorePausedModel = pausedJourneyRef\.current/, "a paused restore must bind the request, session, stage, journey, and exact retained model");
+assert.match(restore, /deviceSessionIsCurrent\(\)[\s\S]*userTurnSequenceRef\.current === restoreUserTurnSequence/, "a reset, logout, timeout, or newer guest turn must invalidate an in-flight restore");
+assert.ok((restore.match(/if \(!restoreIsCurrent\(\)\) return staleRestore/g) || []).length >= 6, "every asynchronous generic restore branch must fail closed before mutating stale state");
 assert.match(restore, /\["checkout", "seatmap", "showtimes", "movies"\]/, "continue my booking must prefer the furthest valid booking step");
 assert.match(restore, /revalidatePausedCheckout/, "checkout restoration must revalidate current data");
 assert.match(restore, /entry\.view === "movies"[\s\S]*vista\.getScheduledFilms[\s\S]*vista\.getCinemaDateSessions/, "movie-card restoration must refresh the current catalog and embedded showtimes");
@@ -37,6 +40,10 @@ assert.match(restore, /targetSelection[\s\S]*activeCancellationMutation\(\) \|\|
 assert.match(restore, /restoreBookingWithoutConfirmation[\s\S]*showStage\(\{ view: "booking", booking: safeBooking \}\)/, "failed cancellation restoration must show a safe booking panel without stale confirmation purpose");
 assert.match(restore, /restorePausedRichStage/, "validated state must be restored through the paused-stage model");
 assert.match(restore, /restoredStageToolGuardRef\.current = \{ view:/, "a restored stage must arm the one-turn delayed-tool guard");
+
+const checkoutRevalidation = between("const revalidatePausedCheckout", "const restorePausedJourney");
+assert.match(checkoutRevalidation, /checkoutIdentityIsCurrent[\s\S]*pendingOrderRef\.current\?\.checkoutId === checkoutId/, "checkout revalidation must retain the exact checkout identity");
+assert.ok((checkoutRevalidation.match(/if \(!checkoutIdentityIsCurrent\(\)\) return staleCheckoutRestore\(\)/g) || []).length >= 7, "checkout identity and lifecycle must be checked after every provider await and before state mutation");
 
 const restoredToolGuard = between("const preservePausedTopicForTool", "const preserveActiveCancellationForTool");
 assert.match(restoredToolGuard, /restored_stage_waiting_for_guest_selection/, "a delayed agent tool must not advance a just-restored panel");

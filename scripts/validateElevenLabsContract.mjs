@@ -77,13 +77,11 @@ function escapeRegExp(value) {
 }
 
 function appHandlerParameterNames(name) {
-  const startMarker = `    ${name}:`;
-  const start = app.indexOf(startMarker);
-  assert.notEqual(start, -1, `${name} must remain registered in App.jsx`);
-  const arrow = app.indexOf("=>", start);
-  assert.notEqual(arrow, -1, `${name} must remain an arrow-function client tool`);
-  const signature = app.slice(start, arrow + 2);
-  const match = signature.match(/\(\{([\s\S]*?)\}\s*=\s*\{\}\)\s*=>$/);
+  // Match only a clientTools handler at its exact object indentation. A tool
+  // name may also appear earlier in guard lookup maps, which is not a runtime
+  // handler and must not be mistaken for its function signature.
+  const handler = new RegExp(`^ {4}${escapeRegExp(name)}:\\s*(?:async\\s*)?\\(\\{([\\s\\S]*?)\\}\\s*=\\s*\\{\\}\\)\\s*=>`, "m");
+  const match = app.match(handler);
   assert.ok(match, `${name} must keep an object-parameter signature with a safe empty-object default`);
   return match[1]
     .split(",")

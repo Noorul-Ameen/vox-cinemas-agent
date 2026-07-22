@@ -3,6 +3,8 @@ import { VOX_FAQ_ENTRIES, buildFaqContextForQuery, classifyFaqActionIntent, reso
 
 const CASES = [
   ["opening hours", "en", "cinema-locations-hours"],
+  ["Where can I park?", "en", "cinema-parking"],
+  ["أين مواقف السيارات؟", "ar", "cinema-parking"],
   ["كيف أستخدم التذكرة الإلكترونية", "ar", "tickets-and-etickets"],
   ["What is IMAX?", "en", "experiences-overview"],
   ["ما هي آيماكس؟", "ar", "experiences-overview"],
@@ -104,6 +106,33 @@ const withLive = serializeFaqContext([hours], {
   liveData: { "cinema-locations-hours": { firstSession: "13:45", cinema: "Selected cinema" } },
 });
 assert.match(withLive, /"cinema":"Selected cinema","firstSession":"13:45"/, "live data must serialize in stable key order");
+
+const parking = resolveFaqOne("Where can I park?", { locale: "en" });
+assert.equal(parking?.id, "cinema-parking", "parking questions need a dedicated journey-aware FAQ route");
+assert.equal(resolveFaqOne("Does Yas Mall have parking?", { locale: "en" })?.id, "cinema-parking", "a named-cinema parking question must outrank generic cinema topics");
+assert.equal(resolveFaqOne("هل توجد مواقف في ياس مول؟", { locale: "ar" })?.id, "cinema-parking", "an Arabic named-cinema parking question must use the same route");
+assert.equal(parking.metadata.provenance, "product", "parking fallback must not claim unverified VOX policy provenance");
+const parkingWithCinema = serializeFaqContext([parking], {
+  locale: "en",
+  maxChars: 4000,
+  liveData: { "cinema-parking": { selectedCinema: "Mall of the Emirates" } },
+});
+assert.match(parkingWithCinema, /"selectedCinema":"Mall of the Emirates"/, "parking context must carry the retained cinema");
+assert.match(parkingWithCinema, /do not ask the guest to repeat it/i, "parking context must prevent a redundant cinema question");
+assert.doesNotMatch(parkingWithCinema, /Official source:/, "the parking fallback must not cite an unrelated policy page");
+
+const namedExperience = resolveFaqOne("Is IMAX available at Yas Mall?", { locale: "en" });
+assert.equal(namedExperience?.id, "experience-availability", "a named-cinema experience question needs the availability route");
+assert.equal(resolveFaqOne("هل آيماكس متاح في ياس مول؟", { locale: "ar" })?.id, "experience-availability", "an Arabic named-cinema experience question needs the same route");
+const namedExperienceContext = serializeFaqContext([namedExperience], {
+  locale: "en",
+  maxChars: 4000,
+  liveData: { "experience-availability": { cinema: "Yas Mall", movie: null, sessions: [] } },
+});
+assert.match(namedExperienceContext, /"cinema":"Yas Mall","movie":null,"sessions":\[\]/, "a named alternative cinema must not receive stale movie or session data");
+assert.doesNotMatch(namedExperienceContext, /Mall of the Emirates/, "named-cinema experience context must not leak a different retained cinema");
+assert.match(namedExperienceContext, /If cinema is supplied, name it and never ask for the cinema again/, "experience guidance must not repeat a cinema already supplied by the guest");
+assert.match(namedExperienceContext, /If movie is null, ask only which movie/, "experience guidance must ask only for the missing movie");
 
 const built = buildFaqContextForQuery("customer care phone number", { locale: "ar", limit: 1 });
 assert.equal(built.matches[0].id, "customer-support");

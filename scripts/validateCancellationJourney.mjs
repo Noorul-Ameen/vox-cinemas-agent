@@ -280,6 +280,14 @@ assert.equal(uniqueTitleContinuation.handled, true, "a displayed movie title mus
 assert.equal(uniqueTitleContinuation.bookingRef, activeB.ref, "one exact displayed title must resolve its booking reference");
 assert.equal(uniqueTitleContinuation.reason, "matched_unique_title");
 
+const ampersandTitleBooking = Object.freeze({ ...activeA, ref: "WLMINIONS", movieTitle: "Minions & Monsters" });
+const ampersandTitleContinuation = resolveCancellationContinuation({
+  text: "Minions and Monsters",
+  stage: { ...selectionStage, candidateRefs: [ampersandTitleBooking.ref] },
+  storedBookings: [ampersandTitleBooking],
+});
+assert.equal(ampersandTitleContinuation.bookingRef, ampersandTitleBooking.ref, "a spoken and must match an ampersand in the displayed cancellation title");
+
 const spokenNumberContinuation = resolveCancellationContinuation({
   text: "Please cancel Active two",
   stage: selectionStage,

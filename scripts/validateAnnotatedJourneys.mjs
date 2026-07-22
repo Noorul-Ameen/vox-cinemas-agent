@@ -3,11 +3,47 @@ import fs from "node:fs";
 import { guardAgentStateClaim } from "../src/lib/agentStateTruth.js";
 import { resolveCinemaCandidate } from "../src/lib/cinemaRouting.js";
 import { isCheckoutSeatEditTurn } from "../src/lib/checkoutConversationRouting.js";
+import { localizedStageMessage } from "../src/lib/discoveryPromptLocalization.js";
 import { STRINGS } from "../src/i18n/strings.js";
 import * as vista from "../src/vistaClient.js";
 import { installPublicAssetFetch } from "./lib/installPublicAssetFetch.mjs";
 
 installPublicAssetFetch();
+
+const guardedShowtimePause = guardAgentStateClaim("The booking process is temporarily paused.", {
+  stage: {
+    view: "showtimes",
+    movie: { title: "The Odyssey" },
+    sessions: [{ sessionId: "s1", time: "22:00" }, { sessionId: "s2", time: "23:00" }],
+  },
+  locale: "en",
+});
+assert.doesNotMatch(guardedShowtimePause, /paused/iu, "customer-facing agent output must never describe a valid showtime step as paused");
+assert.match(guardedShowtimePause, /2 showtime options are shown for The Odyssey/iu, "a false pause claim must be replaced with the actual visible showtime state");
+
+for (const falsePauseClaim of [
+  "I've temporarily paused what was on screen.",
+  "I've paused the current options.",
+]) {
+  const corrected = guardAgentStateClaim(falsePauseClaim, {
+    stage: {
+      view: "showtimes",
+      movie: { title: "The Odyssey" },
+      sessions: [{ sessionId: "s1", time: "22:00" }, { sessionId: "s2", time: "23:00" }],
+    },
+    locale: "en",
+  });
+  assert.doesNotMatch(corrected, /paused/iu, "first-person pause claims must be replaced with the visible state");
+  assert.match(corrected, /2 showtime options are shown for The Odyssey/iu);
+}
+
+const guardedHiddenCheckoutPause = guardAgentStateClaim("Checkout has been temporarily paused.", {
+  stage: { view: "empty" },
+  pendingOrder: { checkoutId: "checkout-1", seats: ["E1", "E2"] },
+  locale: "en",
+});
+assert.doesNotMatch(guardedHiddenCheckoutPause, /paused/iu, "a retained checkout must be described without internal pause terminology");
+assert.match(guardedHiddenCheckoutPause, /preserved but is not currently shown/iu, "a hidden checkout correction must tell the guest how to restore it");
 
 function readNamedFunction(source, name) {
   const start = source.indexOf(`function ${name}(`);
@@ -60,7 +96,7 @@ assert.equal(resolveCinemaCandidate(cinemas, "dcc tonight")?.id, "0001", "DCC mu
 assert.match(app, /replace\(\/\\bdcc\\b\/giu, cinema\.name\)/, "DCC must be expanded before the agent receives the turn");
 
 const movieGuardSource = readNamedFunction(app, "guardMovieDisplayClaim");
-const guardMovieDisplayClaim = Function(`${movieGuardSource}; return guardMovieDisplayClaim;`)();
+const guardMovieDisplayClaim = Function("localizedStageMessage", `${movieGuardSource}; return guardMovieDisplayClaim;`)(localizedStageMessage);
 const falseCinemaMovieClaim = "Great choice! Let's see what's playing at City Centre Deira tonight. Please have a look at the options on your screen.";
 assert.equal(
   guardMovieDisplayClaim(falseCinemaMovieClaim, { view: "cinemas", notice: "Which VOX Cinemas UAE location would you like?" }, "en"),
@@ -75,6 +111,23 @@ assert.equal(
   }),
   "What date would you like to go?",
   "the agent must ask the first locally missing criterion",
+);
+
+assert.equal(
+  guardAgentStateClaim("Yes, IMAX is available at VOX Cinemas Yas Mall. What date would you like to go?", {
+    stage: { view: "discovery", missing: ["date"], question: "What date would you like to go?" },
+    locale: "en",
+  }),
+  "What date would you like to go?",
+  "the agent must not confirm experience availability before the missing date is supplied and verified",
+);
+assert.equal(
+  guardAgentStateClaim("آيماكس متاح في ياس مول. ما التاريخ الذي تفضله؟", {
+    stage: { view: "discovery", missing: ["date"], question: "ما التاريخ الذي تفضّله؟" },
+    locale: "ar",
+  }),
+  "ما التاريخ الذي تفضّله؟",
+  "Arabic output must not confirm experience availability before the missing date is supplied and verified",
 );
 
 for (const { locale, question, unsafeReply } of [

@@ -141,7 +141,10 @@ assert.match(discoveryRouter, /!availableDates\.includes\(preferences\.date\)[\s
 const unavailablePresentation = app.slice(app.indexOf("const showUnavailableProgrammingDate"), app.indexOf("const resolveClientToolProgrammingDate"));
 assert.match(unavailablePresentation, /view:\s*"movies",\s*movies:\s*\[\],\s*error:/, "an unavailable date must replace stale movie or showtime results with an explicit empty state");
 assert.match(unavailablePresentation, /errorCode:\s*"date_unavailable"/, "the date-unavailable state must remain distinguishable from a provider loading error");
-const showShowtimesTool = app.slice(app.indexOf("show_showtimes:"), app.indexOf("show_seat_map:"));
+const showShowtimesStart = app.indexOf("show_showtimes: async");
+const showSeatMapStart = app.indexOf("show_seat_map: async", showShowtimesStart);
+assert.ok(showShowtimesStart >= 0 && showSeatMapStart > showShowtimesStart, "show_showtimes client-tool implementation must be present");
+const showShowtimesTool = app.slice(showShowtimesStart, showSeatMapStart);
 assert.match(showShowtimesTool, /const requestedDateText = toolDate \|\| displayDate \|\| date;/, "show_showtimes must derive its optional date only from declared date fields");
 assert.match(showShowtimesTool, /const visibleMovie = resolveFilm\(movieId\) \|\| resolveFilm\(movieTitle\)/, "show_showtimes must resolve the requested title from the visible list before loading another date");
 assert.match(showShowtimesTool, /resolveVisibleSelectionProgrammingDate\(\{[\s\S]*visibleDate:\s*filmsDateRef\.current[\s\S]*hasVisibleSelection/, "show_showtimes must retain the displayed movie list date");

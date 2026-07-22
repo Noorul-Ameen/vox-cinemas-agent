@@ -130,10 +130,12 @@ const SPOKEN_NUMBER_TOKENS = Object.freeze({
 });
 
 const normalizeCancellationSelector = (value) => normalizeText(value)
+  .replace(/\band\b/g, " ")
   .replace(/\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten)\b/g, (word) => SPOKEN_NUMBER_TOKENS[word] || word)
   .replace(/^(?:please\s+)?(?:select|choose|pick|cancel)\s+(?:(?:the|my)\s+)?(?:(?:booking|reservation|tickets?)\s+)?(?:for\s+)?/, "")
   .replace(/^the\s+/, "")
   .replace(/\s+(?:booking|reservation|tickets?)$/, "")
+  .replace(/\s+/g, " ")
   .trim();
 
 const leavesCancellationTargetSelection = (query) => /^(?:(?:go\s+)?back|never\s*mind|stop|keep\s+(?:it|them|the\s+booking)|do\s+not\s+cancel|dont\s+cancel|start\s+over|new\s+conversation|show|find|browse|book|watch|what|how|why|when|where|which)(?:\s|$)/.test(query)

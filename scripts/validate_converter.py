@@ -11,7 +11,7 @@ converter = module_from_spec(spec)
 spec.loader.exec_module(converter)
 
 compact = converter.read_json(ROOT / "data" / "vox_sessions_08-15Jul.json.gz")
-metadata = converter.read_json(ROOT / "data" / "movie_metadata_08-15Jul.json")
+metadata = converter.read_json(ROOT / "scripts" / "fixtures" / "movie_metadata_08-15Jul.json")
 compact_rows, compact_raw, compact_duplicates = converter.parse_rows(compact)
 converter.validate(compact, metadata, compact_rows, compact_raw)
 

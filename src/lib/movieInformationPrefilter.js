@@ -1,0 +1,5 @@
+const MOVIE_INFORMATION_PATTERN = /\b(?:ratings?|rated|certificates?|classification|review|score|stars?|imdb|rotten\s+tomatoes|year[ -]?old|child|kid|suitable|appropriate|synopsis|plot|story|storyline|what happens|movie summary|film summary|summary of|what(?:'s| is) .{1,80} about|language|subtitles?|runtime|duration|how long|genre|cast|actors?|actress|starring|trailer|preview|teaser|release date|released|premiere date|come out|tell me about|more about|information about|details about|movie details|film details)\b|(?:تصنيف|التصنيف|التصنيفات|تقييم|التقييمات|مراجعة|نجوم|طفل|اطفال|أطفال|ابني|ابنتي|مناسب|قصة|قصه|ملخص|عن ماذا|عن شو|احداث الفيلم|أحداث الفيلم|لغة (?:ال)?فيلم|لغه (?:ال)?فيلم|ترجمة|ترجمه|(?:مدة|مده)(?: الفيلم| فيلم)?|كم دقيقة|كم دقيقه|نوع الفيلم|طاقم التمثيل|الممثل|الممثلة|الممثله|اعلان الفيلم|إعلان الفيلم|تاريخ العرض|تاريخ الاصدار|تاريخ الإصدار|معلومات عن|تفاصيل الفيلم|تفاصيل عن)/iu;
+
+export function isPotentialMovieInformationTurn(value) {
+  return MOVIE_INFORMATION_PATTERN.test(String(value || ""));
+}

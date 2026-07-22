@@ -432,7 +432,80 @@ function editDistance(left, right) {
   return previous[b.length];
 }
 
-function fuzzyMovieFromQuestion(movies, text) {
+const MOVIE_REFERENCE_CONNECTORS = new Set(["a", "an", "and", "of", "the"]);
+const MOVIE_REFERENCE_BLOCKLIST = new Set([
+  "action", "adventure", "animation", "arabic", "certificate", "child", "children", "comedy",
+  "drama", "english", "family", "film", "french", "genre", "hindi", "horror", "kids", "language",
+  "malayalam", "movie", "rating", "runtime", "score", "showtime", "subtitles", "tamil", "telugu",
+  "tonight", "tomorrow", "trailer", "urdu",
+]);
+
+const normalizedMovieReferenceText = (value) => normalizedText(String(value || "").replace(/&/g, " and "));
+
+// Full information questions contain verbs and intent words that are not movie
+// titles. Keep those words out of edit-distance matching so, for example,
+// "take" cannot be treated as a voice typo for the official title "Wake".
+// Explicit movieTitle inputs still use the original token set below.
+const MOVIE_INFORMATION_QUESTION_FILLERS = new Set([
+  "a", "about", "actor", "actors", "actress", "actresses", "age", "aged", "all", "allowed", "an", "and",
+  "appropriate", "are", "bring", "can", "captions", "cast", "certificate", "classification", "could", "daughter",
+  "details", "do", "does", "duration", "film", "for", "genre", "genres", "good", "guest", "have", "how", "i",
+  "imdb", "in", "information", "is", "it", "its", "kid", "kids", "language", "languages", "long", "may", "me",
+  "might", "movie", "my", "of", "old", "our", "parent", "please", "plot", "rating", "rated", "release",
+  "released", "review", "runtime", "score", "see", "should", "show", "someone", "son", "stars", "story",
+  "storyline", "subtitles", "suitable", "summary", "take", "tell", "that", "the", "this", "to", "trailer",
+  "watch", "was", "we", "what", "when", "which", "who", "with", "worth", "would", "year", "years", "you",
+  "your",
+  "\u0647\u0644", "\u064a\u0645\u0643\u0646", "\u064a\u0645\u0643\u0646\u0646\u064a", "\u0627\u0633\u062a\u0637\u064a\u0639",
+  "\u0627\u0635\u0637\u062d\u0627\u0628", "\u0627\u062e\u0630", "\u0637\u0641\u0644", "\u0637\u0641\u0644\u064a",
+  "\u0627\u0637\u0641\u0627\u0644", "\u0627\u0628\u0646\u064a", "\u0628\u0646\u062a\u064a", "\u0627\u0628\u0646\u062a\u064a",
+  "\u0639\u0645\u0631", "\u0639\u0645\u0631\u0647", "\u0639\u0645\u0631\u0647\u0627", "\u0633\u0646\u0629", "\u0633\u0646\u0648\u0627\u062a",
+  "\u0639\u0627\u0645", "\u0627\u0639\u0648\u0627\u0645", "\u0645\u0634\u0627\u0647\u062f\u0629", "\u0627\u0634\u0627\u0647\u062f",
+  "\u0627\u0644\u0641\u064a\u0644\u0645", "\u0641\u064a\u0644\u0645", "\u0645\u0646\u0627\u0633\u0628", "\u0645\u0633\u0645\u0648\u062d",
+  "\u0627\u0644\u0649", "\u0645\u0639", "\u0647\u0630\u0627", "\u0647\u0630\u0647", "\u0645\u0627", "\u0645\u0646", "\u0641\u064a", "\u0639\u0646",
+  "\u0627\u0644\u062a\u0635\u0646\u064a\u0641", "\u0627\u0644\u0639\u0645\u0631\u064a", "\u0627\u0644\u062a\u0642\u064a\u064a\u0645", "\u062a\u0642\u064a\u064a\u0645",
+  "\u0644\u063a\u0629", "\u0645\u062f\u0629", "\u0642\u0635\u0629", "\u0646\u0648\u0639", "\u062a\u0631\u062c\u0645\u0629", "\u0627\u0639\u0644\u0627\u0646",
+  "\u0627\u0635\u062f\u0627\u0631", "\u062a\u0641\u0627\u0635\u064a\u0644",
+  ...Object.keys(ENGLISH_NUMBER_WORDS),
+  ...Object.keys(ARABIC_NUMBER_WORDS),
+].flatMap((value) => normalizedMovieReferenceText(value).split(" ")).filter(Boolean));
+
+function movieInformationQuestionTokens(value) {
+  return normalizedMovieReferenceText(value).split(" ").filter((token) => (
+    token.length >= 3
+    && !/^\d+$/u.test(token)
+    && !MOVIE_INFORMATION_QUESTION_FILLERS.has(token)
+  ));
+}
+
+function distinctiveMovieTitleTokens(value) {
+  return normalizedMovieReferenceText(value).split(" ").filter((token) => (
+    token.length >= 4
+    && !MOVIE_REFERENCE_CONNECTORS.has(token)
+    && !MOVIE_REFERENCE_BLOCKLIST.has(token)
+  ));
+}
+
+function partialMovieReferences(movies, text) {
+  const query = normalizedMovieReferenceText(text);
+  if (!query) return [];
+  const entries = movies.map((movie) => {
+    const title = normalizedMovieReferenceText(movie.title);
+    const matched = distinctiveMovieTitleTokens(title).filter((token) => ` ${query} `.includes(` ${token} `));
+    return {
+      movie,
+      title,
+      matched,
+      score: matched.reduce((total, token) => total + token.length, 0),
+    };
+  }).filter(({ matched }) => matched.length > 0)
+    .sort((left, right) => right.matched.length - left.matched.length || right.score - left.score || right.title.length - left.title.length);
+  if (!entries.length) return [];
+  const best = entries[0];
+  return entries.filter((entry) => entry.matched.length === best.matched.length && entry.score === best.score);
+}
+
+function fuzzyMovieFromQuestion(movies, text, options = {}) {
   const query = normalizedText(text);
   if (!query) return null;
   const exact = movies.filter((movie) => {
@@ -442,7 +515,10 @@ function fuzzyMovieFromQuestion(movies, text) {
   if (exact.length === 1) return exact[0];
   if (exact.length > 1) return exact.sort((left, right) => right.title.length - left.title.length)[0];
 
-  const queryTokens = query.split(" ").filter(Boolean);
+  const queryTokens = options.informationQuestion
+    ? movieInformationQuestionTokens(query)
+    : query.split(" ").filter(Boolean);
+  if (!queryTokens.length) return null;
   const ranked = movies.map((movie) => {
     const titleTokens = normalizedText(movie.title).split(" ").filter(Boolean);
     if (!titleTokens.length) return { movie, matched: 0, distance: Infinity };
@@ -501,9 +577,9 @@ export function resolveMovieForInformationQuestion(options = {}) {
       if (movie?.id && candidate.movie.id) return normalizedText(movie.id) === normalizedText(candidate.movie.id);
       return normalizedText(movie?.title) === normalizedText(candidate.movie.title);
     });
-    return Object.freeze({ movie: entry?.movie || null, source: entry?.source || null, ambiguous: false });
+    return Object.freeze({ movie: entry?.movie || null, source: entry?.source || null, ambiguous: false, candidates: entry?.movie ? [entry.movie] : [] });
   };
-  if (!movies.length) return Object.freeze({ movie: null, source: null, ambiguous: false });
+  if (!movies.length) return Object.freeze({ movie: null, source: null, ambiguous: false, candidates: [] });
 
   const explicitTitle = clean(input.movieTitle || input.movieId);
   if (explicitTitle) {
@@ -511,12 +587,19 @@ export function resolveMovieForInformationQuestion(options = {}) {
     if (explicit) return resultForMovie(explicit);
   }
 
-  const fromQuestion = fuzzyMovieFromQuestion(movies, text);
+  const fromQuestion = fuzzyMovieFromQuestion(movies, text, { informationQuestion: true });
   if (fromQuestion) return resultForMovie(fromQuestion);
+  // Partial catalog grounding is a separate pre-routing layer. The protected
+  // fuzzy resolver above remains unchanged.
+  const partialCandidates = partialMovieReferences(movies, text).map((entry) => entry.movie);
+  if (partialCandidates.length === 1) return resultForMovie(partialCandidates[0]);
+  if (partialCandidates.length > 1) {
+    return Object.freeze({ movie: null, source: null, ambiguous: true, candidates: partialCandidates });
+  }
   if (currentMovie && CURRENT_REFERENCE_PATTERN.test(String(text))) return resultForMovie(currentMovie);
   if (pausedMovie && CURRENT_REFERENCE_PATTERN.test(String(text))) return resultForMovie(pausedMovie);
   if (movies.length === 1) return resultForMovie(movies[0]);
-  return Object.freeze({ movie: null, source: null, ambiguous: true });
+  return Object.freeze({ movie: null, source: null, ambiguous: true, candidates: [] });
 }
 
 function sessionTimes(sessions) {

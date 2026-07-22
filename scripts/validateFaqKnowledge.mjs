@@ -74,4 +74,18 @@ assert.equal(hours.delivery.kind, "api", "cinema locations/hours must be API-dri
 assert.doesNotMatch(hours.answer.en, /\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i, "do not invent fixed cinema hours");
 assert.doesNotMatch(hours.answer.ar, /\b\d{1,2}(?::\d{2})\b/, "do not invent fixed cinema hours in Arabic");
 
+const parking = VOX_FAQ_ENTRIES.find((entry) => entry.id === "cinema-parking");
+assert.ok(parking, "a journey-aware parking fallback is required");
+assert.equal(parking.delivery.kind, "api", "parking guidance must use the retained cinema context");
+assert.deepEqual(parking.delivery.requiredData, ["selectedCinema"], "parking guidance needs only the selected cinema");
+assert.equal(parking.metadata.provenance, "product", "unverified parking details must not be presented as official policy");
+assert.deepEqual(parking.metadata.source, [], "parking guidance must not cite an unrelated official source");
+assert.match(parking.delivery.instruction.en, /do not ask the guest to repeat it/i, "English parking guidance must retain a known cinema");
+assert.match(parking.delivery.instruction.ar, /لا تطلب من الضيف تكراره/u, "Arabic parking guidance must retain a known cinema");
+
+const experienceAvailability = VOX_FAQ_ENTRIES.find((entry) => entry.id === "experience-availability");
+assert.match(experienceAvailability.delivery.instruction.en, /If cinema is supplied[\s\S]*never ask for the cinema again/, "English experience guidance must retain a supplied cinema");
+assert.match(experienceAvailability.delivery.instruction.en, /If movie is null, ask only which movie/, "English experience guidance must ask only for the missing movie");
+assert.match(experienceAvailability.delivery.instruction.ar, /لا تسأل عنها مرة أخرى/u, "Arabic experience guidance must retain a supplied cinema");
+
 console.log(`FAQ knowledge validation passed: ${VOX_FAQ_ENTRIES.length} bilingual entries across ${coveredTopics.size} topics.`);

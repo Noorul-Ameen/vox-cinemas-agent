@@ -146,6 +146,21 @@ assert.match(
   "the deferred transport must retain EU residency",
 );
 
+const movieInformationSentinel = "vox-official-movie-information-v1";
+const movieInformationChunkPaths = filesBelow(path.join(DIST, "assets"))
+  .filter((filePath) => filePath.endsWith(".js"))
+  .filter((filePath) => readFileSync(filePath, "utf8").includes(movieInformationSentinel));
+assert.equal(movieInformationChunkPaths.length, 1, "the production build must contain one deferred official movie-information chunk");
+assert.ok(
+  !initialJavaScriptPaths.includes(movieInformationChunkPaths[0]),
+  "the information-only movie catalog must stay out of initial JavaScript",
+);
+assert.match(
+  readFileSync(movieInformationChunkPaths[0], "utf8"),
+  /Ezma/u,
+  "the deferred official movie-information chunk must retain reference-title coverage",
+);
+
 const shardPaths = filesBelow(SNAPSHOT_ROOT).filter((filePath) => filePath.endsWith(".json"));
 assert.ok(shardPaths.length > 0, "versioned showtime shards are missing from dist/data/vox-snapshot");
 assert.ok(shardPaths.length <= BUDGETS.shardCount, `snapshot shard count exceeds ${BUDGETS.shardCount}`);

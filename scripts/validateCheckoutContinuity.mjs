@@ -100,6 +100,10 @@ for (const [label, source, messageVariable] of [
 const faqPreparation = sliceBetween(app, "const prepareFaqContext", "useEffect(() =>", "FAQ preparation");
 assert.doesNotMatch(faqPreparation, /showStage\(/, "FAQ retrieval must not mutate the stored rich step");
 assert.match(faqPreparation, /preserveBookingIntent[\s\S]*["']checkout["']/, "FAQ handling must preserve checkout booking intent");
+assert.match(faqPreparation, /current\.order\?\.cinemaName[\s\S]*retainedStage\?\.order\?\.cinemaName[\s\S]*cinemaRef\.current\?\.name/, "FAQ handling must recover the selected cinema from checkout, retained stage, or live journey state");
+assert.match(faqPreparation, /const explicitlyMentionedCinema = resolveCinema\(query\)[\s\S]*explicitlyMentionedCinema\?\.name[\s\S]*current\.order\?\.cinemaName/, "an explicitly named FAQ cinema must override retained checkout context without mutating the booking");
+assert.match(faqPreparation, /["']cinema-parking["']:\s*\{\s*selectedCinema:\s*selectedCinemaName/, "parking FAQ context must carry the retained checkout cinema");
+assert.match(faqPreparation, /explicitCinemaOverridesJourney[\s\S]*["']experience-availability["']:[\s\S]*movie:\s*explicitCinemaOverridesJourney \? null[\s\S]*sessions:\s*explicitCinemaOverridesJourney\s*\? \[\]/, "a different cinema named in an experience FAQ must not inherit the checkout movie or sessions");
 assert.doesNotMatch(app, /function FaqPanel|stage\.view === ["']faq["']/, "FAQ answers must remain in the transcript instead of replacing checkout");
 assert.match(app, /pauseRenderingForUnrelatedTurn[\s\S]*pauseRichRenderingForTopicChange/, "an unrelated FAQ must hide the old rich panel while preserving it for restoration");
 
@@ -111,10 +115,11 @@ assert.equal(
 );
 
 const mainRender = sliceBetween(app, "<main ref={scrollRef}", "</main>", "main checkout rendering");
-assert.match(mainRender, /pendingOrder[\s\S]{0,2400}checkout\.resume|checkout\.resume[\s\S]{0,2400}pendingOrder/, "a pending checkout must expose a persistent resume affordance outside checkout");
+assert.match(mainRender, /\{pendingOrder\?\.checkoutId && visibleStageView !== ["']checkout["'] && \([\s\S]{0,2400}checkout\.resume/, "a pending checkout must expose a persistent resume affordance even while its rich stage is hidden for an FAQ");
+assert.doesNotMatch(mainRender, /\{stageVisible && pendingOrder\?\.checkoutId/, "hiding checkout for an FAQ must not hide its return control");
 assert.match(mainRender, /role=["']region["']/, "the pending checkout affordance must be a named region");
 assert.match(mainRender, /aria-label=\{t\(["']checkout\.resume["']\)\}/, "the pending checkout region must have a localized accessible name");
-assert.match(mainRender, /onClick=\{\(\) => \{ void restorePausedJourney\(\{ target: "checkout", source: "ui" \}\); \}\}/, "the visible resume action must use revalidated paused-checkout restoration");
+assert.match(mainRender, /onClick=\{\(\) => \{ beginDirectUiUserTurn\(\); void restorePausedJourney\(\{ target: "checkout", source: "ui" \}\); \}\}/, "the visible resume action must supersede older async turns before revalidated paused-checkout restoration");
 assert.match(mainRender, /<button\b[\s\S]{0,900}t\(["']checkout\.resume["']\)/, "the pending checkout affordance must include a visible localized action");
 
 for (const locale of ["en", "ar"]) {
@@ -182,6 +187,6 @@ assert.ok((checkout.match(/onPaymentStateChange\?\.\(false\)/g) || []).length >=
 const stageTransition = sliceBetween(app, "const showStage", "const commitDiscoveryPreferences", "stage transition guard");
 assert.match(stageTransition, /checkoutPaymentActiveRef\.current/, "stage transitions must inspect active payment authorization");
 assert.match(stageTransition, /stageRef\.current\??\.view\s*===\s*["']checkout["'][\s\S]*next\.view\s*!==\s*["']checkout["']/, "active authorization must block displacement from checkout");
-assert.match(mainRender, /<Checkout\b[\s\S]{0,1200}onPaymentStateChange=/, "App must connect checkout authorization state to the displacement guard");
+assert.match(mainRender, /<RetryableLazy\b[^>]*loader=\{loadCheckout\}[\s\S]{0,1200}onPaymentStateChange=/, "App must connect retryable checkout authorization state to the displacement guard");
 
 console.log("Validated checkout continuity: FAQ hiding with preserved state, exact EN/AR text and voice resume, checkout revalidation, intentional invalidation, edit-seat repricing, payment lock, and completion cleanup.");

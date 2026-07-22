@@ -91,6 +91,34 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
     }),
   }),
   Object.freeze({
+    id: "cinema-parking",
+    topic: "locations_hours",
+    priority: 98,
+    utterances: Object.freeze({
+      en: Object.freeze(["where can i park", "cinema parking", "parking information", "does this cinema have parking", "parking at the cinema", "where is the parking"]),
+      ar: Object.freeze(["أين يمكنني ركن السيارة", "مواقف السينما", "معلومات مواقف السيارات", "هل توجد مواقف في هذه السينما", "أين مواقف السيارات", "مواقف السيارات في السينما"]),
+    }),
+    answer: Object.freeze({
+      en: "Voxi does not currently have verified parking instructions for the selected cinema. Please check the venue's official parking information before you travel.",
+      ar: "لا تتوفر لدى Voxi حاليا إرشادات موثقة لمواقف السيارات في السينما المحددة. يرجى التحقق من معلومات مواقف السيارات الرسمية الخاصة بالموقع قبل التوجه إليه.",
+    }),
+    delivery: Object.freeze({
+      kind: "api",
+      provider: "the current Voxi journey context",
+      requiredData: Object.freeze(["selectedCinema"]),
+      instruction: Object.freeze({
+        en: "If selectedCinema is supplied, name that exact cinema and do not ask the guest to repeat it. Say that verified parking instructions are not available in Voxi and direct the guest to the venue's official parking information. Ask which VOX cinema they mean only when selectedCinema is null.",
+        ar: "إذا كانت selectedCinema متوفرة، فاذكر اسم السينما نفسه ولا تطلب من الضيف تكراره. وضح أن Voxi لا يملك إرشادات موثقة لمواقف السيارات ووجه الضيف إلى معلومات المواقف الرسمية الخاصة بالموقع. اسأل عن السينما فقط عندما تكون selectedCinema فارغة.",
+      }),
+    }),
+    metadata: metadata({
+      tags: { en: ["parking", "park", "car", "cinema", "venue"], ar: ["مواقف", "سيارة", "ركن", "سينما", "موقع"] },
+      source: [],
+      update: apiUpdate("the current Voxi journey context"),
+      provenance: "product",
+    }),
+  }),
+  Object.freeze({
     id: "tickets-and-etickets",
     topic: "tickets",
     priority: 96,
@@ -137,16 +165,16 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
       ar: Object.freeze(["أين تتوفر آيماكس", "أي سينما فيها فور دي إكس", "هل جولد متاحة", "مواعيد تجربة", "هل توجد ماكس في هذه السينما"]),
     }),
     answer: Object.freeze({
-      en: "Experience availability changes by cinema, movie and session. Choose a cinema and movie so I can check the current session formats instead of guessing.",
-      ar: "تتغير التجارب المتاحة حسب السينما والفيلم وموعد العرض. اختر السينما والفيلم لأتحقق من تجارب العروض الحالية بدلاً من التخمين.",
+      en: "Experience availability changes by cinema, movie and session. Keep every cinema or movie already supplied and ask only for the missing selection so current session formats can be checked.",
+      ar: "تتغير التجارب المتاحة حسب السينما والفيلم وموعد العرض. احتفظ بكل سينما أو فيلم تم تحديده واسأل فقط عن الاختيار الناقص حتى يمكن التحقق من تجارب العروض الحالية.",
     }),
     delivery: Object.freeze({
       kind: "api",
       provider: "vista.getSessions",
       requiredData: Object.freeze(["selectedCinema", "selectedMovie", "session.exp"]),
       instruction: Object.freeze({
-        en: "Use only experience labels returned on current sessions for the selected cinema and movie.",
-        ar: "استخدم فقط أسماء التجارب الواردة في العروض الحالية للسينما والفيلم المحددين.",
+        en: "Use only experience labels returned on current sessions for the selected cinema and movie. If cinema is supplied, name it and never ask for the cinema again. If movie is null, ask only which movie. If sessions is empty, do not claim the experience is unavailable.",
+        ar: "استخدم فقط أسماء التجارب الواردة في العروض الحالية للسينما والفيلم المحددين. إذا كانت السينما متوفرة فاذكر اسمها ولا تسأل عنها مرة أخرى. إذا كان movie فارغا فاسأل فقط عن الفيلم. إذا كانت sessions فارغة فلا تدع أن التجربة غير متاحة.",
       }),
     }),
     metadata: metadata({

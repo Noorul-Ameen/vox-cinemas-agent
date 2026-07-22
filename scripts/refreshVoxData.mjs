@@ -2,26 +2,30 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { delimiter, dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { retainMediaOnPartialResponse, retainPreviouslyVerifiedPosters } from "./refreshRetention.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const stamp = `${Date.now()}-${process.pid}`;
 const currentJson = resolve(root, "data/vox_showtimes_full.json");
+const currentMovieInformation = resolve(root, "data/vox_movie_information_catalog.json");
 const currentModule = resolve(root, "src/mockVistaData.js");
 const currentManifest = resolve(root, "src/generated/voxSnapshotManifest.js");
 const currentShardRoot = resolve(root, "public/data/vox-snapshot");
 const nextJson = resolve(root, `data/.vox_showtimes_full.next-${stamp}.json`);
+const nextMovieInformation = resolve(root, `data/.vox_movie_information_catalog.next-${stamp}.json`);
 const nextModule = resolve(root, `src/.mockVistaData.next-${stamp}.js`);
 const nextManifest = resolve(root, `src/generated/.voxSnapshotManifest.next-${stamp}.js`);
 const nextShardRoot = resolve(root, `public/data/.vox-snapshot.next-${stamp}`);
 const backupJson = resolve(root, `data/.vox_showtimes_full.backup-${stamp}.json`);
+const backupMovieInformation = resolve(root, `data/.vox_movie_information_catalog.backup-${stamp}.json`);
 const backupModule = resolve(root, `src/.mockVistaData.backup-${stamp}.js`);
 const backupManifest = resolve(root, `src/generated/.voxSnapshotManifest.backup-${stamp}.js`);
 const backupShardRoot = resolve(root, `public/data/.vox-snapshot.backup-${stamp}`);
 const assetPairs = [
   [currentJson, nextJson, backupJson],
+  [currentMovieInformation, nextMovieInformation, backupMovieInformation],
   [currentModule, nextModule, backupModule],
   [currentManifest, nextManifest, backupManifest],
   [currentShardRoot, nextShardRoot, backupShardRoot],
@@ -29,10 +33,6 @@ const assetPairs = [
 const backedUpPaths = new Set();
 const installedPaths = new Set();
 const python = process.env.PYTHON || (process.platform === "win32" ? "python" : "python3");
-const packageManager = process.env.npm_execpath
-  ? { command: process.execPath, prefix: [process.env.npm_execpath] }
-  : { command: process.platform === "win32" ? "npm.cmd" : "npm", prefix: [] };
-
 function run(command, args, label) {
   console.error(`\n[refresh] ${label}`);
   return new Promise((resolveRun, rejectRun) => {
@@ -46,12 +46,28 @@ function run(command, args, label) {
 }
 
 async function runPackageScript(name) {
-  return run(packageManager.command, [...packageManager.prefix, "run", name], `npm run ${name}`);
+  const packageJson = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
+  const script = packageJson.scripts?.[name];
+  if (!script) throw new Error(`package script ${name} is not defined`);
+  const env = {
+    ...process.env,
+    PATH: `${resolve(root, "node_modules/.bin")}${delimiter}${process.env.PATH || ""}`,
+  };
+  console.error(`\n[refresh] package script ${name}`);
+  return new Promise((resolveRun, rejectRun) => {
+    const child = spawn(script, { cwd: root, env, shell: true, stdio: "inherit" });
+    child.on("error", rejectRun);
+    child.on("exit", (code, signal) => {
+      if (code === 0) resolveRun();
+      else rejectRun(new Error(`package script ${name} failed${signal ? ` with signal ${signal}` : ` with exit code ${code}`}`));
+    });
+  });
 }
 
 async function removeTemporaryFiles() {
   await Promise.all([
     rm(nextJson, { force: true }),
+    rm(nextMovieInformation, { force: true }),
     rm(nextModule, { force: true }),
     rm(nextManifest, { force: true }),
     rm(nextShardRoot, { recursive: true, force: true }),
@@ -100,7 +116,7 @@ async function restoreBackups() {
   }
 }
 
-const backupPaths = [backupJson, backupModule, backupManifest, backupShardRoot];
+const backupPaths = [backupJson, backupMovieInformation, backupModule, backupManifest, backupShardRoot];
 async function removeBackups() {
   await Promise.all(backupPaths.map((path) => rm(path, { recursive: true, force: true }).catch(() => {})));
 }
@@ -122,12 +138,15 @@ try {
   const extractorArgs = [
     resolve(root, "scripts/extractVoxShowtimes.mjs"),
     "--output", nextJson,
+    "--movie-information-output", nextMovieInformation,
+    "--previous-movie-information", currentMovieInformation,
     "--max-days", process.env.VOX_REFRESH_MAX_DAYS || "31",
     "--workers", process.env.VOX_REFRESH_WORKERS || "2",
   ];
   await run(process.execPath, extractorArgs, "extract official VOX UAE schedule");
   await retainPreviouslyVerifiedMedia();
   await run(process.execPath, [resolve(root, "scripts/validateShowtimeRefresh.mjs"), nextJson, currentJson], "validate freshness and completeness");
+  await run(process.execPath, [resolve(root, "scripts/validateMovieInformationCatalog.mjs"), nextMovieInformation, nextJson], "validate official movie information catalog");
   await run(python, [resolve(root, "convert_extraction.py"), nextJson, nextModule], "generate Vista-shaped browser data");
   await run(process.execPath, [
     resolve(root, "scripts/generateSnapshotAssets.mjs"),

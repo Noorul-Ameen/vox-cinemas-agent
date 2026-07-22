@@ -29,8 +29,10 @@ assert.match(voiceStartup, /overrides:\s*conversationSessionOverrides\(activeLoc
 
 const typedMessageFlow = sliceBetween(app, "const sendText", "const sendUiTurn", "typed message flow");
 assert.doesNotMatch(typedMessageFlow, /sessionModeRef\.current\s*===\s*["']voice["']\)\s*return/, "typing must not be disabled during an active voice session");
+assert.doesNotMatch(typedMessageFlow, /deterministicUiStageGuardRef\.current\s*=\s*null/, "a new typed turn must not drop progression protection before async classification can identify an FAQ");
 assert.match(typedMessageFlow, /const ready = sessionModeRef\.current \? true : await startTextSession/, "an existing voice session must be reused for typed messages");
 assert.match(typedMessageFlow, /const agentFacingValue = normalizeCinemaAsrForAgent\(value, details\.cinema\)[\s\S]*conversation\.sendUserMessage\(agentFacingValue\)/, "typed messages must be safely normalized and sent through the active voice or text conversation");
+assert.match(typedMessageFlow, /if \(discoveryRouteResult && stageRef\.current\.view !== ["']loading["']\)[\s\S]*deterministicUiStageGuardRef\.current\s*=\s*\{[\s\S]*view:\s*stageRef\.current\.view/, "a locally routed typed discovery result must be protected from a delayed model display tool");
 const textComposer = sliceBetween(app, '<section aria-label={t("app.conversation")}', "</section>", "text composer");
 assert.match(textComposer, /<input\b[\s\S]*?onKeyDown=\{\(event\) => event\.key === ["']Enter["'][\s\S]*?sendText\(\)/, "the text composer must remain rendered and submit while voice is active");
 
@@ -49,6 +51,7 @@ assert.doesNotMatch(app, /Date\.now\(\)\s*-\s*guard\.advancedAt\s*>/, "determini
 assert.doesNotMatch(app, /\\u0*600[^\n]*\\u0*6ff/i, "Arabic-script detection must not auto-switch the interface language");
 const messageHandler = sliceBetween(app, "onMessage:", "onError:", "conversation message handler");
 assert.match(messageHandler, /resolveLanguageSignal/, "message language changes must pass through the explicit confirmation state machine");
+assert.doesNotMatch(messageHandler, /deterministicUiStageGuardRef\.current\s*=\s*null/, "a new voice turn must not drop progression protection before async classification can identify an FAQ");
 assert.doesNotMatch(messageHandler, /isArabic|arabicScript|\\p\{Script=Arabic\}/iu, "incoming language must not switch from a raw script detector");
 
 assert.match(app, /function LanguageSelector\s*\(/, "an explicit language selector must be rendered");

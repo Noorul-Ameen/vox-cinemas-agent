@@ -1,3 +1,5 @@
+import { discoveryQuestionForLocale } from "./discoveryPromptLocalization.js";
+
 const clean = (value) => String(value || "").replace(/\s+/g, " ").trim();
 
 const seatEditRefusal = (value) => /\b(?:can(?:not|'t)|unable to)\b[\s\S]{0,80}\b(?:change|edit|add|remove)\b[\s\S]{0,80}\bseats?\b|\b(?:new|another) booking\b[\s\S]{0,80}\b(?:change|edit|add|remove|seat)\b|(?:لا يمكن|لا أستطيع|لا استطيع)[\s\S]{0,80}(?:تغيير|تعديل|إضافة|اضافة|حذف)[\s\S]{0,80}(?:المقاعد|مقعد)/iu.test(value);
@@ -14,7 +16,9 @@ const seatMapDisplayClaim = (value) => /\b(?:displayed|shown|opened)\b[\s\S]{0,9
 const bookingSummaryDisplayClaim = (value) => /\b(?:displayed|shown|created|opened)\b[\s\S]{0,90}\bbooking summary\b|\bbooking summary\b[\s\S]{0,90}\b(?:displayed|shown|created|open|on (?:the )?screen)\b|(?:عرضت|أنشأت|انشأت|فتحت)[\s\S]{0,80}(?:ملخص الحجز)/iu.test(value);
 const checkoutInstructionClaim = (value) => /\b(?:complete|finish|continue)\b[\s\S]{0,60}\b(?:your\s+|the\s+)?booking\b[\s\S]{0,60}\b(?:screen|checkout)\b|(?:أكمل|اكمل|تابع)[\s\S]{0,50}(?:الحجز|حجزك)[\s\S]{0,50}(?:الشاشة|الدفع)/iu.test(value);
 const checkoutDisplayClaim = (value) => /\bcheckout\b[\s\S]{0,70}\b(?:displayed|shown|open|on (?:the )?screen)\b|\b(?:displayed|shown|opened)\b[\s\S]{0,70}\bcheckout\b|(?:شاشة الدفع|الدفع)[\s\S]{0,60}(?:مفتوحة|ظاهرة|معروضة)/iu.test(value);
+const pausedProcessClaim = (value) => /\b(?:booking|checkout|seat selection|showtimes?|movie selection|process|journey|step)\b[\s\S]{0,70}\b(?:is|has been|was|remains?)\s+(?:temporarily\s+)?paused\b|\b(?:temporarily\s+)?paused\b[\s\S]{0,70}\b(?:booking|checkout|seat selection|showtimes?|movie selection|process|journey|step)\b|\b(?:i(?:'ve| have)?|we(?:'ve| have)?)\s+(?:temporarily\s+)?paused\b|(?:تم\s+)?(?:إيقاف|ايقاف|تعليق)[\s\S]{0,70}(?:الحجز|الدفع|اختيار المقاعد|مواعيد العرض|الخطوة|العملية)/iu.test(value);
 const referenceOnlyCancellationPrompt = (value) => /\b(?:need|provide|enter|give|have)\b[\s\S]{0,55}\b(?:booking\s+)?(?:reference|ref(?:erence)?\s+number)\b|\bwhat(?:'s| is)\s+(?:the|your)\s+(?:booking\s+)?(?:reference|ref(?:erence)?\s+number)\b|\bdo you have (?:it|the reference)\b|(?:احتاج|أحتاج|أدخل|ادخل|زودني|اعطني|هل لديك|ما هو|ما هي)[\s\S]{0,55}(?:مرجع الحجز|رقم الحجز|المرجع)/iu.test(value);
+const unverifiedAvailabilityClaim = (value) => /\b(?:imax|4dx|max|gold|theatre|kids|premier|movies?|films?|showtimes?|sessions?)\b[\s\S]{0,80}\b(?:is|are)\s+(?:currently\s+)?available\b|(?:آيماكس|فور دي إكس|ماكس|جولد|ثياتر|أفلام|عروض|مواعيد)[\s\S]{0,80}(?:متاح|متاحة|متوفرة)/iu.test(value);
 
 function orderSeatLabels(stage, pendingOrder) {
   const order = pendingOrder || stage?.order || {};
@@ -126,9 +130,10 @@ function conciseMovieChoiceGuidance(stage, locale) {
 function discoveryStepGuidance(stage, locale) {
   const view = stage?.view;
   if (view === "discovery") {
+    const missing = stage?.missing?.[0];
+    if (missing) return discoveryQuestionForLocale(stage.missing, locale);
     const supplied = clean(stage?.question || stage?.error);
     if (supplied) return supplied;
-    const missing = stage?.missing?.[0];
     if (locale === "ar") {
       if (missing === "cinema") return "اختر موقع VOX Cinemas UAE للمتابعة.";
       if (missing === "date") return "اختر تاريخاً للمتابعة.";
@@ -169,9 +174,9 @@ function discoveryStepGuidance(stage, locale) {
   return null;
 }
 
-function requiredDiscoveryClarification(stage) {
+function requiredDiscoveryClarification(stage, locale) {
   if (stage?.view !== "discovery" || stage?.missing?.[0] !== "unsupported_language_afghan") return null;
-  return clean(stage?.question || stage?.error);
+  return discoveryQuestionForLocale(stage.missing, locale);
 }
 
 function wrongDiscoveryQuestion(value, stage) {
@@ -203,14 +208,29 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
   const value = clean(text);
   if (!value) return value;
 
-  const requiredClarification = requiredDiscoveryClarification(stage);
+  const requiredClarification = requiredDiscoveryClarification(stage, locale);
   if (requiredClarification) return requiredClarification;
+
+  if (stage?.view === "discovery" && stage?.missing?.length && unverifiedAvailabilityClaim(value)) {
+    return discoveryStepGuidance(stage, locale) || clean(stage?.question || stage?.error) || value;
+  }
 
   if (overloadedMovieListing(value, stage)) return conciseMovieChoiceGuidance(stage, locale);
 
-  if (wrongDiscoveryQuestion(value, stage)) return clean(stage.question);
+  if (wrongDiscoveryQuestion(value, stage)) return discoveryQuestionForLocale(stage.missing, locale);
   const progressionCorrection = staleProgressionQuestion(value, stage, pendingOrder, locale);
   if (progressionCorrection) return progressionCorrection;
+
+  if (pausedProcessClaim(value)) {
+    if (stage?.view === "checkout") return checkoutGuidance(stage, pendingOrder, locale);
+    if (stage?.view === "seatmap") return seatMapGuidance(locale);
+    const visibleStep = discoveryStepGuidance(stage, locale);
+    if (visibleStep) return visibleStep;
+    if (pendingOrder?.checkoutId) return preservedCheckoutGuidance(pendingOrder, locale);
+    return locale === "ar"
+      ? "تم الاحتفاظ باختياراتك الحالية. تابع من الخطوة الظاهرة، أو أخبرني بالخيار الدقيق الذي تريده."
+      : "Your current selections are retained. Continue from the step shown, or tell me the exact option you want.";
+  }
 
   if (stage?.view === "history"
     && stage?.purpose === "cancellation_target_selection"

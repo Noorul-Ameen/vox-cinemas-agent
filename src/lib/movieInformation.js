@@ -16,6 +16,7 @@ const normalize = (value) => String(value || "")
   .toLocaleLowerCase("en")
   .replace(/[إأآٱ]/g, "ا")
   .replace(/ى/g, "ي")
+  .replace(/&/g, " and ")
   .replace(/[^\p{L}\p{N}+#]+/gu, " ")
   .replace(/\s+/g, " ")
   .trim();
@@ -81,6 +82,29 @@ function languageFor(movie) {
   return clean(movie?.languageName || movie?.language || movie?.LanguageName || movie?.Language);
 }
 
+function namedTitleVariants(movies, query) {
+  const normalizedQuery = ` ${normalize(query)} `;
+  const groups = new Map();
+  for (const movie of uniqueMovies(movies)) {
+    const title = clean(movie?.title || movie?.movieTitle);
+    const titleKey = normalize(title);
+    if (!titleKey || !normalizedQuery.includes(` ${titleKey} `)) continue;
+    if (!groups.has(titleKey)) groups.set(titleKey, []);
+    groups.get(titleKey).push(movie);
+  }
+  return [...groups.entries()]
+    .sort((left, right) => right[0].length - left[0].length)
+    .map(([, variants]) => variants)
+    .find((variants) => variants.length > 1) || [];
+}
+
+function localizedList(values, locale) {
+  const items = [...new Set(values.map(clean).filter(Boolean))];
+  if (items.length <= 1) return items[0] || "";
+  if (items.length === 2) return items.join(locale === "ar" ? " و" : " and ");
+  return `${items.slice(0, -1).join(locale === "ar" ? "، " : ", ")}${locale === "ar" ? "، و" : ", and "}${items.at(-1)}`;
+}
+
 function runtimeFor(movie) {
   const runtime = Number(movie?.runtime ?? movie?.RunTime ?? movie?.duration);
   return Number.isFinite(runtime) && runtime > 0 ? Math.round(runtime) : null;
@@ -114,22 +138,35 @@ function pluralRatingAnswer(movies, locale) {
   ));
 }
 
-function missingMovieAnswer(locale) {
+export function buildMovieTitleClarification(options = {}) {
+  const input = typeof options === "string" ? { locale: options } : options || {};
+  const locale = input.locale === "ar" ? "ar" : "en";
+  const titles = uniqueMovies(input.candidates || [])
+    .map((movie) => clean(movie?.title || movie?.movieTitle))
+    .filter(Boolean)
+    .slice(0, 4);
+  if (titles.length > 1) {
+    return clean(localeText(
+      locale,
+      `Which movie do you mean: ${titles.join(", ")}? Please say one title.`,
+      `أي فيلم تقصد: ${titles.join("، ")}؟ اذكر اسماً واحداً.`,
+    ));
+  }
   return localeText(
     locale,
-    "Which movie do you mean? Please say one title from the current movie list.",
-    "أي فيلم تقصد؟ اذكر اسماً واحداً من قائمة الأفلام الحالية.",
+    "Which movie do you mean? Please say the movie title.",
+    "أي فيلم تقصد؟ اذكر اسم الفيلم.",
   );
 }
 
-function answerForTopic({ topic, movie, query, locale, sessions }) {
+function answerForTopic({ topic, movie, query, locale, sessions, viewerAge }) {
   const title = clean(movie?.title || movie?.movieTitle);
   if (topic === "rating") {
     const meaning = resolveRatingMeaning(query);
     return buildMovieRatingAnswer({
       query,
       movie,
-      viewerAge: extractViewerAge(query),
+      viewerAge: viewerAge ?? extractViewerAge(query),
       locale,
       sessions,
       meaning,
@@ -182,14 +219,85 @@ function answerForTopic({ topic, movie, query, locale, sessions }) {
   if (topic === "cast") return localeText(locale, `The current VOX listing does not provide verified cast details for ${title}, so I will not guess.`, `لا تعرض قائمة ڤوكس الحالية تفاصيل موثقة عن طاقم فيلم ${title}، لذلك لن أخمن.`);
   if (topic === "trailer") return localeText(locale, `A verified trailer link for ${title} is not available in the current widget.`, `لا يتوفر رابط إعلان موثق لفيلم ${title} في الواجهة الحالية.`);
   if (topic === "release") return localeText(locale, `The current VOX listing does not provide a verified release date for ${title}.`, `لا تعرض قائمة ڤوكس الحالية تاريخ إصدار موثقاً لفيلم ${title}.`);
-  return missingMovieAnswer(locale);
+  return buildMovieTitleClarification({ locale });
 }
 
 export function resolveMovieInformationTurn(options = {}) {
   const query = clean(options.query ?? options.text);
   const locale = options.locale === "ar" ? "ar" : "en";
-  const topic = classifyMovieInformationQuestion(query);
+  const forcedTopic = ["rating", "synopsis", "subtitles", "language", "runtime", "genre", "cast", "trailer", "release", "details"].includes(options.forcedTopic)
+    ? options.forcedTopic
+    : null;
+  const topic = forcedTopic || classifyMovieInformationQuestion(query);
   if (!topic) return { handled: false, topic: null, movie: null, answer: "", context: "" };
+  const viewerAge = options.viewerAge ?? extractViewerAge(query);
+
+  const variantCandidates = namedTitleVariants([
+    ...(Array.isArray(options.visibleMovies) ? options.visibleMovies : []),
+    ...(Array.isArray(options.movies) ? options.movies : []),
+  ], query);
+  let explicitVariant = null;
+  if (variantCandidates.length) {
+    const normalizedQuery = ` ${normalize(query)} `;
+    const requestedVariants = variantCandidates.filter((movie) => {
+      const language = normalize(languageFor(movie));
+      return language && normalizedQuery.includes(` ${language} `);
+    });
+    if (requestedVariants.length === 1) explicitVariant = requestedVariants[0];
+    const currentVariant = options.currentMovie || options.stage?.movie || null;
+    const currentId = clean(currentVariant?.id || currentVariant?.movieId);
+    const currentLanguage = languageFor(currentVariant);
+    if (!explicitVariant) {
+      explicitVariant = variantCandidates.find((movie) => currentId && clean(movie?.id || movie?.movieId) === currentId) || null;
+    }
+    const currentTitle = normalize(currentVariant?.title || currentVariant?.movieTitle);
+    const variantTitle = normalize(variantCandidates[0]?.title || variantCandidates[0]?.movieTitle);
+    if (!explicitVariant && currentTitle && currentTitle === variantTitle && currentLanguage) {
+      explicitVariant = variantCandidates.find((movie) => normalize(languageFor(movie)) === normalize(currentLanguage)) || null;
+    }
+    if (!explicitVariant && topic === "language") {
+      const title = clean(variantCandidates[0]?.title || variantCandidates[0]?.movieTitle);
+      const languages = [...new Set(variantCandidates.map(languageFor).filter(Boolean))];
+      const languageList = localizedList(languages, locale);
+      const answer = clean(localeText(
+        locale,
+        `${title} is currently listed in ${languageList}.`,
+        `فيلم ${title} مدرج حاليا باللغات ${languageList}.`,
+      ));
+      return {
+        handled: true,
+        topic,
+        movie: null,
+        variants: variantCandidates,
+        viewerAge,
+        answer,
+        context: [
+          `AUTHORITATIVE MOVIE LANGUAGE VARIANTS: ${JSON.stringify(variantCandidates.map((movie) => ({ id: movie.id || movie.movieId || null, title, language: languageFor(movie) || null })))}`,
+          `Authoritative customer answer: ${answer}`,
+          "Speak the authoritative customer answer exactly once. Do not choose one language variant, select a movie, change filters, call a display tool, or invent another variant.",
+        ].join("\n"),
+      };
+    }
+    if (!explicitVariant) {
+      const title = clean(variantCandidates[0]?.title || variantCandidates[0]?.movieTitle);
+      const languages = [...new Set(variantCandidates.map(languageFor).filter(Boolean))];
+      const languageList = localizedList(languages, locale);
+      const answer = clean(localeText(
+        locale,
+        `${title} has current VOX listings in ${languageList}. Please include the language version in your question so I do not guess.`,
+        `لفيلم ${title} عروض حالية لدى ڤوكس باللغات ${languageList}. يرجى ذكر نسخة اللغة في سؤالك حتى لا أخمن.`,
+      ));
+      return {
+        handled: true,
+        topic,
+        movie: null,
+        variants: variantCandidates,
+        viewerAge,
+        answer,
+        context: `${JSON.stringify(variantCandidates.map((movie) => ({ id: movie.id || movie.movieId || null, title, language: languageFor(movie) || null })))}\nAuthoritative customer answer: ${answer}\nAsk for the exact language version and do not select a movie, change filters, call a display tool, or guess.`,
+      };
+    }
+  }
 
   const visibleMovies = uniqueMovies(options.visibleMovies);
   if (topic === "rating" && PLURAL_REFERENCE_PATTERN.test(query) && visibleMovies.length) {
@@ -198,6 +306,7 @@ export function resolveMovieInformationTurn(options = {}) {
       handled: true,
       topic,
       movie: null,
+      viewerAge,
       answer,
       context: [
         `AUTHORITATIVE VISIBLE MOVIE RATINGS: ${JSON.stringify(visibleMovies.map((movie) => ({ title: clean(movie.title), rating: normalizeMovieRating(movie.rating) })))}`,
@@ -207,7 +316,7 @@ export function resolveMovieInformationTurn(options = {}) {
     };
   }
 
-  const resolution = resolveMovieForInformationQuestion({
+  const resolution = explicitVariant ? { movie: explicitVariant, source: "named_language_variant", ambiguous: false, candidates: [explicitVariant] } : resolveMovieForInformationQuestion({
     query,
     currentMovie: options.currentMovie,
     visibleMovies,
@@ -220,18 +329,19 @@ export function resolveMovieInformationTurn(options = {}) {
     && !/\b(?:of|for|about)\s+[\p{L}\p{N}]/iu.test(query);
   const movie = resolution?.movie || (genericCurrentReference ? options.currentMovie : null);
   if (!movie) {
-    const answer = missingMovieAnswer(locale);
+    const answer = buildMovieTitleClarification({ locale, candidates: resolution?.candidates });
     return {
       handled: true,
       topic,
       movie: null,
+      viewerAge,
       answer,
       context: `${resolution?.ambiguous ? "The movie reference is ambiguous." : "No movie is available in the current context."} Authoritative customer answer: ${answer} Ask only for one movie title. Do not select a movie or restart discovery.`,
     };
   }
 
   const sessions = Array.isArray(options.sessions) ? options.sessions : movie.relevantSessions || [];
-  const answer = clean(answerForTopic({ topic, movie, query, locale, sessions }));
+  const answer = clean(answerForTopic({ topic, movie, query, locale, sessions, viewerAge }));
   const facts = {
     id: movie.id || movie.movieId || null,
     title: clean(movie.title || movie.movieTitle),
@@ -249,5 +359,5 @@ export function resolveMovieInformationTurn(options = {}) {
       `Authoritative customer answer: ${answer}`,
       "Speak the authoritative customer answer exactly once. Do not select a movie, change filters, call a display tool, restart discovery, or invent missing facts.",
     ].join("\n");
-  return { handled: true, topic, movie, answer, context };
+  return { handled: true, topic, movie, viewerAge, answer, context };
 }

@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
+  buildMovieTitleClarification,
   classifyMovieInformationQuestion,
   isLikelyMovieInformationQuestion,
   resolveMovieInformationTurn,
 } from "../src/lib/movieInformation.js";
+import { loadMovieInformationCatalog, mergeMovieInformationCatalog } from "../src/lib/movieInformationCatalog.js";
+import { isPotentialMovieInformationTurn } from "../src/lib/movieInformationPrefilter.js";
 
 const ezma = {
   id: "HO00015828",
@@ -18,6 +21,58 @@ const ezma = {
   relevantSessions: [{ sessionId: "ezma-1755", time: "17:55", exp: "PREMIER" }],
 };
 const family = { id: "family", title: "Family Quest", rating: "PG", runtime: 96, language: "English", genres: ["Animation", "Family"] };
+const minions = {
+  id: "minions",
+  title: "Minions & Monsters",
+  rating: "PG",
+  runtime: 100,
+  language: "English",
+  genres: ["Animation", "Comedy", "Family"],
+};
+
+const repositoryInformationCatalog = await loadMovieInformationCatalog([]);
+const janaNayaganVariants = repositoryInformationCatalog.filter((movie) => movie.title === "Jana Nayagan");
+assert.deepEqual(janaNayaganVariants.map((movie) => movie.languageName), ["Tamil", "Hindi"], "the runtime information catalog must preserve both Jana Nayagan language variants");
+const toxicVariants = repositoryInformationCatalog.filter((movie) => movie.title === "Toxic");
+assert.deepEqual(toxicVariants.map((movie) => movie.languageName), ["Kannada", "Hindi", "Tamil", "Malayalam"], "the runtime information catalog must preserve all Toxic language variants");
+const janaLanguageAnswer = resolveMovieInformationTurn({ query: "What language is Jana Nayagan?", locale: "en", movies: repositoryInformationCatalog });
+assert.equal(janaLanguageAnswer.movie, null, "a title-level language question must not silently choose one official variant");
+assert.match(janaLanguageAnswer.answer, /Tamil and Hindi/, "Jana Nayagan language guidance must report both current variants");
+const toxicLanguageAnswer = resolveMovieInformationTurn({ query: "What language is Toxic?", locale: "en", movies: repositoryInformationCatalog });
+assert.match(toxicLanguageAnswer.answer, /Kannada, Hindi, Tamil, and Malayalam/, "Toxic language guidance must report every current variant");
+const toxicRuntimeClarification = resolveMovieInformationTurn({ query: "How long is Toxic?", locale: "en", movies: repositoryInformationCatalog });
+assert.equal(toxicRuntimeClarification.movie, null, "a variant-specific fact must not use an arbitrary same-title record");
+assert.match(toxicRuntimeClarification.answer, /include the language version/i, "a variant-specific fact must request the exact language version");
+const toxicHindiRuntime = resolveMovieInformationTurn({ query: "How long is Toxic in Hindi?", locale: "en", movies: repositoryInformationCatalog });
+assert.equal(toxicHindiRuntime.movie?.id, "HO00015727", "an explicitly named language variant must resolve by official code");
+assert.match(toxicHindiRuntime.answer, /150 minutes/, "the selected Toxic Hindi variant must use its official runtime");
+const unrelatedHindiContext = resolveMovieInformationTurn({
+  query: "How long is Jana Nayagan?",
+  locale: "en",
+  currentMovie: { id: "other-hindi", title: "Another Movie", languageName: "Hindi", runtime: 100 },
+  movies: repositoryInformationCatalog,
+});
+assert.equal(unrelatedHindiContext.movie, null, "an unrelated current movie language must not select a same-title variant");
+assert.match(unrelatedHindiContext.answer, /include the language version/i, "an unqualified Jana Nayagan fact must clarify the variant");
+const explicitHindiOverCurrentTamil = resolveMovieInformationTurn({
+  query: "How long is Jana Nayagan in Hindi?",
+  locale: "en",
+  currentMovie: janaNayaganVariants.find((movie) => movie.languageName === "Tamil"),
+  movies: repositoryInformationCatalog,
+});
+assert.equal(explicitHindiOverCurrentTamil.movie?.id, "HO00015544", "an explicitly requested language must override a different current variant");
+const arabicJanaLanguageAnswer = resolveMovieInformationTurn({ query: "ما لغة فيلم Jana Nayagan؟", locale: "ar", movies: repositoryInformationCatalog });
+assert.equal(isPotentialMovieInformationTurn("ما لغة فيلم Jana Nayagan؟"), true, "the App prefilter must route a mixed Latin-title Arabic language question into the local movie-information resolver");
+assert.match(arabicJanaLanguageAnswer.answer, /Tamil وHindi/u, "Arabic language guidance must retain both Jana Nayagan variants");
+const repositoryEzma = repositoryInformationCatalog.find((movie) => movie.title === "Ezma");
+assert.ok(repositoryEzma, "the App information catalog must retain verified Ezma metadata when it leaves the active showtime schedule");
+assert.equal(repositoryEzma.rating, "PG15");
+assert.equal(repositoryEzma.id, "HO00015828");
+const fresherEzma = { ...repositoryEzma, rating: "PG", runtime: 106, synopsis: "", genres: [] };
+const mergedInformationCatalog = mergeMovieInformationCatalog([fresherEzma], [repositoryEzma]);
+assert.equal(mergedInformationCatalog.find((movie) => movie.title === "Ezma")?.rating, "PG", "current schedule metadata must override the information-only reference record with the same title");
+assert.equal(mergedInformationCatalog.find((movie) => movie.title === "Ezma")?.synopsis, repositoryEzma.synopsis, "empty schedule metadata must not erase a useful official fallback synopsis");
+assert.deepEqual(mergedInformationCatalog.find((movie) => movie.title === "Ezma")?.genres, repositoryEzma.genres, "empty schedule arrays must not erase useful official fallback genres");
 
 const cases = [
   ["Can I take my 10 year old to Exma?", "rating"],
@@ -57,6 +112,148 @@ assert.match(ageAnswer.answer, /10/);
 assert.match(ageAnswer.answer, /15 or older/i);
 assert.doesNotMatch(ageAnswer.answer, /check (?:the|its) rating|look elsewhere/i);
 assert.match(ageAnswer.context, /AUTHORITATIVE MOVIE RATING FACTS/);
+
+for (const query of [
+  "Can I take a 10-year-old to Ezma?",
+  "Could my 10-year-old see Ezma?",
+  "Is Ezma suitable for my ten year old?",
+  "Can my ten year old watch Exma?",
+]) {
+  const result = resolveMovieInformationTurn({ query, locale: "en", movies: repositoryInformationCatalog });
+  assert.equal(result.handled, true, `${query}: the fresh-session App catalog must handle the rating turn locally`);
+  assert.equal(result.movie?.title, "Ezma", `${query}: exact and voice-like title forms must resolve to Ezma`);
+  assert.match(result.answer, /Ezma is rated PG15/i, query);
+  assert.match(result.answer, /aged 10[\s\S]*only with someone aged 15 or older/i, query);
+  assert.doesNotMatch(result.answer, /Which movie do you mean/i, query);
+}
+
+const arabicFreshEzma = resolveMovieInformationTurn({
+  query: "\u0647\u0644 \u064a\u0645\u0643\u0646\u0646\u064a \u0627\u0635\u0637\u062d\u0627\u0628 \u0637\u0641\u0644 \u0639\u0645\u0631\u0647 10 \u0633\u0646\u0648\u0627\u062a \u0625\u0644\u0649 Ezma\u061f",
+  locale: "ar",
+  movies: repositoryInformationCatalog,
+});
+assert.equal(arabicFreshEzma.handled, true, "the equivalent fresh-session Arabic suitability question must be handled");
+assert.equal(arabicFreshEzma.movie?.title, "Ezma");
+assert.match(arabicFreshEzma.answer, /Ezma/u);
+assert.match(arabicFreshEzma.answer, /PG15/u);
+assert.match(arabicFreshEzma.answer, /10/u);
+assert.match(arabicFreshEzma.answer, /15/u);
+assert.match(arabicFreshEzma.answer, /\u0628\u0631\u0641\u0642\u0629/u, "the Arabic answer must state the accompaniment requirement");
+
+const englishClarificationQuestion = "Can I take a 10-year-old?";
+const englishClarification = resolveMovieInformationTurn({
+  query: englishClarificationQuestion,
+  locale: "en",
+  movies: repositoryInformationCatalog,
+});
+assert.equal(englishClarification.movie, null);
+assert.equal(englishClarification.topic, "rating");
+assert.equal(englishClarification.viewerAge, 10, "the title clarification result must expose the original viewer age for the App pending state");
+assert.match(englishClarification.answer, /Which movie do you mean/i);
+const englishClarificationAnswer = resolveMovieInformationTurn({
+  query: `${englishClarificationQuestion} Ezma`,
+  forcedTopic: englishClarification.topic,
+  viewerAge: englishClarification.viewerAge,
+  locale: "en",
+  movies: repositoryInformationCatalog,
+});
+assert.equal(englishClarificationAnswer.movie?.title, "Ezma");
+assert.match(englishClarificationAnswer.answer, /Ezma is rated PG15/i);
+assert.match(englishClarificationAnswer.answer, /aged 10[\s\S]*only with someone aged 15 or older/i, "the second turn must retain age 10 rather than falling back to generic PG15 guidance");
+
+for (const query of [
+  "Could I bring my 10-year-old?",
+  "Can my child watch it?",
+  "How long is it?",
+  "Show me the trailer.",
+]) {
+  const result = resolveMovieInformationTurn({ query, locale: "en", movies: repositoryInformationCatalog });
+  assert.equal(result.movie, null, `${query}: information wording must not fuzzily select an unrelated catalog title`);
+  assert.match(result.answer, /Which movie do you mean/i, `${query}: a missing title must produce a clarification`);
+}
+
+const arabicClarificationQuestion = "\u0647\u0644 \u064a\u0645\u0643\u0646\u0646\u064a \u0627\u0635\u0637\u062d\u0627\u0628 \u0637\u0641\u0644 \u0639\u0645\u0631\u0647 10 \u0633\u0646\u0648\u0627\u062a\u061f";
+const arabicClarification = resolveMovieInformationTurn({
+  query: arabicClarificationQuestion,
+  locale: "ar",
+  movies: repositoryInformationCatalog,
+});
+assert.equal(arabicClarification.movie, null);
+assert.equal(arabicClarification.topic, "rating");
+assert.equal(arabicClarification.viewerAge, 10);
+const arabicClarificationAnswer = resolveMovieInformationTurn({
+  query: `${arabicClarificationQuestion} Ezma`,
+  forcedTopic: arabicClarification.topic,
+  viewerAge: arabicClarification.viewerAge,
+  locale: "ar",
+  movies: repositoryInformationCatalog,
+});
+assert.equal(arabicClarificationAnswer.movie?.title, "Ezma");
+assert.match(arabicClarificationAnswer.answer, /PG15/u);
+assert.match(arabicClarificationAnswer.answer, /10/u);
+assert.match(arabicClarificationAnswer.answer, /15/u);
+assert.match(arabicClarificationAnswer.answer, /\u0628\u0631\u0641\u0642\u0629/u, "the Arabic second turn must retain the age-specific accompaniment answer");
+
+for (const query of [
+  "\u0647\u0644 \u064a\u0645\u0643\u0646\u0646\u064a \u0627\u0635\u0637\u062d\u0627\u0628 \u0637\u0641\u0644 \u0639\u0645\u0631\u0647 10 \u0633\u0646\u0648\u0627\u062a\u061f",
+  "\u0645\u0627 \u0645\u062f\u0629 \u0627\u0644\u0641\u064a\u0644\u0645\u061f",
+]) {
+  const result = resolveMovieInformationTurn({ query, locale: "ar", movies: repositoryInformationCatalog });
+  assert.equal(result.movie, null, `${query}: Arabic information wording must not fuzzily select an unrelated catalog title`);
+}
+
+const runtimeClarification = resolveMovieInformationTurn({ query: "How long is it?", locale: "en", movies: repositoryInformationCatalog });
+const runtimeClarificationAnswer = resolveMovieInformationTurn({
+  query: "How long is it? Ezma",
+  forcedTopic: runtimeClarification.topic,
+  locale: "en",
+  movies: repositoryInformationCatalog,
+});
+assert.equal(runtimeClarification.topic, "runtime", "the structured pending state must retain non-rating information topics too");
+assert.match(runtimeClarificationAnswer.answer, /105 minutes/i);
+
+const minionsChildSuitability = resolveMovieInformationTurn({
+  query: "Can my child watch Minions?",
+  locale: "en",
+  visibleMovies: [],
+  movies: [ezma, family, minions],
+});
+assert.equal(minionsChildSuitability.handled, true, "a title-specific child question must remain an information turn");
+assert.equal(minionsChildSuitability.movie?.id, "minions", "an unambiguous partial catalog title must resolve even when it is not the current visible card");
+assert.match(minionsChildSuitability.answer, /Minions & Monsters is rated PG/i);
+assert.match(minionsChildSuitability.answer, /parental guidance/i);
+assert.doesNotMatch(minionsChildSuitability.answer, /Which movie do you mean/i);
+
+const spokenMinionsTitle = resolveMovieInformationTurn({
+  query: "Is Minions and Monsters suitable for children?",
+  locale: "en",
+  movies: [minions],
+});
+assert.equal(spokenMinionsTitle.movie?.id, "minions", "spoken and must match the ampersand in a catalog title for information questions");
+assert.match(spokenMinionsTitle.answer, /rated PG/i);
+
+const clarifiedMinionsRating = resolveMovieInformationTurn({
+  query: "Minions and Monsters",
+  forcedTopic: "rating",
+  locale: "en",
+  movies: [minions],
+});
+assert.equal(clarifiedMinionsRating.movie?.id, "minions", "a bare title must complete the pending movie-information question without becoming a booking selection");
+assert.equal(clarifiedMinionsRating.topic, "rating");
+assert.match(clarifiedMinionsRating.answer, /rated PG/i);
+
+const ambiguousMinions = resolveMovieInformationTurn({
+  query: "Can my child watch Minions?",
+  locale: "en",
+  movies: [minions, { ...minions, id: "minions-return", title: "Minions Return" }],
+});
+assert.equal(ambiguousMinions.movie, null, "a shared partial title must not be guessed");
+assert.match(ambiguousMinions.answer, /Which movie do you mean: Minions & Monsters, Minions Return\?/i);
+assert.equal(
+  buildMovieTitleClarification({ locale: "en", candidates: [minions, { id: "minions-return", title: "Minions Return" }] }),
+  "Which movie do you mean: Minions & Monsters, Minions Return? Please say one title.",
+  "the pure clarification helper must ground the follow-up in the ambiguous catalog titles",
+);
 
 const questions = [
   ["What is Ezma about?", /videotaped clues/i],
@@ -103,16 +300,33 @@ assert.match(arabic.answer, /PG15/);
 assert.match(arabic.answer, /15/);
 
 const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+const movieInformationPrefilterSource = await readFile(new URL("../src/lib/movieInformationPrefilter.js", import.meta.url), "utf8");
 assert.match(appSource, /movieInformation\?\.handled/);
-assert.match(appSource, /synopsis\|plot\|story\|storyline/);
+assert.match(movieInformationPrefilterSource, /synopsis\|plot\|story\|storyline/);
 assert.match(appSource, /movieRating:\s*movie\?\.rating/);
 assert.match(appSource, /movieRating:\s*movie\.rating/);
 assert.match(appSource, /pendingAuthoritativeMovieAnswerRef/);
 assert.match(appSource, /movieInformationMovieRef\.current = movieInformation\.movie/);
 assert.match(appSource, /visibleMovies\.length \? null : movieInformationMovieRef\.current/);
 assert.match(appSource, /movieInformationMovieRef\.current = null/);
+assert.match(appSource, /loadMovieInformationCatalog\(\[/, "App must load its information-only reference catalog before resolving a fresh-session title question");
+assert.match(appSource, /resolveFilmCandidate\(movieInformationCatalog, query\)/, "title-only clarification continuations must use the same information catalog");
+assert.match(appSource, /movies:\s*movieInformationCatalog/, "direct movie-information turns must use the merged information catalog");
+assert.match(appSource, /pendingMovieInformationRef = useRef\(null\)/, "movie-information clarification must use a structured one-turn pending ref");
+for (const field of ["topic", "query", "viewerAge", "locale", "turnSequence", "expiresAt"]) {
+  assert.match(appSource, new RegExp(`${field}:`), `the structured pending information ref must retain ${field}`);
+}
+assert.match(appSource, /pendingInformation\.expiresAt <= Date\.now\(\)/, "expired title clarifications must clear before routing another turn");
+assert.match(appSource, /userTurnSequenceRef\.current > pendingInformation\.turnSequence \+ 1/, "a title clarification must not survive beyond the immediately following user turn");
+assert.match(appSource, /forcedTopic: continuationMovie \? pendingInformation\.topic : null/, "a grounded bare title must answer the retained information topic");
+assert.match(appSource, /viewerAge: continuationMovie \? pendingInformation\.viewerAge : undefined/, "the title continuation must retain the original viewer age");
+assert.match(appSource, /`\$\{pendingInformation\.query\} \$\{query\}`/, "the title continuation must retain other facts from the original information question");
+assert.match(appSource, /pendingMovieInformationRef\.current = requiresMovieTitle[\s\S]{0,500}viewerAge: result\.viewerAge \?\? null/, "the pending ref must store structured facts and clear after a grounded answer");
+assert.match(appSource, /pendingMovieInformationRef\.current = null;[\s\S]{0,160}return null;/, "cancelled or unmatched one-turn clarifications must clear safely");
+const abandonJourneySource = appSource.slice(appSource.indexOf("const abandonActiveBookingJourney"), appSource.indexOf("const beginReplacementBookingJourney"));
+assert.match(abandonJourneySource, /pendingMovieInformationRef\.current = null/, "cancelling an active journey must also clear a pending movie-information clarification");
 assert.match(appSource, /read-only movie-information turn/);
 assert.match(appSource, /already displayed this exact answer for the typed turn/);
 assert.match(appSource, /Keep the current .* panel and every retained booking field unchanged/);
 
-console.log("Movie-information validation passed: 41 deterministic text, voice-context, Arabic, metadata, ambiguity, filter-routing, and state-continuity assertions.");
+console.log("Movie-information validation passed: deterministic text, voice-context, Arabic, metadata, ambiguity, filter-routing, and state-continuity assertions.");

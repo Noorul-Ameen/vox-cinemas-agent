@@ -9,7 +9,7 @@ export function pausedResumeTarget(value, { affirmativeRecoveryPending = false }
   if (!text) return null;
   if (isResumeCheckoutTurn(text)) return "checkout";
   if (/\b(?:go|come|take me|return|back)\s+(?:me\s+)?(?:back\s+)?to\s+(?:my|the)?\s*(?:seats?|seat map)|\b(?:show|open)\s+(?:my|the)?\s*seats?\s+(?:again|please)|(?:ارجع|أرجع|عد|العودة)\s+(?:إلى|الى|ل)?\s*(?:مقاعدي|المقاعد|خريطة المقاعد)/iu.test(text)) return "seatmap";
-  if (/\b(?:show|open|return|go|back)\s+(?:me\s+)?(?:back\s+)?(?:to\s+)?(?:the\s+)?showtimes?\s*(?:again|please)?|(?:اعرض|أعرض|اظهر|أظهر|ارجع|أرجع|عد)\s+(?:إلى|الى|ل)?\s*(?:مواعيد العرض|العروض)/iu.test(text)) return "showtimes";
+  if (/\b(?:show|open|return|go|back)\s+(?:me\s+)?(?:back\s+)?(?:to\s+)?(?:(?:my|the)\s+)?showtimes?\s*(?:again|please)?|(?:اعرض|أعرض|اظهر|أظهر|ارجع|أرجع|عد)\s+(?:إلى|الى|ل)?\s*(?:مواعيد العرض|العروض)/iu.test(text)) return "showtimes";
   if (/\b(?:continue|resume|return to)\s+(?:my|the|this)?\s*cancell?ation|(?:متابعة|استكمال|اكمال|إكمال)\s+(?:طلب\s+)?(?:الإلغاء|الالغاء)/iu.test(text)) return "cancellation";
   if (/\b(?:show|open|return to)\s+(?:my|the)?\s*(?:booking history|bookings?)\s*(?:again|please)?|(?:اعرض|أعرض|افتح|أظهر)\s+(?:سجل\s+)?حجوزي\s*(?:مرة أخرى)?/iu.test(text)) return "history";
   if (/\b(?:continue|resume|go back|take me back|return)\s+(?:to\s+)?where\s+i\s+(?:was|stopped|left off)|\b(?:go|take me|return)\s+back\s+to\s+(?:my\s+)?(?:previous|last)\s+(?:step|screen)|(?:تابع|أكمل|ارجع|أرجع|عد)\s+(?:إلى|الى)?\s*(?:من\s+)?حيث\s+توقفت/iu.test(text)) return "last";

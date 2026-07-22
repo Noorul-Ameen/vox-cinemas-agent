@@ -20,6 +20,8 @@ __pycache__/
 # Transactional showtime-refresh work files.
 data/.vox_showtimes_full.next-*.json
 data/.vox_showtimes_full.backup-*.json
+data/.vox_movie_information_catalog.next-*.json
+data/.vox_movie_information_catalog.backup-*.json
 src/.mockVistaData.next-*.js
 src/.mockVistaData.backup-*.js
 src/generated/.voxSnapshotManifest.next-*.js

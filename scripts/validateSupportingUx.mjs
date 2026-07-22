@@ -55,24 +55,35 @@ const historySource = await readFile(new URL("../src/components/BookingHistory.j
 const qrSource = await readFile(new URL("../src/components/BookingQRCode.jsx", import.meta.url), "utf8");
 const handoverSource = await readFile(new URL("../src/components/HandoverPanel.jsx", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+const retryableLazySource = await readFile(new URL("../src/components/RetryableLazy.jsx", import.meta.url), "utf8");
+const mainSource = await readFile(new URL("../src/main.jsx", import.meta.url), "utf8");
 for (const key of ["booking.cinema", "booking.performance", "booking.status"]) assert.match(richMediaSource, new RegExp(key.replace(".", "\\.")), `${key} must be shown on booking confirmation`);
 for (const field of ["cinemaName", "booking.date", "history.cancelled", "history.active"]) assert.match(historySource, new RegExp(field.replace(".", "\\.")), `${field} must be represented in booking history`);
 assert.match(historySource, /const current = isCurrentBooking\(booking\)/, "booking history must classify each record using the shared current-booking rules");
 assert.match(historySource, /: !current\s*\? t\("history\.past"\)/, "elapsed records must be labelled as past shows");
 assert.match(historySource, /\{current && cancelBooking && \(/, "only current bookings may expose the cancellation action");
 assert.match(richMediaSource, /booking\.performanceDate\s*\|\|\s*booking\.sourceDate\s*\|\|\s*booking\.date/, "booking cards must prefer the actual performance date and retain after-midnight source dates");
+assert.match(richMediaSource, /sessionSummaryParts[\s\S]*findIndex\([\s\S]*trim\(\)\.toLowerCase\(\)[\s\S]*join\(" · "\)/, "booking summaries must not repeat an experience when the screen label is identical");
+assert.match(richMediaSource, /uniqueDisplayParts\(s\.exp, s\.screen\)\.slice\(1\)/, "showtime cards must not repeat identical experience and screen labels");
 assert.match(historySource, /booking\.performanceDate\s*\|\|\s*booking\.sourceDate\s*\|\|\s*booking\.date/, "booking history must use the actual performance date fallback chain");
 assert.match(richMediaSource, /m\.language\s*\|\|\s*""/, "movie cards must show language even when runtime is present");
 assert.match(qrSource, /booking\.qrDemoHint/, "reference QR codes must direct guests to their official VOX ticket for entry");
 assert.match(qrSource, /const providerQrValue =/, "verified bookings must require an explicit provider admission QR payload");
 assert.match(qrSource, /if \(!qrValue\)/, "a verified booking without a provider QR payload must not encode its bare reference as an entry ticket");
+assert.match(retryableLazySource, /useMemo\(\(\) => React\.lazy\(loader\), \[loader, attempt\]\)/, "retrying a failed lazy panel must create a fresh lazy importer instead of rethrowing React's cached rejection");
+assert.match(retryableLazySource, /failed to fetch dynamically imported module[\s\S]*chunkloaderror/i, "the lazy boundary must recognize deployed chunk loading failures");
+assert.match(retryableLazySource, /isChunkLoadError\(error\)[\s\S]*window\.location\.reload\(\)[\s\S]*return;[\s\S]*setAttempt\(\(current\) => current \+ 1\)/, "chunk failures must reload the page while ordinary render errors may remount the lazy panel");
+assert.match(retryableLazySource, /fallback=\{\(\{ error \}\) =>[\s\S]*onClick=\{\(\) => retry\(error\)\}/, "the retry action must classify the error captured by its boundary");
+assert.match(appSource, /loader=\{loadCheckout\}[\s\S]*errorTitle=\{t\("error\.title"\)\}/, "checkout must use the retryable lazy boundary without discarding the active App journey");
+assert.match(richMediaSource, /loader=\{loadBookingQRCode\}[\s\S]*retryLabel=\{t\("error\.retry"\)\}/, "the booking QR must recover from a transient chunk load failure in place");
+assert.match(mainSource, /failed to fetch dynamically imported module[\s\S]*window\.location\.reload\(\)/, "the global boundary must reload for any remaining cached lazy chunk failure");
 assert.match(richMediaSource, /booking\.noRefundProcessed/, "device-only cancellation must not claim that a refund was initiated");
 assert.match(richMediaSource, /pricing\?\.tiers\?\.standard/, "seat prices must come from pricing metadata");
 assert.match(richMediaSource, /seats\.demoEstimateLabel/, "estimated seat totals must defer final pricing to checkout");
 assert.match(richMediaSource, /seats\.quoteRequiredLabel/, "live pricing must remain pending until a quote is returned");
 assert.doesNotMatch(richMediaSource, /\?\s*63\s*:\s*42/, "the seat map must not hard-code pre-quote tier prices");
 assert.match(richMediaSource, /s\.availabilityVerified === true[\s\S]*showtimes\.seats[\s\S]*showtimes\.previewAvailability/, "snapshot showtimes must not present generated seat counts as live inventory");
-assert.match(appSource, /<Showtimes[^>]+error=\{stage\.error\}[^>]+onRetry=/, "a failed showtime request must render a scoped retry action");
+assert.match(appSource, /<Showtimes[^>]+error=\{localizedStageMessage\(stage, "error", locale\)\}[^>]+onRetry=/, "a failed showtime request must render a localized scoped retry action");
 assert.doesNotMatch(appSource, /app\.(?:text|voice)Connected/, "transport readiness must not be added to customer chat");
 for (const key of [
   "common.retry", "movies.empty", "movies.error", "showtimes.empty", "showtimes.error", "showtimes.previewAvailability",

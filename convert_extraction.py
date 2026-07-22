@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 INPUT = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "data" / "vox_showtimes_full.json"
 OUTPUT = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "src" / "mockVistaData.js"
-METADATA = Path(sys.argv[3]) if len(sys.argv) > 3 else ROOT / "data" / "movie_metadata_08-15Jul.json"
+METADATA = Path(sys.argv[3]) if len(sys.argv) > 3 else ROOT / "scripts" / "fixtures" / "movie_metadata_08-15Jul.json"
 
 PALETTE = [
     ("#63418D", "#B6186C"), ("#7A5A2E", "#C79A4B"),

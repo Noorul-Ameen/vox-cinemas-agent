@@ -160,7 +160,7 @@ export default function Checkout({ order, onPaid, onCancel, onRetry, onPaymentSt
       </div>
       <div style={summaryCard}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ fontSize: 13, color: C.muted }}>{t("checkout.seatCountOnly", { count: seats.length })} · <span dir="ltr">{order?.screen}</span></span>
+          <span style={{ fontSize: 13, color: C.muted }}>{t(seats.length === 1 ? "checkout.oneSeatCount" : "checkout.manySeatCount", { count: seats.length })} · <span dir="ltr">{order?.screen}</span></span>
           <span dir="ltr" style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{formatCurrency(order?.total || 0, currency)}</span>
         </div>
         {subtotal != null && <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "4px 12px", marginTop: 9, borderTop: `1px solid ${C.border}`, paddingTop: 8, color: C.muted, fontSize: 10 }}>

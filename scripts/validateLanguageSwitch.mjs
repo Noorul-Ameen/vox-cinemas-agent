@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { conversationLanguageContinuityContext, explicitLanguageRequest, resolveLanguageSignal, stripLanguageControlCommand } from "../src/lib/languageSwitch.js";
 import { extractDiscoveryPreferencePatch } from "../src/lib/discoveryPreferences.js";
+import { discoveryQuestionForLocale, localizedStageMessage, localizeDiscoveryStage } from "../src/lib/discoveryPromptLocalization.js";
+import { guardAgentStateClaim } from "../src/lib/agentStateTruth.js";
+import { capturePausedRichStage, createPausedRichJourney, selectRestorableRichStage } from "../src/lib/pausedRichJourney.js";
 
 assert.equal(explicitLanguageRequest("شكراً"), null, "one Arabic word must not switch English to Arabic");
 assert.equal(explicitLanguageRequest("Two tickets لو سمحت"), null, "mixed speech must not switch automatically");
@@ -41,6 +45,66 @@ assert.equal(extractDiscoveryPreferencePatch("أريد أفلام عربية").p
 assert.match(conversationLanguageContinuityContext("أريد أفلام عربية", "en"), /Reply in English/, "Arabic-script discovery must not silently change an English conversation");
 assert.match(conversationLanguageContinuityContext("I choose Ezma", "ar"), /Reply in Arabic/, "a Latin-script booking turn must not silently change an Arabic conversation");
 assert.equal(conversationLanguageContinuityContext("Switch to Arabic", "en"), "", "an explicit language command must not receive a continuity override");
+
+const englishDateStage = {
+  view: "discovery",
+  missing: ["date"],
+  question: discoveryQuestionForLocale(["date"], "en"),
+  preferences: { cinemaId: "YAS", cinemaName: "Yas Mall", experience: "IMAX" },
+};
+const arabicDateStage = localizeDiscoveryStage(englishDateStage, "ar");
+assert.equal(arabicDateStage.question, "ما التاريخ الذي تفضّله؟", "an active English date prompt must switch its heading to Arabic");
+assert.deepEqual(arabicDateStage.preferences, englishDateStage.preferences, "switching the prompt language must preserve cinema and experience state");
+assert.equal(localizeDiscoveryStage(arabicDateStage, "en").question, "What date would you like to go?", "the same retained prompt must switch back to English");
+assert.equal(
+  guardAgentStateClaim("Yes, IMAX is available at Yas Mall.", { stage: englishDateStage, locale: "ar" }),
+  "ما التاريخ الذي تفضّله؟",
+  "the truth guard must use the active Arabic locale even if it receives an older English stage snapshot",
+);
+assert.equal(
+  guardAgentStateClaim("نعم، آيماكس متاح في ياس مول.", { stage: arabicDateStage, locale: "en" }),
+  "What date would you like to go?",
+  "the truth guard must use the active English locale even if it receives an older Arabic stage snapshot",
+);
+
+const retainedMovieNoResults = {
+  view: "movies",
+  movies: [],
+  preferences: { cinemaId: "MOE", date: "2026-07-23", language: "French" },
+  error: "No French-language movies are available at Mall of the Emirates on 23 July 2026. You can change the date, cinema, or movie language.",
+  errorByLocale: {
+    en: "No French-language movies are available at Mall of the Emirates on 23 July 2026. You can change the date, cinema, or movie language.",
+    ar: "لا توجد أفلام باللغة French في Mall of the Emirates بتاريخ 23 يوليو 2026. يمكنك تغيير التاريخ أو السينما أو لغة الفيلم.",
+  },
+};
+assert.equal(localizedStageMessage(retainedMovieNoResults, "error", "ar"), retainedMovieNoResults.errorByLocale.ar, "an active English movie no-results error must render in Arabic immediately");
+assert.equal(localizedStageMessage(retainedMovieNoResults, "error", "en"), retainedMovieNoResults.errorByLocale.en, "the same retained movie error must switch back to English");
+assert.deepEqual(retainedMovieNoResults.preferences, { cinemaId: "MOE", date: "2026-07-23", language: "French" }, "localizing a movie error must preserve every retained filter");
+
+const retainedShowtimeNotice = {
+  view: "showtimes",
+  movie: { id: "movie-1", title: "Example Movie" },
+  sessions: [{ sessionId: "session-1", time: "19:30" }],
+  notice: "لا يوجد عرض عند 19:00. هذه أقرب الأوقات المناسبة.",
+  noticeByLocale: {
+    en: "No exact 19:00 showtime is available. These are the closest suitable times.",
+    ar: "لا يوجد عرض عند 19:00. هذه أقرب الأوقات المناسبة.",
+  },
+};
+assert.equal(localizedStageMessage(retainedShowtimeNotice, "notice", "en"), retainedShowtimeNotice.noticeByLocale.en, "an active Arabic showtime notice must render in English immediately");
+assert.equal(localizedStageMessage(retainedShowtimeNotice, "notice", "ar"), retainedShowtimeNotice.noticeByLocale.ar, "the same retained showtime notice must switch back to Arabic");
+assert.equal(retainedShowtimeNotice.sessions[0].sessionId, "session-1", "localizing a showtime notice must preserve the selected movie and sessions");
+let savedShowtimeJourney = createPausedRichJourney({ sessionId: "language-session", journeyId: "language-journey", now: "2026-07-22T12:00:00.000Z" });
+savedShowtimeJourney = capturePausedRichStage(savedShowtimeJourney, retainedShowtimeNotice, { now: "2026-07-22T12:00:00.000Z" });
+const restoredShowtimeStage = selectRestorableRichStage(savedShowtimeJourney, { view: "showtimes" }).snapshot;
+assert.equal(localizedStageMessage(restoredShowtimeStage, "notice", "en"), retainedShowtimeNotice.noticeByLocale.en, "a saved Arabic showtime notice must restore in English without losing its bilingual source");
+assert.equal(localizedStageMessage(restoredShowtimeStage, "notice", "ar"), retainedShowtimeNotice.noticeByLocale.ar, "the saved showtime notice must still switch back to Arabic after restoration");
+
+const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+const movieDisplayGuard = appSource.slice(appSource.indexOf("function guardMovieDisplayClaim"), appSource.indexOf("function programmingDatesForCinema"));
+assert.match(movieDisplayGuard, /localizedStageMessage\(stage, "notice", locale\)/, "the agent response guard must use the active locale for retained cinema and movie notices");
+assert.match(movieDisplayGuard, /localizedStageMessage\(stage, "error", locale\)/, "the agent response guard must use the active locale for retained movie errors");
+assert.doesNotMatch(movieDisplayGuard, /String\(stage\.(?:notice|error)/, "the agent response guard must not reuse a stale-language notice or error directly");
 
 const offeredArabic = resolveLanguageSignal({
   role: "agent",

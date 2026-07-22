@@ -6,6 +6,7 @@ for (const [phrase, target] of [
   ["Resume the booking", "journey"],
   ["Go back to the seats", "seatmap"],
   ["Show the showtimes again", "showtimes"],
+  ["Back to my showtimes", "showtimes"],
   ["Return to checkout", "checkout"],
   ["Continue cancellation", "cancellation"],
   ["Show my booking history again", "history"],

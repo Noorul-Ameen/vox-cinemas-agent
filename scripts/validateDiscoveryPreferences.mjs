@@ -3,7 +3,9 @@ import {
   createDiscoveryPreferences,
   extractDiscoveryPreferencePatch,
   filterDiscoveryResults,
+  formatDiscoveryTimePreference,
   getMissingDiscoveryCriteria,
+  hasDiscoveryTimePreference,
   isOpenDiscoveryChoiceReply,
   mergeDiscoveryPreferences,
   parseAndMergeDiscoveryPreferences,
@@ -17,10 +19,12 @@ import {
   isAmbiguousMovieSelectionUtterance,
 } from "../src/lib/discoveryResultContext.js";
 import { buildDiscoveryNoResultsMessage } from "../src/lib/discoveryNoResults.js";
+import { buildVoxiContext } from "../src/lib/voxiSession.js";
 
 const NOW = new Date("2026-07-14T08:00:00Z");
 const cinemas = [
   { id: "0002", name: "Mall of the Emirates", city: "Dubai" },
+  { id: "0005", name: "City Centre Mirdif", city: "Dubai" },
   { id: "0012", name: "Yas Mall", city: "Abu Dhabi" },
 ];
 const movies = [
@@ -28,6 +32,7 @@ const movies = [
   { id: "laugh", title: "The Big Laugh", genres: ["Comedy"], languageName: "Arabic", experiences: ["STANDARD"] },
   { id: "race", title: "Desert Race", genres: ["Action", "Sports"], languageName: "English", experiences: ["4DX", "STANDARD"] },
 ];
+const minionsMovie = { id: "minions", title: "Minions & Monsters", genres: ["Animation", "Comedy", "Family"], languageName: "English", experiences: ["STANDARD"] };
 const sessions = [
   { sessionId: "t1", scheduledFilmId: "toy", cinemaId: "0002", programmingDate: "2026-07-15", time: "17:40", exp: "STANDARD" },
   { sessionId: "t2", scheduledFilmId: "toy", cinemaId: "0002", programmingDate: "2026-07-15", time: "18:00", exp: "IMAX" },
@@ -205,6 +210,34 @@ const familyTitleOnly = extractDiscoveryPreferencePatch("Book The Family Plan", 
 assert.equal(familyTitleOnly.patch.movieId, "family-plan");
 assert.equal(familyTitleOnly.patch.audience, undefined, "an audience word inside an exact title must not become an extra filter");
 
+const cinemaTitleCollision = extractDiscoveryPreferencePatch(
+  "Show family movies at City Centre Mirdif on 24 July",
+  {
+    cinemas,
+    movies: [
+      { id: "motor-city", title: "Motor City", genres: ["Drama"], languageName: "English", experiences: ["STANDARD"] },
+      ...movies,
+    ],
+    now: NOW,
+  },
+);
+assert.equal(cinemaTitleCollision.patch.cinemaId, "0005", "City Centre Mirdif must remain the grounded cinema");
+assert.equal(cinemaTitleCollision.patch.date, "2026-07-24", "the combined date must remain grounded");
+assert.equal(cinemaTitleCollision.patch.audience, "kids_family", "the family requirement must remain grounded");
+assert.equal(cinemaTitleCollision.patch.movieId, undefined, "a cinema phrase must not partially match the unrelated Motor City movie");
+assert.equal(cinemaTitleCollision.patch.movieTitle, undefined, "a cinema phrase must not create an unrelated movie-title filter");
+
+const realMotorCityAtMirdif = extractDiscoveryPreferencePatch(
+  "Show Motor City at City Centre Mirdif on 24 July",
+  {
+    cinemas,
+    movies: [{ id: "motor-city", title: "Motor City", genres: ["Drama"], languageName: "English", experiences: ["STANDARD"] }],
+    now: NOW,
+  },
+);
+assert.equal(realMotorCityAtMirdif.patch.cinemaId, "0005", "the cinema must remain grounded when a real movie is also supplied");
+assert.equal(realMotorCityAtMirdif.patch.movieId, "motor-city", "an explicitly named movie outside the cinema phrase must still resolve");
+
 const educationalFamily = parseAndMergeDiscoveryPreferences({}, "I want educational family movies", { cinemas, movies, now: NOW });
 assert.equal(educationalFamily.preferences.audience, "kids_family", "a family requirement must survive an educational clarification");
 assert.equal(educationalFamily.preferences.recommendationIntent, "educational", "educational must be retained as a clarification intent, not invented as a published genre");
@@ -264,6 +297,26 @@ const unavailableFrenchMessage = buildDiscoveryNoResultsMessage({
 assert.match(unavailableFrenchMessage, /^No French-language movies are available at Mall of the Emirates on 15 July 2026\./);
 assert.match(unavailableFrenchMessage, /change the date, cinema, or movie language/i);
 assert.doesNotMatch(unavailableFrenchMessage, /[\u2013\u2014]/u, "the grounded empty-state response must use standard punctuation only");
+
+const unavailableRangeMessage = buildDiscoveryNoResultsMessage({
+  preferences: { cinemaName: "Mall of the Emirates", date: "2026-07-15", timeRangeStart: "18:00", timeRangeEnd: "20:00" },
+  cinemaName: "Mall of the Emirates",
+  date: "2026-07-15",
+  noResultsReason: "no_suitable_time",
+  locale: "en",
+});
+assert.match(unavailableRangeMessage, /between 18:00 and 20:00/, "a zero-result message must explain the full requested time range");
+const rangeSessionContext = buildVoxiContext({
+  locale: "en",
+  cinema: null,
+  scheduleDate: "2026-07-15",
+  stage: { view: "discovery" },
+  selectedSeats: [],
+  discoveryPreferences: { cinemaName: "Mall of the Emirates", date: "2026-07-15", timeRangeStart: "18:00", timeRangeEnd: "20:00" },
+  journey: {},
+  messages: [],
+});
+assert.match(rangeSessionContext, /preferred time 18:00 to 20:00/, "the ElevenLabs journey context must not report a retained time range as missing");
 
 for (const reply of ["yes", "no", "maybe later", "thank you", "...", "🤷"]) {
   const signal = extractDiscoveryPreferencePatch(reply, { cinemas, movies, now: NOW });
@@ -347,6 +400,24 @@ assert.equal(extractDiscoveryPreferencePatch("January 2nd", { now: new Date("202
 
 assert.equal(unresolvedMovieTitleCandidate("I want to watch a comedy", extractDiscoveryPreferencePatch("I want to watch a comedy", { movies, now: NOW })), null, "a genre request must not be retained as an unknown title");
 assert.equal(unresolvedMovieTitleCandidate("I want to watch a movie tomorrow", extractDiscoveryPreferencePatch("I want to watch a movie tomorrow", { movies, now: NOW })), null, "a broad movie request must not become an unknown title");
+const spokenAmpersandTitle = extractDiscoveryPreferencePatch("Book Minions and Monsters tomorrow", { movies: [minionsMovie], now: NOW });
+assert.equal(spokenAmpersandTitle.patch.movieId, "minions", "spoken and must match an ampersand in the authoritative title");
+assert.equal(spokenAmpersandTitle.patch.movieTitle, "Minions & Monsters");
+assert.equal(spokenAmpersandTitle.patch.date, "2026-07-15", "the movie title must not consume the supplied tomorrow date signal");
+assert.equal(spokenAmpersandTitle.patch.dateSignal, "tomorrow");
+const partialMinionsTitle = extractDiscoveryPreferencePatch("Minions tomorrow", { movies: [minionsMovie], now: NOW });
+assert.equal(partialMinionsTitle.patch.movieId, "minions", "an unambiguous distinctive partial title must resolve from a short natural turn");
+assert.equal(partialMinionsTitle.patch.dateSignal, "tomorrow", "a partial title and date must be extracted in the same turn");
+assert.equal(resolveDiscoveryMovieCandidate([minionsMovie], "Minions and Monsters"), minionsMovie, "and and ampersand title forms must resolve equivalently after catalog load");
+assert.equal(resolveDiscoveryMovieCandidate([minionsMovie], "Minions"), minionsMovie, "an unambiguous partial catalog title must resolve");
+const duplicatedMinionsCatalog = [minionsMovie, { ...minionsMovie }, { ...minionsMovie }];
+assert.equal(extractDiscoveryPreferencePatch("Minions", { movies: duplicatedMinionsCatalog, now: NOW }).patch.movieId, "minions", "duplicate schedule rows for one movie must not make its partial title ambiguous");
+assert.equal(resolveDiscoveryMovieCandidate(duplicatedMinionsCatalog, "Minions"), minionsMovie, "duplicate catalog rows with one movie identity must collapse before ambiguity checks");
+assert.equal(resolveDiscoveryMovieCandidate([minionsMovie, { id: "minions-2", title: "Minions Return" }], "Minions"), null, "a shared partial title must request clarification instead of guessing");
+const englishMovieChangeSignal = extractDiscoveryPreferencePatch("I want to go for English movie", { movies: [minionsMovie], now: NOW });
+assert.equal(englishMovieChangeSignal.patch.language, "English", "natural go-for phrasing must be retained as a language filter");
+assert.equal(englishMovieChangeSignal.patch.movieTitle, undefined, "English movie must not invent a title");
+assert.equal(unresolvedMovieTitleCandidate("I want to go for English movie", englishMovieChangeSignal), null, "the filler phrase to go must not be retained as a deferred movie title");
 assert.equal(unresolvedMovieTitleCandidate("I want Toy Storey 5 at Mall of the Emirates tomorrow", extractDiscoveryPreferencePatch("I want Toy Storey 5 at Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW })), "Toy Storey 5", "live mode must retain a likely title until its cinema/date catalog loads");
 assert.equal(unresolvedMovieTitleCandidate("I need Toy Storey 5 at Mall of the Emirates tomorrow", extractDiscoveryPreferencePatch("I need Toy Storey 5 at Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW })), "Toy Storey 5", "I-need phrasing must retain a plausible title without confusing ticket-count requests");
 assert.equal(unresolvedMovieTitleCandidate("Toy Storey 5 at Mall of the Emirates tomorrow", extractDiscoveryPreferencePatch("Toy Storey 5 at Mall of the Emirates tomorrow", { cinemas, movies: [], now: NOW })), "Toy Storey 5", "a bare residual title must survive cinema/date removal in live mode");
@@ -450,7 +521,9 @@ assert.equal(shouldTreatAsDiscoveryFilterTurn("IMAX", { view: "movies", signal: 
 assert.equal(shouldTreatAsDiscoveryFilterTurn("I want IMAX", { view: "seatmap", signal: extractDiscoveryPreferencePatch("I want IMAX", { movies, now: NOW }) }), true, "an explicit experience change must update an active booking journey");
 assert.equal(shouldTreatAsDiscoveryFilterTurn("Is IMAX wheelchair accessible?", { view: "seatmap", signal: extractDiscoveryPreferencePatch("Is IMAX wheelchair accessible?", { movies, now: NOW }) }), false, "an accessibility FAQ must not clear seat state merely because it names an experience");
 assert.equal(shouldTreatAsDiscoveryFilterTurn("Does Mall of the Emirates cinema have parking?", { view: "movies", signal: extractDiscoveryPreferencePatch("Does Mall of the Emirates cinema have parking?", { cinemas, movies, now: NOW }) }), false, "a cinema policy FAQ must not mutate retained discovery criteria");
+assert.equal(shouldTreatAsDiscoveryFilterTurn("Does Mall of the Emirates have parking?", { view: "showtimes", signal: extractDiscoveryPreferencePatch("Does Mall of the Emirates have parking?", { cinemas, movies, now: NOW }) }), false, "a named cinema inside a parking question must not replace verified showtimes");
 assert.equal(shouldTreatAsDiscoveryFilterTurn("What Arabic movies are showing tonight?", { view: "empty", signal: extractDiscoveryPreferencePatch("What Arabic movies are showing tonight?", { movies, now: NOW }) }), true, "a question-shaped discovery request must still route when it asks what is showing");
+assert.equal(shouldTreatAsDiscoveryFilterTurn("What is playing at Mall of the Emirates tomorrow at 6 PM?", { view: "showtimes", signal: extractDiscoveryPreferencePatch("What is playing at Mall of the Emirates tomorrow at 6 PM?", { cinemas, movies, now: NOW }) }), true, "a genuine question-shaped cinema, date, and time discovery request must still update results");
 
 const arabicComedy = extractDiscoveryPreferencePatch("I want an Arabic comedy around 8 PM", { movies, now: NOW });
 assert.equal(arabicComedy.patch.genre, "Comedy");
@@ -463,6 +536,27 @@ assert.equal(
 );
 assert.equal(extractDiscoveryPreferencePatch("18:30", { now: NOW }).patch.preferredTime, "18:30");
 assert.equal(extractDiscoveryPreferencePatch("8", { now: NOW, expectingTime: true }).patch.preferredTime, "08:00");
+
+for (const [request, start, end] of [
+  ["around 8 to 10 at night", "20:00", "22:00"],
+  ["from 8 pm to 10 pm", "20:00", "22:00"],
+  ["between eight and ten at night", "20:00", "22:00"],
+  ["11 pm to 1 am", "23:00", "01:00"],
+]) {
+  const range = extractDiscoveryPreferencePatch(request, { now: NOW });
+  assert.equal(range.patch.timeRangeStart, start, `${request}: the range start must be retained`);
+  assert.equal(range.patch.timeRangeEnd, end, `${request}: the range end must be retained`);
+  assert.equal(range.patch.preferredTime, undefined, `${request}: a range must not collapse to a midpoint`);
+}
+const retainedRangePreference = { timeRangeStart: "18:00", timeRangeEnd: "20:00" };
+assert.equal(hasDiscoveryTimePreference(retainedRangePreference), true, "a complete time range must satisfy the narrowing-time requirement");
+assert.equal(formatDiscoveryTimePreference(retainedRangePreference), "18:00 to 20:00", "English context must retain both range boundaries");
+assert.equal(formatDiscoveryTimePreference(retainedRangePreference, { locale: "ar" }), "18:00 إلى 20:00", "Arabic UI context must retain both range boundaries");
+assert.equal(hasDiscoveryTimePreference({ timeRangeStart: "18:00" }), false, "an incomplete range must not be treated as a usable time criterion");
+assert.equal(extractDiscoveryPreferencePatch("الساعة ١٠ مساء", { now: NOW }).patch.preferredTime, "22:00");
+assert.equal(extractDiscoveryPreferencePatch("الساعة عشرة مساء", { now: NOW }).patch.preferredTime, "22:00");
+assert.equal(extractDiscoveryPreferencePatch("الساعة واحدة ليلا", { now: NOW }).patch.preferredTime, "01:00");
+assert.equal(extractDiscoveryPreferencePatch("twelve at night", { now: NOW }).patch.preferredTime, "00:00");
 
 const exact = filterDiscoveryResults({
   movies,
@@ -494,6 +588,49 @@ assert.equal(nearest.time.exactTimeMatch, false);
 assert.equal(nearest.time.usedNearestFallback, true);
 assert.equal(nearest.time.closestDeltaMinutes, 35);
 assert.deepEqual(nearest.time.closestTimes, ["18:35"]);
+
+const rangeSessions = ["19:30", "20:00", "21:00", "22:00", "22:30"].map((time, index) => ({
+  sessionId: `range-${index}`,
+  scheduledFilmId: "toy",
+  cinemaId: "0002",
+  date: "2026-07-15",
+  time,
+}));
+const ranged = filterDiscoveryResults({
+  movies,
+  sessions: rangeSessions,
+  cinemas,
+  preferences: { cinemaId: "0002", date: "2026-07-15", movieId: "toy", timeRangeStart: "20:00", timeRangeEnd: "22:00" },
+});
+assert.deepEqual(ranged.sessions.map((session) => session.time), ["20:00", "21:00", "22:00"], "a time range must include every visible session within its endpoints");
+assert.equal(ranged.time.matchKind, "range");
+assert.equal(ranged.time.rangeSessionCount, 3);
+assert.equal(ranged.time.usedNearestFallback, false);
+
+const rangeNearest = filterDiscoveryResults({
+  movies,
+  sessions: rangeSessions,
+  cinemas,
+  preferences: { cinemaId: "0002", date: "2026-07-15", movieId: "toy", timeRangeStart: "18:00", timeRangeEnd: "19:00" },
+});
+assert.deepEqual(rangeNearest.sessions.map((session) => session.time), ["19:30", "20:00"], "an empty time range must return the closest options ranked from the nearest boundary");
+assert.equal(rangeNearest.time.usedNearestFallback, true);
+assert.equal(rangeNearest.time.closestDeltaMinutes, 30);
+
+const overnightSessions = ["22:30", "23:00", "00:30", "01:00", "01:30"].map((time, index) => ({
+  sessionId: `overnight-${index}`,
+  scheduledFilmId: "toy",
+  cinemaId: "0002",
+  date: "2026-07-15",
+  time,
+}));
+const overnightRange = filterDiscoveryResults({
+  movies,
+  sessions: overnightSessions,
+  cinemas,
+  preferences: { cinemaId: "0002", date: "2026-07-15", movieId: "toy", timeRangeStart: "23:00", timeRangeEnd: "01:00" },
+});
+assert.deepEqual(overnightRange.sessions.map((session) => session.time), ["23:00", "00:30", "01:00"], "a spoken range crossing midnight must follow the cinema programming day");
 
 const kidsOnly = filterDiscoveryResults({ movies, sessions, cinemas, preferences: { audience: "kids_family", date: "2026-07-15" } });
 assert.deepEqual(kidsOnly.movies.map((movie) => movie.id), ["toy"], "kids/family discovery must exclude unrelated adult catalog entries");
@@ -527,6 +664,37 @@ for (const request of ["Show me IMAX instead", "Show me IMAX only", "اعرض آ
   assert.equal(signal.patch.experience, "IMAX", `${request}: the replacement experience must be retained`);
   assert.equal(unresolvedMovieTitleCandidate(request, signal), null, `${request}: a replacement modifier must not become an unresolved movie title`);
 }
+
+const replacementSeed = createDiscoveryPreferences({
+  cinemaId: "0002",
+  cinemaName: "Mall of the Emirates",
+  city: "Dubai",
+  date: "2026-07-15",
+  dateSignal: "tomorrow",
+  preferredTime: "20:00",
+  genre: "Drama",
+  language: "Tamil",
+  experience: "IMAX",
+  movieId: "old-title",
+  movieTitle: "Old Title",
+  audience: "kids_family",
+  openChoice: true,
+  recommendationIntent: "educational",
+});
+const explicitContentReplacement = parseAndMergeDiscoveryPreferences(
+  replacementSeed,
+  "I changed my mind. I want to go for an English movie",
+  { movies: [minionsMovie], now: NOW },
+);
+assert.equal(explicitContentReplacement.update.replacementIntent, "content", "changed my mind must expose a safe explicit content-replacement signal");
+assert.equal(explicitContentReplacement.preferences.language, "English", "the new explicit language must win over the cleared stale language");
+for (const key of ["genre", "experience", "movieId", "movieTitle", "audience", "openChoice", "recommendationIntent"]) {
+  assert.equal(explicitContentReplacement.preferences[key], null, `${key} must be cleared by an explicit content replacement`);
+}
+assert.equal(explicitContentReplacement.preferences.cinemaId, "0002", "a content replacement must retain the established cinema");
+assert.equal(explicitContentReplacement.preferences.date, "2026-07-15", "a content replacement must retain the established date");
+assert.equal(explicitContentReplacement.preferences.preferredTime, "20:00", "a content replacement must retain the established time unless the guest changes it");
+assert.equal(extractDiscoveryPreferencePatch("I've changed my mind", { movies, now: NOW }).replacementIntent, "content", "apostrophized voice or text phrasing must expose the same replacement signal after normalization");
 
 const mallJuly17 = createDiscoveryPreferences({
   cinemaId: "0002",
