@@ -35,8 +35,14 @@ const DISCOVERY_COMMAND_PATTERN = /^(?:show|find|list|suggest|recommend|book|i w
 export function classifyMovieInformationQuestion(input) {
   const text = clean(typeof input === "object" && input !== null ? input.text ?? input.query : input);
   if (!text) return null;
+  const normalizedText = normalize(text);
+  const pluralDiscoveryCollection = /\b(?:movies|films|showtimes|options|choices)\b/iu.test(normalizedText)
+    && !/\b(?:these|those|their)\b/iu.test(normalizedText);
+  const explicitOpenFilter = /\b(?:any|no)\s+(?:movie\s+)?(?:language|genre)(?:\s+preference)?\b|\b(?:language|genre)\s+(?:does not matter|doesn t matter|is fine|is okay|is ok)\b|(?:أي|اي)\s+(?:لغة|لغه|نوع)|(?:لا|ما)\s+(?:فرق|عندي تفضيل)\s+(?:باللغة|باللغه|بالنوع)?/iu.test(normalizedText);
+  if (explicitOpenFilter || (pluralDiscoveryCollection && DISCOVERY_COMMAND_PATTERN.test(normalizedText))) return null;
+  if (pluralDiscoveryCollection && /\b(?:language|genre)\b/iu.test(normalizedText)) return null;
   const rating = isMovieRatingQuestion(text) || /\b(?:ratings|certificates)\b|(?:التصنيفات|التقييمات)/iu.test(text);
-  if (rating && DISCOVERY_COMMAND_PATTERN.test(normalize(text)) && /\b(?:g|pg|pg13|pg15|15\+|18\+|21\+|18tc)\b/i.test(text)) return null;
+  if (rating && DISCOVERY_COMMAND_PATTERN.test(normalizedText) && /\b(?:g|pg|pg13|pg15|15\+|18\+|21\+|18tc)\b/i.test(text)) return null;
   if (rating) return "rating";
   if (SYNOPSIS_PATTERN.test(text)) return "synopsis";
   if (SUBTITLE_PATTERN.test(text)) return "subtitles";

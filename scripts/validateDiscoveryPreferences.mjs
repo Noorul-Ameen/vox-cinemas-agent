@@ -580,6 +580,11 @@ assert.equal(clearedTime.preferences.preferredTime, null);
 assert.equal(clearedTime.preferences.experience, "IMAX");
 assert.deepEqual(clearedTime.clearedKeys, ["preferredTime"]);
 
+const clearedLanguage = parseAndMergeDiscoveryPreferences({ ...changedExperience.preferences, language: "French" }, "Any language is fine", { now: NOW });
+assert.equal(clearedLanguage.preferences.language, null, "an explicit any-language reply must remove the retained movie-language filter");
+assert.equal(clearedLanguage.preferences.experience, "IMAX", "clearing movie language must retain unrelated criteria");
+assert.equal(clearedLanguage.preferences.movieTitle, null, "an explicit any-language reply must not become a movie title");
+
 const replacementMovieSeed = {
   cinemaId: "0002",
   cinemaName: "Mall of the Emirates",

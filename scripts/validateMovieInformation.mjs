@@ -39,6 +39,15 @@ for (const [query, topic] of cases) {
   assert.equal(isLikelyMovieInformationQuestion(query), true);
 }
 assert.equal(classifyMovieInformationQuestion("Show me PG movies tomorrow"), null, "rating-code discovery must remain a filter request");
+for (const filterTurn of [
+  "any language is fine",
+  "no genre preference",
+  "show me English language movies",
+  "I want comedy genre movies",
+  "what Arabic language films are showing tonight",
+]) {
+  assert.equal(classifyMovieInformationQuestion(filterTurn), null, `${filterTurn}: discovery filters must not become movie-information questions`);
+}
 
 const ageAnswer = resolveMovieInformationTurn({ query: "Can I take my 10 year old to Exma?", locale: "en", visibleMovies: [ezma, family] });
 assert.equal(ageAnswer.handled, true);
@@ -106,4 +115,4 @@ assert.match(appSource, /read-only movie-information turn/);
 assert.match(appSource, /already displayed this exact answer for the typed turn/);
 assert.match(appSource, /Keep the current .* panel and every retained booking field unchanged/);
 
-console.log("Movie-information validation passed: 36 deterministic text, voice-context, Arabic, metadata, ambiguity, and state-continuity assertions.");
+console.log("Movie-information validation passed: 41 deterministic text, voice-context, Arabic, metadata, ambiguity, filter-routing, and state-continuity assertions.");
