@@ -95,11 +95,15 @@ assert.match(arabic.answer, /15/);
 
 const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
 assert.match(appSource, /movieInformation\?\.handled/);
+assert.match(appSource, /synopsis\|plot\|story\|storyline/);
 assert.match(appSource, /movieRating:\s*movie\?\.rating/);
 assert.match(appSource, /movieRating:\s*movie\.rating/);
 assert.match(appSource, /pendingAuthoritativeMovieAnswerRef/);
+assert.match(appSource, /movieInformationMovieRef\.current = movieInformation\.movie/);
+assert.match(appSource, /visibleMovies\.length \? null : movieInformationMovieRef\.current/);
+assert.match(appSource, /movieInformationMovieRef\.current = null/);
 assert.match(appSource, /read-only movie-information turn/);
 assert.match(appSource, /already displayed this exact answer for the typed turn/);
 assert.match(appSource, /Keep the current .* panel and every retained booking field unchanged/);
 
-console.log("Movie-information validation passed: 32 deterministic text, voice-context, Arabic, metadata, ambiguity, and state-continuity assertions.");
+console.log("Movie-information validation passed: 36 deterministic text, voice-context, Arabic, metadata, ambiguity, and state-continuity assertions.");

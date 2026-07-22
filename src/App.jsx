@@ -80,7 +80,7 @@ const DISCOVERY_MOVIE_CATALOG = vista.getDiscoveryMovieCatalog();
 const stripVox = (name) => String(name || "").replace(/^VOX\s*[\u2014-]\s*/, "");
 const norm = (value) => String(value ?? "").toLowerCase().trim();
 const hasMeaningfulTurnContent = (value) => /[\p{L}\p{N}]/u.test(String(value || ""));
-const isPotentialMovieInformationTurn = (value) => /\b(?:ratings?|rated|certificates?|classification|review|score|stars?|imdb|rotten\s+tomatoes|year[ -]?old|child|kid|suitable|appropriate|synopsis|plot|storyline|what(?:'s| is) .{1,80} about|language|subtitles?|runtime|duration|how long|genre|cast|actors?|actress|starring|trailer|teaser|release date|tell me about|movie details|film details)\b|(?:تصنيف|التصنيف|التصنيفات|تقييم|التقييمات|مراجعة|نجوم|طفل|اطفال|أطفال|ابني|ابنتي|مناسب|قصة الفيلم|قصه الفيلم|ملخص|لغة الفيلم|لغه الفيلم|ترجمة|ترجمه|(?:مدة|مده)(?: الفيلم| فيلم)?|كم دقيقة|كم دقيقه|نوع الفيلم|طاقم التمثيل|الممثل|الممثلة|الممثله|اعلان الفيلم|إعلان الفيلم|تاريخ الاصدار|تاريخ الإصدار|معلومات عن|تفاصيل الفيلم)/iu.test(String(value || ""));
+const isPotentialMovieInformationTurn = (value) => /\b(?:ratings?|rated|certificates?|classification|review|score|stars?|imdb|rotten\s+tomatoes|year[ -]?old|child|kid|suitable|appropriate|synopsis|plot|story|storyline|what happens|movie summary|film summary|summary of|what(?:'s| is) .{1,80} about|language|subtitles?|runtime|duration|how long|genre|cast|actors?|actress|starring|trailer|preview|teaser|release date|released|premiere date|come out|tell me about|more about|information about|details about|movie details|film details)\b|(?:تصنيف|التصنيف|التصنيفات|تقييم|التقييمات|مراجعة|نجوم|طفل|اطفال|أطفال|ابني|ابنتي|مناسب|قصة|قصه|ملخص|عن ماذا|عن شو|احداث الفيلم|أحداث الفيلم|لغة الفيلم|لغه الفيلم|ترجمة|ترجمه|(?:مدة|مده)(?: الفيلم| فيلم)?|كم دقيقة|كم دقيقه|نوع الفيلم|طاقم التمثيل|الممثل|الممثلة|الممثله|اعلان الفيلم|إعلان الفيلم|تاريخ العرض|تاريخ الاصدار|تاريخ الإصدار|معلومات عن|تفاصيل الفيلم|تفاصيل عن)/iu.test(String(value || ""));
 const authoritativeJourneyDate = ({ stage, discoveryPreferences, pendingOrder, booking } = {}) => (
   stage?.session?.date
   || stage?.order?.performanceDate
@@ -651,6 +651,7 @@ export default function App() {
   const continuationSessionRef = useRef(false);
   const pendingLanguageSwitchRef = useRef(null);
   const pendingAuthoritativeMovieAnswerRef = useRef(null);
+  const movieInformationMovieRef = useRef(null);
   const languageTransportRestartRef = useRef(null);
   const disconnectReasonRef = useRef("ended");
   const suppressDisconnectNoticeRef = useRef(false);
@@ -2089,7 +2090,7 @@ export default function App() {
           synopsis: value.movieSynopsis || null,
         }
       : null;
-    const currentMovie = current.movie
+    const contextualMovie = current.movie
       || resolveStoredMovie(current.order)
       || resolveStoredMovie(current.booking)
       || retainedStage?.movie
@@ -2101,6 +2102,9 @@ export default function App() {
       : retainedStage?.view === "movies" && Array.isArray(retainedStage.movies)
         ? retainedStage.movies
         : [];
+    const currentMovie = contextualMovie
+      || (visibleMovies.length ? null : movieInformationMovieRef.current)
+      || null;
     const sessions = current.movie && currentMovie && String(current.movie.id) === String(currentMovie.id)
       ? (Array.isArray(current.sessions) ? current.sessions : sessionsRef.current)
       : retainedStage?.movie && currentMovie && String(retainedStage.movie.id) === String(currentMovie.id)
@@ -4354,6 +4358,7 @@ export default function App() {
     historyContextRef.current = null;
     offersReturnRef.current = null;
     lastOfferRef.current = null;
+    movieInformationMovieRef.current = null;
     resetClarificationFailures();
     transportConversationIdRef.current = null;
     const endedPausedJourney = reason === "timeout"
@@ -4704,6 +4709,7 @@ export default function App() {
           });
         }
         if (movieInformation?.handled) {
+          if (movieInformation.movie) movieInformationMovieRef.current = movieInformation.movie;
           pendingAuthoritativeMovieAnswerRef.current = {
             answer: movieInformation.answer,
             at: Date.now(),
@@ -5442,6 +5448,7 @@ export default function App() {
       : null;
     if (movieInformation?.handled) {
       setInput("");
+      if (movieInformation.movie) movieInformationMovieRef.current = movieInformation.movie;
       say("agent", movieInformation.answer);
       conversation.sendContextualUpdate?.(`${movieInformation.context}\nThe widget already displayed this exact answer for the typed turn. Keep the current ${stageRef.current.view} panel and every retained booking field unchanged. Do not generate another reply unless the guest speaks or types again.`);
       return;
