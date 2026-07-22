@@ -43,6 +43,7 @@ const AREA_RULES = Object.freeze([
   { key: "saadiyat", label: "Saadiyat Island", aliases: ["saadiyat", "saadiyat island", "جزيرة السعديات", "السعديات"], cinemaIds: ["0046", "0104", "0036"] },
   { key: "khalifa_city", label: "Khalifa City", aliases: ["khalifa city", "masdar city", "مدينة خليفة", "مدينة مصدر"], cinemaIds: ["0012", "0036"] },
   { key: "umm_al_quwain", label: "Umm Al Quwain", aliases: ["umm al quwain", "umm al-quwain", "uaq", "أم القيوين", "ام القيوين"], cinemaIds: ["0004", "0055", "0009"] },
+  { key: "hatta", label: "Hatta", aliases: ["hatta", "حتا"], cinemaIds: ["0006", "0055", "0004"] },
   { key: "east_coast", label: "UAE East Coast", aliases: ["khor fakkan", "khorfakkan", "kalba", "خورفكان", "خور فكان", "كلباء"], cinemaIds: ["0006"] },
 ]);
 

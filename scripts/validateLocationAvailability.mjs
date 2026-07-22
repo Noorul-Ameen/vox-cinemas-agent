@@ -13,7 +13,7 @@ assert.equal(resolveCinemaCandidate(cinemas, "Abu Dhabi Marina Mall"), null, "an
 assert.equal(resolveCinemaCandidate(cinemas, "Ras Al Khaimah"), null, "Ras Al Khaimah must remain a city-level request");
 assert.equal(resolveCinemaCandidate(cinemas, "Al Ain"), null, "Al Ain must remain a city-level request");
 
-for (const request of ["Dubai Marina", "Al Quoz", "Karama", "Jumeirah", "Umm Suqeim", "Al Nahda", "Mussafah", "Khalidiya"]) {
+for (const request of ["Dubai Marina", "Al Quoz", "Karama", "Jumeirah", "Umm Suqeim", "Al Nahda", "Mussafah", "Khalidiya", "Hatta"]) {
   const result = resolveLocationIntent(cinemas, `Show movies near ${request} tomorrow`);
   assert.equal(result?.kind, "area", `${request} must route as a UAE area, not a movie title`);
   assert.ok(result.cinemas.length > 0, `${request} must return deterministic VOX alternatives`);
