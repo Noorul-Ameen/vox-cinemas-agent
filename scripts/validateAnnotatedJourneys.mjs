@@ -50,7 +50,7 @@ function readNamedFunction(source, name) {
 }
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
-const prompt = fs.readFileSync(new URL("../src/lib/voxiSession.js", import.meta.url), "utf8");
+const prompt = fs.readFileSync(new URL("../src/lib/voxiPrompt.js", import.meta.url), "utf8");
 const richMedia = fs.readFileSync(new URL("../src/components/RichMedia.jsx", import.meta.url), "utf8");
 
 const cinemas = vista.getCinemas();

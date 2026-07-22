@@ -36,6 +36,12 @@ function resultBlock(result, locale, liveData) {
     lines.push(supplied === undefined
       ? "Live result: NOT SUPPLIED. Ask for the missing selection or call the existing provider; never invent a current value."
       : `Live result: ${stableJson(supplied)}`);
+  } else if (entry.id === "movie-age-ratings") {
+    const supplied = liveData?.[entry.id];
+    if (supplied !== undefined) {
+      lines.push(`Authoritative movie-specific result: ${stableJson(supplied)}`);
+      lines.push("Movie-specific rule: Treat a supplied current certificate as an age and admission certificate, not a review score. Use it exactly for the named movie. Never infer a certificate from the title, genre, synopsis, popularity, or review score.");
+    }
   }
 
   lines.push(`Audience: ${entry.metadata.audience.join(", ")}`);

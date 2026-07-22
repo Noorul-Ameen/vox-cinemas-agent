@@ -777,6 +777,15 @@ function valuesMatch(values, requested) {
 }
 
 function kidsFamilyMovie(movie) {
+  const rating = String(movie?.rating ?? movie?.Rating ?? movie?.movieRating ?? "")
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/PLUS/g, "+");
+  // KIDS is an auditorium experience, not an age certificate. A restricted
+  // certificate can never become a family recommendation because of a KIDS
+  // session or a loose metadata tag. PG15 also carries a content-suitability
+  // warning, so generic kids/family discovery is limited to G, PG, and PG13.
+  if (rating && !["G", "PG", "PG13"].includes(rating)) return false;
   const genres = movieGenres(movie);
   const tags = splitValues([movie?.audience, movie?.audiences, movie?.categories, movie?.Category]);
   return genres.some((genre) => ["family", "animation", "children", "kids"].includes(genre))
@@ -802,9 +811,14 @@ function movieMatchesMetadata(movie, preferences, kidsSessionMovieIds, cinemas, 
   if (preferences.date && directDate && directDate !== preferences.date) return false;
   if (preferences.genre && !valuesMatch(movieGenres(movie), preferences.genre)) return false;
   if (preferences.language && !valuesMatch(movieLanguages(movie), preferences.language)) return false;
-  if (preferences.audience === "kids_family"
-    && !kidsFamilyMovie(movie)
-    && !kidsSessionMovieIds.has(movieIdentity(movie))) return false;
+  if (preferences.audience === "kids_family") {
+    const rating = String(movie?.rating ?? movie?.Rating ?? movie?.movieRating ?? "")
+      .toUpperCase()
+      .replace(/\s+/g, "")
+      .replace(/PLUS/g, "+");
+    if (rating && !["G", "PG", "PG13"].includes(rating)) return false;
+    if (!kidsFamilyMovie(movie) && !kidsSessionMovieIds.has(movieIdentity(movie))) return false;
+  }
   if (!ignoreExperience && preferences.experience && movieExperiences(movie).length && !valuesMatch(movieExperiences(movie), preferences.experience)) return false;
   return true;
 }

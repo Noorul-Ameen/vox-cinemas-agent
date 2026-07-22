@@ -61,7 +61,7 @@ import {
   invalidateVoiceCancellationDecision,
   syncVoiceCancellationConfirmation,
 } from "./lib/voiceCancellationDecision.js";
-import { VOXI_AGENT_PROMPT, VOXI_FIRST_MESSAGES, buildVoxiContext } from "./lib/voxiSession.js";
+import { VOXI_FIRST_MESSAGES, buildVoxiContext } from "./lib/voxiSession.js";
 import { OFFER_META } from "./offers/offersData.js";
 import { answerForOfferTopic, buildOfferFacts } from "./offers/offerFacts.js";
 import { buildOfferEvaluationContext, shouldInvalidateOfferResult } from "./offers/offerContext.js";
@@ -80,6 +80,7 @@ const DISCOVERY_MOVIE_CATALOG = vista.getDiscoveryMovieCatalog();
 const stripVox = (name) => String(name || "").replace(/^VOX\s*[\u2014-]\s*/, "");
 const norm = (value) => String(value ?? "").toLowerCase().trim();
 const hasMeaningfulTurnContent = (value) => /[\p{L}\p{N}]/u.test(String(value || ""));
+const isPotentialMovieInformationTurn = (value) => /\b(?:ratings?|rated|certificates?|classification|review|score|stars?|imdb|rotten\s+tomatoes|year[ -]?old|child|kid|suitable|appropriate|synopsis|plot|storyline|what(?:'s| is) .{1,80} about|language|subtitles?|runtime|duration|how long|genre|cast|actors?|actress|starring|trailer|teaser|release date|tell me about|movie details|film details)\b|(?:تصنيف|التصنيف|التصنيفات|تقييم|التقييمات|مراجعة|نجوم|طفل|اطفال|أطفال|ابني|ابنتي|مناسب|قصة الفيلم|قصه الفيلم|ملخص|لغة الفيلم|لغه الفيلم|ترجمة|ترجمه|(?:مدة|مده)(?: الفيلم| فيلم)?|كم دقيقة|كم دقيقه|نوع الفيلم|طاقم التمثيل|الممثل|الممثلة|الممثله|اعلان الفيلم|إعلان الفيلم|تاريخ الاصدار|تاريخ الإصدار|معلومات عن|تفاصيل الفيلم)/iu.test(String(value || ""));
 const authoritativeJourneyDate = ({ stage, discoveryPreferences, pendingOrder, booking } = {}) => (
   stage?.session?.date
   || stage?.order?.performanceDate
@@ -649,6 +650,7 @@ export default function App() {
   const hasDisplayedWelcomeRef = useRef(false);
   const continuationSessionRef = useRef(false);
   const pendingLanguageSwitchRef = useRef(null);
+  const pendingAuthoritativeMovieAnswerRef = useRef(null);
   const languageTransportRestartRef = useRef(null);
   const disconnectReasonRef = useRef("ended");
   const suppressDisconnectNoticeRef = useRef(false);
@@ -919,6 +921,7 @@ export default function App() {
     cancellationLockPendingRef.current = false;
     cancellationLockPromiseRef.current = null;
     cancellationInFlightRef.current = false;
+    pendingAuthoritativeMovieAnswerRef.current = null;
     clearCancellationConfirmationTimer(reason);
     cancellationPausedRef.current = false;
     if (reason !== "confirmation_timeout") {
@@ -1582,7 +1585,17 @@ export default function App() {
       cinema: { id: target.id, name: target.name },
       selectedDate: requestedDate,
       preferences,
-      movies: enrichedMovies.map((movie) => ({ id: movie.id, title: movie.title, showtimes: (movie.relevantSessions || []).map((session) => ({ sessionId: session.sessionId, time: session.time, experience: session.exp })) })),
+      movies: enrichedMovies.map((movie) => ({
+        id: movie.id,
+        title: movie.title,
+        rating: movie.rating || null,
+        language: movie.languageName || movie.language || null,
+        runtime: Number(movie.runtime) || null,
+        genres: Array.isArray(movie.genres) ? movie.genres : [movie.genre].filter(Boolean),
+        synopsis: movie.synopsis || null,
+        subtitles: Array.isArray(movie.subtitles) ? movie.subtitles : [],
+        showtimes: (movie.relevantSessions || []).map((session) => ({ sessionId: session.sessionId, time: session.time, experience: session.exp })),
+      })),
       time: result.time,
       expiredSessionCount: availability.expired.length,
       failedMovieCount: 0,
@@ -2006,6 +2019,17 @@ export default function App() {
   const prepareFaqContext = useCallback((query) => {
     const activeLocale = localeRef.current;
     const current = stageRef.current;
+    const retainedStage = selectRestorableRichStage(pausedJourneyRef.current);
+    const currentMovie = current.movie
+      || (current.order ? resolveFilm(current.order.movieId || current.order.movieTitle) : null)
+      || (current.booking ? resolveFilm(current.booking.movieId || current.booking.movieTitle) : null)
+      || retainedStage?.movie
+      || null;
+    const visibleMovies = current.view === "movies" && Array.isArray(current.movies)
+      ? current.movies
+      : retainedStage?.view === "movies" && Array.isArray(retainedStage.movies)
+        ? retainedStage.movies
+        : [];
     const faq = buildFaqContextForQuery(query, {
       locale: activeLocale,
       minScore: 35,
@@ -2023,6 +2047,10 @@ export default function App() {
           id: lastOfferRef.current.offer?.id,
           eligibility: lastOfferRef.current.status,
         } : null,
+        "movie-age-ratings": {
+          currentMovie: currentMovie ? { id: currentMovie.id, title: currentMovie.title, rating: currentMovie.rating || null } : null,
+          visibleMovies: visibleMovies.map((movie) => ({ id: movie.id, title: movie.title, rating: movie.rating || null })),
+        },
       },
     });
     if (!faq.matches.length) return faq;
@@ -2042,6 +2070,53 @@ export default function App() {
     }
     return faq;
   }, []);
+
+  const resolveMovieInformation = async (query) => {
+    if (!isPotentialMovieInformationTurn(query)) return null;
+    const { resolveMovieInformationTurn } = await import("./lib/movieInformation.js");
+    const current = stageRef.current;
+    const retainedStage = selectRestorableRichStage(pausedJourneyRef.current);
+    const resolveStoredMovie = (value) => value
+      ? resolveFilm(value.movieId || value.movieTitle)
+        || resolveFilmCandidate(DISCOVERY_MOVIE_CATALOG, value.movieId || value.movieTitle)
+        || {
+          id: value.movieId || null,
+          title: value.movieTitle || null,
+          rating: value.movieRating || null,
+          language: value.movieLanguage || null,
+          runtime: value.movieRuntime || null,
+          genres: value.movieGenres || [],
+          synopsis: value.movieSynopsis || null,
+        }
+      : null;
+    const currentMovie = current.movie
+      || resolveStoredMovie(current.order)
+      || resolveStoredMovie(current.booking)
+      || retainedStage?.movie
+      || resolveStoredMovie(retainedStage?.order)
+      || resolveStoredMovie(retainedStage?.booking)
+      || null;
+    const visibleMovies = current.view === "movies" && Array.isArray(current.movies)
+      ? current.movies
+      : retainedStage?.view === "movies" && Array.isArray(retainedStage.movies)
+        ? retainedStage.movies
+        : [];
+    const sessions = current.movie && currentMovie && String(current.movie.id) === String(currentMovie.id)
+      ? (Array.isArray(current.sessions) ? current.sessions : sessionsRef.current)
+      : retainedStage?.movie && currentMovie && String(retainedStage.movie.id) === String(currentMovie.id)
+        ? (Array.isArray(retainedStage.sessions) ? retainedStage.sessions : [])
+        : undefined;
+    return resolveMovieInformationTurn({
+      query,
+      locale: localeRef.current,
+      stage: current,
+      pausedStage: retainedStage,
+      currentMovie,
+      visibleMovies,
+      movies: DISCOVERY_MOVIE_CATALOG,
+      sessions,
+    });
+  };
 
   const pauseRenderingForUnrelatedTurn = ({
     decision,
@@ -2242,6 +2317,11 @@ export default function App() {
       const order = {
         movieId: movie?.id,
         movieTitle: movie?.title,
+        movieRating: movie?.rating || null,
+        movieLanguage: movie?.languageName || movie?.language || null,
+        movieRuntime: Number(movie?.runtime) || null,
+        movieGenres: Array.isArray(movie?.genres) ? [...movie.genres] : [movie?.genre].filter(Boolean),
+        movieSynopsis: movie?.synopsis || null,
         cinemaId: selectedCinema.id,
         cinemaName: selectedCinema.name,
         sessionId: session?.sessionId,
@@ -3135,7 +3215,14 @@ export default function App() {
       showStage({ view: "showtimes", movie, sessions, notice, expiredSessionCount: availability.expired.length });
       resetClarificationFailures();
       return JSON.stringify({
+        movieId: movie.id,
         movie: movie.title,
+        movieRating: movie.rating || null,
+        movieLanguage: movie.languageName || movie.language || null,
+        movieRuntime: Number(movie.runtime) || null,
+        movieGenres: Array.isArray(movie.genres) ? movie.genres : [movie.genre].filter(Boolean),
+        movieSynopsis: movie.synopsis || null,
+        movieSubtitles: Array.isArray(movie.subtitles) ? movie.subtitles : [],
         cinema: cinemaRef.current.name,
         date: requestedDate,
         showtimes: sessions.map((session) => ({ sessionId: session.sessionId, time: session.time, experience: session.exp, screen: session.screen, language: movie.language, seatsAvailable: session.seatsAvailable })),
@@ -4357,6 +4444,7 @@ export default function App() {
       const sanitized = role === "user" ? sanitizeUserText(eventText) : { safeText: eventText, sensitive: false };
       const safeMessage = sanitized.safeText;
       if (role === "user") {
+        if (pendingAuthoritativeMovieAnswerRef.current?.displayedAt) pendingAuthoritativeMovieAnswerRef.current = null;
         if (!hasMeaningfulTurnContent(safeMessage)) return;
         const languageContinuityContext = conversationLanguageContinuityContext(safeMessage, localeRef.current);
         if (languageContinuityContext) conversation.sendContextualUpdate?.(languageContinuityContext);
@@ -4445,15 +4533,18 @@ export default function App() {
           || (stageRef.current.view !== "checkout" && isResumeOnlyTurn(safeMessage)));
         if (checkoutResumeTurn) restoreActiveCheckout();
         const resumeOnlyTurn = !directSeatSelection && (isResumeOnlyTurn(safeMessage) || checkoutResumeTurn);
+        const movieInformation = decision === null
+          ? await resolveMovieInformation(safeMessage)
+          : null;
         const directCinemaSelection = isDirectCinemaSelectionUtterance({
           text: safeMessage,
           view: stageRef.current.view,
           cinemaMatch: resolveCinema(safeMessage),
         });
-        const directMovieSelection = decision === null && !activeCheckout
+        const directMovieSelection = decision === null && !activeCheckout && !movieInformation?.handled
           ? resolveVisibleMovieSelectionTurn({ text: safeMessage, stage: stageRef.current })
           : null;
-        const directShowtimeSelection = decision === null && !activeCheckout && !directMovieSelection
+        const directShowtimeSelection = decision === null && !activeCheckout && !movieInformation?.handled && !directMovieSelection
           ? resolveVisibleShowtimeSelectionTurn({ text: safeMessage, stage: stageRef.current })
           : null;
         const ambiguousShowtimeCandidates = decision === null && !activeCheckout && !directMovieSelection && !directShowtimeSelection
@@ -4497,11 +4588,11 @@ export default function App() {
             conversation.sendContextualUpdate?.(`The offer panel could not be opened: ${error?.message || "unknown error"}. Do not claim an offer was applied.`);
           }
         }
-        dismissStaleTransactionalView({ text: safeMessage, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
+        if (!movieInformation?.handled) dismissStaleTransactionalView({ text: safeMessage, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
         const checkoutFaq = activeCheckout && !localOfferTurn && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection && !ambiguousShowtimeSelection
           ? prepareFaqContext(safeMessage)
           : { matches: [], context: "" };
-        const discoveryFilterTurn = checkoutFaq.matches.length || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection ? false : isDiscoveryFilterTurn(safeMessage);
+        const discoveryFilterTurn = movieInformation?.handled || checkoutFaq.matches.length || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection ? false : isDiscoveryFilterTurn(safeMessage);
         const faq = localOfferTurn
           ? { matches: [], context: "" }
           : checkoutFaq.matches.length
@@ -4509,11 +4600,11 @@ export default function App() {
           : directCinemaSelection || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection || directCancellation || directSeatSelection || discoveryFilterTurn
             ? { matches: [], context: "" }
             : prepareFaqContext(safeMessage);
-        const explicitDiscoveryTurn = !directCancellation && !faq.matches.length && (actionIntent === "booking" || directCinemaSelection || isDiscoveryRequest(safeMessage));
+        const explicitDiscoveryTurn = !movieInformation?.handled && !directCancellation && !faq.matches.length && (actionIntent === "booking" || directCinemaSelection || isDiscoveryRequest(safeMessage));
         if (explicitDiscoveryTurn && (pausedJourneyRef.current.status === "paused" || activeCheckout || bookingRef.current?.ref)) {
           beginReplacementBookingJourney("voice_new_booking_replaced_previous");
         }
-        pauseRenderingForUnrelatedTurn({
+        if (!movieInformation?.handled) pauseRenderingForUnrelatedTurn({
           decision,
           historyRequested: historyRequest.requested,
           directCancellation,
@@ -4529,11 +4620,11 @@ export default function App() {
           actionIntent,
           faq,
         });
-        const details = activeCheckout && !explicitDiscoveryTurn
+        const details = movieInformation?.handled || (activeCheckout && !explicitDiscoveryTurn)
           ? { cinema: null, requestedSeatTarget: null }
           : applyUtteranceBookingDetails(safeMessage, { actionIntent, hasFaq: faq.matches.length > 0 });
         const availableDates = programmingDatesForCinema(cinemaRef.current);
-        const bookingContext = decision === null && !directCancellation && !ambiguousShowtimeSelection && !faq.matches.length && (
+        const bookingContext = decision === null && !movieInformation?.handled && !directCancellation && !ambiguousShowtimeSelection && !faq.matches.length && (
           actionIntent === "booking"
           || (stageVisibleRef.current && !activeCheckout && journeyRef.current.intent === "booking")
           || isDiscoveryRequest(safeMessage)
@@ -4612,7 +4703,14 @@ export default function App() {
             conversation.sendContextualUpdate?.(`The cancellation check failed: ${error?.message || "unknown error"}. Do not claim cancellation or refund success.`);
           });
         }
-        if (faq.matches.length) {
+        if (movieInformation?.handled) {
+          pendingAuthoritativeMovieAnswerRef.current = {
+            answer: movieInformation.answer,
+            at: Date.now(),
+            topic: movieInformation.topic,
+          };
+          conversation.sendContextualUpdate?.(`${movieInformation.context}\nThis is a read-only movie-information turn. Keep the current ${stageRef.current.view} panel and every retained booking field unchanged.`);
+        } else if (faq.matches.length) {
           conversation.sendContextualUpdate?.(`${faq.context}\nThe guest's spoken question is: ${safeMessage}. Answer from this approved context without restarting the active task.`);
         } else if (!localOfferTurn) updateIntentFromText(safeMessage);
       }
@@ -4642,13 +4740,18 @@ export default function App() {
         return;
       }
       if (role !== "user") {
+        const pendingMovieAnswer = role === "agent" ? pendingAuthoritativeMovieAnswerRef.current : null;
+        if (pendingMovieAnswer && Date.now() - pendingMovieAnswer.at > 30000) pendingAuthoritativeMovieAnswerRef.current = null;
+        if (pendingMovieAnswer?.displayedAt) return;
         const claimStage = stageVisibleRef.current ? stageRef.current : { view: "empty", pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null };
+        const authoritativeMessage = pendingMovieAnswer?.answer || safeMessage;
         const displayedMessage = role === "agent"
           ? guardAgentStateClaim(
-            guardMovieDisplayClaim(safeMessage, claimStage, localeRef.current),
+            guardMovieDisplayClaim(authoritativeMessage, claimStage, localeRef.current),
             { stage: claimStage, pendingOrder: pendingOrderRef.current, locale: localeRef.current },
           )
-          : safeMessage;
+          : authoritativeMessage;
+        if (pendingMovieAnswer) pendingAuthoritativeMovieAnswerRef.current = { ...pendingMovieAnswer, displayedAt: Date.now() };
         say(role, displayedMessage);
       }
     },
@@ -4969,6 +5072,7 @@ export default function App() {
         };
         journeyRef.current = syncJourney(handoffJourney, journeyPayload);
         dispatchJourney({ type: "sync", payload: journeyPayload });
+        const { VOXI_AGENT_PROMPT } = await import("./lib/voxiPrompt.js");
         conversation.sendContextualUpdate?.(`${VOXI_AGENT_PROMPT}\n\n${buildVoxiContext({
           locale: activeLocale,
           cinema: cinemaRef.current,
@@ -5097,6 +5201,7 @@ export default function App() {
         };
         journeyRef.current = syncJourney(handoffJourney, journeyPayload);
         dispatchJourney({ type: "sync", payload: journeyPayload });
+        const { VOXI_AGENT_PROMPT } = await import("./lib/voxiPrompt.js");
         conversation.sendContextualUpdate?.(`${VOXI_AGENT_PROMPT}\n\n${buildVoxiContext({
           locale: activeLocale,
           cinema: cinemaRef.current,
@@ -5332,6 +5437,15 @@ export default function App() {
       }
       return;
     }
+    const movieInformation = turnCancellationDecision === null
+      ? await resolveMovieInformation(value)
+      : null;
+    if (movieInformation?.handled) {
+      setInput("");
+      say("agent", movieInformation.answer);
+      conversation.sendContextualUpdate?.(`${movieInformation.context}\nThe widget already displayed this exact answer for the typed turn. Keep the current ${stageRef.current.view} panel and every retained booking field unchanged. Do not generate another reply unless the guest speaks or types again.`);
+      return;
+    }
     const seatTurn = decision === null ? resolveVisibleSeatTurn(value) : { requested: false, seats: [] };
     const directSeatSelection = Boolean(seatTurn.requested);
     const checkoutResumeTurn = activeCheckout && (isResumeCheckoutTurn(value)
@@ -5343,10 +5457,10 @@ export default function App() {
       view: stageRef.current.view,
       cinemaMatch: resolveCinema(value),
     });
-    const directMovieSelection = decision === null && !activeCheckout
+    const directMovieSelection = decision === null && !activeCheckout && !movieInformation?.handled
       ? resolveVisibleMovieSelectionTurn({ text: value, stage: stageRef.current })
       : null;
-    const directShowtimeSelection = decision === null && !activeCheckout && !directMovieSelection
+    const directShowtimeSelection = decision === null && !activeCheckout && !movieInformation?.handled && !directMovieSelection
       ? resolveVisibleShowtimeSelectionTurn({ text: value, stage: stageRef.current })
       : null;
     const ambiguousShowtimeCandidates = decision === null && !activeCheckout && !directMovieSelection && !directShowtimeSelection

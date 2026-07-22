@@ -164,7 +164,7 @@ assert.deepEqual(offersTool.parameters.properties.detailTopic.enum, EXPECTED_DET
 assert.ok(!Object.hasOwn(offersTool.parameters.properties, "ticketCount"), "offer ticket count must remain locally derived from selected seats");
 assert.ok(!Object.hasOwn(offersTool.parameters.properties, "orderTotal"), "offer order total must remain locally derived from checkout");
 
-assert.equal(contract.prompt.source, "src/lib/voxiSession.js");
+assert.equal(contract.prompt.source, "src/lib/voxiPrompt.js");
 assert.equal(contract.prompt.exportName, "VOXI_AGENT_PROMPT");
 assert.equal(contract.prompt.version, contract.contractVersion, "prompt and contract versions must move together");
 assert.equal(contract.prompt.hashAlgorithm, "sha256");

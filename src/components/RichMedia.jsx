@@ -133,6 +133,7 @@ export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, err
               <span dir="auto" style={{ display: "block", fontSize: 14, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>{m.title}</span>
               <span style={{ display: "block", marginTop: 3, fontSize: 10, color: C.muted }}>
                 <span style={{ background: C.primarySoft, color: C.primary, borderRadius: 3, padding: "1px 4px", marginInlineEnd: 5 }}>{m.rating}</span>
+                {" · "}
                 {[
                   ...(m.genres || [m.genre]).filter(Boolean).slice(0, 2),
                   m.runtime ? t("showtimes.minutes", { count: m.runtime }) : "",

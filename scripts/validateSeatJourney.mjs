@@ -50,7 +50,7 @@ assert.equal(matchesSeatToolAuthorization(authorizedSeatTurn, { seats: ["E1", "E
 assert.equal(matchesSeatToolAuthorization(authorizedSeatTurn, { seats: ["E1", "E2"], sessionEpoch: 4, stageRevision: 9, planContext: "0002:s1", now: 1_000 + SEAT_TOOL_AUTHORIZATION_TTL_MS + 1 }), false, "an expired seat authorization must fail closed");
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
-const prompt = fs.readFileSync(new URL("../src/lib/voxiSession.js", import.meta.url), "utf8");
+const prompt = fs.readFileSync(new URL("../src/lib/voxiPrompt.js", import.meta.url), "utf8");
 const voiceStart = Math.max(app.indexOf("onMessage: async (message) =>"), app.indexOf("onMessage: (message) =>"));
 const voiceFlow = app.slice(voiceStart, app.indexOf("onError:", voiceStart));
 const typedFlow = app.slice(app.indexOf("const sendText"), app.indexOf("const sendUiTurn"));

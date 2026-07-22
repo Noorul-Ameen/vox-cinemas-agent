@@ -2,9 +2,9 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-22.1`
+Prompt contract version: `2026-07-22.2`
 
-Prompt value SHA-256: `5365b2a3a4096ecf6364f98057bef7ebe7a422f9eac0a06d57441ef6d98cb3e4`
+Prompt value SHA-256: `8d6747a745286f6b3e8b6acef83762f267eab0649cbb8504b6dc1d9f5d8ae0b8`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 
@@ -14,8 +14,8 @@ VOXi is the bilingual AI assistant for VOX Cinemas UAE. Keep the product and wel
 
 Status: REPOSITORY CONTRACT AND ELEVENLABS DASHBOARD ARE SYNCHRONIZED. LIVE ACOUSTIC VOICE VERIFICATION IS STILL REQUIRED.
 
-- Contract `2026-07-22.1` was copied from the exported `VOXI_AGENT_PROMPT` value, published to the target agent, reloaded, and read back on 22 July 2026.
-- The readback confirmed the grounded Afghan clarification, spoken discovery availability gate, replacement-discovery handling, visible-hour showtime resolution, and one-shot paused-journey recovery rules.
+- Contract `2026-07-22.2` was published to the target agent and read back on 22 July 2026. The readback confirmed authoritative movie age-rating, child-suitability, movie-fact, review-score ambiguity, and read-only journey-continuity rules.
+- The eight existing client-tool names, `{{voxi_session_opening}}`, English and Arabic configuration, and voice assignments were checked after publication and remained unchanged.
 - The dashboard still uses the correct target agent, bilingual language configuration, `{{voxi_session_opening}}`, Agent language override, Text only override, and exact client-tool names. Detect language remains off.
 - The English primary voice and Arabic voice override remain configured. No connection type, client tool, worklet, or EU residency setting was changed.
 - Run a real microphone input and audible English and Arabic output check on the deployed origin. Repository and dashboard checks cannot prove acoustic input or output quality.
@@ -29,7 +29,7 @@ Configure the target agent with these settings:
 - Supported languages: English (`en`, `en-AE`) and Arabic (`ar`, `ar-AE`).
 - Primary language: English.
 - Configure the dashboard first-message field as `{{voxi_session_opening}}`.
-- Copy the complete `VOXI_AGENT_PROMPT` value from `src/lib/voxiSession.js` into the dashboard system prompt.
+- Copy the complete `VOXI_AGENT_PROMPT` value from `src/lib/voxiPrompt.js` into the dashboard system prompt.
 - Disable the ElevenLabs `language_detection` system tool. VOXi uses explicit language selection and confirmation, not automatic detected-language switching.
 - ElevenLabs forces the Agent language override permission on and disables its toggle when Arabic is configured. Leave that dashboard state unchanged. The widget sends `overrides.agent.language` as `en` or `ar` from the explicit selector or confirmed language command.
 - Do not enable or depend on an `agent.firstMessage` client override.
@@ -498,7 +498,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 1. Confirm the dashboard target is `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`.
 2. Confirm all eight exact client-tool names and schemas match `config/elevenlabs-agent-contract.json`.
 3. Enable Wait for response on all eight tools. Confirm `show_seat_map` returns after map loading and never waits for a later seat-selection turn.
-4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-22.1`.
+4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-22.2`.
 5. Set the first message to `{{voxi_session_opening}}`.
 6. Confirm the dashboard detects `voxi_session_opening` from the first-message template. The widget supplies all 13 contract variables when it starts a session; do not create unsupported manual placeholders for variables that the dashboard does not expose.
 7. Configure English and Arabic support, then disable the automatic `language_detection` system tool.

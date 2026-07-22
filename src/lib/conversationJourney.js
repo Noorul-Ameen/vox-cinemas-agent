@@ -36,6 +36,10 @@ const bookingSummaryStatus = (booking) => {
 const compactMovie = (movie) => movie ? {
   id: movie.id || movie.movieId || null,
   title: movie.title || movie.movieTitle || null,
+  rating: movie.rating || movie.movieRating || null,
+  language: movie.language || movie.languageName || null,
+  runtime: Number(movie.runtime) || null,
+  genres: Array.isArray(movie.genres) ? [...movie.genres] : [],
   posterUrl: movie.posterUrl || null,
 } : null;
 const compactCinema = (cinema) => cinema ? { id: cinema.id || null, name: cinema.name || null } : null;
@@ -110,8 +114,8 @@ export function syncJourney(current, payload = {}) {
   const clearsMovie = clearsUpstream || view === "movies";
   const clearsSession = clearsMovie || view === "showtimes";
   const movie = stage?.movie
-    || (activeOrder ? { id: activeOrder.movieId, title: activeOrder.movieTitle, posterUrl: activeOrder.posterUrl } : null)
-    || (activeBooking ? { id: activeBooking.movieId, title: activeBooking.movieTitle, posterUrl: activeBooking.posterUrl } : null)
+    || (activeOrder ? { id: activeOrder.movieId, title: activeOrder.movieTitle, rating: activeOrder.movieRating, language: activeOrder.movieLanguage, runtime: activeOrder.movieRuntime, genres: activeOrder.movieGenres, posterUrl: activeOrder.posterUrl } : null)
+    || (activeBooking ? { id: activeBooking.movieId, title: activeBooking.movieTitle, rating: activeBooking.movieRating, language: activeBooking.movieLanguage, runtime: activeBooking.movieRuntime, genres: activeBooking.movieGenres, posterUrl: activeBooking.posterUrl } : null)
     || (clearsMovie ? null : current.movie);
   const session = stage?.session
     || (activeOrder ? { sessionId: activeOrder.sessionId, date: activeOrder.date, time: activeOrder.showtime, experience: activeOrder.experience, screen: activeOrder.screen } : null)

@@ -75,6 +75,7 @@ export function buildAuthoritativeDiscoveryContext(result, { maxMovies = 8, maxS
 
   const rows = movies.map((movie) => {
     const title = clean(movie?.title) || "Untitled movie";
+    const facts = [clean(movie?.rating), clean(movie?.language), movie?.runtime ? `${Number(movie.runtime)} min` : ""].filter(Boolean);
     const showtimes = Array.isArray(movie?.showtimes)
       ? movie.showtimes.slice(0, maxShowtimes).map((session) => {
         const time = clean(session?.time);
@@ -82,7 +83,7 @@ export function buildAuthoritativeDiscoveryContext(result, { maxMovies = 8, maxS
         return [time, experience].filter(Boolean).join(" ");
       }).filter(Boolean)
       : [];
-    return `${title}: ${showtimes.length ? showtimes.join(", ") : "no displayed showtime"}`;
+    return `${title}${facts.length ? ` (${facts.join(", ")})` : ""}: ${showtimes.length ? showtimes.join(", ") : "no displayed showtime"}`;
   });
 
   const omitted = Math.max(0, (Array.isArray(result.movies) ? result.movies.length : 0) - movies.length);

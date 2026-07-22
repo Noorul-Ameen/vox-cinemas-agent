@@ -9,6 +9,8 @@ const refKey = (value) => String(value || "").trim().toUpperCase();
 const scopeValue = (value) => String(value || "").trim();
 const CUSTOMER_TEXT_FIELDS = [
   "movieTitle",
+  "movieRating",
+  "movieLanguage",
   "cinemaName",
   "experience",
   "screen",
