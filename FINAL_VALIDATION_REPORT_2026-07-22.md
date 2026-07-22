@@ -10,17 +10,17 @@ StackBlitz: <https://stackblitz.com/github/Noorul-Ameen/vox-cinemas-agent>
 
 Production branch: `main`
 
-Final hosted release: commit `bc34e3e0ea53b27aa5e276e2e682f4b3389b8131`, bundle `/assets/index-Cc1yKhu_.js`
+Validated hosted code release: commit `0030943cb5cb3290f85a044c9d2677b54bad4e21`, bundle `/assets/index-CSjTLhgw.js`
 
 Final corrective deployment: PASS
 
 ## Executive decision
 
-The 22 July corrective release is deployed and passes the critical hosted text, rendering, booking, cancellation, language, availability, offer, voice-transport, layout, and navigation journeys described below. It includes corrections for three regressions discovered during the preceding hosted replay: required Afghan-language clarification, protection against unsolicited seat selection, and correct parsing of an experience change such as `Show me IMAX instead`.
+The 22 July corrective release is deployed and passes the critical hosted text, rendering, booking, cancellation, language, availability, offer, voice-transport, and layout journeys described below. In addition to the earlier journey protections, this release grounds movie ratings and details, retains the named movie across short follow-ups, separates movie filters from movie-detail questions, routes Hatta to curated alternatives, and localizes retained location notices after a language switch.
 
-Those corrections passed the complete aggregate validator, production build, local mounted replay, GitHub push, Cloudflare asset-parity check, and final hosted replay. Commit `bc34e3e0ea53b27aa5e276e2e682f4b3389b8131` and `/assets/index-Cc1yKhu_.js` were verified on the production domain.
+Those corrections passed the complete aggregate validator, production build, local mounted replay, GitHub push, Cloudflare asset-parity check, and final hosted replay. Code commit `0030943cb5cb3290f85a044c9d2677b54bad4e21` and `/assets/index-CSjTLhgw.js` were verified on the production domain.
 
-The user-facing web experience is ready for leadership review with the disclosed boundaries. It is not ready for live ticket sales because licensed inventory, hold, payment, ticket, provider cancellation, and refund APIs are not connected. Voice transport connected in English and Arabic, but real microphone recognition and audible TTS still require manual acceptance in a normal HTTPS browser with an available microphone.
+The user-facing web experience is ready for leadership review with the disclosed boundaries. It is not ready for live ticket sales because licensed inventory, hold, payment, ticket, provider cancellation, and refund APIs are not connected. Voice transport connected in English and Arabic on Cloudflare, including an English-to-Arabic restart. Acoustic recognition and audible TTS quality still require a human speak-and-listen acceptance check.
 
 ## Status summary
 
@@ -33,32 +33,32 @@ The user-facing web experience is ready for leadership review with the disclosed
 | Cancellation | PASS | Selecting a listed booking by its movie title remains in the cancellation journey and requires confirmation. The result is disclosed as device-only. |
 | FAQ and offer continuity | PASS | FAQ and offer detours preserve and restore the active showtime, seat, checkout, booking-history, or cancellation stage. |
 | English and Arabic text | PASS | Explicit interface selection controls the active agent language. Arabic-language movie requests do not silently switch the interface. |
-| Voice application path | PASS AT CODE AND TRANSPORT LEVEL | WebRTC, explicit language override, shared routing, transcript handling, recovery, and permission errors are validated. |
-| Acoustic voice | BLOCKED BY TEST ENVIRONMENT | Automated testing did not capture real microphone audio or validate audible English and Arabic TTS. |
-| ElevenLabs dashboard | PASS | Contract `2026-07-22.1` is published and read back from the target agent. |
-| Schedule snapshot | PASS | 11,699 sessions, 45 films, 22 cinemas, and 22 dates from 2026-07-22 through 2026-08-12. |
+| Voice application path | PASS LOCALLY AND ON CLOUDFLARE | WebRTC, explicit language override, shared routing, transcript handling, recovery, permission errors, live English start, live Arabic restart, and clean stop are validated. |
+| Acoustic voice quality | MANUAL ACCEPTANCE REQUIRED | Automated testing did not speak a controlled utterance or judge audible English and Arabic TTS. |
+| ElevenLabs dashboard | PASS | Contract `2026-07-22.2` is published and read back from the target agent. |
+| Schedule snapshot | PASS | 11,716 sessions, 45 films, 22 cinemas, and 22 dates from 2026-07-22 through 2026-08-12. |
 | Bank offers | PASS WITH SOURCE LIMITATIONS | 21 promotions across 20 offer groups are available with bilingual detail and official links. Missing official conditions remain explicitly unknown. |
 | 420 px visual layout | PASS ON VERIFIED BASELINE | White and blue layout, compact posters, offer artwork, RTL treatment, seat map, checkout, and QR remained inside the widget in the tested browser. |
 | Customer-facing punctuation | PASS | Repository and runtime validation reject Unicode em dash and en dash characters. The focused repository scan also passed after this report was added. |
-| Corrective Cloudflare build | PASS | Commit `bc34e3e0ea53b27aa5e276e2e682f4b3389b8131`, asset `/assets/index-Cc1yKhu_.js`, browser navigation, and the critical hosted replay were verified. |
+| Corrective Cloudflare build | PASS | Code commit `0030943cb5cb3290f85a044c9d2677b54bad4e21`, asset `/assets/index-CSjTLhgw.js`, and the critical hosted replay were verified. |
 | Live ticket transactions | BLOCKED | Licensed provider APIs are required. |
 
 ## Fresh schedule snapshot
 
-Validated snapshot: `20260721-a101604217549f5f`
+Validated snapshot: `20260722-9494582985db4292`
 
-Extraction time: `2026-07-21T20:11:33.705Z`
+Extraction time: `2026-07-22T04:45:48.076Z`
 
-- 11,771 source rows.
-- 11,699 deduplicated sessions.
-- 72 duplicate rows removed.
+- 11,793 source rows.
+- 11,716 deduplicated sessions.
+- 77 duplicate rows removed.
 - 45 scheduled films.
 - 22 VOX UAE cinemas.
 - 22 programming dates from 2026-07-22 through 2026-08-12.
-- 1,361 sessions on 22 July.
+- 1,368 sessions on 22 July.
 - 1,376 sessions on 23 July.
-- 319 runtime cinema and date shards.
-- 4,164,914 total shard bytes.
+- 320 runtime cinema and date shards.
+- 4,171,104 total shard bytes.
 - No missing official movie posters in the promoted snapshot.
 - 14 experience-media records, including retained first-party records where the latest upstream response was partial.
 - 21 fresh offer-media records.
@@ -73,13 +73,18 @@ The daily refresh workflow validates freshness, coverage, deduplication, officia
 - A guest can provide several requirements in one sentence. The supplied cinema, date, time, genre, language, experience, movie, and audience criteria are retained.
 - A cinema, date, or time already provided is not requested again in the tested routes.
 - A specific movie request returns that movie's relevant cinemas and showtimes rather than unrelated movies.
+- Movie age-rating questions use the current VOX listing and UAE certificate rules. The Ezma PG15 age-10 case explains the 15-or-older accompaniment rule and suitability discretion.
+- Runtime, synopsis, language, genre, subtitle status, cast, trailer, release date, and review-score questions use catalog facts and explicitly decline to invent missing information.
+- An explicitly named movie remains available for short follow-ups such as `How long is it?`, `What is the story?`, and `What language is it?` until the movie changes or the conversation resets.
 - Requests around a preferred time show exact or nearby options and state when there is no exact match.
 - Kids and family, genre, movie language, cinema experience, cinema, and combined filters use the available-session index.
 - A preference change updates the results. A change that invalidates movie, session, or seat state clears the incompatible selection.
 - `anything is fine` and similar generic responses do not become a movie-title lookup.
+- `any language is fine`, `no genre preference`, and plural filter requests remain discovery turns rather than movie-detail questions.
 - `Show me IMAX instead` and `Show me IMAX only` retain IMAX as the experience without treating the modifier as a title.
 - `Afghan` alone requires clarification among Afghan-produced movies, Dari-language movies, and Pashto-language movies.
 - Unsupported cinemas such as Dubai Mall are not silently mapped to another venue. The widget offers verified alternatives from known UAE mappings.
+- Hatta is truthfully reported as having no listed VOX cinema, with curated Fujairah, Al Zahia, and Ajman alternatives. The notice changes immediately when the interface language changes.
 - French or another unavailable movie-language request returns a no-result state and proposes changing a criterion.
 - Posters render as compact cards inside the conversation instead of occupying the full widget.
 - Data is loaded from versioned cinema and date shards. Movie rendering is not generated live by the language model.
@@ -156,9 +161,9 @@ The following items are blocked by services or environments outside this reposit
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Contract: `2026-07-22.1`
+Contract: `2026-07-22.2`
 
-Prompt SHA-256: `5365b2a3a4096ecf6364f98057bef7ebe7a422f9eac0a06d57441ef6d98cb3e4`
+Prompt SHA-256: `8d6747a745286f6b3e8b6acef83762f267eab0649cbb8504b6dc1d9f5d8ae0b8`
 
 The exact repository prompt was entered in the signed-in ElevenLabs dashboard, published, reloaded, and read back. The verification confirmed:
 
@@ -173,7 +178,7 @@ The exact repository prompt was entered in the signed-in ElevenLabs dashboard, p
 - WebRTC voice, WebSocket text, and EU residency.
 - Scoped journey restoration, spoken discovery gating, and the Afghan clarification rule.
 
-No additional ElevenLabs prompt change is required for this repository contract. The remaining ElevenLabs acceptance action is to test one complete spoken English journey and one complete spoken Arabic journey with a real microphone and audible response on the final deployed origin.
+No additional ElevenLabs prompt change is required for this repository contract. The final Cloudflare replay established English and Arabic WebRTC sessions. The remaining acceptance action is to speak and listen in both languages to judge recognition and audible response quality.
 
 Protected settings must remain unchanged:
 
@@ -207,7 +212,7 @@ For content operations:
 
 The final corrective release passed:
 
-- `pnpm run validate`, covering 48 validator commands.
+- `pnpm run validate`, covering 50 validator commands.
 - `pnpm run build`.
 - Snapshot extraction, integrity, shard, runtime, and cinema-date coverage checks.
 - Discovery criteria, availability, prompt progression, annotated journey, exact movie, exact showtime, and programming-date checks.
@@ -215,10 +220,10 @@ The final corrective release passed:
 - Offers, FAQ, handover, i18n, language switching, conversation mode, transport, recovery, and voice-startup checks.
 - ElevenLabs contract and protected-invariant checks.
 - Customer-facing punctuation checks.
-- Baseline cold-load budget at 895,780 raw bytes, 252,509 gzip bytes, and 229,956 Brotli bytes. The Brotli limit is 230,400 bytes.
-- Final corrective production build `/assets/index-Cc1yKhu_.js` at 230,223 Brotli bytes against the same 230,400-byte limit.
+- Final cold-load budget at 887,453 raw bytes, 249,419 gzip bytes, and 226,901 Brotli bytes. The Brotli limit is 230,400 bytes.
+- Final corrective production build `/assets/index-CSjTLhgw.js` at 226,901 Brotli bytes against the same 230,400-byte limit.
 
-After hosted testing found the three corrective regressions, the experience-modifier, clarification, and seat-authorization regressions passed their focused checks. The complete `pnpm run validate` aggregate and `pnpm run build` also passed. The corrective commit was deployed and the final hosted replay passed.
+After hosted testing found movie-context, filter-routing, unsupported-location, and retained-notice localization defects, each exact reproduction received a deterministic regression check. The complete `pnpm run validate` aggregate and `pnpm run build` passed again after every correction. The final code commit was deployed and the Cloudflare replay passed.
 
 ## Local and hosted end-to-end evidence
 
@@ -263,13 +268,22 @@ The final hosted replay passed:
 10. Twenty-one bank promotions across 20 groups and detailed FAB information.
 11. The protected 420 px visual layout.
 12. Browser back and forward navigation returning to the same deployed asset.
+13. Ezma PG15 suitability for a 10-year-old, followed by `How long is it?`, `What is the story?`, and `What language is it?` without losing the named movie.
+14. Current Ezma showtimes stayed visible during a rating question.
+15. Seats E2 and E3 produced two tickets and AED 84, then checkout editing removed E3 and recalculated one ticket at AED 42.
+16. The saved Ezma summary rendered a reference QR, and `cancel Ezma` stayed in cancellation through explicit confirmation.
+17. `any language is fine` cleared a retained French filter without becoming a movie-information question. A following `anything is fine` produced movie cards rather than a title error.
+18. A Hatta request stated that no listed VOX cinema exists there and showed City Centre Fujairah, City Centre Al Zahia, and City Centre Ajman.
+19. Switching the retained Hatta panel to Arabic localized its notice and preserved the three alternatives.
+20. Live WebRTC reached English Voice chat, restarted into Arabic Voice chat, and stopped cleanly on Cloudflare.
 
 The first Supergirl cards appeared within 1.733 seconds, including a 1.4-second observation wait. A fresh final tab recorded no browser errors or warnings. The earlier long-running replay recorded only the expected WebSocket-close warning during the intentional language restart, with no browser error logs.
 
-Voice transport connection and language routing are verified. The automated replay did not speak into a real microphone or judge audible English or Arabic TTS, so no acoustic acceptance claim is made.
+Voice transport connection and language routing are verified in both languages. The automated replay did not speak a controlled utterance into the microphone or judge audible English or Arabic TTS, so no acoustic quality claim is made.
 
 Existing visual and log evidence:
 
+- [Final Cloudflare Arabic location rendering](./evidence/screenshots/final-cloudflare-arabic-location-2026-07-22.png)
 - [Cloudflare Arabic checkout restored](./evidence/screenshots/cloudflare-arabic-checkout-restored-2026-07-21.jpg)
 - [Local final Arabic checkout](./evidence/screenshots/local-final-arabic-checkout-2026-07-21.jpg)
 - [Local Arabic checkout continuity](./evidence/screenshots/local-arabic-checkout-continuity-2026-07-21.png)
@@ -289,8 +303,10 @@ Leadership web review: **READY WITH DISCLOSED BOUNDARIES.**
 
 Final corrective web behavior: **PASS LOCALLY AND ON CLOUDFLARE.**
 
-Acoustic voice: **PENDING A REAL ENGLISH AND ARABIC MICROPHONE AND TTS ACCEPTANCE TEST.**
+Voice transport: **PASS IN ENGLISH AND ARABIC ON CLOUDFLARE.**
+
+Acoustic recognition and audible TTS quality: **PENDING A HUMAN SPEAK-AND-LISTEN ACCEPTANCE TEST.**
 
 Live ticket sales: **BLOCKED BY LICENSED PROVIDER APIS.**
 
-The final release record includes the corrective commit hash, promoted Cloudflare bundle, exact three-regression hosted replay, rendering observation, navigation result, and browser console result. Acoustic voice acceptance remains the only browser-dependent test item, and live ticket sales remain blocked by the licensed provider APIs listed above.
+The final release record includes the validated code commit, promoted Cloudflare bundle, movie-information and filter regressions, booking and cancellation replay, bilingual WebRTC transport, localized location rendering, and the disclosed external boundaries. Acoustic quality acceptance remains the only browser-dependent voice item, and live ticket sales remain blocked by the licensed provider APIs listed above.

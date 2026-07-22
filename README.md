@@ -9,11 +9,13 @@ StackBlitz: <https://stackblitz.com/github/Noorul-Ameen/vox-cinemas-agent>
 ## Current product coverage
 
 - Official VOX UAE public-site schedule snapshot for 22 July to 12 August 2026.
-- 11,699 deduplicated sessions, 45 scheduled films, and 22 cinemas.
-- 1,361 sessions on 22 July and 1,376 sessions on 23 July.
+- 11,716 deduplicated sessions, 45 scheduled films, and 22 cinemas.
+- 1,368 sessions on 22 July and 1,376 sessions on 23 July.
 - Official movie posters, 14 experience-media records, and 21 current offer-media records with source provenance and explicit fallbacks.
 - Progressive movie discovery using cinema, city, date, time, genre, language, experience, movie, and audience criteria already supplied by the guest.
 - Exact-time and nearest-time showtime handling.
+- Grounded movie age ratings, child-suitability guidance, runtime, language, genre, synopsis, subtitle status, and explicit unknown-fact handling without invented review scores.
+- Movie context retained across short follow-ups such as `How long is it?`, `What is the story?`, and `What language is it?` until the guest changes the movie or starts a new conversation.
 - Deterministic exact-title selection from visible movie cards for both typed and normalized voice turns.
 - Deterministic exact-time selection from visible showtimes to the real session seat map for typed and normalized voice turns.
 - Text, touch, and optional voice entry through one shared logical journey.
@@ -57,7 +59,7 @@ The current site uses Cloudflare Pages Git integration:
 - Build command: `npm ci && npm run validate && npm run build`
 - Output directory: `dist`
 
-The 22 July corrective release was deployed from `main` at commit `bc34e3e0ea53b27aa5e276e2e682f4b3389b8131`. Cloudflare serves `/assets/index-Cc1yKhu_.js` and the versioned showtime snapshot. The complete local validator, production build, mounted-browser replay, Cloudflare asset-parity check, and final hosted replay passed. See [FINAL_VALIDATION_REPORT_2026-07-22.md](./FINAL_VALIDATION_REPORT_2026-07-22.md) for the tested journeys and remaining external boundaries.
+The final 22 July code release was deployed from `main` at commit `0030943cb5cb3290f85a044c9d2677b54bad4e21`. Cloudflare serves `/assets/index-CSjTLhgw.js` and versioned snapshot `20260722-9494582985db4292`. The complete local validator, production build, mounted-browser replay, Cloudflare asset-parity check, and final hosted replay passed. See [FINAL_VALIDATION_REPORT_2026-07-22.md](./FINAL_VALIDATION_REPORT_2026-07-22.md) for the tested journeys and remaining external boundaries.
 
 Snapshot mode requires no secret environment variables. If `VITE_VISTA_BASE` is enabled later, it must point only to a public-safe server gateway. Every `VITE_*` value is embedded in the browser bundle.
 
@@ -87,11 +89,11 @@ The product also supports:
 
 Text chat uses the SDK text-only WebSocket path. Voice uses protected WebRTC and self-hosted primary ElevenLabs AudioWorklets under `public/elevenlabs/`. The CSP permits the SDK-required secondary `blob:` worklet and continues to block `data:` scripts.
 
-Repository tests validate transport contracts, startup timeouts, explicit agent-language overrides, bilingual copy, state preservation, and protected configuration. ElevenLabs contract `2026-07-22.1` was published and read back from the signed-in target dashboard with the expected first message and repository rules. The latest automated local voice attempt ended in the bounded microphone-permission timeout, so real microphone recognition and TTS remain a manual HTTPS-browser check. See [ELEVENLABS_AGENT_SETUP.md](./ELEVENLABS_AGENT_SETUP.md).
+Repository tests validate transport contracts, startup timeouts, explicit agent-language overrides, bilingual copy, state preservation, and protected configuration. ElevenLabs contract `2026-07-22.2` was published and read back from the signed-in target dashboard with the expected first message and repository rules. The final Cloudflare replay established live WebRTC voice sessions in English and Arabic and stopped them cleanly. Acoustic speech recognition and audible TTS quality still require a person to speak and listen on a normal HTTPS browser. See [ELEVENLABS_AGENT_SETUP.md](./ELEVENLABS_AGENT_SETUP.md).
 
 ## Schedule data and refresh
 
-The current extraction completed at `2026-07-21T20:11:33.705Z`. It uses official VOX UAE public-site routes under:
+The current extraction completed at `2026-07-22T04:45:48.076Z`. It uses official VOX UAE public-site routes under:
 
 - `https://uae.voxcinemas.com`
 - `https://uae-apife.voxcinemas.com`
@@ -100,9 +102,9 @@ The extractor starts on the current UAE date, discovers official advertised prog
 
 Current crawl facts:
 
-- 11,771 raw rows
-- 11,699 unique sessions
-- 72 duplicates removed
+- 11,793 raw rows
+- 11,716 unique sessions
+- 77 duplicates removed
 - 22 programming dates, from 22 July to 12 August 2026
 - 45 films and 22 cinemas
 - No missing official movie posters in the promoted snapshot
@@ -115,7 +117,7 @@ The workflow `.github/workflows/refresh-vox-showtimes.yml` runs daily at 01:30 U
 npm run refresh:data
 ```
 
-The release candidate uses versioned snapshot `20260721-a101604217549f5f`. It does not silently cycle to stale dates. When a requested date is not covered, the UI shows an honest unavailable state. Past showtimes are filtered with UAE time and a 06:00 programming-day cutoff.
+The release candidate uses versioned snapshot `20260722-9494582985db4292`. It does not silently cycle to stale dates. When a requested date is not covered, the UI shows an honest unavailable state. Past showtimes are filtered with UAE time and a 06:00 programming-day cutoff.
 
 Live sold-out status, seat inventory, holds, authoritative pricing, payment, official admission QR, refunds, and provider cancellation require a licensed server integration and are not represented as live in snapshot mode.
 
@@ -127,6 +129,7 @@ Live sold-out status, seat inventory, holds, authoritative pricing, payment, off
 - Persistent discovery criteria, specific-movie filtering, genre, audience, language, experience, and nearest-time behavior.
 - Deterministic exact visible-movie selection for text and normalized voice, with generic references kept non-selecting.
 - Deterministic exact visible-showtime selection for text and normalized voice, with ambiguous times and information questions kept non-selecting.
+- Canonical UAE movie ratings, age and accompaniment rules, movie-information follow-ups, review-score ambiguity, missing-fact safety, and separation of movie filters from movie-detail questions.
 - English and Arabic discovery, including the exact Arabic language, cinema, and date request regression.
 - Booking storage, cancellation routing and safety, explicit journey clearing, seat-derived ticket count, quote races, and stale-state invalidation.
 - Current-catalog paused-stage restoration, authoritative programming-date selection, and capitalization-safe location parsing.
@@ -142,10 +145,10 @@ Current July 22 validation status:
 - Repository WebRTC, WebSocket, bilingual transport, location, availability, continuity, and punctuation checks: PASS.
 - Local movie-result rendering: approximately 334 to 368 ms in sampled mounted-browser runs.
 - Final Arabic mounted journey: Ezma `17:55`, A6 and A7, two seats, AED 84, food FAQ pause, and exact checkout restore all passed with empty browser error and warning logs.
-- Final corrective cold-load budget: PASS at 230,223 of 230,400 initial JavaScript Brotli bytes, bundle `/assets/index-Cc1yKhu_.js`.
-- ElevenLabs contract `2026-07-22.1`: PUBLISHED AND DASHBOARD-VERIFIED.
-- Real microphone recognition and TTS: BLOCKED by the in-app browser permission timeout and still requires manual acceptance.
-- Cloudflare validation of corrective commit `bc34e3e0ea53b27aa5e276e2e682f4b3389b8131`: PASS for the expected bundle and snapshot, Afghan clarification, IMAX refinement, guest-authorized seats, two-seat AED 84 checkout, FAB FAQ restoration, device-only payment summary and QR, cancellation by title, bilingual discovery and voice transport, grounded unsupported locations, bank offers, 420 px layout, and browser navigation.
+- Final corrective cold-load budget: PASS at 226,901 of 230,400 initial JavaScript Brotli bytes, bundle `/assets/index-CSjTLhgw.js`.
+- ElevenLabs contract `2026-07-22.2`: PUBLISHED AND DASHBOARD-VERIFIED.
+- Live voice transport: PASS on Cloudflare in English and Arabic. Acoustic recognition and audible TTS quality still require manual acceptance.
+- Cloudflare validation of code commit `0030943cb5cb3290f85a044c9d2677b54bad4e21`: PASS for the expected bundle and snapshot, movie-rating and follow-up context, filter recovery, exact and nearby showtimes, guest-authorized seats, checkout seat editing, AED 42 repricing, FAB detail, device-only payment summary and QR, cancellation by title, bilingual discovery and voice transport, localized Hatta alternatives, bank offers, and the 420 px layout.
 - Final fresh-tab browser logs: PASS with no errors or warnings. The expected WebSocket-close warning occurred only during the intentional language restart in the earlier long-running replay.
 - First Supergirl cards appeared within 1.733 seconds, including a 1.4-second observation wait.
 - Live customer transaction readiness: BLOCKED by external inventory, payment, ticket, cancellation, and refund APIs.
@@ -161,7 +164,10 @@ The authoritative evidence and readiness decision are in [FINAL_VALIDATION_REPOR
 - `src/lib/discoveryPreferences.js`: persistent criteria parsing and filtering.
 - `src/lib/customerFacingText.js`: customer-facing punctuation normalization.
 - `src/lib/voiceStartup.js`: bounded voice startup and failure classification.
-- `src/lib/voxiSession.js`: bilingual agent prompt and session guidance.
+- `src/lib/voxiPrompt.js`: published bilingual ElevenLabs prompt contract.
+- `src/lib/voxiSession.js`: first-message, retained-state, and session guidance.
+- `src/lib/movieRating.js`: canonical UAE age ratings and suitability rules.
+- `src/lib/movieInformation.js`: grounded movie-detail question routing and answers.
 - `src/knowledge/`: sourced bilingual FAQ data and resolver.
 - `src/offers/`: structured offer catalog and eligibility resolver.
 - `scripts/refreshVoxData.mjs`: transactional refresh coordinator.

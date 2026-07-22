@@ -8,7 +8,7 @@ StackBlitz URL: <https://stackblitz.com/github/Noorul-Ameen/vox-cinemas-agent>
 
 Production branch: `main`
 
-Current hosted release: commit `bc34e3e0ea53b27aa5e276e2e682f4b3389b8131`, bundle `/assets/index-Cc1yKhu_.js`
+Validated hosted code release: commit `0030943cb5cb3290f85a044c9d2677b54bad4e21`, bundle `/assets/index-CSjTLhgw.js`
 
 Final corrective release: deployed and hosted replay passed
 
@@ -17,29 +17,29 @@ Final corrective release: deployed and hosted replay passed
 | Scope | Status | Decision |
 | --- | --- | --- |
 | Repository feature set | PASS | Progressive discovery, bilingual text, exact movie and showtime selection, seats, checkout continuity, booking history, cancellation, FAQ, and bank offers passed the tested local and hosted journeys. |
-| Final corrective release | PASS LOCALLY AND ON CLOUDFLARE | Corrections for Afghan-language clarification, unsolicited seat-tool calls, and phrases such as `Show me IMAX instead` passed the complete validator, production build, mounted-browser replay, deployment parity check, and final hosted replay. |
-| Showtime snapshot | PASS | Snapshot `20260721-a101604217549f5f` contains 11,699 deduplicated sessions, 45 films, and 22 cinemas from 2026-07-22 through 2026-08-12. |
+| Final corrective release | PASS LOCALLY AND ON CLOUDFLARE | Movie-rating grounding, short movie-detail follow-ups, movie-filter routing, Hatta alternatives, language-aware retained notices, and the earlier journey corrections passed the complete validator, production build, mounted-browser replay, deployment parity check, and final hosted replay. |
+| Showtime snapshot | PASS | Snapshot `20260722-9494582985db4292` contains 11,716 deduplicated sessions, 45 films, and 22 cinemas from 2026-07-22 through 2026-08-12. |
 | Bank offers | PASS WITH SOURCE LIMITATIONS | The widget contains 21 promotions across 20 offer groups, rich English and Arabic detail, card and experience guidance, redemption instructions, terms, and official links. Incomplete source terms are disclosed instead of invented. |
 | ElevenLabs repository contract | PASS | WebRTC voice, WebSocket text, EU residency, eight client tools, explicit English or Arabic override, state variables, and the first-message contract pass repository validation. |
-| ElevenLabs published agent | PASS | Contract `2026-07-22.1` was published to the exact target agent, reloaded, and read back from the signed-in dashboard. |
+| ElevenLabs published agent | PASS | Contract `2026-07-22.2` was published to the exact target agent, reloaded, and read back from the signed-in dashboard. |
 | Live ElevenLabs text | PASS | English and Arabic hosted text sessions reached the published agent and retained the shared widget journey. |
-| Live spoken audio | ENVIRONMENT BLOCKED | The automated browser could not complete a real microphone capture and audible TTS exchange. The voice path and failure recovery are tested, but acoustic acceptance still requires a normal HTTPS browser with a working microphone. |
+| Live voice transport | PASS ON CLOUDFLARE | The hosted widget established English WebRTC voice, restarted into Arabic voice while retaining context, and stopped cleanly. Acoustic speech-recognition and audible TTS quality still require a person to speak and listen. |
 | Leadership review | READY WITH DISCLOSED BOUNDARIES | The final corrective release passed the tested web journeys. Acoustic voice acceptance and live transaction APIs remain outside this pass. |
 | Live ticket sales | BLOCKED BY EXTERNAL APIS | Seat holds, authoritative prices, payment, official tickets and QR codes, cross-device booking lookup, provider cancellation, and refunds are not enabled. |
 
 ## Current product facts
 
-- Snapshot version: `20260721-a101604217549f5f`.
-- Extraction time: `2026-07-21T20:11:33.705Z`.
+- Snapshot version: `20260722-9494582985db4292`.
+- Extraction time: `2026-07-22T04:45:48.076Z`.
 - Coverage: 22 programming dates from 2026-07-22 through 2026-08-12.
-- Source rows: 11,771.
-- Deduplicated sessions: 11,699.
-- Duplicates removed: 72.
+- Source rows: 11,793.
+- Deduplicated sessions: 11,716.
+- Duplicates removed: 77.
 - Scheduled films: 45.
 - VOX UAE cinemas: 22.
-- Sessions on 22 July: 1,361.
+- Sessions on 22 July: 1,368.
 - Sessions on 23 July: 1,376.
-- Runtime shards: 319, totaling 4,164,914 bytes.
+- Runtime shards: 320, totaling 4,171,104 bytes.
 - All promoted movie records have official poster coverage.
 
 The snapshot is derived from the official VOX UAE public site and API-facing routes. It is not a live inventory feed. Sold-out status, current seat availability, holds, transaction prices, and booking mutations require licensed server APIs.
@@ -52,12 +52,17 @@ The snapshot is derived from the official VOX UAE public site and API-facing rou
 - Discovery retains cinema, city, date, preferred time, genre, movie language, experience, movie, and audience criteria.
 - Information already supplied by the guest is not requested again in the tested flows.
 - Specific-movie requests show only that movie's relevant sessions.
+- Movie age-rating questions use the published UAE certificate. A PG15 age-10 question explains the 15-or-older accompaniment rule and leaves final suitability to a parent or guardian.
+- Runtime, language, genre, synopsis, subtitle status, cast, trailer, release date, and review-score questions use only current catalog facts. Missing facts are stated as unavailable instead of invented.
+- An explicitly named movie remains the subject of short follow-ups such as `How long is it?` and `What is the story?` until a new movie is chosen or the conversation is reset.
 - Exact and nearby-time results distinguish an exact match from the closest available options.
 - Exact visible movie titles and showtimes are selected deterministically for typed and normalized voice turns.
 - Unsupported venues are not silently fuzzy-matched to a different cinema. Verified nearby VOX alternatives are offered from known location mappings.
+- Hatta is disclosed as having no listed VOX cinema and presents curated Fujairah, Al Zahia, and Ajman alternatives. The retained notice updates when the interface language changes.
 - Zero-result language, genre, cinema, and date combinations return an honest no-result state instead of fabricated availability.
 - Afghan-origin, Dari-language, and Pashto-language requests are separated by a required three-way clarification when the guest says only `Afghan`.
 - Generic preference phrases such as `anything is fine` remain non-selecting.
+- Explicit filter changes such as `any language is fine` and `no genre preference` are routed to discovery instead of being mistaken for movie-detail questions.
 - Experience modifiers such as `Show me IMAX instead` update the retained experience and are not parsed as movie title `instead`.
 - One selected seat equals one ticket. Seat changes recalculate ticket count, subtotal, fees, and total.
 - There is no separate quantity step or plus and minus quantity control.
@@ -95,9 +100,9 @@ The snapshot is derived from the official VOX UAE public site and API-facing rou
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Published contract: `2026-07-22.1`
+Published contract: `2026-07-22.2`
 
-Prompt SHA-256: `5365b2a3a4096ecf6364f98057bef7ebe7a422f9eac0a06d57441ef6d98cb3e4`
+Prompt SHA-256: `8d6747a745286f6b3e8b6acef83762f267eab0649cbb8504b6dc1d9f5d8ae0b8`
 
 Verified published settings:
 
@@ -114,7 +119,7 @@ Verified published settings:
 - Exact client-tool names, including protected `select_seats`.
 - Wait-for-response behavior on all client tools.
 
-No further dashboard prompt edit is required for contract `2026-07-22.1`. Required acceptance work is limited to one real microphone and audible response test in English and one in Arabic on the deployed HTTPS origin. Do not rename client tools, change EU residency, remove `select_seats`, or replace the existing fuzzy movie and session resolvers.
+No further dashboard prompt edit is required for contract `2026-07-22.2`. Live English and Arabic voice transport is verified. Remaining acceptance is limited to speaking and listening in each language to judge recognition and audible output quality. Do not rename client tools, change EU residency, remove `select_seats`, or replace the existing fuzzy movie and session resolvers.
 
 ## API and knowledge needs
 
@@ -139,10 +144,10 @@ Sustained content accuracy requires:
 
 The final release completed:
 
-- Full `pnpm run validate` aggregate across 48 validation commands.
+- Full `pnpm run validate` aggregate across 50 validation commands.
 - `pnpm run build` and the cold-load budget.
-- Baseline initial JavaScript at 895,780 raw bytes, 252,509 gzip bytes, and 229,956 Brotli bytes against the 230,400-byte Brotli limit.
-- Cloudflare bundle and snapshot parity at commit `bc34e3e0ea53b27aa5e276e2e682f4b3389b8131`.
+- Final initial JavaScript at 887,453 raw bytes, 249,419 gzip bytes, and 226,901 Brotli bytes against the 230,400-byte Brotli limit.
+- Cloudflare bundle and snapshot parity at code commit `0030943cb5cb3290f85a044c9d2677b54bad4e21`.
 - English specific-movie filtering for Supergirl at Mall of the Emirates.
 - Exact showtime selection using `9` for the visible 09:30 session.
 - Manual seat change from E1 and E2 to E1 and E3, with two tickets and AED 84 at checkout.
@@ -155,6 +160,9 @@ The final release completed:
 - Dubai Mall rejection with verified VOX alternatives.
 - Combined Mall of the Emirates, tomorrow, and 6 PM filtering, including the exact 18:00 option.
 - French-language zero-result handling.
+- Explicit French-filter removal followed by an open-choice request, without treating either phrase as a movie title.
+- Ezma PG15 suitability for a 10-year-old, followed by grounded runtime, synopsis, and language questions using retained movie context.
+- Hatta no-cinema disclosure, three curated alternatives, and immediate English-to-Arabic notice localization.
 - Bank-offer rendering with 21 promotions and 20 offer groups.
 - Compact poster rendering and empty browser error and warning logs during the critical replay.
 
@@ -164,9 +172,9 @@ The hosted replay exposed three issues that were then corrected in source:
 2. The agent could call `select_seats` immediately after the seat map opened. A short-lived, exact-session authorization now permits the tool only after the guest chooses or confirms seats.
 3. The word `instead` could be treated as a movie title in `Show me IMAX instead`. Generic residual filtering now keeps the intended experience change.
 
-After these corrections, the complete `pnpm run validate` aggregate passed. `pnpm run build` also passed and produced `/assets/index-Cc1yKhu_.js` at 230,223 of 230,400 initial JavaScript Brotli bytes. The mounted-browser replay passed the exact Afghan three-way clarification, IMAX refinement, rejection of unsolicited seats, typed E1 and E3 selection through AED 84 checkout, French open-choice no-result retention, 420 px visual inspection, and browser back and forward reload.
+After these corrections, the complete `pnpm run validate` aggregate passed. `pnpm run build` also passed and produced `/assets/index-CSjTLhgw.js` at 226,901 of 230,400 initial JavaScript Brotli bytes. The mounted-browser replay passed movie-information continuity, filter recovery, Hatta alternatives, localized retained notices, the prior clarification and seat protections, and the 420 px visual inspection.
 
-The final Cloudflare replay then passed the same Afghan clarification and IMAX refinement. The seat map stayed at zero selected seats until the guest typed E1 and E3, then checkout showed two seats and AED 84. FAB FAQ and exact checkout restoration, Samsung Pay device-only summary and QR, cancellation by Supergirl title and confirmation, English and Arabic voice transport connection, Arabic family filtering, Arabic-movie filtering without an interface switch, Dubai Mall rejection with verified alternatives, 21 bank promotions across 20 groups, FAB details, the 420 px layout, and browser back and forward navigation all passed.
+The final Cloudflare replay passed Ezma selection and current showtimes, PG15 guidance, seat-derived count and pricing, checkout-to-seat editing, AED 42 repricing, device-only summary and QR, cancellation by Ezma title, 21 bank promotions and FAB detail, family filtering, exact and nearby-time filtering, French filter recovery, Arabic movie filtering without an interface switch, explicit Arabic interface and transport switching, Hatta alternatives, and live English-to-Arabic WebRTC restart. The 420 px layout remained visually contained.
 
 The first Supergirl cards appeared within 1.733 seconds, including a 1.4-second observation wait. A fresh final tab had no browser errors or warnings. The longer replay produced only the expected WebSocket-close warning during an intentional language restart, with no browser error logs.
 
@@ -178,6 +186,7 @@ Repository evidence:
 - [ElevenLabs setup and acceptance checklist](./ELEVENLABS_AGENT_SETUP.md)
 - [21 July Arabic checkout continuity](./evidence/screenshots/cloudflare-arabic-checkout-restored-2026-07-21.jpg)
 - [21 July local Arabic checkout](./evidence/screenshots/local-final-arabic-checkout-2026-07-21.jpg)
+- [Final Cloudflare Arabic location rendering](./evidence/screenshots/final-cloudflare-arabic-location-2026-07-22.png)
 - [Bank-offer and ElevenLabs validation log](./evidence/logs/bank-offers-elevenlabs-validation-2026-07-17.md)
 
 ## Final production-readiness status
@@ -186,7 +195,9 @@ Leadership review status: **READY WITH DISCLOSED BOUNDARIES.**
 
 Repository feature readiness: **PASS LOCALLY AND ON THE FINAL CLOUDFLARE RELEASE.**
 
-Acoustic voice readiness: **PENDING A REAL MICROPHONE AND AUDIBLE ENGLISH AND ARABIC ACCEPTANCE TEST.**
+Voice transport readiness: **PASS IN ENGLISH AND ARABIC ON CLOUDFLARE.**
+
+Acoustic recognition and audible output quality: **PENDING A HUMAN SPEAK-AND-LISTEN ACCEPTANCE TEST.**
 
 Live ticket-sale readiness: **BLOCKED BY EXTERNAL PROVIDER APIS.**
 
