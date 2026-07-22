@@ -1706,21 +1706,25 @@ export default function App() {
       clearSeatSelection();
 
       if (locationIntent.kind === "outside_scope") {
-        const notice = localeRef.current === "ar"
-          ? `تغطي هذه الخدمة مواقع ڤوكس سينما داخل الإمارات فقط، ولا يوجد موقع إماراتي في ${locationIntent.label}. اختر مدينة أو سينما داخل الإمارات للمتابعة.`
-          : `This service covers VOX Cinemas UAE only, and there is no UAE cinema in ${locationIntent.label}. Choose a UAE city or cinema to continue.`;
+        const noticeByLocale = {
+          en: `This service covers VOX Cinemas UAE only, and there is no UAE cinema in ${locationIntent.label}. Choose a UAE city or cinema to continue.`,
+          ar: `تغطي هذه الخدمة مواقع ڤوكس سينما داخل الإمارات فقط، ولا يوجد موقع إماراتي في ${locationIntent.label}. اختر مدينة أو سينما داخل الإمارات للمتابعة.`,
+        };
+        const notice = noticeByLocale[localeRef.current];
         cinemaReturnRef.current = { view: "empty" };
-        showStage({ view: "cinemas", cinemas: CINEMAS, notice, preferences });
+        showStage({ view: "cinemas", cinemas: CINEMAS, notice, noticeByLocale, preferences });
         return { shown: "UAE cinema picker", cinemas: CINEMAS.map(({ id, name }) => ({ id, name })), missing: ["cinema"], preferences, locationStatus: "outside_scope", reason: notice };
       }
 
       const suggested = locationIntent.cinemas || [];
       if (!suggested.length) {
-        const notice = localeRef.current === "ar"
-          ? `لا توجد سينما VOX في ${locationIntent.label}. أخبرني بالمدينة أو المنطقة لأعرض أقرب الخيارات، أو اختر موقعاً من قائمة سينمات الإمارات.`
-          : `There is no VOX cinema at ${locationIntent.label}. Tell me the city or area so I can show the closest options, or choose from the UAE cinema list.`;
+        const noticeByLocale = {
+          en: `There is no VOX cinema at ${locationIntent.label}. Tell me the city or area so I can show the closest options, or choose from the UAE cinema list.`,
+          ar: `لا توجد سينما VOX في ${locationIntent.label}. أخبرني بالمدينة أو المنطقة لأعرض أقرب الخيارات، أو اختر موقعاً من قائمة سينمات الإمارات.`,
+        };
+        const notice = noticeByLocale[localeRef.current];
         cinemaReturnRef.current = { view: "empty" };
-        showStage({ view: "cinemas", cinemas: CINEMAS, notice, preferences });
+        showStage({ view: "cinemas", cinemas: CINEMAS, notice, noticeByLocale, preferences });
         return {
           shown: "UAE cinema picker",
           cinemas: CINEMAS.map(({ id, name }) => ({ id, name })),
@@ -1747,15 +1751,18 @@ export default function App() {
         verified = availability.cinemas.length > 0;
         failedCinemaCount = availability.failedCinemaCount;
       }
-      const notice = verified
-        ? (localeRef.current === "ar"
-          ? `لا توجد سينما ڤوكس في ${locationIntent.label}. تعرض القائمة مواقع بديلة قريبة تم التحقق من مطابقتها لتفضيلاتك في التاريخ المحدد.`
-          : `There is no VOX cinema at ${locationIntent.label}. These nearby alternatives were verified against your preferences for the selected date.`)
-        : (localeRef.current === "ar"
-          ? `لا توجد سينما ڤوكس في ${locationIntent.label}. هذه مواقع ڤوكس بديلة قريبة، ولكن لم يتم العثور على تطابق مؤكد مع جميع تفضيلاتك حتى الآن.`
-          : `There is no VOX cinema at ${locationIntent.label}. These are nearby VOX alternatives, but no match for every retained preference has been verified yet.`);
+      const noticeByLocale = verified
+        ? {
+          en: `There is no VOX cinema at ${locationIntent.label}. These nearby alternatives were verified against your preferences for the selected date.`,
+          ar: `لا توجد سينما ڤوكس في ${locationIntent.label}. تعرض القائمة مواقع بديلة قريبة تم التحقق من مطابقتها لتفضيلاتك في التاريخ المحدد.`,
+        }
+        : {
+          en: `There is no VOX cinema at ${locationIntent.label}. These are nearby VOX alternatives, but no match for every retained preference has been verified yet.`,
+          ar: `لا توجد سينما ڤوكس في ${locationIntent.label}. هذه مواقع ڤوكس بديلة قريبة، ولكن لم يتم العثور على تطابق مؤكد مع جميع تفضيلاتك حتى الآن.`,
+        };
+      const notice = noticeByLocale[localeRef.current];
       cinemaReturnRef.current = { view: "empty" };
-      showStage({ view: "cinemas", cinemas: visibleCinemas, notice, preferences, retryAvailable: failedCinemaCount > 0 });
+      showStage({ view: "cinemas", cinemas: visibleCinemas, notice, noticeByLocale, preferences, retryAvailable: failedCinemaCount > 0 });
       return {
         shown: verified ? "verified nearby cinema picker" : "nearby cinema picker",
         cinemas: visibleCinemas.map(({ id, name }) => ({ id, name })),
@@ -6676,7 +6683,7 @@ export default function App() {
             dateLabel={t("dates.label")}
             onDateSelect={chooseDate}
           />}
-          {visibleStageView === "cinemas" && <CinemaPicker cinemas={stage.cinemas || CINEMAS} selected={cinema} notice={stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => routeDiscoveryTurn("", { preferencesAlreadyApplied: true }) : undefined} onSelect={chooseCinema} onBack={() => showStage(cinemaReturnRef.current || { view: "empty" })} />}
+          {visibleStageView === "cinemas" && <CinemaPicker cinemas={stage.cinemas || CINEMAS} selected={cinema} notice={stage.noticeByLocale?.[locale] || stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => routeDiscoveryTurn("", { preferencesAlreadyApplied: true }) : undefined} onSelect={chooseCinema} onBack={() => showStage(cinemaReturnRef.current || { view: "empty" })} />}
           {visibleStageView === "movies" && cinema && <MovieGrid movies={stage.movies} cinemaName={stripVox(cinema.name)} scheduleDate={stage.errorCode === "date_unavailable" ? userRequestedDateRef.current : scheduleDate} notice={stage.notice} onSelect={pickMovie} error={stage.error} onRetry={stage.errorCode === "date_unavailable" ? undefined : () => routeDiscoveryTurn("", { cinemaOverride: cinema, dateOverride: scheduleDate, preferencesAlreadyApplied: true })} />}
           {visibleStageView === "showtimes" && <Showtimes movie={stage.movie} sessions={stage.sessions} notice={stage.notice} error={stage.error} onRetry={stage.retryAvailable ? () => pickMovie(stage.movie) : undefined} onSelect={pickSession} onBack={backFromShowtimes} />}
           {visibleStageView === "seatmap" && <SeatMap movie={stage.movie} session={stage.session} plan={stage.plan} selected={selectedSeats} requestedTarget={requestedSeatTarget} pricing={SEAT_PRICING_PREVIEW} quoteState={seatQuote} notice={stage.planMeta?.verified === false ? true : stage.planMeta?.warning || false} onToggle={toggleSeat} onConfirm={confirmSeats} onBack={backFromSeatMap} />}

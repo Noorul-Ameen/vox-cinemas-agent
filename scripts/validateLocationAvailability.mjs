@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { resolveCinemaCandidate } from "../src/lib/cinemaRouting.js";
 import { filterDiscoveryResults } from "../src/lib/discoveryPreferences.js";
 import { nearbyCinemasForCinema, resolveLocationIntent } from "../src/lib/locationRouting.js";
@@ -110,5 +111,9 @@ assert.ok(verifiedDubai.every(({ result }) => result.movies.every((movie) => (mo
 const sourceCinema = cinemas.find((cinema) => nearbyCinemasForCinema(cinemas, cinema.id).length > 0);
 assert.ok(sourceCinema, "the catalog must contain at least one curated nearby-cinema relationship");
 assert.ok(nearbyCinemasForCinema(cinemas, sourceCinema.id).every((cinema) => cinema.id !== sourceCinema.id), "nearby alternatives must never repeat the selected cinema");
+
+const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+assert.match(appSource, /noticeByLocale\?\.\[locale\] \|\| stage\.notice/, "location notices must update when the customer explicitly switches the interface language");
+assert.match(appSource, /showStage\(\{ view: "cinemas", cinemas: visibleCinemas, notice, noticeByLocale/, "nearby-cinema stages must retain both English and Arabic notice copy");
 
 console.log(`Validated location routing and availability against rolling snapshot date ${programmingDate}.`);
