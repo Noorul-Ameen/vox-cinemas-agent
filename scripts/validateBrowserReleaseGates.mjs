@@ -72,6 +72,21 @@ assert.match(hostedSpec, /no-store/, "Hosted smoke must require no-store on snap
 assert.match(hostedSpec, /The requested Voxi resource is not available/, "Hosted smoke must assert the custom missing-resource marker.");
 
 assert.match(validationWorkflow, /upload-artifact/, "Validation CI must upload Playwright artifacts.");
+for (const [name, source] of [
+  ["validation", validationWorkflow],
+  ["hosted smoke", hostedWorkflow],
+]) {
+  const officialActionReferences = [...source.matchAll(/uses:\s*(actions\/[^@\s]+)@([^\s#]+)/gu)];
+  assert.ok(officialActionReferences.length >= 3, `${name} CI must declare its official setup actions.`);
+  for (const [, action, revision] of officialActionReferences) {
+    assert.match(revision, /^[0-9a-f]{40}$/u, `${name} CI ${action} must be pinned to an immutable full commit SHA.`);
+  }
+  assert.match(
+    source,
+    /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a\s+# v7\.0\.1/u,
+    `${name} CI must use the Node.js 24 artifact uploader.`,
+  );
+}
 assert.match(hostedWorkflow, /workflow_run:/, "Hosted smoke must be able to follow a successful validation run.");
 assert.match(hostedWorkflow, /waitForHostedSnapshot/, "Hosted smoke must wait for the matching Cloudflare snapshot.");
 assert.match(hostedWorkflow, /PLAYWRIGHT_BASE_URL:\s*https:\/\/voxi-ai\.pages\.dev/, "Hosted smoke must target the production Cloudflare URL.");
