@@ -19,6 +19,29 @@ assert.equal((await resolveVisibleMovieSelectionTurn({ text: "أريد Ezma", st
 assert.equal(await resolveVisibleMovieSelectionTurn({ text: "the chosen movies", stage }), null);
 assert.equal(await resolveVisibleMovieSelectionTurn({ text: "Tell me about Ezma", stage }), null);
 assert.equal(await resolveVisibleMovieSelectionTurn({ text: "I want details about Ezma", stage }), null);
+assert.equal(
+  await resolveVisibleMovieSelectionTurn({ text: "ما تصنيف فيلم Minions & Monsters؟", stage: ampersandStage }),
+  null,
+  "an Arabic age-rating question containing an exact visible title must stay informational",
+);
+assert.equal(
+  await resolveVisibleMovieSelectionTurn({ text: "What is the age rating for Minions & Monsters?", stage: ampersandStage }),
+  null,
+  "an English age-rating question containing an exact visible title must stay informational",
+);
+for (const informationQuery of [
+  "ما تقييم فيلم Minions & Monsters؟",
+  "ما مدة فيلم Minions & Monsters؟",
+  "ما لغة فيلم Minions & Monsters؟",
+  "ما قصة فيلم Minions & Monsters؟",
+  "هل فيلم Minions & Monsters مناسب للأطفال؟",
+]) {
+  assert.equal(
+    await resolveVisibleMovieSelectionTurn({ text: informationQuery, stage: ampersandStage }),
+    null,
+    `${informationQuery}: an Arabic information question containing a visible title must stay read-only`,
+  );
+}
 assert.equal(await resolveVisibleMovieSelectionTurn({ text: "Arabic movies", stage }), null);
 assert.equal(await resolveVisibleMovieSelectionTurn({ text: "Unknown title", stage }), null);
 assert.equal(await resolveVisibleMovieSelectionTurn({ text: "Ezma", stage: { view: "showtimes", movies } }), null);

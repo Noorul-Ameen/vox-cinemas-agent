@@ -125,6 +125,7 @@ const meaningCases = [
   ["Can my child watch this PG15 movie?", "certificate"],
   ["What does eighteen plus mean?", "certificate"],
   ["\u0645\u0627 \u0627\u0644\u062a\u0635\u0646\u064a\u0641 \u0627\u0644\u0639\u0645\u0631\u064a \u0644\u0647\u0630\u0627 \u0627\u0644\u0641\u064a\u0644\u0645\u061f", "certificate"],
+  ["ما تصنيف فيلم Minions & Monsters؟", "certificate"],
   ["What is its IMDb score?", "review"],
   ["How many stars did this movie get?", "review"],
   ["What is the rating?", "ambiguous"],
@@ -135,8 +136,10 @@ for (const [input, expected] of meaningCases) {
   assert.equal(isMovieRatingQuestion(input), true, `${input}: rating information must route before movie selection`);
 }
 assert.equal(isMovieRatingQuestion("Can my ten year old watch Exma?"), true, "a voice-style child suitability question must be recognized");
+assert.equal(isMovieRatingQuestion("ما تصنيف فيلم Minions & Monsters؟"), true, "a mixed-title Arabic rating question must route before visible-title selection");
 assert.equal(isMovieRatingQuestion("Show me Arabic movies"), false, "a movie-language request must not become an age-rating question");
 assert.equal(isMovieRatingQuestion("Switch the interface to Arabic"), false, "a language-switch request must not become an age-rating question");
+assert.equal(resolveRatingMeaning("ما تصنيف النوع لفيلم Ezma؟"), null, "an Arabic genre classification question must remain outside age-rating handling");
 
 // Policy codes are deliberately distinct. PG15 is accompaniment guidance;
 // 15+ is restricted admission, even with a parent.

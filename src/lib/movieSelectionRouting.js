@@ -1,5 +1,6 @@
 import { resolveBilingualDiscoveryMovieCandidate } from "./discoveryPreferences.js";
 import { isAmbiguousMovieSelectionUtterance } from "./discoveryResultContext.js";
+import { isPotentialMovieInformationTurn } from "./movieInformationPrefilter.js";
 
 const clean = (value) => String(value || "")
   .normalize("NFKC")
@@ -25,6 +26,7 @@ export async function resolveVisibleMovieSelectionTurn({ text, stage } = {}) {
   if (stage?.view !== "movies" || !Array.isArray(stage.movies) || !stage.movies.length) return null;
   const query = clean(text);
   if (!query || isAmbiguousMovieSelectionUtterance(query)) return null;
+  if (isPotentialMovieInformationTurn(query)) return null;
 
   const explicitTitleQuery = query.replace(/^(?:(?:i(?:'|’)d|i\s+would)\s+like|i\s+(?:choose|chose|select|selected|pick|picked|want)|choose|chose|select|selected|pick|picked|book|watch|اخترت|أختار|اختار|سأختار|أريد|اريد|أود|اود|احجز|أحجز|سأشاهد|اشاهد)\s+(?:(?:the\s+)?(?:movie|film)\s+|فيلم\s+)?/iu, "").trim();
   const directMovie = await resolveBilingualDiscoveryMovieCandidate(stage.movies, query);

@@ -265,6 +265,41 @@ test("language control switches the complete interface direction", async ({ page
   await expect(applicationRoot).toHaveAttribute("dir", "ltr");
 });
 
+test("Arabic movie rating questions keep the visible movie list read-only", async ({ page }) => {
+  await openMallOfTheEmirates(page);
+  await choosePublishedDate(page);
+
+  const input = page.locator("input[aria-label]").last();
+  await input.fill("anything is fine");
+  await input.press("Enter");
+  await expect(page.getByRole("heading", { name: "Choose a movie" })).toBeVisible();
+
+  const movieRegion = page.getByRole("region", { name: "Choose a movie" });
+  const movieButtons = movieRegion.locator("button").filter({ has: page.locator('span[dir="auto"]') });
+  await expect(movieButtons.first()).toBeVisible();
+  const minionsTitle = movieRegion.getByText("Minions & Monsters", { exact: true });
+  const movieTitle = await minionsTitle.count()
+    ? "Minions & Monsters"
+    : String(await movieButtons.first().locator('span[dir="auto"]').first().textContent()).trim();
+  expect(movieTitle).not.toEqual("");
+
+  await page.getByRole("button", { name: "العربية", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "اختر فيلماً" })).toBeVisible();
+
+  const arabicInput = page.locator("input[aria-label]").last();
+  await arabicInput.fill(`ما تصنيف فيلم ${movieTitle}؟`);
+  await arabicInput.press("Enter");
+
+  const escapedTitle = movieTitle.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  await expect(page.getByText(new RegExp(
+    `(?:تصنيف فيلم ${escapedTitle} هو|لفيلم ${escapedTitle} عروض حالية لدى ڤوكس باللغات)`,
+    "u",
+  ))).toBeVisible();
+  await expect(page.getByRole("heading", { name: "اختر فيلماً" })).toBeVisible();
+  await expect(page.getByText("اختر موعد العرض", { exact: true })).toHaveCount(0);
+  await expectNoForbiddenCustomerFacingDashes(page);
+});
+
 test("booking history renders a valid localStorage booking", async ({ page }) => {
   const booking = {
     ref: "E2E420",

@@ -92,6 +92,7 @@ const cases = [
   ["What is the release date for Ezma?", "release"],
   ["Tell me about Ezma", "details"],
   ["ما تصنيف فيلم Ezma لطفل عمره 10 سنوات؟", "rating"],
+  ["ما تصنيف فيلم Minions & Monsters؟", "rating"],
   ["ما مدة فيلم Ezma؟", "runtime"],
   ["ما قصة فيلم Ezma؟", "synopsis"],
 ];
@@ -99,6 +100,18 @@ for (const [query, topic] of cases) {
   assert.equal(classifyMovieInformationQuestion(query), topic, `${query} must classify as ${topic}`);
   assert.equal(isLikelyMovieInformationQuestion(query), true);
 }
+assert.equal(classifyMovieInformationQuestion("ما تصنيف النوع لفيلم Ezma؟"), "genre", "an Arabic genre question must not be mistaken for an age-rating question");
+
+const arabicMinionsRating = resolveMovieInformationTurn({
+  query: "ما تصنيف فيلم Minions & Monsters؟",
+  locale: "ar",
+  movies: [ezma, family, minions],
+  visibleMovies: [minions],
+});
+assert.equal(arabicMinionsRating.handled, true, "a mixed-title Arabic rating question must be answered locally");
+assert.equal(arabicMinionsRating.topic, "rating");
+assert.equal(arabicMinionsRating.movie?.id, "minions");
+assert.match(arabicMinionsRating.answer, /تصنيف فيلم Minions & Monsters هو PG/u);
 
 const transactionalTitleCollisions = [
   "I need three tickets for Toy Story 5 at Mall of the Emirates tomorrow at 8:45 PM",
