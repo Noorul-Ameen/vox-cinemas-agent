@@ -50,7 +50,7 @@ import { resolveVisibleMovieSelectionTurn } from "./lib/movieSelectionRouting.js
 import { resolveVisibleShowtimeSelectionTurn, visibleShowtimeSelectionCandidates } from "./lib/showtimeSelectionRouting.js";
 import { createSeatToolAuthorization, matchesSeatToolAuthorization, normalizeSeatIds, resolveSeatEditSelectionTurn, resolveSeatSelectionTurn, resolveSeatToolInput } from "./lib/seatRouting.js";
 import { filterBookableSessions } from "./lib/showtimeAvailability.js";
-import { startTransportWithRetirement } from "./lib/transportStart.js";
+import { beginOwnedSessionSwitch, canRestorePreviousSession, endTransportWithRetirement, finalizeOwnedSessionStart, finalizeOwnedSessionSwitch, resetOwnedSessionSwitch, startTransportWithRetirement, waitForLazyTransport } from "./lib/transportStart.js";
 import { conversationSessionOverrides } from "./lib/transportLanguage.js";
 import { ELEVENLABS_WORKLET_PATHS, VOICE_MIC_PERMISSION_TIMEOUT_MS, VOICE_TRANSPORT_START_TIMEOUT_MS, requireMicrophoneCapture, voiceStartupErrorKey } from "./lib/voiceStartup.js";
 import {
@@ -680,7 +680,10 @@ export default function App() {
   const requestedSessionEpochRef = useRef(null);
   const transportGenerationRef = useRef(0);
   const transportRef = useRef(null);
+  const transportStatusRef = useRef(transportStatus);
   const switchingSessionRef = useRef(false);
+  const switchingSessionOwnerRef = useRef(null);
+  const idleTimeoutOperationRef = useRef(null);
   const lastSentTextRef = useRef(null);
   const pendingTypedMessagesRef = useRef([]);
   const typedTurnSequenceRef = useRef(0);
@@ -4714,13 +4717,13 @@ export default function App() {
     return `${bookingHistoryAgentContext(items)} ${instruction}`;
   };
 
-  const clearConversationState = useCallback((reason = "reset") => {
+  const clearConversationState = useCallback((reason = "reset", { sessionEpochAlreadyInvalidated = false } = {}) => {
     if (checkoutPaymentActiveRef.current) return false;
     if (activeCancellationMutation()) {
       lastActivityRef.current = Date.now();
       return false;
     }
-    sessionEpochRef.current += 1;
+    if (!sessionEpochAlreadyInvalidated) sessionEpochRef.current += 1;
     cancellationOperationRef.current += 1;
     requestedSessionEpochRef.current = null;
     dismissPendingCancellation(reason, { force: true });
@@ -4820,13 +4823,15 @@ export default function App() {
   const transportCallbacks = {
     onConnect: () => {
       if (requestedSessionEpochRef.current !== sessionEpochRef.current) return;
+      transportStatusRef.current = "connected";
       const connectedMode = requestedSessionModeRef.current || "voice";
       sessionModeRef.current = connectedMode;
       setSessionMode(connectedMode);
       setStartingMode(null);
-      switchingSessionRef.current = false;
+      resetOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
     },
     onDisconnect: () => {
+      transportStatusRef.current = "disconnected";
       const switching = switchingSessionRef.current;
       clearPendingVoiceCancellationDecision();
       pendingLanguageSwitchRef.current = null;
@@ -4895,10 +4900,31 @@ export default function App() {
         }
         if (isExplicitConversationEndTurn(safeMessage)) {
           conversation.sendContextualUpdate?.("The guest explicitly ended the conversation. The widget cleared the active journey. Do not continue booking or cancellation and do not claim that any stored booking record was cancelled.");
+          const closingGeneration = transportGenerationRef.current;
+          const closingTransport = transportRef.current;
           const cleared = clearConversationState("conversation_ended");
           if (cleared) say("system", localeRef.current === "ar" ? "انتهت المحادثة وتم مسح رحلة الحجز النشطة." : "The conversation ended and the active booking journey was cleared.");
+          const operationEpoch = sessionEpochRef.current;
+          const transitionOwner = beginOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
           suppressDisconnectNoticeRef.current = true;
-          void conversation.endSession?.();
+          void (async () => {
+            try {
+              await endTransportWithRetirement({
+                transport: closingTransport,
+                retire: () => retireTransportGeneration(closingGeneration),
+              });
+            } catch (error) {
+              console.warn("Ended voice conversation transport could not close cleanly", error);
+            } finally {
+              if (operationEpoch === sessionEpochRef.current) {
+                requestedSessionModeRef.current = null;
+                sessionModeRef.current = null;
+                setSessionMode(null);
+                suppressDisconnectNoticeRef.current = false;
+              }
+              finalizeOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef, owner: transitionOwner });
+            }
+          })();
           return;
         }
         if (isExplicitJourneyCancellationTurn(safeMessage)) {
@@ -5275,13 +5301,17 @@ export default function App() {
     [],
   );
   const updateTransportStatus = useCallback((generation, nextStatus) => {
-    if (transportGenerationRef.current === generation) setTransportStatus(nextStatus);
+    if (transportGenerationRef.current === generation) {
+      transportStatusRef.current = nextStatus;
+      setTransportStatus(nextStatus);
+    }
   }, []);
   const retireTransportGeneration = useCallback((generation) => {
     if (transportGenerationRef.current !== generation) return;
     const nextGeneration = generation + 1;
     transportGenerationRef.current = nextGeneration;
     transportRef.current = null;
+    transportStatusRef.current = "disconnected";
     setTransportStatus("disconnected");
     setTransportGeneration(nextGeneration);
   }, []);
@@ -5317,13 +5347,20 @@ export default function App() {
     }
     suppressDisconnectNoticeRef.current = true;
     disconnectReasonRef.current = reason;
-    switchingSessionRef.current = false;
+    resetOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
+    sessionEpochRef.current += 1;
+    const closingGeneration = transportGenerationRef.current;
+    const closingTransport = transportRef.current;
     try {
-      if (conversation.status === "connected" || conversation.status === "connecting") await conversation.endSession();
+      const closeResult = await endTransportWithRetirement({
+        transport: closingTransport,
+        retire: () => retireTransportGeneration(closingGeneration),
+      });
+      if (closeResult.retired) console.warn("Conversation reset transport did not close in time and was retired");
     } catch (error) {
       console.warn("Conversation reset could not close the active transport cleanly", error);
     } finally {
-      clearConversationState(reason);
+      clearConversationState(reason, { sessionEpochAlreadyInvalidated: true });
       requestedSessionModeRef.current = null;
       sessionModeRef.current = null;
       setSessionMode(null);
@@ -5332,7 +5369,7 @@ export default function App() {
       disconnectReasonRef.current = "ended";
     }
     return true;
-  }, [clearConversationState, conversation, say]);
+  }, [clearConversationState, retireTransportGeneration, say]);
 
   useEffect(() => {
     const onRestart = () => { restartConversation("new_conversation"); };
@@ -5454,45 +5491,68 @@ export default function App() {
     const interval = window.setInterval(() => {
       const hasTransientState = messagesRef.current.length > 0 || stageRef.current.view !== "empty" || Boolean(sessionModeRef.current);
       if (!hasTransientState || Date.now() - lastActivityRef.current < CONVERSATION_IDLE_MS) return;
-      if (activeCancellationMutation()) {
+      if (idleTimeoutOperationRef.current) return;
+      if (checkoutPaymentActiveRef.current || activeCancellationMutation() || switchingSessionRef.current || sessionStartRef.current) {
         lastActivityRef.current = Date.now();
         return;
       }
+      sessionEpochRef.current += 1;
+      const invalidatedEpoch = sessionEpochRef.current;
+      const closingGeneration = transportGenerationRef.current;
+      const closingTransport = transportRef.current;
+      const timeoutOperation = { epoch: invalidatedEpoch, promise: null, noticeSent: false, stateCleared: false };
+      idleTimeoutOperationRef.current = timeoutOperation;
       disconnectReasonRef.current = "timeout";
-      suppressDisconnectNoticeRef.current = false;
-      if (sessionModeRef.current) conversation.endSession().catch(() => {
-        clearConversationState("timeout");
-        say("system", t("app.timeoutMessage"));
-      });
-      else {
-        clearConversationState("timeout");
+      suppressDisconnectNoticeRef.current = true;
+      retireTransportGeneration(closingGeneration);
+      timeoutOperation.stateCleared = clearConversationState("timeout", { sessionEpochAlreadyInvalidated: true });
+      requestedSessionModeRef.current = null;
+      sessionModeRef.current = null;
+      setSessionMode(null);
+      setStartingMode(null);
+      resetOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
+      if (timeoutOperation.stateCleared && !timeoutOperation.noticeSent) {
+        timeoutOperation.noticeSent = true;
         say("system", t("app.timeoutMessage"));
       }
+      suppressDisconnectNoticeRef.current = false;
+      disconnectReasonRef.current = "ended";
+      timeoutOperation.promise = (async () => {
+        try {
+          const closeResult = await endTransportWithRetirement({
+            transport: closingTransport,
+            retire: () => retireTransportGeneration(closingGeneration),
+          });
+          if (closeResult.retired) console.warn("Idle conversation transport did not close in time and was retired");
+        } catch (error) {
+          console.warn("Idle conversation transport could not close cleanly", error);
+        } finally {
+          const ownsOperation = idleTimeoutOperationRef.current === timeoutOperation;
+          const ownsEpoch = sessionEpochRef.current === invalidatedEpoch;
+          if (ownsOperation && ownsEpoch) {
+            if (!timeoutOperation.stateCleared) {
+              timeoutOperation.stateCleared = clearConversationState("timeout", { sessionEpochAlreadyInvalidated: true });
+            }
+            if (timeoutOperation.stateCleared && !timeoutOperation.noticeSent) {
+              timeoutOperation.noticeSent = true;
+              say("system", t("app.timeoutMessage"));
+            }
+          }
+          if (ownsOperation) idleTimeoutOperationRef.current = null;
+        }
+      })();
     }, 30_000);
     return () => window.clearInterval(interval);
-  }, [clearConversationState, conversation, say, t]);
+  }, [clearConversationState, retireTransportGeneration, say, t]);
 
   const startTransportWithGuards = useCallback(async (options, epoch, timeoutMs) => {
     const generation = transportGenerationRef.current;
-    const transport = transportRef.current || await new Promise((resolve, reject) => {
-      const startedAt = Date.now();
-      const waitForLazyTransport = () => {
-        if (generation !== transportGenerationRef.current) {
-          reject(new Error("Conversation transport restarted while loading"));
-          return;
-        }
-        if (transportRef.current) {
-          resolve(transportRef.current);
-          return;
-        }
-        if (Date.now() - startedAt >= 10_000) {
-          reject(new Error("Conversation transport could not load"));
-          return;
-        }
-        window.setTimeout(waitForLazyTransport, 20);
-      };
-      waitForLazyTransport();
+    const transport = transportRef.current || await waitForLazyTransport({
+      getTransport: () => transportRef.current,
+      isEpochCurrent: () => epoch === sessionEpochRef.current,
+      isGenerationCurrent: () => generation === transportGenerationRef.current,
     });
+    if (!transport || epoch !== sessionEpochRef.current || generation !== transportGenerationRef.current) return null;
     const startedConversationId = await startTransportWithRetirement({
       transport,
       options,
@@ -5503,9 +5563,14 @@ export default function App() {
       timeoutMs,
     });
     if (epoch !== sessionEpochRef.current || generation !== transportGenerationRef.current) {
-      switchingSessionRef.current = true;
-      try { await transport.endSession(); } catch {}
-      finally { switchingSessionRef.current = false; }
+      const cleanupOwner = beginOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
+      try {
+        await endTransportWithRetirement({
+          transport,
+          retire: () => retireTransportGeneration(generation),
+        });
+      } catch {}
+      finally { finalizeOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef, owner: cleanupOwner }); }
       return null;
     }
     return startedConversationId || transport.getId?.() || "connected";
@@ -5610,7 +5675,11 @@ export default function App() {
     try {
       return await start;
     } finally {
-      if (sessionStartRef.current === entry) sessionStartRef.current = null;
+      finalizeOwnedSessionStart({
+        startRef: sessionStartRef,
+        entry,
+        clearStartingMode: () => setStartingMode(null),
+      });
     }
   }, [conversation, say, startTransportWithGuards, t]);
 
@@ -5625,9 +5694,12 @@ export default function App() {
     if (sessionModeRef.current === "voice") return;
 
     const previousMode = sessionModeRef.current;
+    const previousTransport = transportRef.current;
+    const previousTransportGeneration = transportGenerationRef.current;
     const epoch = sessionEpochRef.current;
     const start = (async () => {
       let endedPreviousSession = false;
+      let transitionOwner = null;
       setStartingMode("voice");
       try {
         // Permission is checked before ending text chat so a denial never
@@ -5653,9 +5725,18 @@ export default function App() {
         if (epoch !== sessionEpochRef.current) return false;
         setTransportEnabled(true);
         if (sessionModeRef.current) {
-          switchingSessionRef.current = true;
-          await conversation.endSession();
+          transitionOwner = beginOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
           endedPreviousSession = true;
+          const closingGeneration = transportGenerationRef.current;
+          const closingTransport = transportRef.current;
+          const closeResult = await endTransportWithRetirement({
+            transport: closingTransport,
+            retire: () => retireTransportGeneration(closingGeneration),
+          });
+          if (closeResult.retired) console.warn("Previous conversation transport did not close in time and was retired");
+        }
+        if (epoch !== sessionEpochRef.current) {
+          return false;
         }
         requestedSessionEpochRef.current = epoch;
         requestedSessionModeRef.current = "voice";
@@ -5726,9 +5807,17 @@ export default function App() {
         return true;
       } catch (error) {
         console.error("Voice conversation could not start", error);
-        switchingSessionRef.current = false;
         setStartingMode(null);
-        if (previousMode && !endedPreviousSession) {
+        if (canRestorePreviousSession({
+          previousMode,
+          previousTransport,
+          previousGeneration: previousTransportGeneration,
+          endedPreviousSession,
+          currentMode: sessionModeRef.current,
+          currentTransport: transportRef.current,
+          currentGeneration: transportGenerationRef.current,
+          currentStatus: transportStatusRef.current,
+        })) {
           requestedSessionModeRef.current = previousMode;
           sessionModeRef.current = previousMode;
           setSessionMode(previousMode);
@@ -5738,6 +5827,8 @@ export default function App() {
           setSessionMode(null);
         }
         say("system", t(voiceStartupErrorKey(error)));
+      } finally {
+        finalizeOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef, owner: transitionOwner });
       }
     })();
     const entry = { mode: "voice", promise: start };
@@ -5745,9 +5836,13 @@ export default function App() {
     try {
       return await start;
     } finally {
-      if (sessionStartRef.current === entry) sessionStartRef.current = null;
+      finalizeOwnedSessionStart({
+        startRef: sessionStartRef,
+        entry,
+        clearStartingMode: () => setStartingMode(null),
+      });
     }
-  }, [conversation, say, startTransportWithGuards, t]);
+  }, [conversation, retireTransportGeneration, say, startTransportWithGuards, t]);
 
   const restartActiveTransportForLanguage = useCallback(async (nextLocale) => {
     const activeStart = sessionStartRef.current;
@@ -5755,57 +5850,78 @@ export default function App() {
     const activeMode = sessionModeRef.current;
     if (!activeMode) return false;
 
-    switchingSessionRef.current = true;
+    const operationEpoch = sessionEpochRef.current;
+    const transitionOwner = beginOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
     setStartingMode(activeMode);
     try {
-      await conversation.endSession();
-    } catch (error) {
-      console.warn("Conversation transport could not close for a language change", error);
-    }
-    requestedSessionModeRef.current = null;
-    sessionModeRef.current = null;
-    setSessionMode(null);
-
-    const restarted = activeMode === "voice"
-      ? await startVoiceSession()
-      : await startTextSession();
-    if (!restarted) {
-      switchingSessionRef.current = false;
-      setStartingMode(null);
-      return false;
-    }
-
-    const next = nextLocale === "ar" ? "Arabic" : "English";
-    conversation.sendContextualUpdate?.(`The guest explicitly selected ${next}. The transport restarted as a continuation with ${next} speech recognition and voice. Preserve the active task and do not repeat the welcome message. ${buildVoxiContext({
-      locale: nextLocale,
-      cinema: cinemaRef.current,
-      scheduleDate: scheduleDateRef.current,
-      stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
-      selectedSeats: seatsRef.current,
-      requestedSeatTarget: requestedSeatTargetRef.current,
-      discoveryPreferences: discoveryPreferencesRef.current,
-      offer: lastOfferRef.current,
-      journey: { ...journeyRef.current, locale: nextLocale },
-      messages: messagesRef.current,
-    })}`);
-    return true;
-  }, [conversation, startTextSession, startVoiceSession]);
-  languageTransportRestartRef.current = restartActiveTransportForLanguage;
-
-  const endVoiceSession = useCallback(async () => {
-    switchingSessionRef.current = true;
-    try {
-      await conversation.endSession();
-    } catch (error) {
-      console.warn("Voice transport could not close cleanly", error);
-    } finally {
+      try {
+        const closingGeneration = transportGenerationRef.current;
+        const closingTransport = transportRef.current;
+        const closeResult = await endTransportWithRetirement({
+          transport: closingTransport,
+          retire: () => retireTransportGeneration(closingGeneration),
+        });
+        if (closeResult.retired) console.warn("Previous conversation transport did not close in time and was retired for the language change");
+      } catch (error) {
+        console.warn("Conversation transport could not close for a language change", error);
+      }
+      if (operationEpoch !== sessionEpochRef.current) return false;
       requestedSessionModeRef.current = null;
       sessionModeRef.current = null;
       setSessionMode(null);
-      switchingSessionRef.current = false;
+
+      const restarted = activeMode === "voice"
+        ? await startVoiceSession()
+        : await startTextSession();
+      if (!restarted) {
+        setStartingMode(null);
+        return false;
+      }
+
+      const next = nextLocale === "ar" ? "Arabic" : "English";
+      conversation.sendContextualUpdate?.(`The guest explicitly selected ${next}. The transport restarted as a continuation with ${next} speech recognition and voice. Preserve the active task and do not repeat the welcome message. ${buildVoxiContext({
+        locale: nextLocale,
+        cinema: cinemaRef.current,
+        scheduleDate: scheduleDateRef.current,
+        stage: stageVisibleRef.current ? stageRef.current : { view: "empty", paused: true, pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null },
+        selectedSeats: seatsRef.current,
+        requestedSeatTarget: requestedSeatTargetRef.current,
+        discoveryPreferences: discoveryPreferencesRef.current,
+        offer: lastOfferRef.current,
+        journey: { ...journeyRef.current, locale: nextLocale },
+        messages: messagesRef.current,
+      })}`);
+      return true;
+    } finally {
+      finalizeOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef, owner: transitionOwner });
     }
-    await startTextSession();
-  }, [conversation, startTextSession]);
+  }, [conversation, retireTransportGeneration, startTextSession, startVoiceSession]);
+  languageTransportRestartRef.current = restartActiveTransportForLanguage;
+
+  const endVoiceSession = useCallback(async () => {
+    const operationEpoch = sessionEpochRef.current;
+    const transitionOwner = beginOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
+    try {
+      try {
+        const closingGeneration = transportGenerationRef.current;
+        const closingTransport = transportRef.current;
+        const closeResult = await endTransportWithRetirement({
+          transport: closingTransport,
+          retire: () => retireTransportGeneration(closingGeneration),
+        });
+        if (closeResult.retired) console.warn("Voice conversation transport did not close in time and was retired");
+      } catch (error) {
+        console.warn("Voice transport could not close cleanly", error);
+      }
+      if (operationEpoch !== sessionEpochRef.current) return false;
+      requestedSessionModeRef.current = null;
+      sessionModeRef.current = null;
+      setSessionMode(null);
+      return await startTextSession();
+    } finally {
+      finalizeOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef, owner: transitionOwner });
+    }
+  }, [retireTransportGeneration, startTextSession]);
 
   const sendText = useCallback(async (text) => {
     const rawValue = (text ?? input).trim();
@@ -5881,11 +5997,28 @@ export default function App() {
     if (isExplicitConversationEndTurn(value)) {
       setInput("");
       conversation.sendContextualUpdate?.("The guest explicitly ended the conversation. The widget is clearing the active journey. Do not continue booking or cancellation and do not claim an existing booking record was cancelled.");
+      const closingGeneration = transportGenerationRef.current;
+      const closingTransport = transportRef.current;
       const cleared = clearConversationState("conversation_ended");
       if (cleared) say("system", localeRef.current === "ar" ? "انتهت المحادثة وتم مسح رحلة الحجز النشطة." : "The conversation ended and the active booking journey was cleared.");
-      if (conversation.status === "connected") {
+      if (closingTransport) {
         suppressDisconnectNoticeRef.current = true;
-        await conversation.endSession();
+        const transitionOwner = beginOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
+        try {
+          const closeResult = await endTransportWithRetirement({
+            transport: closingTransport,
+            retire: () => retireTransportGeneration(closingGeneration),
+          });
+          if (closeResult.retired) console.warn("Ended conversation transport did not close in time and was retired");
+        } catch (error) {
+          console.warn("Ended conversation transport could not close cleanly", error);
+        } finally {
+          requestedSessionModeRef.current = null;
+          sessionModeRef.current = null;
+          setSessionMode(null);
+          suppressDisconnectNoticeRef.current = false;
+          finalizeOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef, owner: transitionOwner });
+        }
       }
       return;
     }
