@@ -4,63 +4,58 @@ Date: 23 July 2026, UAE
 
 Production URL: <https://voxi-ai.pages.dev/>
 
-Commit preview: <https://97288d6a.voxi-ai.pages.dev/>
+Branch: `main`
 
-Release commit: `f4a77c5e9ac9006c6500071f9cf8dd431ff1038b`
-
-Cloudflare deployment: `97288d6a-0312-4d6f-a393-ebd5a5db58cd`
+Validated runtime source commit: `1af1d1908545483ff9659288fc645fac7fdda6d9`
 
 ## Deployment parity
 
-- Cloudflare deployment status: SUCCESS.
-- Production branch: `main`.
-- Production commit: `f4a77c5`.
-- Production asset: `/assets/index-En0aJL-F.js`.
-- Commit-preview asset: `/assets/index-En0aJL-F.js`.
-- Production and preview snapshot marker: `20260723-ba0d4226e0bb646c`.
-- Hosted JavaScript bytes: 891,001.
-- Hosted gzip bytes: 253,744.
-- Hosted Brotli bytes: 228,320.
-- Old snapshot marker: absent.
-- The production root serves the current release without a deployment query parameter.
+- Functional test deployment `release.json` commit: `1af1d1908545483ff9659288fc645fac7fdda6d9`
+- Production `release.json` snapshot: `20260723-180b0b07f8429acf`
+- Exact commit match: PASS
+- Exact snapshot match: PASS
+- Hosted asset: `/assets/index-DqBCeyow.js`
+- Hosted JavaScript bytes: 889,938
+- Immutable cache policy: PASS
 
-## Hosted text and booking replay
+## Hosted automated results
 
-- Production root loaded in text mode without microphone permission: PASS.
-- French movies at Mall of the Emirates tomorrow returned a truthful no-result state: PASS.
-- `Anything is fine` cleared only the unavailable language: PASS.
-- Mall of the Emirates and 24 July remained selected: PASS.
-- 12 available movies rendered after contextual recovery: PASS.
-- Exact request for Minions & Monsters at Mall of the Emirates tomorrow at 8:10 PM: PASS.
-- Correct 20:10 KIDS seat map rendered: PASS.
-- E1, E2, and E4 selection: PASS.
-- Three seats and AED 126 total: PASS.
-- Checkout movie, cinema, showtime, seats, and total: PASS.
-- Refund FAQ hid checkout while retaining the journey: PASS.
-- Grounded refund-policy guidance rendered: PASS.
-- Return to checkout restored the same summary: PASS.
-- Arabic and English switching retained checkout, E1, E2, E4, and AED 126: PASS.
-- Screen label rendered without a stray zero: PASS.
+- Exact-commit smoke: 1/1 PASS
+- Hosted E2E: 23/23 PASS
 
-## Hosted language replay
+## Hosted data
 
-- Visible Arabic language selection changed the interface route: PASS.
-- Arabic input rendered correctly: PASS.
-- Existing Mall of the Emirates, date, and movie-card context remained available: PASS.
-- Arabic and English use the same validated discovery and booking logic: PASS BY REPOSITORY CONTRACT.
+- Sessions: 10,606
+- Films: 35
+- Cinemas: 22
+- Dates: 21, through 2026-08-12
+- Sessions today: 1,116
+- Sessions tomorrow: 1,398
+- Schedule shards: 320
+- Official movie-information records: 83
 
-## Hosted voice status
+## Live Chrome results
 
-Controlled-browser voice failure and recovery: **PASS**. Controlled Chrome blocked microphone access. After the configured permission window, the widget showed `Microphone access is blocked. Allow microphone access for this site, then try again.`, re-enabled the voice control, and retained checkout with E1, E2, E4, and AED 126.
+- Arabic rating query: PASS
+- Movie list remained visible: PASS
+- Compact official poster rendering in signed-in Chrome: PASS
+- Controlled microphone denial: PASS
+- Recovery completed after 45 seconds: PASS
+- Active state retained after recovery: PASS
 
-Repository validators for WebRTC, WebSocket, bounded startup and shutdown, stale-attempt retirement, recovery, explicit language routing, and protected ElevenLabs configuration pass. The ElevenLabs contract `2026-07-23.1` was published and read back. No successful live microphone conversation is claimed in this log.
+## Visual evidence
 
-Required follow-up:
+- [Signed-in Chrome poster and compact movie-card rendering](../screenshots/final-hosted-signed-in-chrome-2026-07-23.png)
+- [Hosted Arabic rating answer with the movie list retained](../screenshots/final-hosted-arabic-rating-2026-07-23.png)
 
-1. Repeat English and Arabic startup in a normal HTTPS browser with a real microphone.
-2. Speak a discovery request, select a movie and showtime, complete seats, ask an FAQ, and restore checkout.
-3. Listen to the English and Arabic responses and record acoustic acceptance.
+## ElevenLabs hosted status
+
+- Contract `2026-07-23.3` published: PASS
+- Contract read back: PASS
+- Prompt SHA-256: `dc8d1af309c247a642c155e017e2b26b4caf1b3801c429f5f8a883ff5f3ca467`
+
+The controlled denial test validates recovery and state retention. Acoustic English and Arabic speech recognition and audible output remain a human normal-browser acceptance gate. Public authentication or origin allowlisting and conversation-data retention remain governance gates.
 
 ## Hosted conclusion
 
-Cloudflare deployment parity, current snapshot delivery, text discovery, contextual no-result recovery, exact booking, seat-derived checkout, FAQ continuity, seat editing, bilingual interface routing, 420 px rendering, and controlled-browser voice failure recovery passed. Acoustic voice requires manual acceptance, and provider transactions remain blocked by external APIs.
+Production release identity, immutable asset delivery, exact-commit smoke, hosted E2E, Arabic rating behavior, movie-list retention, and controlled microphone-denial recovery passed. Offers still require official checkout verification. Live inventory, holds, payment, official ticket QR, provider cancellation, refund, and handover are unavailable because the required provider APIs are not integrated.
