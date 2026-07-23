@@ -9,21 +9,21 @@ Repository: <https://github.com/Noorul-Ameen/vox-cinemas-agent>
 ## Current release
 
 - Branch: `main`
-- Validated runtime source commit: `1af1d1908545483ff9659288fc645fac7fdda6d9`
-- Snapshot: `20260723-180b0b07f8429acf`
-- Hosted asset: `/assets/index-DqBCeyow.js`
-- Hosted asset size: 889,938 bytes
+- Validated runtime and data source commit: `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79`
+- Snapshot: `20260723-08c005696287764d`
+- Hosted asset: `/assets/index-CUILGygO.js`
+- Hosted asset size: 889,919 bytes
 - Hosted asset cache policy: immutable
 - Schedule coverage: 2026-07-23 through 2026-08-12
-- Schedule: 10,606 sessions, 35 films, 22 cinemas, and 21 dates
-- Sessions today: 1,116
-- Sessions tomorrow: 1,398
+- Schedule: 10,388 sessions, 35 films, 22 cinemas, and 21 dates
+- Sessions today: 817
+- Sessions tomorrow: 1,408
 - Schedule shards: 320
 - Official movie-information records: 83
 - ElevenLabs contract: `2026-07-23.3`
 - ElevenLabs prompt SHA-256: `dc8d1af309c247a642c155e017e2b26b4caf1b3801c429f5f8a883ff5f3ca467`
 
-Production `release.json` is the source of truth for the current deployment commit. The runtime source above was deployed with the listed snapshot and passed the complete hosted validation.
+Production `release.json` is the source of truth for the current deployment commit after non-runtime documentation and workflow updates. The runtime and data source above was deployed with the listed snapshot and passed the complete hosted validation.
 
 ## Product coverage
 
@@ -94,18 +94,23 @@ Public agent authentication or origin allowlisting and an approved conversation-
 
 The current official VOX UAE public-site snapshot contains:
 
-- 10,606 sessions
+- 10,388 sessions
 - 35 films
 - 22 cinemas
 - 21 dates from 2026-07-23 through 2026-08-12
-- 1,116 sessions today
-- 1,398 sessions tomorrow
+- 817 sessions today
+- 1,408 sessions tomorrow
 - 320 versioned schedule shards
 - 83 official movie-information records
 
 The snapshot is not live inventory. It does not provide seat holds, payment, official ticket QR issuance, provider cancellation, provider refunds, or customer-care handover.
 
 The automated refresh runs daily at 02:30 UTC, which is 06:30 UAE, 30 minutes after the 06:00 programming-day cutoff. A redundant refresh check runs every Thursday at 06:30 UTC, which is 10:30 UAE. Each candidate must pass the complete validators and production build before it can be published.
+
+Manual [Refresh VOX UAE showtimes run #13](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30008195281) succeeded in 2m41s and published data commit `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79`. [Validate VOXi run #4](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30008628943) then passed that data commit in 1m29s.
+
+The prior Node 20 artifact warning is removed in this release. Both upload steps use `actions/upload-artifact` v7.0.1 pinned to its full commit SHA.
+[Validate VOXi run #7](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30009245035) passed without annotations in 1m27s, and [Hosted VOXi smoke run #7](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30009356648) passed in 45s.
 
 ## Validation status
 
@@ -116,6 +121,11 @@ The automated refresh runs daily at 02:30 UTC, which is 06:30 UAE, 30 minutes af
 - Hosted E2E: 23/23 PASS
 - Package audit: no known production vulnerabilities
 - Secret scan: clean
+- Manual refresh workflow run #13: PASS in 2m41s, data commit published
+- Validate VOXi workflow run #4: PASS in 1m29s against the data commit
+- Warning-free Validate VOXi run #7: PASS in 1m27s
+- Hosted VOXi smoke run #7: PASS in 45s
+- Artifact-action upgrade: both upload steps use `actions/upload-artifact` v7.0.1 pinned SHA, removing the prior Node 20 warning
 - Live Chrome Arabic rating query: PASS, with movie list retained
 - Controlled Chrome microphone-denial recovery after 45 seconds: PASS, with state retained
 - Acoustic English and Arabic voice: HUMAN ACCEPTANCE REQUIRED

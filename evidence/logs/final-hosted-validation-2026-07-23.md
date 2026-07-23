@@ -6,31 +6,37 @@ Production URL: <https://voxi-ai.pages.dev/>
 
 Branch: `main`
 
-Validated runtime source commit: `1af1d1908545483ff9659288fc645fac7fdda6d9`
+Validated runtime and data source commit: `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79`
 
 ## Deployment parity
 
-- Functional test deployment `release.json` commit: `1af1d1908545483ff9659288fc645fac7fdda6d9`
-- Production `release.json` snapshot: `20260723-180b0b07f8429acf`
+- Functional production `release.json` commit: `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79`
+- Production `release.json` snapshot: `20260723-08c005696287764d`
 - Exact commit match: PASS
 - Exact snapshot match: PASS
-- Hosted asset: `/assets/index-DqBCeyow.js`
-- Hosted JavaScript bytes: 889,938
+- Hosted asset: `/assets/index-CUILGygO.js`
+- Hosted JavaScript bytes: 889,919
 - Immutable cache policy: PASS
 
 ## Hosted automated results
 
 - Exact-commit smoke: 1/1 PASS
 - Hosted E2E: 23/23 PASS
+- Manual [Refresh VOX UAE showtimes run #13](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30008195281): PASS in 2m41s, data commit published
+- [Validate VOXi run #4](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30008628943): PASS in 1m29s against the data commit
+- Both release artifact upload steps: `actions/upload-artifact` v7.0.1 pinned SHA
+- Prior Node 20 artifact warning: removed
+- [Validate VOXi run #7](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30009245035): PASS without annotations in 1m27s
+- [Hosted VOXi smoke run #7](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30009356648): PASS in 45s
 
 ## Hosted data
 
-- Sessions: 10,606
+- Sessions: 10,388
 - Films: 35
 - Cinemas: 22
 - Dates: 21, through 2026-08-12
-- Sessions today: 1,116
-- Sessions tomorrow: 1,398
+- Sessions today: 817
+- Sessions tomorrow: 1,408
 - Schedule shards: 320
 - Official movie-information records: 83
 

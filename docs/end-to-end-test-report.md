@@ -2,7 +2,7 @@
 
 Test date: 23 July 2026, UAE
 
-Build under test: `main` commit `1af1d1908545483ff9659288fc645fac7fdda6d9`
+Runtime and data source under test: `main` commit `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79`
 
 Production URL: <https://voxi-ai.pages.dev/>
 
@@ -12,19 +12,19 @@ Authoritative report: [FINAL_VALIDATION_REPORT_2026-07-23.md](../FINAL_VALIDATIO
 
 Production `release.json` returned:
 
-- Commit: `1af1d1908545483ff9659288fc645fac7fdda6d9`
-- Snapshot: `20260723-180b0b07f8429acf`
+- Commit: `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79`
+- Snapshot: `20260723-08c005696287764d`
 
-The hosted page loaded `/assets/index-DqBCeyow.js`. The asset is 889,938 bytes and served with immutable caching.
+The hosted page loaded `/assets/index-CUILGygO.js`. The asset is 889,919 bytes and served with immutable caching.
 
 ## Data under test
 
-- 10,606 sessions
+- 10,388 sessions
 - 35 films
 - 22 cinemas
 - 21 dates through 2026-08-12
-- 1,116 sessions today
-- 1,398 sessions tomorrow
+- 817 sessions today
+- 1,408 sessions tomorrow
 - 320 schedule shards
 - 83 official movie-information records
 
@@ -39,6 +39,18 @@ The hosted page loaded `/assets/index-DqBCeyow.js`. The asset is 889,938 bytes a
 | Hosted E2E | 23/23 PASS |
 | Package audit | No known production vulnerabilities |
 | Secret scan | Clean |
+| Refresh VOX UAE showtimes run #13 | PASS in 2m41s, data commit published |
+| Validate VOXi run #4 | PASS in 1m29s against the data commit |
+| Warning-free Validate VOXi run #7 | PASS in 1m27s with no annotations |
+| Hosted VOXi smoke run #7 | PASS in 45s |
+
+## Workflow evidence
+
+- Manual [Refresh VOX UAE showtimes run #13](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30008195281) succeeded in 2m41s and published data commit `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79`.
+- [Validate VOXi run #4](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30008628943) passed that data commit in 1m29s.
+- This release upgrades both upload steps to `actions/upload-artifact` v7.0.1 pinned to its full commit SHA, removing the prior Node 20 artifact warning.
+- [Validate VOXi run #7](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30009245035) passed without annotations in 1m27s.
+- [Hosted VOXi smoke run #7](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30009356648) passed in 45s.
 
 ## Covered journeys
 
@@ -99,6 +111,10 @@ Offer guidance must be verified at official checkout before eligibility or redem
 - [Hosted validation evidence](../evidence/logs/final-hosted-validation-2026-07-23.md)
 - [Generated snapshot manifest](../src/generated/voxSnapshotManifest.js)
 - [ElevenLabs contract](../config/elevenlabs-agent-contract.json)
+- [Refresh VOX UAE showtimes run #13](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30008195281)
+- [Validate VOXi run #4](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30008628943)
+- [Warning-free Validate VOXi run #7](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30009245035)
+- [Hosted VOXi smoke run #7](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30009356648)
 
 ## Readiness decision
 

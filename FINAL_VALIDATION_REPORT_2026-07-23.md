@@ -8,15 +8,15 @@ Repository: <https://github.com/Noorul-Ameen/vox-cinemas-agent>
 
 Branch: `main`
 
-Validated runtime source commit: `1af1d1908545483ff9659288fc645fac7fdda6d9`
+Validated runtime and data source commit: `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79`
 
-Snapshot: `20260723-180b0b07f8429acf`
+Snapshot: `20260723-08c005696287764d`
 
-Hosted production asset: `/assets/index-DqBCeyow.js`
+Hosted production asset: `/assets/index-CUILGygO.js`
 
 ## Executive status
 
-The runtime source was correctly published and tested at the production URL. During functional validation, production `release.json` returned the exact runtime commit `1af1d1908545483ff9659288fc645fac7fdda6d9` and snapshot `20260723-180b0b07f8429acf`. The hosted JavaScript asset is `/assets/index-DqBCeyow.js`, is 889,938 bytes, and is served with immutable caching. Production `release.json` remains the source of truth for the current deployment commit after documentation-only updates.
+The runtime and data source was correctly published and tested at the production URL. During final functional validation, production `release.json` returned the exact source commit `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79` and snapshot `20260723-08c005696287764d`. The hosted JavaScript asset is `/assets/index-CUILGygO.js`, is 889,919 bytes, and is served with immutable caching. Production `release.json` remains the source of truth for the current deployment commit after non-runtime documentation and workflow updates.
 
 The full local validator suite and production build passed. Local E2E passed 23 of 23 tests. The hosted exact-commit smoke passed 1 of 1, and hosted E2E passed 23 of 23. The package audit found no known production vulnerabilities, and the secret scan was clean.
 
@@ -29,19 +29,19 @@ This release is ready for production use as a discovery and booking-preview expe
 | Item | Verified result |
 | --- | --- |
 | Production branch | `main` |
-| Runtime release commit | `1af1d1908545483ff9659288fc645fac7fdda6d9` |
-| Functional test deployment commit | Exact runtime source match |
-| Snapshot | `20260723-180b0b07f8429acf` |
+| Validated runtime and data source commit | `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79` |
+| Functional production `release.json` commit | Exact source match |
+| Snapshot | `20260723-08c005696287764d` |
 | Production `release.json` snapshot | Exact match |
-| Hosted asset | `/assets/index-DqBCeyow.js` |
-| Hosted asset size | 889,938 bytes |
+| Hosted asset | `/assets/index-CUILGygO.js` |
+| Hosted asset size | 889,919 bytes |
 | Hosted cache policy | Immutable |
-| Sessions | 10,606 |
+| Sessions | 10,388 |
 | Films | 35 |
 | Cinemas | 22 |
 | Dates | 21, through 2026-08-12 |
-| Sessions today | 1,116 |
-| Sessions tomorrow | 1,398 |
+| Sessions today | 817 |
+| Sessions tomorrow | 1,408 |
 | Schedule shards | 320 |
 | Official movie-information records | 83 |
 
@@ -56,6 +56,11 @@ This release is ready for production use as a discovery and booking-preview expe
 | Hosted E2E | 23/23 PASS |
 | Package audit | No known production vulnerabilities |
 | Secret scan | Clean |
+| Manual refresh workflow | Run #13 PASS in 2m41s, data commit published |
+| Validate VOXi workflow | Run #4 PASS in 1m29s against the data commit |
+| Warning-free Validate VOXi workflow | Run #7 PASS in 1m27s with no annotations |
+| Hosted VOXi smoke workflow | Run #7 PASS in 45s |
+| Artifact-action upgrade | Both upload steps use `actions/upload-artifact` v7.0.1 pinned SHA |
 | Live Chrome Arabic rating query | PASS, movie list retained |
 | Controlled Chrome microphone-denial recovery | PASS after 45 seconds, state retained |
 | ElevenLabs contract publication and readback | PASS |
@@ -78,6 +83,9 @@ This release is ready for production use as a discovery and booking-preview expe
 - Controlled Chrome recovered from denied microphone permission after 45 seconds without losing state.
 - Contract `2026-07-23.3` was published to ElevenLabs and read back successfully.
 - Package and secret checks passed.
+- Manual Refresh VOX UAE showtimes run #13 published the refreshed data commit in 2m41s, and Validate VOXi run #4 passed it in 1m29s.
+- This release removes the prior Node 20 artifact warning by upgrading both upload steps to `actions/upload-artifact` v7.0.1 pinned to its full commit SHA.
+- Validate VOXi run #7 passed the upgraded workflow without annotations in 1m27s, and Hosted VOXi smoke run #7 passed in 45s.
 
 ## What does not work
 
@@ -135,8 +143,12 @@ This release is ready for production use as a discovery and booking-preview expe
 - [Generated snapshot manifest](./src/generated/voxSnapshotManifest.js)
 - [ElevenLabs contract](./config/elevenlabs-agent-contract.json)
 - [ElevenLabs setup checklist](./ELEVENLABS_AGENT_SETUP.md)
+- [Refresh VOX UAE showtimes run #13](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30008195281)
+- [Validate VOXi run #4](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30008628943)
+- [Warning-free Validate VOXi run #7](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30009245035)
+- [Hosted VOXi smoke run #7](https://github.com/Noorul-Ameen/vox-cinemas-agent/actions/runs/30009356648)
 
-Evidence confirms 23 of 23 local E2E tests, 1 of 1 hosted exact-commit smoke test, 23 of 23 hosted E2E tests, the live Chrome Arabic rating query with movie-list retention, and the 45-second controlled microphone-denial recovery with state retention.
+Evidence confirms the successful refresh and validation workflow runs, 23 of 23 local E2E tests, 1 of 1 hosted exact-commit smoke test, 23 of 23 hosted E2E tests, the live Chrome Arabic rating query with movie-list retention, and the 45-second controlled microphone-denial recovery with state retention.
 
 ## Final production readiness
 
