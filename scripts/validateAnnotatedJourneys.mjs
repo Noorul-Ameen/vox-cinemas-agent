@@ -282,6 +282,42 @@ assert.match(
   /on-device booking summaries are shown/i,
   "a history response must stay grounded in the visible saved summaries instead of falling back to checkout guidance",
 );
+const activeHistoryBooking = {
+  ref: "WLHISTORY1",
+  movieTitle: "Minions & Monsters",
+  performanceDate: "2026-07-24",
+  showtime: "20:10",
+  cinemaName: "Mall of the Emirates",
+  bookingStatus: "summary_saved",
+  cancelled: false,
+};
+assert.equal(
+  guardAgentStateClaim("I could not find any active bookings for you.", {
+    stage: { view: "history", bookings: [activeHistoryBooking], historyFilter: "active" },
+    bookingHistory: { bookings: [activeHistoryBooking], activeOnly: true, hasActive: true },
+    locale: "en",
+  }),
+  "1 current on-device booking summary is shown. Select one to view its details, or use its Mark cancelled button. These are device records, not provider confirmations.",
+  "a populated authoritative history must replace a generated false-empty reply",
+);
+assert.equal(
+  guardAgentStateClaim("Your booking is confirmed and ready.", {
+    stage: { view: "history", bookings: [], historyFilter: "all" },
+    bookingHistory: { bookings: [], activeOnly: false, hasActive: false },
+    locale: "en",
+  }),
+  "No booking summaries are saved on this device.",
+  "an empty authoritative history must never invent a visible or provider-confirmed booking",
+);
+assert.equal(
+  guardAgentStateClaim("لا توجد حجوزات حالية لديك.", {
+    stage: { view: "history", bookings: [activeHistoryBooking], historyFilter: "active" },
+    bookingHistory: { bookings: [activeHistoryBooking], activeOnly: true, hasActive: true },
+    locale: "ar",
+  }),
+  "يظهر الآن 1 من ملخصات حجوزاتك الحالية المحفوظة على هذا الجهاز. اختر ملخصاً لعرض التفاصيل، أو استخدم زر تسجيله كملغى. هذه سجلات محفوظة على الجهاز وليست تأكيدات من مزود الحجز.",
+  "Arabic history responses must use the same authoritative populated-history truth guard",
+);
 assert.match(
   guardAgentStateClaim("I can't change the seats after the booking is confirmed. You'll need a new booking.", { stage: checkoutStage, pendingOrder, locale: "en" }),
   /can change seats before completing checkout/i,
@@ -291,6 +327,34 @@ assert.match(
   guardAgentStateClaim("I've displayed the seat map for The Odyssey.", { stage: checkoutStage, pendingOrder, locale: "en" }),
   /shown in checkout/i,
   "a stale seat-map claim must be aligned with the visible checkout",
+);
+assert.equal(
+  guardAgentStateClaim("The seat map for Toy Story 5 at Mall of the Emirates on July 24th at 8:45 PM is ready. Please select three seats.", {
+    stage: { view: "movies", movies: [{ id: "toy-story-5", title: "Toy Story 5" }] },
+    locale: "en",
+  }),
+  "1 movie option is shown. Choose one of the displayed movies to continue.",
+  "a premature seat-map claim must guide the guest from the movie card that is actually visible",
+);
+assert.equal(
+  guardAgentStateClaim("I see you've selected Toy Story 5. Please choose your three seats on the seat map.", {
+    stage: { view: "movies", movies: [{ id: "toy-story-5", title: "Toy Story 5" }] },
+    locale: "en",
+  }),
+  "1 movie option is shown. Choose one of the displayed movies to continue.",
+  "premature seat-selection instructions must not imply that an undisplayed seat map is interactive",
+);
+assert.equal(
+  guardAgentStateClaim("Please select three seats to continue.", {
+    stage: {
+      view: "showtimes",
+      movie: { id: "toy-story-5", title: "Toy Story 5" },
+      sessions: [{ sessionId: "toy-story-5-2045", time: "20:45" }],
+    },
+    locale: "en",
+  }),
+  "1 showtime option is shown for Toy Story 5. Choose one displayed showtime to continue.",
+  "seat guidance must not skip over an exact showtime that has not been selected",
 );
 const hiddenCheckoutGuidance = guardAgentStateClaim("Checkout is displayed. Complete your booking on the screen.", {
   stage: { view: "offers" },
@@ -340,7 +404,7 @@ for (const claim of [
       stage: { view: "history", purpose: "cancellation_target_selection", candidateRefs: ["WL1", "WL2"] },
       locale: "en",
     }),
-    "Choose one of the current bookings shown, by movie title or booking reference.",
+    "Choose one of the current summaries shown, by movie title or device reference.",
     "multiple displayed cancellation targets must be selectable by title as well as reference",
   );
 }
@@ -405,7 +469,7 @@ const checkoutBack = app.slice(app.indexOf("const backToSeatMapFromCheckout"), a
 assert.match(checkoutBack, /activeCheckoutStage\(\)\) restoreActiveCheckout\(\)/, "edit seats must also work when another panel temporarily covers checkout");
 assert.match(checkoutBack, /requestedSeatTargetRef\.current = requestedTarget[\s\S]*setRequestedSeatTarget\(requestedTarget\)/, "a requested seat target must appear on the restored seat map");
 
-const paymentCompletion = app.slice(app.indexOf("const handlePaid"), app.indexOf("CLIENT TOOLS"));
+const paymentCompletion = app.slice(app.indexOf("const handleCheckoutReviewComplete"), app.indexOf("CLIENT TOOLS"));
 assert.match(paymentCompletion, /\["stale_checkout", "stale_device_session"\][\s\S]*checkoutPaymentActiveRef\.current = false/, "stale checkout outcomes must release the payment navigation lock");
 assert.match(paymentCompletion, /checkout session changed[\s\S]*No payment was taken/i, "stale checkout outcomes must display a no-charge recovery message");
 assert.doesNotMatch(paymentCompletion, /sendUiTurn\(`Booking summary/, "completion must not trigger a duplicate agent response after the deterministic summary notice");
@@ -424,6 +488,11 @@ assert.match(app, /const VISIBLE_TRANSCRIPT_MESSAGES = 8/, "long transcripts mus
 assert.match(app, /const RICH_STAGE_TRANSCRIPT_MESSAGES = 4/, "rich panels must reserve space by showing a shorter recent transcript");
 assert.match(app, /messages\.slice\(-transcriptMessageLimit\)/, "older messages must be collapsed without deleting the full transcript");
 assert.match(app, /aria-expanded=\{showFullTranscript\}/, "the full transcript must remain accessible through an explicit control");
+assert.match(app, /const authoritativeBookingHistoryForStage = \(historyStage\) => \{[\s\S]*sortBookingsForDisplay\(readBookings\(\{ strict: true \}\)\)[\s\S]*hasActive: visibleBookings\.some\(\(item\) => isCurrentBooking\(item\)\)/, "agent history output must be grounded against the latest strictly read booking history");
+assert.match(app, /storageUnavailable:\s*true/, "history truth grounding must distinguish unavailable storage from an empty history");
+assert.match(app, /bookingHistory: authoritativeBookingHistoryForStage\(claimStage\)/, "the shared agent output guard must receive authoritative history for typed, quick-action, and voice responses");
+assert.match(app, /showStage\(\{[\s\S]{0,180}view: "history",[\s\S]{0,180}bookings: visibleBookings,[\s\S]{0,180}historyFilter: activeOnly \? "active" : "all"/, "the shared history opener must synchronously retain the exact visible history scope");
+assert.match(app, /chips\.map\(\(chip, index\)[\s\S]{0,220}index === 2[\s\S]{0,140}openHistory\(\{ forceOpen: true \}\)/, "the booking-history quick action must open authoritative device records directly instead of depending on a model tool call");
 assert.match(richMedia, /const visibleMovies = showAll \? movies : movies\.slice\(0, 4\)/, "movie results must begin with a compact progressive list");
 assert.match(richMedia, /const visible = key \|\| showAll \? matching : matching\.slice\(0, 6\)/, "the cinema picker must begin with a compact progressive list while retaining search");
 for (const locale of ["en", "ar"]) {

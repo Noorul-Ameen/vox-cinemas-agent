@@ -12,10 +12,20 @@
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate
 
+/release.json
+  Cache-Control: no-store
+
+/asset-manifest.json
+  Cache-Control: no-store
+
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
-# Snapshot paths include a content version. A new refresh writes a new path,
-# so these files can be cached permanently without serving an older schedule.
+# Snapshot paths include a content version. Keep these responses out of the
+# browser cache so a missing shard can never become a cached HTML fallback
+# during an atomic deployment.
 /data/vox-snapshot/*
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: no-store
+
+/404.html
+  Cache-Control: no-store

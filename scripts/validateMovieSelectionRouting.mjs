@@ -10,22 +10,24 @@ const movies = [
 ];
 const stage = { view: "movies", movies };
 const ampersandStage = { view: "movies", movies: [{ id: "minions", title: "Minions & Monsters" }] };
+const bilingualStage = { view: "movies", movies: [{ id: "toy", title: "Toy Story 5" }] };
 
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "Ezma", stage })?.id, "ezma");
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "I choose Ezma", stage })?.id, "ezma");
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "اخترت Ezma", stage })?.id, "ezma");
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "أريد Ezma", stage })?.id, "ezma");
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "the chosen movies", stage }), null);
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "Tell me about Ezma", stage }), null);
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "I want details about Ezma", stage }), null);
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "Arabic movies", stage }), null);
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "Unknown title", stage }), null);
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "Ezma", stage: { view: "showtimes", movies } }), null);
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "Minions and Monsters", stage: ampersandStage })?.id, "minions", "spoken and must select a visible title published with an ampersand");
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "Minions & Monsters", stage: ampersandStage })?.id, "minions", "the published ampersand title must remain selectable");
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "I want Minions and Monsters", stage: ampersandStage })?.id, "minions");
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "I choose Minions and Monsters", stage: ampersandStage })?.id, "minions");
-assert.equal(resolveVisibleMovieSelectionTurn({ text: "I'd like Minions and Monsters", stage: ampersandStage })?.id, "minions");
+assert.equal((await resolveVisibleMovieSelectionTurn({ text: "Ezma", stage }))?.id, "ezma");
+assert.equal((await resolveVisibleMovieSelectionTurn({ text: "I choose Ezma", stage }))?.id, "ezma");
+assert.equal((await resolveVisibleMovieSelectionTurn({ text: "اخترت Ezma", stage }))?.id, "ezma");
+assert.equal((await resolveVisibleMovieSelectionTurn({ text: "أريد Ezma", stage }))?.id, "ezma");
+assert.equal(await resolveVisibleMovieSelectionTurn({ text: "the chosen movies", stage }), null);
+assert.equal(await resolveVisibleMovieSelectionTurn({ text: "Tell me about Ezma", stage }), null);
+assert.equal(await resolveVisibleMovieSelectionTurn({ text: "I want details about Ezma", stage }), null);
+assert.equal(await resolveVisibleMovieSelectionTurn({ text: "Arabic movies", stage }), null);
+assert.equal(await resolveVisibleMovieSelectionTurn({ text: "Unknown title", stage }), null);
+assert.equal(await resolveVisibleMovieSelectionTurn({ text: "Ezma", stage: { view: "showtimes", movies } }), null);
+assert.equal((await resolveVisibleMovieSelectionTurn({ text: "Minions and Monsters", stage: ampersandStage }))?.id, "minions", "spoken and must select a visible title published with an ampersand");
+assert.equal((await resolveVisibleMovieSelectionTurn({ text: "Minions & Monsters", stage: ampersandStage }))?.id, "minions", "the published ampersand title must remain selectable");
+assert.equal((await resolveVisibleMovieSelectionTurn({ text: "I want Minions and Monsters", stage: ampersandStage }))?.id, "minions");
+assert.equal((await resolveVisibleMovieSelectionTurn({ text: "I choose Minions and Monsters", stage: ampersandStage }))?.id, "minions");
+assert.equal((await resolveVisibleMovieSelectionTurn({ text: "I'd like Minions and Monsters", stage: ampersandStage }))?.id, "minions");
+assert.equal((await resolveVisibleMovieSelectionTurn({ text: "توي ستوري 5", stage: bilingualStage }))?.id, "toy", "an Arabic title reply must select its visible English catalog movie");
 
 const rapidMovie = {
   ...ampersandStage.movies[0],
@@ -34,7 +36,7 @@ const rapidMovie = {
     { sessionId: "minions-premier-2115", time: "21:15", exp: "PREMIER", date: "2026-07-23" },
   ],
 };
-const rapidMovieSelection = resolveVisibleMovieSelectionTurn({
+const rapidMovieSelection = await resolveVisibleMovieSelectionTurn({
   text: "Minions and Monsters",
   stage: { view: "movies", movies: [rapidMovie] },
 });
@@ -72,8 +74,10 @@ assert.equal(shouldBlockConcurrentDeterministicToolCall({
 }), true, "a late seat-map tool call from the prior agent turn must not race the latest local showtime selection");
 
 const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
-assert.match(app, /resolveVisibleMovieSelectionTurn\(\{ text: safeMessage, stage: stageRef\.current \}\)/, "voice transcripts must resolve explicit visible movie selection");
-assert.match(app, /resolveVisibleMovieSelectionTurn\(\{ text: value, stage: stageRef\.current \}\)/, "typed turns must resolve explicit visible movie selection");
+assert.doesNotMatch(app, /^import .*movieSelectionRouting/m, "the initial App module must not statically import visible movie selection routing");
+assert.match(app, /await import\("\.\/lib\/movieSelectionRouting\.js"\)/, "visible movie selection routing must load only when a user turn needs it");
+assert.match(app, /await resolveVisibleMovieSelectionTurnLazy\(\s*\{ text: safeMessage, stage: stageRef\.current \},\s*\{ isCurrent: voiceTurnIsCurrent \}/, "voice transcripts must resolve explicit visible movie selection through the guarded lazy route");
+assert.match(app, /await resolveVisibleMovieSelectionTurnLazy\(\s*\{ text: value, stage: stageRef\.current \},\s*\{ isCurrent: typedTurnIsCurrent \}/, "typed turns must resolve explicit visible movie selection through the guarded lazy route");
 assert.ok((app.match(/routeVisibleMovieSelection\(directMovieSelection\)/g) || []).length >= 2, "text and voice must both open verified showtimes deterministically");
 assert.match(app, /const pauseRenderingForUnrelatedTurn[\s\S]*directMovieSelection[\s\S]*\|\| directMovieSelection/, "an exact visible-movie choice must stay transactional instead of pausing its movie panel before showtimes load");
 assert.ok((app.match(/directMovieSelection,\s*\n\s*directShowtimeSelection,/g) || []).length >= 2, "text and voice must preserve the visible movie stage while their deterministic selection route runs");

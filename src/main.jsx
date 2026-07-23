@@ -24,7 +24,7 @@ class ErrorBoundary extends React.Component {
       return (
         <div dir={this.props.dir} style={{ maxWidth: 420, margin: "40px auto", border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface, boxShadow: `0 18px 48px ${C.shadow}`, padding: 24, color: C.text, fontFamily: "system-ui" }}>
           <h3 style={{ color: C.danger }}>{this.props.t("error.title")}</h3>
-          <p dir="auto" style={{ color: C.muted, fontSize: 14 }}>{String(this.state.err?.message || this.state.err)}</p>
+          <p dir="auto" style={{ color: C.muted, fontSize: 14 }}>{this.props.t("error.body")}</p>
           <button onClick={this.retry}
             style={{ marginTop: 12, background: C.primary, color: C.onPrimary, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer" }}>
             {this.props.t("error.retry")}

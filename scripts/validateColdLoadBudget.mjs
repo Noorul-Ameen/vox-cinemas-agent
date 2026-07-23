@@ -72,6 +72,9 @@ const html = htmlBuffer.toString("utf8");
 assert.ok(htmlBuffer.length <= BUDGETS.htmlBytes, `index HTML exceeds ${bytesLabel(BUDGETS.htmlBytes)}`);
 assert.match(html, /class="startup-shell"/u, "index HTML must render a branded shell before JavaScript starts");
 assert.match(html, /Loading your cinema concierge\.\.\./u, "the startup shell must explain the initial loading state");
+const inlineExecutableScripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/giu)]
+  .filter(([, attributes, body]) => !/\bsrc\s*=/iu.test(attributes) && body.trim());
+assert.equal(inlineExecutableScripts.length, 0, "production index HTML must comply with the strict script CSP without inline execution");
 
 const scriptUrls = tags(html, "script")
   .filter((tag) => attribute(tag, "src"))
@@ -85,6 +88,7 @@ const stylesheetUrls = tags(html, "link")
 
 const initialUrls = [...new Set([...scriptUrls, ...modulePreloadUrls, ...stylesheetUrls])];
 assert.ok(scriptUrls.length > 0, "index HTML must load an application script");
+assert.ok(scriptUrls.includes("/locale-bootstrap.js"), "production index HTML must load the same-origin locale bootstrap");
 assert.ok(
   initialUrls.length <= BUDGETS.initialRequests,
   `initial application request count ${initialUrls.length} exceeds ${BUDGETS.initialRequests}`,
@@ -157,8 +161,8 @@ assert.ok(
 );
 assert.match(
   readFileSync(movieInformationChunkPaths[0], "utf8"),
-  /Ezma/u,
-  "the deferred official movie-information chunk must retain reference-title coverage",
+  /uae-apife\.voxcinemas\.com\/v1\/vox2-0\/content\/movies/u,
+  "the deferred movie-information chunk must retain official VOX UAE provenance",
 );
 
 const shardPaths = filesBelow(SNAPSHOT_ROOT).filter((filePath) => filePath.endsWith(".json"));
@@ -191,7 +195,32 @@ assert.ok(snapshotBytes <= BUDGETS.snapshotBytes, `snapshot files exceed ${bytes
 const headersPath = path.join(DIST, "_headers");
 assert.ok(existsSync(headersPath), "Cloudflare _headers file is missing from dist");
 const headers = readFileSync(headersPath, "utf8");
-assert.match(headers, /\/data\/vox-snapshot\/\*\s+[\s\S]*?Cache-Control:\s*public,\s*max-age=31536000,\s*immutable/iu);
+const contentSecurityPolicy = headers.match(/Content-Security-Policy:\s*([^\r\n]+)/iu)?.[1] || "";
+assert.doesNotMatch(contentSecurityPolicy, /script-src[^;]*'unsafe-inline'/iu, "production script CSP must not allow inline execution");
+for (const releaseFile of ["release.json", "asset-manifest.json"]) {
+  const releasePath = path.join(DIST, releaseFile);
+  assert.ok(existsSync(releasePath), `${releaseFile} is missing from the production build`);
+  JSON.parse(readFileSync(releasePath, "utf8"));
+  assert.match(
+    headers,
+    new RegExp(`\\/${releaseFile.replace(".", "\\.")}\\s+[\\s\\S]*?Cache-Control:\\s*no-store`, "iu"),
+    `${releaseFile} must be fetched without cache during release recovery`,
+  );
+}
+assert.match(
+  headers,
+  /\/data\/vox-snapshot\/\*\s+[\s\S]*?Cache-Control:\s*no-store/iu,
+  "snapshot responses must not cache a missing shard or an HTML fallback",
+);
+const notFoundPath = path.join(DIST, "404.html");
+assert.ok(existsSync(notFoundPath), "Cloudflare 404 boundary is missing from dist");
+const notFound = readFileSync(notFoundPath, "utf8");
+assert.match(notFound, /Resource not found/iu, "the static 404 boundary must be explicit");
+assert.match(
+  headers,
+  /\/404\.html\s+[\s\S]*?Cache-Control:\s*no-store/iu,
+  "the Cloudflare 404 response must not be cached",
+);
 
 console.log(JSON.stringify({
   status: "PASS",

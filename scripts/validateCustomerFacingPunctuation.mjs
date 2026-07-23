@@ -12,7 +12,13 @@ import { VOX_FAQ_ENTRIES } from "../src/knowledge/voxFaqData.js";
 import { VOXI_AGENT_PROMPT, VOXI_FIRST_MESSAGES } from "../src/lib/voxiSession.js";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const ignoredDirectories = new Set([".git", "dist", "node_modules"]);
+const ignoredDirectories = new Set([
+  ".git",
+  "dist",
+  "node_modules",
+  "playwright-report",
+  "test-results",
+]);
 const textExtensions = new Set([
   ".cjs", ".css", ".html", ".js", ".json", ".jsx", ".md", ".mjs",
   ".py", ".svg", ".ts", ".tsx", ".txt", ".xml", ".yaml", ".yml",

@@ -3,18 +3,44 @@ import { getOfferMedia, OFFER_MEDIA } from "../src/mediaData.js";
 import { hasForbiddenCustomerFacingDash } from "../src/lib/customerFacingText.js";
 import { OFFER_META, OFFERS } from "../src/offers/offersData.js";
 import { answerForOfferTopic, buildOfferFacts } from "../src/offers/offerFacts.js";
+import { OFFER_KNOWLEDGE_MAX_AGE_DAYS, OFFER_KNOWLEDGE_STATUS, getOfferKnowledgeStatus } from "../src/offers/offerFreshness.js";
 import { ELIGIBILITY, evaluateOfferEligibility, normalizeExperience, resolveOffer, resolveOfferForBankAndCard, searchOffers } from "../src/offers/offerResolver.js";
 
 assert.equal(OFFERS.length, 20, "knowledge base must contain all 20 issuer groups");
 assert.equal(new Set(OFFERS.map((offer) => offer.id)).size, 20, "offer IDs must be unique");
-assert.equal(OFFERS.reduce((sum, offer) => sum + offer.promotionCount, 0), 21, "issuer groups must represent all 21 current promotions");
+assert.equal(OFFERS.reduce((sum, offer) => sum + offer.promotionCount, 0), 21, "issuer groups must represent all 21 published snapshot promotions");
 assert.equal(OFFER_META.promotionCount, 21);
 assert.equal(OFFER_META.issuerCount, 20);
 assert.equal(OFFER_META.capturedDate, "2026-07-17");
 assert.equal(OFFER_META.verifiedDate, "2026-07-17");
 assert.match(OFFER_META.disclaimer.en, /guidance only/i);
-assert.match(OFFER_META.disclaimer.en, /Final eligibility is verified at VOX checkout/i);
+assert.match(OFFER_META.disclaimer.en, new RegExp(OFFER_META.verifiedDate), "dated offer guidance must disclose when its published sources were checked");
+assert.match(OFFER_META.disclaimer.en, /Final eligibility is verified only in the official VOX website or app checkout/i);
 assert.match(OFFER_META.disclaimer.en, /bank’s current terms/i);
+
+assert.equal(OFFER_KNOWLEDGE_MAX_AGE_DAYS, 30, "bank-offer semantic knowledge must have a bounded freshness window");
+const lastFreshKnowledgeDay = getOfferKnowledgeStatus({ asOf: "2026-08-16" });
+assert.equal(lastFreshKnowledgeDay.status, OFFER_KNOWLEDGE_STATUS.FRESH, "the 30th day after verification remains within the freshness window");
+assert.equal(lastFreshKnowledgeDay.ageDays, 30);
+assert.equal(lastFreshKnowledgeDay.validThrough, "2026-08-16");
+const firstStaleKnowledgeDay = getOfferKnowledgeStatus({ asOf: "2026-08-17" });
+assert.equal(firstStaleKnowledgeDay.status, OFFER_KNOWLEDGE_STATUS.STALE, "the 31st day after verification must fail closed");
+assert.equal(firstStaleKnowledgeDay.isFresh, false);
+assert.equal(firstStaleKnowledgeDay.verifiedDate, OFFER_META.verifiedDate);
+assert.match(firstStaleKnowledgeDay.guidance.en, new RegExp(OFFER_META.verifiedDate));
+assert.match(firstStaleKnowledgeDay.guidance.en, /official current terms/i);
+assert.match(firstStaleKnowledgeDay.guidance.en, /official VOX website or app checkout/i);
+assert.match(firstStaleKnowledgeDay.guidance.ar, /الشروط الرسمية الحالية/u);
+assert.equal(
+  getOfferKnowledgeStatus({ asOf: "2026-07-16" }).status,
+  OFFER_KNOWLEDGE_STATUS.INVALID,
+  "a future-dated verification record must fail closed",
+);
+assert.equal(
+  getOfferKnowledgeStatus({ asOf: "2026-07-23", verifiedDate: "not-a-date" }).status,
+  OFFER_KNOWLEDGE_STATUS.INVALID,
+  "an invalid verification date must fail closed",
+);
 
 for (const offer of OFFERS) {
   assert.ok(offer.bank.en && offer.bank.ar, `${offer.id}: bilingual bank name`);
@@ -139,7 +165,7 @@ for (const promotion of promotionViews) {
       assert.equal(hasForbiddenCustomerFacingDash(answer), false, `${label}/${language}/${topic}: answer punctuation`);
       if (!promotion.detailsPublished) {
         assert.match(answer, language === "ar" ? /لا تنشر|التحقق من الأهلية/u : /do not publish|has not published|not publish/iu, `${label}/${language}/${topic}: unpublished details must be disclosed`);
-        assert.match(answer, language === "ar" ? /إتمام الحجز لدى VOX/u : /VOX checkout/iu, `${label}/${language}/${topic}: unpublished details must retain the checkout boundary`);
+        assert.match(answer, language === "ar" ? /صفحة الدفع الرسمية في موقع VOX أو تطبيقه/u : /official VOX website or app checkout/iu, `${label}/${language}/${topic}: unpublished details must retain the checkout boundary`);
       }
     }
 
@@ -210,6 +236,48 @@ const qualified = (context = {}) => ({
   cinemaName: "Yas Mall",
   ...context,
 });
+
+const fabOffer = OFFERS.find((offer) => offer.id === "fab-share");
+const freshFabEvaluation = evaluateOfferEligibility(
+  fabOffer,
+  fabOffer.profiles[0],
+  qualified({ experience: "Regular 2D", cinemaName: "City Centre Mirdif" }),
+  { asOf: "2026-08-16" },
+);
+assert.equal(freshFabEvaluation.status, ELIGIBILITY.ELIGIBLE, "fresh offer knowledge must preserve detailed eligibility behavior");
+const staleFabEvaluation = evaluateOfferEligibility(
+  fabOffer,
+  fabOffer.profiles[0],
+  qualified({ experience: "Regular 2D", cinemaName: "City Centre Mirdif" }),
+  { asOf: "2026-08-17" },
+);
+assert.equal(staleFabEvaluation.status, ELIGIBILITY.CARD_REQUIRED, "stale offer knowledge must not claim eligibility");
+assert.equal(staleFabEvaluation.eligible, false);
+assert.deepEqual(staleFabEvaluation.missingFields, ["checkoutVerification"]);
+assert.equal(staleFabEvaluation.knowledgeStatus, OFFER_KNOWLEDGE_STATUS.STALE);
+assert.equal(staleFabEvaluation.knowledgeVerifiedDate, OFFER_META.verifiedDate);
+assert.equal(staleFabEvaluation.currentTermsUrl, fabOffer.termsUrl);
+assert.match(staleFabEvaluation.reason, new RegExp(OFFER_META.verifiedDate));
+assert.match(staleFabEvaluation.reason, /official current terms/i);
+assert.match(staleFabEvaluation.reason, /official VOX website or app checkout/i);
+assert.equal(
+  evaluateOfferEligibility(
+    fabOffer,
+    fabOffer.profiles[0],
+    qualified({ experience: "IMAX 2D" }),
+    { asOf: "2026-08-17" },
+  ).status,
+  ELIGIBILITY.CARD_REQUIRED,
+  "stale offer knowledge must not make a definitive ineligibility claim",
+);
+const staleFabAnswerEn = answerForOfferTopic(fabOffer, fabOffer.profiles[0], "en", "experiences", { asOf: "2026-08-17" });
+assert.match(staleFabAnswerEn, new RegExp(OFFER_META.verifiedDate));
+assert.match(staleFabAnswerEn, /official current terms/i);
+assert.doesNotMatch(staleFabAnswerEn, /Eligible experiences/i, "stale answers must not repeat semantic eligibility claims");
+const staleFabAnswerAr = answerForOfferTopic(fabOffer, fabOffer.profiles[0], "ar", "cards", { asOf: "2026-08-17" });
+assert.match(staleFabAnswerAr, /الشروط الرسمية الحالية/u);
+assert.match(staleFabAnswerAr, /صفحة الدفع الرسمية في موقع VOX أو تطبيقه/u);
+assert.equal(hasForbiddenCustomerFacingDash(`${staleFabEvaluation.reason} ${staleFabAnswerEn} ${staleFabAnswerAr}`), false);
 
 expectStatus("FAB", { experience: "Regular 2D" }, ELIGIBILITY.CARD_REQUIRED, "fab-share");
 expectStatus("FAB SHARE card", qualified({ experience: "Regular 2D", cinemaName: "City Centre Mirdif" }), ELIGIBILITY.ELIGIBLE, "fab-share");

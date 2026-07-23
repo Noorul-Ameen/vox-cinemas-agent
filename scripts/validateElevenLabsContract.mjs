@@ -14,6 +14,7 @@ const journey = readText("src/lib/conversationJourney.js");
 const vite = readText("vite.config.js");
 const environmentExample = readText(".env.example");
 const setupGuide = readText("ELEVENLABS_AGENT_SETUP.md");
+const offerFacts = readText("src/offers/offerFacts.js");
 const packageJson = JSON.parse(readText("package.json"));
 
 const EXPECTED_AGENT_ID = "agent_0001kx3xc0b4f6s8dqy9qnejm4qr";
@@ -178,6 +179,10 @@ assert.match(promptSource, /Treat Afghan or Afghani movie wording as ambiguous[\
 assert.match(promptSource, /A request for new movies, different movies, another movie[\s\S]*Never continue with the old title or old showtime/, "the prompt must replace stale movie and time filters on an explicit alternative request");
 assert.match(promptSource, /When a short hour such as "9" uniquely matches one visible showtime[\s\S]*Never restart movie discovery/, "the prompt must ground short-hour choices in visible showtimes and clarify ambiguity in place");
 assert.match(promptSource, /Never tell the guest that the booking process is paused[\s\S]*Do not apply that short reply as a global restore/, "the prompt must keep one-shot paused-journey recovery customer-safe and state-scoped");
+assert.match(promptSource, /Payment-detail entry is disabled in this widget/, "the live-agent prompt must state that payment-detail entry is disabled");
+assert.match(promptSource, /one guest-controlled Save booking summary action[\s\S]*submits no real payment or reservation/, "the live-agent prompt must describe only the non-transactional summary action");
+assert.doesNotMatch(promptSource, /Payment details are entered only in the on-screen checkout/, "the live-agent prompt must not direct guests to removed payment fields");
+assert.match(offerFacts, /use the official VOX website or app checkout/i, "offer redemption must direct guests to an official VOX checkout");
 const promptHash = createHash("sha256").update(normalizeSource(VOXI_AGENT_PROMPT), "utf8").digest("hex");
 assert.equal(promptHash, contract.prompt.sha256, "the exported ElevenLabs prompt value changed without a contract version update");
 

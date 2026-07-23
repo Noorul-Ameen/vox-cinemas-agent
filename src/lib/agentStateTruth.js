@@ -12,7 +12,7 @@ const bookingConfirmationClaim = (value) => {
 const paymentCompletionClaim = (value) => /\bpayment\b[\s\S]{0,80}\b(?:was|is|has been)?\s*(?:charged|processed|completed|successful|approved)\b|\b(?:charged|processed|completed)\b[\s\S]{0,80}\bpayment\b|(?:تم|اكتملت)[\s\S]{0,50}(?:عملية الدفع|الدفع بنجاح)/iu.test(value);
 const referenceCreationClaim = (value) => /\b(?:booking reference|reservation reference|reference number|qr code)\b[\s\S]{0,80}\b(?:is|created|generated|ready)\b|(?:مرجع الحجز|رقم الحجز|رمز QR)[\s\S]{0,80}(?:جاهز|تم إنشاؤه|هو)/iu.test(value);
 const admissionReadyClaim = (value) => /\b(?:tickets?|admission|reservation)\b[\s\S]{0,60}\b(?:is|are)\s+ready\b|\b(?:use|scan|show)\b[\s\S]{0,50}\bqr(?:\s+code)?\b[\s\S]{0,70}\b(?:admission|entry|enter|cinema)\b|(?:التذكرة|التذاكر|الدخول|الحجز)[\s\S]{0,60}(?:جاهز|جاهزة|جاهزة للدخول)|(?:استخدم|امسح|اعرض)[\s\S]{0,50}(?:رمز QR)[\s\S]{0,60}(?:للدخول|السينما)/iu.test(value);
-const seatMapDisplayClaim = (value) => /\b(?:displayed|shown|opened)\b[\s\S]{0,90}\bseat map\b|\bseat map\b[\s\S]{0,90}\b(?:displayed|shown|open|on (?:the )?screen)\b|(?:عرضت|فتحت|تظهر)[\s\S]{0,80}(?:خريطة المقاعد)/iu.test(value);
+const seatMapDisplayClaim = (value) => /\b(?:displayed|shown|opened)\b[\s\S]{0,90}\bseat map\b|\bseat map\b[\s\S]{0,90}\b(?:displayed|shown|open|ready|on (?:the )?screen)\b|\b(?:select|choose|tap)\b[\s\S]{0,70}\bseats?\b[\s\S]{0,45}\b(?:on|from)\s+(?:the\s+)?seat map\b|(?:عرضت|فتحت|تظهر|جاهزة)[\s\S]{0,80}(?:خريطة المقاعد)|(?:خريطة المقاعد)[\s\S]{0,80}(?:جاهزة)|(?:اختر|حدد|اضغط)[\s\S]{0,60}(?:المقاعد|مقاعد)[\s\S]{0,45}(?:خريطة المقاعد)/iu.test(value);
 const bookingSummaryDisplayClaim = (value) => /\b(?:displayed|shown|created|opened)\b[\s\S]{0,90}\bbooking summary\b|\bbooking summary\b[\s\S]{0,90}\b(?:displayed|shown|created|open|on (?:the )?screen)\b|(?:عرضت|أنشأت|انشأت|فتحت)[\s\S]{0,80}(?:ملخص الحجز)/iu.test(value);
 const checkoutInstructionClaim = (value) => /\b(?:complete|finish|continue)\b[\s\S]{0,60}\b(?:your\s+|the\s+)?booking\b[\s\S]{0,60}\b(?:screen|checkout)\b|(?:أكمل|اكمل|تابع)[\s\S]{0,50}(?:الحجز|حجزك)[\s\S]{0,50}(?:الشاشة|الدفع)/iu.test(value);
 const checkoutDisplayClaim = (value) => /\bcheckout\b[\s\S]{0,70}\b(?:displayed|shown|open|on (?:the )?screen)\b|\b(?:displayed|shown|opened)\b[\s\S]{0,70}\bcheckout\b|(?:شاشة الدفع|الدفع)[\s\S]{0,60}(?:مفتوحة|ظاهرة|معروضة)/iu.test(value);
@@ -43,14 +43,14 @@ function checkoutGuidance(stage, pendingOrder, locale) {
   const order = pendingOrder || stage?.order || {};
   const seats = Array.isArray(order.seats) ? order.seats.filter(Boolean) : [];
   if (locale === "ar") {
-    return `${seats.length ? `المقاعد المحددة ${seats.join("، ")} ظاهرة في شاشة الدفع. ` : "المقاعد المحددة ظاهرة في شاشة الدفع. "}أكمل خطوة الدفع على الشاشة، أو اختر تعديل المقاعد لتغييرها. لم يتم تأكيد الحجز بعد.`;
+    return `${seats.length ? `المقاعد المحددة ${seats.join("، ")} ظاهرة في شاشة مراجعة الحجز. ` : "المقاعد المحددة ظاهرة في شاشة مراجعة الحجز. "}استخدم حفظ ملخص الحجز، أو اختر تعديل المقاعد لتغييرها. لم يتم تأكيد الحجز بعد، ولن يتم إرسال دفعة أو حجز.`;
   }
-  return `${seats.length ? `Your selected seats ${seats.join(", ")} are shown in checkout. ` : "Your selected seats are shown in checkout. "}Complete the on-screen payment step, or choose Edit seats to change them. The booking is not confirmed yet.`;
+  return `${seats.length ? `Your selected seats ${seats.join(", ")} are shown in checkout review. ` : "Your selected seats are shown in checkout review. "}Use Save booking summary, or choose Edit seats to change them. The booking is not confirmed yet, and no payment or reservation will be submitted.`;
 }
 
 function seatMapGuidance(locale) {
   return locale === "ar"
-    ? "خريطة المقاعد مفتوحة ويمكنك تعديل اختيارك. اختر المقاعد التي تريدها، ثم أكدها للعودة إلى الدفع. لم يتم تأكيد الحجز بعد."
+    ? "خريطة المقاعد مفتوحة ويمكنك تعديل اختيارك. اختر المقاعد التي تريدها، ثم أكدها للعودة إلى مراجعة إتمام الحجز. لم يتم تأكيد الحجز بعد."
     : "The seat map is open and your seats are editable. Select the seats you want, then confirm them to return to checkout. The booking is not confirmed yet.";
 }
 
@@ -75,15 +75,65 @@ function cancelledSummaryGuidance(booking, locale) {
 function preservedCheckoutGuidance(pendingOrder, locale) {
   const seats = Array.isArray(pendingOrder?.seats) ? pendingOrder.seats.filter(Boolean) : [];
   if (locale === "ar") {
-    return `تم حفظ خطوة الدفع غير المكتملة${seats.length ? ` للمقاعد ${seats.join("، ")}` : ""}، لكنها غير معروضة الآن. اطلب العودة إلى الدفع لعرضها، أو اطلب تعديل المقاعد. لم يتم تأكيد الحجز بعد.`;
+    return `تم حفظ مراجعة إتمام الحجز${seats.length ? ` للمقاعد ${seats.join("، ")}` : ""}، لكنها غير معروضة الآن. اطلب العودة إلى شاشة المراجعة لعرضها، أو اطلب تعديل المقاعد. لن يتم إرسال دفعة أو حجز.`;
   }
-  return `Your unpaid checkout${seats.length ? ` for seats ${seats.join(", ")}` : ""} is preserved but is not currently shown. Ask to return to checkout to display it, or ask to edit seats. The booking is not confirmed yet.`;
+  return `Your checkout review${seats.length ? ` for seats ${seats.join(", ")}` : ""} is preserved but is not currently shown. Ask to return to checkout to display it, or ask to edit seats. No payment or reservation will be submitted.`;
 }
 
-function historyGuidance(locale) {
+const emptyBookingHistoryClaim = (value) => /\b(?:no|zero)\s+(?:(?:current|active|saved|recent|existing|previous|on-device)\s+){0,3}(?:bookings?|reservations?|booking summaries?)\b|\b(?:do(?:n't| not)|can(?:not|'t)|could(?:n't| not)|did(?:n't| not)|am unable to)\s+(?:see|find|locate|access|have)\b[\s\S]{0,70}\b(?:bookings?|reservations?|booking summaries?)\b|\b(?:there (?:are|is)|you have|i (?:can|could) find)\s+(?:currently\s+)?(?:no|not any)\b[\s\S]{0,50}\b(?:bookings?|reservations?|booking summaries?)\b|(?:لا توجد|لا يوجد|ليس لديك|ما عندك|لم أجد|لا أجد|لم يتم العثور على|لا تظهر)[\s\S]{0,60}(?:حجوزات|حجز)/iu.test(value);
+
+const activeOnlyHistoryClaim = (value) => /\b(?:active|current)\s+(?:bookings?|reservations?|booking summaries?)\b|(?:حجوزات|حجز)[\s\S]{0,20}(?:نشط|نشطة|حالي|حالية)/iu.test(value);
+
+function authoritativeHistoryState(stage, bookingHistory) {
+  if (stage?.view !== "history") return null;
+  const activeOnly = bookingHistory?.activeOnly === true || stage?.historyFilter === "active";
+  if (bookingHistory?.storageUnavailable === true || stage?.storageUnavailable === true) {
+    return { bookings: [], activeOnly, hasActive: false, storageUnavailable: true };
+  }
+  const suppliedBookings = Array.isArray(bookingHistory?.bookings)
+    ? bookingHistory.bookings
+    : Array.isArray(stage?.bookings)
+      ? stage.bookings
+      : null;
+  if (!suppliedBookings) return null;
+  const bookings = suppliedBookings.filter(Boolean);
+  const hasActive = typeof bookingHistory?.hasActive === "boolean"
+    ? bookingHistory.hasActive
+    : bookings.some((booking) => (
+      booking?.cancelled !== true
+      && !String(booking?.bookingStatus || booking?.status || "").toLowerCase().startsWith("cancelled")
+    ));
+  return { bookings, activeOnly, hasActive };
+}
+
+function unavailableHistoryGuidance(locale) {
   return locale === "ar"
-    ? "ملخصات حجوزاتك المحفوظة على هذا الجهاز ظاهرة الآن. اختر حجزاً لعرض التفاصيل، أو استخدم زر إلغاء الحجز الخاص به."
-    : "Your current on-device booking summaries are shown. Select one to view its details, or use its Cancel booking button.";
+    ? "يتعذر قراءة ملخصات الحجز المحفوظة على هذا الجهاز الآن. أعد تفعيل تخزين الموقع ثم حاول مرة أخرى. لا يمكنني تأكيد وجود ملخصات أو عدم وجودها حتى تتم استعادة التخزين."
+    : "Saved booking summaries cannot be read from this device right now. Restore site storage and try again. I cannot confirm whether summaries exist until storage is available.";
+}
+
+function historyGuidance(locale, { count = null, activeOnly = false } = {}) {
+  if (locale === "ar") {
+    if (Number.isInteger(count)) {
+      return `يظهر الآن ${count} من ملخصات ${activeOnly ? "حجوزاتك الحالية" : "حجوزاتك"} المحفوظة على هذا الجهاز. اختر ملخصاً لعرض التفاصيل، أو استخدم زر تسجيله كملغى. هذه سجلات محفوظة على الجهاز وليست تأكيدات من مزود الحجز.`;
+    }
+    return "ملخصات حجوزاتك المحفوظة على هذا الجهاز ظاهرة الآن. اختر ملخصاً لعرض التفاصيل، أو استخدم زر تسجيله كملغى.";
+  }
+  if (Number.isInteger(count)) {
+    return `${count} ${activeOnly ? "current " : ""}on-device booking ${count === 1 ? "summary is" : "summaries are"} shown. Select one to view its details, or use its Mark cancelled button. These are device records, not provider confirmations.`;
+  }
+  return "Your current on-device booking summaries are shown. Select one to view its details, or use its Mark cancelled button.";
+}
+
+function emptyHistoryGuidance(locale, { activeOnly = false } = {}) {
+  if (locale === "ar") {
+    return activeOnly
+      ? "لا توجد ملخصات حجوزات حالية محفوظة على هذا الجهاز."
+      : "لا توجد ملخصات حجوزات محفوظة على هذا الجهاز.";
+  }
+  return activeOnly
+    ? "No active booking summaries are saved on this device."
+    : "No booking summaries are saved on this device.";
 }
 
 const normalizeMatchText = (value) => String(value || "")
@@ -193,20 +243,50 @@ function wrongDiscoveryQuestion(value, stage) {
 function staleProgressionQuestion(value, stage, pendingOrder, locale) {
   const asksMovie = /\b(?:what|which)\s+(?:movie|film)\b|\bwhat\b[\s\S]{0,35}\b(?:like|want)\s+to\s+(?:watch|see)\b|(?:أي|اي|ما)\s+(?:فيلم|الفيلم)|ماذا\s+(?:تريد|تفضل)[\s\S]{0,25}(?:تشاهد|مشاهدة)/iu.test(value);
   const asksShowtime = /\b(?:what|which)\s+(?:showtime|time|session)\b|\bwhen\b[\s\S]{0,30}\b(?:watch|see|go)\b|(?:أي|اي|ما)\s+(?:وقت|موعد|عرض)|متى[\s\S]{0,25}(?:العرض|تشاهد)/iu.test(value);
+  const asksSeats = /\b(?:choose|select|pick|tap)\b[\s\S]{0,45}\bseats?\b|(?:اختر|حدد|اضغط)[\s\S]{0,45}(?:المقاعد|مقاعد)/iu.test(value);
+  if (stage?.view === "movies" && (asksShowtime || asksSeats)) return discoveryStepGuidance(stage, locale);
   if (stage?.view === "showtimes" && asksMovie) {
     const title = clean(stage.movie?.title);
     return locale === "ar"
       ? `${title ? `تم اختيار ${title}. ` : "تم اختيار الفيلم. "}اختر أحد مواعيد العرض الظاهرة.`
       : `${title ? `${title} is selected. ` : "The movie is selected. "}Choose one of the displayed showtimes.`;
   }
+  if (stage?.view === "showtimes" && asksSeats) return discoveryStepGuidance(stage, locale);
   if (stage?.view === "seatmap" && (asksMovie || asksShowtime)) return seatMapGuidance(locale);
   if (stage?.view === "checkout" && (asksMovie || asksShowtime)) return checkoutGuidance(stage, pendingOrder, locale);
   return null;
 }
 
-export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, locale = "en" } = {}) {
+export function guardAgentStateClaim(text, {
+  stage = {},
+  pendingOrder = null,
+  locale = "en",
+  bookingHistory = null,
+} = {}) {
   const value = clean(text);
   if (!value) return value;
+
+  const authoritativeHistory = authoritativeHistoryState(stage, bookingHistory);
+  if (authoritativeHistory) {
+    if (authoritativeHistory.storageUnavailable) {
+      return unavailableHistoryGuidance(locale);
+    }
+    if (!authoritativeHistory.bookings.length) {
+      return emptyHistoryGuidance(locale, { activeOnly: authoritativeHistory.activeOnly });
+    }
+    if (emptyBookingHistoryClaim(value)) {
+      const claimNeedsActiveBooking = activeOnlyHistoryClaim(value);
+      const contradictsVisibleHistory = claimNeedsActiveBooking
+        ? authoritativeHistory.hasActive
+        : authoritativeHistory.bookings.length > 0;
+      if (contradictsVisibleHistory) {
+        return historyGuidance(locale, {
+          count: authoritativeHistory.bookings.length,
+          activeOnly: authoritativeHistory.activeOnly,
+        });
+      }
+    }
+  }
 
   const requiredClarification = requiredDiscoveryClarification(stage, locale);
   if (requiredClarification) return requiredClarification;
@@ -238,8 +318,8 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
     && stage.candidateRefs.length
     && referenceOnlyCancellationPrompt(value)) {
     return locale === "ar"
-      ? "اختر أحد الحجوزات الحالية الظاهرة باسم الفيلم أو بمرجع الحجز."
-      : "Choose one of the current bookings shown, by movie title or booking reference.";
+      ? "اختر أحد الملخصات الحالية الظاهرة باسم الفيلم أو بمرجع الجهاز."
+      : "Choose one of the current summaries shown, by movie title or device reference.";
   }
 
   const visibleCheckout = stage?.view === "checkout";
@@ -249,7 +329,7 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
   if (seatEditRefusal(value) && editableCheckout) {
     if (preservedCheckout) return preservedCheckoutGuidance(pendingOrder, locale);
     return locale === "ar"
-      ? "يمكنك تغيير المقاعد قبل إكمال الدفع. اختر تعديل المقاعد على الشاشة، أو قل تعديل المقاعد."
+      ? "يمكنك تغيير المقاعد قبل إكمال مراجعة إتمام الحجز. اختر تعديل المقاعد على الشاشة، أو قل تعديل المقاعد."
       : "You can change seats before completing checkout. Choose Edit seats on screen, or say edit seats.";
   }
   if (seatEditRefusal(value) && editableSeatMap) return seatMapGuidance(locale);
@@ -266,6 +346,8 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
         ? "اختر موعد عرض محدداً من الخيارات الظاهرة لفتح خريطة المقاعد."
         : "Choose one exact displayed showtime to open the seat map.";
     }
+    const visibleDiscoveryStep = discoveryStepGuidance(stage, locale);
+    if (visibleDiscoveryStep) return visibleDiscoveryStep;
     return clean(stage?.question || stage?.error) || (locale === "ar"
       ? "خريطة المقاعد غير معروضة بعد."
       : "The seat map is not displayed yet.");
@@ -281,7 +363,7 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
     }
     if (booking) return savedSummaryGuidance(booking, locale);
     return clean(stage?.question || stage?.error) || (locale === "ar"
-      ? "شاشة الدفع غير معروضة بعد. تابع من الخطوة الظاهرة على الشاشة."
+      ? "شاشة مراجعة إتمام الحجز غير معروضة بعد. تابع من الخطوة الظاهرة على الشاشة."
       : "Checkout is not displayed yet. Continue from the step shown on screen.");
   }
 
@@ -292,7 +374,11 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
     || bookingSummaryDisplayClaim(value)
     || checkoutInstructionClaim(value);
   if (!transactionClaim) return value;
-  if (stage?.view === "history") return historyGuidance(locale);
+  if (stage?.view === "history") {
+    return historyGuidance(locale, authoritativeHistory
+      ? { count: authoritativeHistory.bookings.length, activeOnly: authoritativeHistory.activeOnly }
+      : undefined);
+  }
   if (visibleCheckout) return checkoutGuidance(stage, pendingOrder, locale);
   if (preservedCheckout) return preservedCheckoutGuidance(pendingOrder, locale);
   if (editableSeatMap) return seatMapGuidance(locale);
@@ -309,6 +395,7 @@ export function guardAgentStateClaim(text, { stage = {}, pendingOrder = null, lo
     || booking.paymentStatus === "simulated_not_charged"
     || booking.bookingStatus === "confirmed_demo"
     || booking.bookingStatus === "summary_saved"
+    || booking.bookingStatus === "locally_stored"
   ));
   if (isSavedSummary) return savedSummaryGuidance(booking, locale);
   const visibleDiscoveryStep = discoveryStepGuidance(stage, locale);

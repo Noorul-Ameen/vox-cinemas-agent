@@ -283,6 +283,9 @@ export function normalizeMovieInformationCatalog(contentCatalog, fetchedAt = new
     region: REGION,
     sourceUrl: MOVIE_INFORMATION_SOURCE_URL,
     sourcePageUrl: MOVIE_INFORMATION_PAGE_URL,
+    sourceRecordCount: source.length,
+    acceptedRecordCount: movies.length,
+    rejectedRecordCount: source.length - movies.length,
     movies,
   });
 }

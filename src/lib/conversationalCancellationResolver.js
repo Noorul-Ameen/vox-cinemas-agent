@@ -1,4 +1,6 @@
 import { assessCancellationEligibility } from "./cancellationEligibility.js";
+import { CINEMA_ALIASES } from "./cinemaRouting.js";
+import { findCrossScriptMovieTitleRange } from "./crossScriptMovieTitles.js";
 
 const DUBAI_DATE_PARTS = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Dubai",
@@ -43,6 +45,20 @@ const SPOKEN_NUMBERS = Object.freeze({
   nine: "9",
   ten: "10",
 });
+
+const ARABIC_SPOKEN_CLOCK_HOURS = new Map([
+  ["الواحده", 1],
+  ["الاولي", 1],
+  ["الثانيه", 2],
+  ["الثالثه", 3],
+  ["الرابعه", 4],
+  ["الخامسه", 5],
+  ["السادسه", 6],
+  ["السابعه", 7],
+  ["الثامنه", 8],
+  ["التاسعه", 9],
+  ["العاشره", 10],
+]);
 
 const MONTHS = new Map([
   ["january", 1], ["jan", 1], ["يناير", 1],
@@ -114,10 +130,31 @@ const CINEMA_STOP_WORDS = new Set([
 
 const INTENT_WORDS = new Set([
   "cancel", "cancellation", "refund", "void", "please", "booking", "reservation", "ticket", "tickets",
+  "select", "choose", "pick", "open", "view", "show",
+  "detail", "details",
   "my", "the", "this", "that", "one", "for", "at", "on", "made", "i", "want", "need", "to",
   "it", "current", "active", "upcoming", "selected", "would", "like", "can", "could", "you", "me",
+  "id", "its", "d",
+  "mean", "meant", "sorry", "actually", "instead",
+  "reference", "ref", "movie", "film", "cinema", "location", "showtime", "time", "date",
+  "رقم", "مرجع", "المرجع", "فيلم", "الفيلم", "سينما", "السينما", "تاريخ", "وقت", "عرض",
   "الغ", "الغي", "الغاء", "لغ", "الحجز", "حجز", "حجزي", "تذكره", "تذاكر", "من", "في", "هذا", "هذه",
-  "اريد", "ابي", "ابغي", "ابغى", "لو", "سمحت", "من", "فضلك", "الحالي", "القادم",
+  "اريد", "ابي", "ابغي", "ابغى", "ممكن", "تلغي", "رجع", "استرد", "استرداد", "لو", "سمحت", "من", "فضلك", "الحالي", "القادم",
+  "افتح", "فتح", "اختر", "اختار", "اعرض", "اظهر", "شوف", "وريني", "تفاصيل", "التفاصيل",
+]);
+const TEMPORAL_SELECTOR_WORDS = new Set([
+  ...MONTHS.keys(),
+  ...WEEKDAYS.keys(),
+  ...Object.keys(ORDINALS),
+  "today", "tomorrow", "tonight", "day", "after", "morning", "afternoon", "evening", "night",
+  "am", "pm", "last", "number",
+  "اليوم", "غد", "غدا", "الغد", "بكرا", "باكر", "يوم", "بتاريخ", "الساعه", "ساعه",
+  "الليله", "صباح", "ظهر", "مساء", "ليل",
+]);
+const CONNECTOR_WORDS = new Set([
+  "in", "from", "with", "of", "is", "are", "what", "tell", "about", "yes", "yeah", "think", "probably", "maybe",
+  "mean", "meant", "sorry", "actually", "instead",
+  "نعم", "ايوه", "ايوا", "هو", "هي", "اعتقد", "غالبا", "يمكن", "مع", "عن", "و",
 ]);
 
 const toAsciiDigits = (value) => String(value || "").replace(/[٠-٩۰-۹]/g, (digit) => ARABIC_DIGITS[digit] || digit);
@@ -170,24 +207,24 @@ function bookingDateKey(booking) {
 function parseDateCriterion(query, now) {
   const today = dateKeyFromDate(now);
   if (/\bday after tomorrow\b|(?:\u0628\u0639\u062f\s+\u063a\u062f|\u0628\u0639\u062f\s+\u0628\u0643\u0631\u0627)/u.test(query)) {
-    return { kind: "exact", key: addCalendarDays(today, 2), source: "relative_date" };
+    return { kind: "exact", key: addCalendarDays(today, 2), source: "relative_date", selectorTokens: ["day", "after", "tomorrow"] };
   }
-  if (/\btomorrow(?:s)?\b|(?:\u063a\u062f\u0627|\u0627\u0644\u063a\u062f|\u0628\u0643\u0631\u0627|\u0628\u0627\u0643\u0631)/u.test(query)) {
-    return { kind: "exact", key: addCalendarDays(today, 1), source: "relative_date" };
+  if (/\btomorrow(?:s)?\b|(?:\u063a\u062f\u0627?|\u0627\u0644\u063a\u062f|\u0628\u0643\u0631\u0627|\u0628\u0627\u0643\u0631)/u.test(query)) {
+    return { kind: "exact", key: addCalendarDays(today, 1), source: "relative_date", selectorTokens: ["tomorrow"] };
   }
   if (/\btoday(?:s)?\b|\btonight(?:s)?\b|(?:\u0627\u0644\u064a\u0648\u0645|\u0627\u0644\u0644\u064a\u0644\u0647)/u.test(query)) {
-    return { kind: "exact", key: today, source: "relative_date" };
+    return { kind: "exact", key: today, source: "relative_date", selectorTokens: ["today", "tonight"] };
   }
 
   const iso = query.match(/\b(20\d{2})[-/](0?[1-9]|1[0-2])[-/](0?[1-9]|[12]\d|3[01])\b/);
   if (iso) {
-    return { kind: "exact", key: `${iso[1]}-${String(Number(iso[2])).padStart(2, "0")}-${String(Number(iso[3])).padStart(2, "0")}`, source: "date" };
+    return { kind: "exact", key: `${iso[1]}-${String(Number(iso[2])).padStart(2, "0")}-${String(Number(iso[3])).padStart(2, "0")}`, source: "date", selectorTokens: [iso[0]] };
   }
 
   const numeric = query.match(/\b(0?[1-9]|[12]\d|3[01])[/-](0?[1-9]|1[0-2])(?:[/-](20\d{2}|\d{2}))?\b/);
   if (numeric) {
     const year = numeric[3] ? (numeric[3].length === 2 ? Number(`20${numeric[3]}`) : Number(numeric[3])) : null;
-    return { kind: "parts", day: Number(numeric[1]), month: Number(numeric[2]), year, source: "date" };
+    return { kind: "parts", day: Number(numeric[1]), month: Number(numeric[2]), year, source: "date", selectorTokens: [numeric[0]] };
   }
 
   const tokens = query.split(" ");
@@ -203,6 +240,7 @@ function parseDateCriterion(query, now) {
         month: MONTHS.get(tokens[monthIndex]),
         year: yearToken ? Number(yearToken) : null,
         source: "date",
+        selectorTokens: [dayToken, tokens[monthIndex], yearToken].filter(Boolean),
       };
     }
   }
@@ -210,10 +248,10 @@ function parseDateCriterion(query, now) {
   const ordinalDay = query.match(/\b(?:on\s+(?:the\s+)?|for\s+(?:the\s+)?)([12]?\d|3[01])(?:st|nd|rd|th)?\b/)
     || query.match(/\b([12]?\d|3[01])(?:st|nd|rd|th)\b/)
     || query.match(/(?:\u064a\u0648\u0645|\u0628\u062a\u0627\u0631\u064a\u062e|\u062a\u0627\u0631\u064a\u062e)\s+([12]?\d|3[01])\b/u);
-  if (ordinalDay) return { kind: "parts", day: Number(ordinalDay[1]), month: null, year: null, source: "date" };
+  if (ordinalDay) return { kind: "parts", day: Number(ordinalDay[1]), month: null, year: null, source: "date", selectorTokens: [ordinalDay[1]] };
 
   const weekdayToken = tokens.find((token) => WEEKDAYS.has(token));
-  if (weekdayToken) return { kind: "weekday", weekday: WEEKDAYS.get(weekdayToken), source: "natural_date" };
+  if (weekdayToken) return { kind: "weekday", weekday: WEEKDAYS.get(weekdayToken), source: "natural_date", selectorTokens: [weekdayToken] };
   return null;
 }
 
@@ -234,25 +272,51 @@ function dateMatches(booking, criterion) {
   return false;
 }
 
-function parseClockMinutes(value) {
+function parseClockCriterion(value) {
   const query = normalizeCancellationText(value);
-  let match = query.match(/\b([01]?\d|2[0-3]):([0-5]\d)\s*(am|pm|\u0635|\u0645|\u0635\u0628\u0627\u062d\u0627|\u0645\u0633\u0627\u0621)?\b/u);
-  if (!match) match = query.match(/\b(1[0-2]|0?[1-9])\s*(am|pm|\u0635|\u0645|\u0635\u0628\u0627\u062d\u0627|\u0645\u0633\u0627\u0621)\b/u);
-  if (!match) return null;
-  let hour = Number(match[1]);
-  const minute = Number(match[2] && /^\d{2}$/.test(match[2]) ? match[2] : 0);
-  const suffix = String(match[3] || match[2] || "").toLowerCase();
+  let match = query.match(/(?:^|[^\p{L}\p{N}])([01]?\d|2[0-3]):([0-5]\d)\s*(am|pm|\u0635|\u0645|\u0635\u0628\u0627\u062d\u0627|\u0645\u0633\u0627\u0621)?(?=$|[^\p{L}\p{N}])/u);
+  if (!match) match = query.match(/(?:^|[^\p{L}\p{N}])(1[0-2]|0?[1-9])\s*(am|pm|\u0635|\u0645|\u0635\u0628\u0627\u062d\u0627|\u0645\u0633\u0627\u0621)(?=$|[^\p{L}\p{N}])/u);
+  let hour;
+  let minute = 0;
+  let suffix = "";
+  let selectorTokens = [];
+  let hourToken = "";
+  if (match) {
+    hour = Number(match[1]);
+    minute = Number(match[2] && /^\d{2}$/.test(match[2]) ? match[2] : 0);
+    suffix = String(match[3] || match[2] || "").toLowerCase();
+    selectorTokens = normalizedTokens(match[0]);
+    hourToken = String(match[1]);
+  } else {
+    const tokens = normalizedTokens(query);
+    const hourIndex = tokens.findIndex((token) => ARABIC_SPOKEN_CLOCK_HOURS.has(token));
+    const spokenSuffix = hourIndex >= 0 ? tokens[hourIndex + 1] : "";
+    if (hourIndex < 0 || !["ص", "م", "صباح", "صباحا", "مساء"].includes(spokenSuffix)) return null;
+    hour = ARABIC_SPOKEN_CLOCK_HOURS.get(tokens[hourIndex]);
+    suffix = spokenSuffix;
+    selectorTokens = [tokens[hourIndex], spokenSuffix];
+    hourToken = tokens[hourIndex];
+  }
   if (["pm", "م", "مساء"].includes(suffix) && hour < 12) hour += 12;
-  if (["am", "ص", "صباحا"].includes(suffix) && hour === 12) hour = 0;
-  return hour * 60 + minute;
+  if (["am", "ص", "صباح", "صباحا"].includes(suffix) && hour === 12) hour = 0;
+  return {
+    minutes: hour * 60 + minute,
+    hourToken,
+    selectorTokens,
+  };
+}
+
+function parseClockMinutes(value) {
+  return parseClockCriterion(value)?.minutes ?? null;
 }
 
 function parseTimeBand(query, exactMinutes) {
   if (exactMinutes !== null) return null;
-  if (/\bmorning\b|\u0635\u0628\u0627\u062d/u.test(query)) return "morning";
-  if (/\bafternoon\b|\u0638\u0647\u0631/u.test(query)) return "afternoon";
-  if (/\bevening\b|\u0645\u0633\u0627\u0621/u.test(query)) return "evening";
-  if (/\b(?:night|tonight)\b|\u0644\u064a\u0644/u.test(query)) return "night";
+  const tokens = new Set(normalizedTokens(query));
+  if (/\bmorning\b/u.test(query) || ["صباح", "صباحا", "الصباح"].some((token) => tokens.has(token))) return "morning";
+  if (/\bafternoon\b/u.test(query) || ["ظهر", "ظهرا", "الظهر"].some((token) => tokens.has(token))) return "afternoon";
+  if (/\bevening\b/u.test(query) || ["مساء", "المساء"].some((token) => tokens.has(token))) return "evening";
+  if (/\b(?:night|tonight)\b/u.test(query) || ["ليل", "ليلا", "الليل", "الليله"].some((token) => tokens.has(token))) return "night";
   return null;
 }
 
@@ -308,7 +372,7 @@ function findReferenceCriterion(rawText, query, bookings) {
   });
   if (known) return { key: referenceKey(bookingReference(known)), raw: bookingReference(known), known: true };
 
-  const explicit = toAsciiDigits(rawText).match(/(?:booking\s+)?(?:reference|ref)\s*[:#-]?\s*([a-z0-9][a-z0-9-]{2,})/i)
+  const explicit = toAsciiDigits(rawText).match(/(?:booking\s+)?(?:reference\b|ref\b)\s*[:#-]?\s*([a-z0-9][a-z0-9-]{2,})/i)
     || normalizeCancellationText(rawText).match(/(?:\u0631\u0642\u0645\s+\u0627\u0644\u062d\u062c\u0632|\u0645\u0631\u062c\u0639\s+\u0627\u0644\u062d\u062c\u0632)\s*[:#-]?\s*([a-z0-9][a-z0-9-]{2,})/iu);
   return explicit ? { key: referenceKey(explicit[1]), raw: explicit[1], known: false } : null;
 }
@@ -323,30 +387,92 @@ function queryMentionsMovie(query, title) {
   if (!normalizedTitle) return false;
   if (` ${normalizedQuery} `.includes(` ${normalizedTitle} `)) return true;
   const titleTokens = titleWords(normalizedTitle);
-  const queryTokens = new Set(normalizedTokens(normalizedQuery).filter((token) => !INTENT_WORDS.has(token)));
-  if (titleTokens.length === 1) return titleTokens[0].length >= 3 && queryTokens.has(titleTokens[0]);
+  const queryTokenList = normalizedTokens(normalizedQuery).filter((token) => !INTENT_WORDS.has(token));
+  const queryTokens = new Set(queryTokenList);
+  if (titleTokens.length === 1 && titleTokens[0].length >= 3 && queryTokens.has(titleTokens[0])) return true;
   const matched = titleTokens.filter((token) => queryTokens.has(token));
-  return matched.length >= 2 && matched.length >= Math.min(2, titleTokens.length);
+  if (matched.length >= 2 && matched.length >= Math.min(2, titleTokens.length)) return true;
+  return Boolean(findCrossScriptMovieTitleRange(normalizedTokens(normalizedQuery), title));
 }
 
 function cinemaWords(value) {
-  return normalizedTokens(value).filter((token) => !CINEMA_STOP_WORDS.has(token));
+  return normalizedTokens(value).filter((token) => !CINEMA_STOP_WORDS.has(token) && /[\p{L}\p{N}]/u.test(token));
+}
+
+function matchingCinemaAliases(query, cinema) {
+  const normalizedCinema = normalizeCancellationText(cinema).replace(/\bcenter\b/g, "centre");
+  for (const aliases of Object.values(CINEMA_ALIASES)) {
+    const belongsToCinema = aliases.some((alias) => {
+      const normalizedAlias = normalizeCancellationText(alias).replace(/\bcenter\b/g, "centre");
+      return normalizedAlias.length >= 4 && ` ${normalizedCinema} `.includes(` ${normalizedAlias} `);
+    });
+    if (!belongsToCinema) continue;
+    return aliases.filter((alias) => {
+      const normalizedAlias = normalizeCancellationText(alias);
+      return normalizedAlias && ` ${query} `.includes(` ${normalizedAlias} `);
+    });
+  }
+  return [];
 }
 
 function hasUnrecognizedSelector(query, matchedBy) {
-  if (matchedBy.length) return false;
-  return normalizedTokens(query).some((token) => !INTENT_WORDS.has(token));
+  const criteria = arguments[2] || {};
+  const consumed = new Set();
+  const addConsumed = (value) => normalizedTokens(normalizeSpokenNumbers(value)).forEach((token) => consumed.add(token));
+  for (const movie of Array.isArray(criteria.movie) ? criteria.movie : []) {
+    addConsumed(movie);
+    const queryTokenList = normalizedTokens(normalizeSpokenNumbers(query));
+    const range = findCrossScriptMovieTitleRange(queryTokenList, movie);
+    if (range) range.tokens.forEach((token) => consumed.add(token));
+  }
+  for (const cinema of Array.isArray(criteria.cinema) ? criteria.cinema : []) {
+    addConsumed(cinema);
+    matchingCinemaAliases(query, cinema).forEach(addConsumed);
+    const words = cinemaWords(cinema);
+    if (words.includes("mall") && words.includes("emirates")) consumed.add("moe");
+    if (words.includes("city") && words.includes("centre") && words.includes("mirdif")) consumed.add("ccm");
+  }
+  if (criteria.reference) addConsumed(criteria.reference);
+  for (const token of Array.isArray(criteria.date?.selectorTokens) ? criteria.date.selectorTokens : []) addConsumed(token);
+  if (Number.isInteger(criteria.date?.day)) {
+    addConsumed(criteria.date.day);
+    for (const suffix of ["st", "nd", "rd", "th"]) addConsumed(`${criteria.date.day}${suffix}`);
+  }
+  for (const token of Array.isArray(criteria.showtimeTokens) ? criteria.showtimeTokens : []) addConsumed(token);
+  if (criteria.ordinal !== undefined && criteria.ordinal !== null) addConsumed(criteria.ordinal);
+  const temporalMatched = matchedBy.some((item) => ["date", "relative_date", "natural_date", "showtime", "time_band", "ordinal"].includes(item));
+  const substantiveMatched = matchedBy.some((item) => ["reference", "movie", "cinema", "context_movie", "context_booking"].includes(item));
+  const contextualOne = substantiveMatched && (/\bthe\s+one\b/.test(query) || /\bone(?:\s+please)?\s*$/.test(query))
+    || temporalMatched && (/\bthe\s+one\b/.test(query) || /\bone(?:\s+please)?\s*$/.test(query));
+  return normalizedTokens(normalizeSpokenNumbers(query)).some((token) => {
+    if (INTENT_WORDS.has(token) || consumed.has(token)) return false;
+    if (substantiveMatched && CONNECTOR_WORDS.has(token)) return false;
+    if (contextualOne && token === "1") return false;
+    if (temporalMatched && TEMPORAL_SELECTOR_WORDS.has(token)) return false;
+    return true;
+  });
 }
 
-function queryMentionsCinema(query, cinema) {
+function queryMentionsCinema(query, cinema, ignoredTokens = new Set()) {
   const normalizedCinema = normalizeCancellationText(cinema);
   if (!normalizedCinema) return false;
   if (` ${query} `.includes(` ${normalizedCinema} `)) return true;
+  if (matchingCinemaAliases(query, cinema).length) return true;
   const words = cinemaWords(cinema);
   const queryTokens = new Set(normalizedTokens(query));
+  if (queryTokens.has("moe") && words.includes("mall") && words.includes("emirates")) return true;
+  if (queryTokens.has("ccm") && words.includes("city") && words.includes("centre") && words.includes("mirdif")) return true;
   if (!words.length) return false;
   if (words.length === 1) return words[0].length >= 4 && queryTokens.has(words[0]);
-  return words.every((word) => queryTokens.has(word));
+  if (words.every((word) => queryTokens.has(word))) return true;
+  const distinctiveQueryWords = [...queryTokens].filter((token) => token.length >= 4
+    && !ignoredTokens.has(token)
+    && !CINEMA_STOP_WORDS.has(token)
+    && !INTENT_WORDS.has(token)
+    && !CONNECTOR_WORDS.has(token)
+    && !TEMPORAL_SELECTOR_WORDS.has(token)
+    && !/^\d/.test(token));
+  return distinctiveQueryWords.length > 0 && distinctiveQueryWords.every((token) => words.includes(token));
 }
 
 function contextMovieMatches(booking, context) {
@@ -458,6 +584,7 @@ export function resolveConversationalCancellation({
   conversationContext = {},
   now = new Date(),
   cutoffMinutes,
+  ignoreLifecycle = false,
 } = {}) {
   const safeBookings = Array.isArray(bookings) ? bookings.filter((booking) => booking && typeof booking === "object") : [];
   const query = normalizeCancellationText(text);
@@ -478,7 +605,24 @@ export function resolveConversationalCancellation({
     if (!matches.length) return frozenResult({ status: "none", matchedBy, criteria, reason: "unknown_reference" });
   }
 
-  const ordinal = parseOrdinal(query);
+  const dateCriterion = parseDateCriterion(query, now);
+  const clockCriterion = parseClockCriterion(query);
+  let ordinal = parseOrdinal(query);
+  if (Number.isInteger(ordinal)
+    && dateCriterion?.kind === "parts"
+    && ordinal === dateCriterion.day) {
+    ordinal = null;
+  }
+  if (Number.isInteger(ordinal)
+    && /^\d+$/.test(clockCriterion?.hourToken || "")
+    && ordinal === Number(clockCriterion.hourToken)) {
+    ordinal = null;
+  }
+  if (Number.isInteger(ordinal)
+    && ordinal > displayed.length
+    && !/\b(?:booking|reservation|number)\b|(?:الحجز|حجز|رقم)/u.test(query)) {
+    ordinal = null;
+  }
   if (ordinal !== null) {
     matchedBy.push("ordinal");
     criteria.ordinal = ordinal;
@@ -507,17 +651,28 @@ export function resolveConversationalCancellation({
     }
   }
 
-  const dateCriterion = parseDateCriterion(query, now);
+  const contextualBooking = /\b(?:this|that|my|visible|current)\s+(?:booking|reservation)\b|^(?:cancel|refund|void)(?:\s+(?:it|this|that))?$|(?:هذا|هذه|حجزي|الحجز\s+الحالي)\s*(?:الحجز)?|^(?:الغي|الغاء|لغي|استرد|استرجع)(?:\s+(?:هذا|هذه|الحجز))?$/u.test(query);
+  if (contextualBooking && conversationContext?.currentBookingRef) {
+    matchedBy.push("context_booking");
+    criteria.contextBooking = true;
+    const currentBookingKey = referenceKey(conversationContext.currentBookingRef);
+    matches = matches.filter((booking) => referenceKey(bookingReference(booking)) === currentBookingKey);
+    if (!matches.length) {
+      return frozenResult({ status: "none", matchedBy, criteria, reason: "context_booking_unavailable" });
+    }
+  }
+
   if (dateCriterion) {
     matchedBy.push(dateCriterion.source);
     criteria.date = dateCriterion;
     matches = matches.filter((booking) => dateMatches(booking, dateCriterion));
   }
 
-  const exactMinutes = parseClockMinutes(query);
+  const exactMinutes = clockCriterion?.minutes ?? null;
   if (exactMinutes !== null) {
     matchedBy.push("showtime");
     criteria.showtimeMinutes = exactMinutes;
+    criteria.showtimeTokens = clockCriterion.selectorTokens;
     matches = matches.filter((booking) => parseClockMinutes(bookingShowtime(booking)) === exactMinutes);
   }
   const timeBand = parseTimeBand(query, exactMinutes);
@@ -527,7 +682,11 @@ export function resolveConversationalCancellation({
     matches = matches.filter((booking) => timeBandMatches(parseClockMinutes(bookingShowtime(booking)), timeBand));
   }
 
-  const cinemaMatches = safeBookings.filter((booking) => queryMentionsCinema(query, bookingCinema(booking)));
+  const consumedMovieTokens = new Set(
+    (Array.isArray(criteria.movie) ? criteria.movie : [])
+      .flatMap((movie) => normalizedTokens(normalizeSpokenNumbers(movie))),
+  );
+  const cinemaMatches = safeBookings.filter((booking) => queryMentionsCinema(query, bookingCinema(booking), consumedMovieTokens));
   if (cinemaMatches.length) {
     matchedBy.push("cinema");
     criteria.cinema = [...new Set(cinemaMatches.map(bookingCinema).filter(Boolean))];
@@ -535,7 +694,7 @@ export function resolveConversationalCancellation({
     matches = matches.filter((booking) => keys.has(referenceKey(bookingReference(booking))));
   }
 
-  if (hasUnrecognizedSelector(query, matchedBy)) {
+  if (hasUnrecognizedSelector(query, matchedBy, criteria)) {
     return frozenResult({ status: "none", matchedBy, criteria, reason: "unrecognized_selector" });
   }
 
@@ -551,6 +710,28 @@ export function resolveConversationalCancellation({
         || left.inputIndex - right.inputIndex;
     })
     .map(({ booking }) => booking);
+
+  if (ignoreLifecycle) {
+    const summaries = matches.map((booking) => candidateSummary(booking, displayed));
+    if (matches.length === 1) {
+      return frozenResult({
+        status: "unique",
+        booking: matches[0],
+        candidates: summaries,
+        matchedBy,
+        criteria,
+        reason: "unique_history_match",
+      });
+    }
+    return frozenResult({
+      status: "ambiguous",
+      candidates: summaries,
+      matchedBy,
+      criteria,
+      differentiators: focusedDifferentiators(summaries),
+      reason: "multiple_history_matches",
+    });
+  }
 
   const assessed = matches.map((booking) => ({
     booking,

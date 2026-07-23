@@ -98,8 +98,8 @@ assert.match(
 
 assert.match(
   VOXI_AGENT_PROMPT,
-  /guest must click or tap the checkout controls themselves/i,
-  "secure payment must remain a guest-controlled click or tap",
+  /guest must click or tap Save booking summary themselves/i,
+  "the on-device summary must remain a guest-controlled click or tap",
 );
 assert.match(
   VOXI_AGENT_PROMPT,

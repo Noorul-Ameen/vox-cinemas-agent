@@ -181,24 +181,24 @@ const CITY_ALIASES = Object.freeze([
 ]);
 
 const GENRE_ALIASES = Object.freeze([
-  ["Science Fiction", ["science fiction", "sci fi", "sci-fi", "scifi"]],
-  ["Animation", ["animation", "animated", "cartoon", "رسوم متحركة", "انيميشن"]],
-  ["Documentary", ["documentary", "وثائقي"]],
-  ["Adventure", ["adventure", "مغامرات", "مغامرة"]],
-  ["Thriller", ["thriller", "إثارة", "اثارة"]],
-  ["Romance", ["romance", "romantic", "رومانسي"]],
-  ["Comedy", ["comedy", "funny", "كوميدي", "كوميديا"]],
-  ["Musical", ["musical", "موسيقي"]],
-  ["Action", ["action", "أكشن", "اكشن"]],
-  ["Horror", ["horror", "scary", "رعب"]],
-  ["Drama", ["drama", "دراما"]],
-  ["Family", ["family", "عائلي", "العائلة"]],
-  ["Crime", ["crime", "جريمة"]],
-  ["Sports", ["sports", "sport", "رياضي"]],
-  ["Fantasy", ["fantasy", "خيال", "فانتازيا"]],
-  ["Mystery", ["mystery", "mysteries", "غموض"]],
-  ["Biography", ["biography", "biographical", "سيرة ذاتية"]],
-  ["War", ["war", "war movie", "حرب"]],
+  ["Science Fiction", ["science fiction", "sci fi", "sci-fi", "scifi", "خيال علمي", "الخيال العلمي"]],
+  ["Animation", ["animation", "animated", "cartoon", "رسوم متحركة", "الرسوم المتحركة", "كرتوني", "كرتونية", "انيميشن"]],
+  ["Documentary", ["documentary", "وثائقي", "وثائقية", "الوثائقي", "الوثائقية"]],
+  ["Adventure", ["adventure", "مغامرات", "مغامرة", "المغامرات", "المغامرة"]],
+  ["Thriller", ["thriller", "إثارة", "اثارة", "الإثارة", "الاثارة", "تشويق"]],
+  ["Romance", ["romance", "romantic", "رومانسي", "رومانسية", "الرومانسي", "الرومانسية"]],
+  ["Comedy", ["comedy", "funny", "كوميدي", "كوميدية", "كوميديا", "الكوميدي", "الكوميدية", "الكوميديا"]],
+  ["Musical", ["musical", "موسيقي", "موسيقية", "الموسيقي", "الموسيقية"]],
+  ["Action", ["action", "أكشن", "اكشن", "الأكشن", "الاكشن"]],
+  ["Horror", ["horror", "scary", "رعب", "الرعب", "مرعب", "مرعبة"]],
+  ["Drama", ["drama", "دراما", "الدراما", "درامي", "درامية"]],
+  ["Family", ["family", "عائلي", "عائلية", "العائلي", "العائلية", "العائلة"]],
+  ["Crime", ["crime", "جريمة", "الجريمة", "جرائم"]],
+  ["Sports", ["sports", "sport", "رياضي", "رياضية", "الرياضي", "الرياضية"]],
+  ["Fantasy", ["fantasy", "خيال", "الخيال", "فانتازيا"]],
+  ["Mystery", ["mystery", "mysteries", "غموض", "الغموض"]],
+  ["Biography", ["biography", "biographical", "سيرة ذاتية", "السيرة الذاتية"]],
+  ["War", ["war", "war movie", "حرب", "الحرب", "حربي", "حربية"]],
   ["Western", ["western", "cowboy", "رعاة البقر"]],
   ["Film Noir", ["film noir", "noir"]],
 ]);
@@ -299,8 +299,12 @@ function canonicalDateSignal(input, { now = new Date(), timeZone = "Asia/Dubai" 
   const raw = String(input ?? "").normalize("NFKC").toLowerCase();
   const text = normalizeText(input);
   const today = dateInTimeZone(now, timeZone);
-  const directIso = raw.match(/\b(\d{4}-\d{2}-\d{2})\b/);
-  if (directIso) return { date: directIso[1], dateSignal: "explicit" };
+  const normalizedRaw = normalizeClockDigits(raw);
+  const directIso = normalizedRaw.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
+  if (directIso) {
+    const candidate = validCalendarDate(Number(directIso[1]), Number(directIso[2]), Number(directIso[3]));
+    return candidate ? { date: isoDate(candidate), dateSignal: "explicit" } : null;
+  }
 
   if (/\bday after tomorrow\b|بعد غد|بعد بكرة/.test(text)) {
     return { date: isoDate(addUtcDays(today, 2)), dateSignal: "day_after_tomorrow" };
@@ -311,11 +315,12 @@ function canonicalDateSignal(input, { now = new Date(), timeZone = "Asia/Dubai" 
   if (/\btonight\b|الليلة/.test(text)) return { date: isoDate(today), dateSignal: "tonight" };
   if (/\btoday\b|اليوم/.test(text)) return { date: isoDate(today), dateSignal: "today" };
 
-  const numeric = text.match(/(?:^|\D)(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?(?:\D|$)/);
+  const numeric = normalizedRaw.match(/(?:^|\D)(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?(?:\D|$)/);
   if (numeric) {
     const yearValue = Number(numeric[3]) || today.getUTCFullYear();
     const year = yearValue < 100 ? 2000 + yearValue : yearValue;
-    return { date: `${year}-${pad2(Number(numeric[2]))}-${pad2(Number(numeric[1]))}`, dateSignal: "explicit" };
+    const candidate = validCalendarDate(year, Number(numeric[2]), Number(numeric[1]));
+    return candidate ? { date: isoDate(candidate), dateSignal: "explicit" } : null;
   }
 
   const monthAliases = {
@@ -323,9 +328,16 @@ function canonicalDateSignal(input, { now = new Date(), timeZone = "Asia/Dubai" 
     may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8,
     september: 9, sept: 9, sep: 9, october: 10, oct: 10, november: 11, nov: 11,
     december: 12, dec: 12,
+    يناير: 1, فبراير: 2, مارس: 3, أبريل: 4, ابريل: 4, مايو: 5, يونيو: 6,
+    يوليو: 7, أغسطس: 8, اغسطس: 8, سبتمبر: 9, أكتوبر: 10, اكتوبر: 10,
+    نوفمبر: 11, ديسمبر: 12,
   };
   for (const [monthName, month] of Object.entries(monthAliases)) {
-    const match = text.match(new RegExp(`(?:\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${monthName}\\b|\\b${monthName}\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b)`));
+    const monthToken = escapeRegex(monthName);
+    const match = text.match(new RegExp(
+      `(?:^|\\s)(?:(?:يوم|بتاريخ)\\s+)?(?:(\\d{1,2})(?:st|nd|rd|th)?\\s+${monthToken}|${monthToken}\\s+(\\d{1,2})(?:st|nd|rd|th)?)(?=\\s|$)`,
+      "u",
+    ));
     if (match) {
       const day = Number(match[1] || match[2]);
       let year = today.getUTCFullYear();
@@ -347,12 +359,27 @@ function canonicalDateSignal(input, { now = new Date(), timeZone = "Asia/Dubai" 
     }
   }
 
-  const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-  const weekday = weekdays.findIndex((name) => phraseInText(text, name));
+  const weekdays = [
+    ["sunday", "الأحد", "الاحد"],
+    ["monday", "الإثنين", "الاثنين"],
+    ["tuesday", "الثلاثاء"],
+    ["wednesday", "الأربعاء", "الاربعاء"],
+    ["thursday", "الخميس"],
+    ["friday", "الجمعة"],
+    ["saturday", "السبت"],
+  ];
+  const weekday = weekdays.findIndex((aliases) => aliases.some((name) => phraseInText(text, name)));
   if (weekday >= 0) {
-    for (let offset = 0; offset < 8; offset += 1) {
+    const namedWeekday = weekdays[weekday][0];
+    const explicitlyNext = weekdays[weekday]
+      .slice(1)
+      .some((name) => new RegExp(
+        `(?:^|\\s)(?:يوم\\s+)?${escapeRegex(normalizeText(name))}\\s+(?:القادم(?:ة)?|الجاي(?:ة)?)(?=\\s|$)`,
+        "u",
+      ).test(text));
+    for (let offset = explicitlyNext ? 1 : 0; offset < 8; offset += 1) {
       const candidate = addUtcDays(today, offset);
-      if (candidate.getUTCDay() === weekday) return { date: isoDate(candidate), dateSignal: weekdays[weekday] };
+      if (candidate.getUTCDay() === weekday) return { date: isoDate(candidate), dateSignal: namedWeekday };
     }
   }
   return null;
@@ -723,7 +750,7 @@ export function extractDiscoveryPreferencePatch(input, {
     patch.recommendationIntent = "unsupported_language_afghan";
   }
 
-  const kidsFamilyRequest = /\b(?:kids?|children|childrens|family|families|family friendly)\b|أطفال|اطفال|عائلي|العائلة/.test(facetText);
+  const kidsFamilyRequest = /\b(?:kids?|children|childrens|family|families|family friendly)\b|أطفال|اطفال|عائلي|عائلية|العائلي|العائلية|العائلة/.test(facetText);
   const explicitKidsExperience = /\b(?:kids?\s+(?:cinema|experience|format)|in\s+kids|kids?\s+(?:at|showtime))\b|(?:سينما|تجربة|صيغة)\s+(?:الأطفال|الاطفال)/.test(facetText);
   const catalogExperiences = (movies || []).flatMap((item) => item?.experiences || item?.Experiences || []).filter(Boolean);
   const experience = findAliasValue(facetText, [
@@ -867,7 +894,7 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
   candidateSource = removeCanonicalAliases(candidateSource, patch.genre, GENRE_ALIASES);
   candidateSource = removeCanonicalAliases(candidateSource, patch.language, LANGUAGE_ALIASES);
   candidateSource = removeCanonicalAliases(candidateSource, patch.experience, EXPERIENCE_ALIASES);
-  if (patch.audience === "kids_family") candidateSource = candidateSource.replace(/\b(?:kids?|children|childrens|family|families|family friendly)\b|(?:أطفال|اطفال|عائلي|العائلة)/giu, " ");
+  if (patch.audience === "kids_family") candidateSource = candidateSource.replace(/\b(?:kids?|children|childrens|family|families|family friendly)\b|(?:أطفال|اطفال|عائلي|عائلية|العائلي|العائلية|العائلة)/giu, " ");
   candidateSource = candidateSource
     .replace(/\b\d{4}-\d{2}-\d{2}\b|\b(?:today|tomorrow|tonight|day after tomorrow|morning|afternoon|evening|late at night)\b|(?:اليوم|غدا|غداً|الليلة|بعد غد|صباح|بعد الظهر|مساء)/giu, " ")
     .replace(/\b\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?)?|\b\d{1,2}\s*(?:a\.?m\.?|p\.?m\.?)\b/giu, " ")
@@ -924,6 +951,19 @@ export function resolveDiscoveryMovieCandidate(movies, candidate) {
   const bestScore = Math.max(...scored.map((item) => item.score));
   const best = scored.filter((item) => item.score === bestScore);
   return resolvedItem.score === bestScore && best.length === 1 ? resolved : null;
+}
+
+/**
+ * Keeps common same-script matching synchronous and loads the bilingual
+ * resolver only when the fast path cannot identify a catalog movie.
+ */
+export async function resolveBilingualDiscoveryMovieCandidate(movies, candidate) {
+  const sameScript = resolveDiscoveryMovieCandidate(movies, candidate);
+  if (sameScript) return sameScript;
+  const list = uniqueMovieCatalog(movies);
+  if (!list.length) return null;
+  const { resolveCrossScriptMovieCandidate } = await import("./crossScriptMovieTitles.js");
+  return resolveCrossScriptMovieCandidate(list, candidate, movieTitle);
 }
 
 /** Clear first, then apply this turn's explicit values; a supplied value wins. */

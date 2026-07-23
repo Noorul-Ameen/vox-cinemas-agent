@@ -1,3 +1,5 @@
+import { sanitizeSensitiveConversationText } from "./sensitiveText.js";
+
 const VIEW_PROGRESS = Object.freeze({
   empty: "start",
   discovery: "requirements_discovery",
@@ -5,7 +7,7 @@ const VIEW_PROGRESS = Object.freeze({
   movies: "movie_selection",
   showtimes: "showtime_selection",
   seatmap: "seat_selection",
-  checkout: "payment",
+  checkout: "checkout_review",
   booking: "confirmation",
   history: "booking_history",
   offers: "offer_enquiry",
@@ -153,7 +155,7 @@ export function syncJourney(current, payload = {}) {
   const bookingStatus = activeBooking
     ? bookingSummaryStatus(activeBooking)
     : activeOrder
-      ? "payment_pending"
+      ? "review_pending"
       : (clearsMovie || clearsSession ? null : normalizeJourneyBookingStatus(current.bookingStatus));
   const bookingProgress = view === "booking" && bookingStatus === "summary_saved"
     ? "saved_booking_summary"
@@ -199,10 +201,7 @@ export function relevantConversationHistory(messages, limit = 8) {
     .slice(-limit)
     .map((message) => ({
       role: message.role === "agent" ? "assistant" : message.role,
-      text: String(message.text)
-        .replace(/\b(?:\d[ -]*?){12,19}\b/g, "[payment number removed]")
-        .replace(/\b(?:cvv|cvc|otp|password|pin)\s*[:=-]?\s*\S+/gi, "$1 [removed]")
-        .slice(0, 500),
+      text: sanitizeSensitiveConversationText(message.text).safeText.slice(0, 500),
     }));
 }
 

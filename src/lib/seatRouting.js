@@ -227,6 +227,36 @@ export function resolveSeatEditSelectionTurn(text, { availableSeatIds = [], curr
 
   const swapSources = edit.sourceSeats.length ? edit.sourceSeats : interpretedSeats.slice(0, 1);
   const swapTargets = edit.targetSeats.length ? edit.targetSeats : interpretedSeats.slice(1);
+  const rejectedEdit = (reason, rejectedSeats) => Object.freeze({
+    requested: true,
+    operation,
+    explicitSeats: interpretedSeats,
+    invalidSeats: [...new Set(rejectedSeats)],
+    seats: [],
+    proposedSeats: [...workingSeats],
+    baselineSeats: edit.baselineSeats,
+    targetCount: workingSeats.length,
+    targetMet: false,
+    interpretedAsr: Boolean(asrSeat.seat),
+    reason,
+  });
+  if (operation === "add") {
+    const alreadySelected = interpretedSeats.filter((seat) => workingSeats.includes(seat));
+    if (alreadySelected.length) return rejectedEdit("seat_already_selected", alreadySelected);
+  }
+  if (operation === "remove") {
+    const notSelected = interpretedSeats.filter((seat) => !workingSeats.includes(seat));
+    if (notSelected.length) return rejectedEdit("seat_not_selected", notSelected);
+  }
+  if (operation === "swap") {
+    if (!swapSources.length || !swapTargets.length) {
+      return rejectedEdit("swap_source_or_target_required", [...swapSources, ...swapTargets]);
+    }
+    const unselectedSources = swapSources.filter((seat) => !workingSeats.includes(seat));
+    if (unselectedSources.length) return rejectedEdit("swap_source_not_selected", unselectedSources);
+    const selectedTargets = swapTargets.filter((seat) => workingSeats.includes(seat));
+    if (selectedTargets.length) return rejectedEdit("swap_target_already_selected", selectedTargets);
+  }
   const seats = operation === "add"
     ? [...new Set([...workingSeats, ...interpretedSeats])]
     : operation === "remove"

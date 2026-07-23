@@ -37,10 +37,21 @@ export function I18nProvider({ children }) {
 
   const value = useMemo(() => {
     const t = (key, vars) => interpolate(STRINGS[locale]?.[key] || STRINGS.en[key] || key, vars);
-    const formatCurrency = (amount, currency = "AED") => new Intl.NumberFormat(
-      locale === "ar" ? "ar-AE" : "en-AE",
-      { style: "currency", currency, maximumFractionDigits: 2 },
-    ).format(Number(amount) || 0);
+    const formatCurrency = (amount, currency = "AED") => {
+      const requestedCurrency = String(currency || "").trim().toUpperCase();
+      const safeCurrency = /^[A-Z]{3}$/.test(requestedCurrency) ? requestedCurrency : "AED";
+      try {
+        return new Intl.NumberFormat(
+          locale === "ar" ? "ar-AE" : "en-AE",
+          { style: "currency", currency: safeCurrency, maximumFractionDigits: 2 },
+        ).format(Number(amount) || 0);
+      } catch {
+        return new Intl.NumberFormat(
+          locale === "ar" ? "ar-AE" : "en-AE",
+          { style: "currency", currency: "AED", maximumFractionDigits: 2 },
+        ).format(Number(amount) || 0);
+      }
+    };
     const formatDate = (value) => {
       const date = value ? new Date(value) : null;
       if (!date || Number.isNaN(date.getTime())) return value || "";

@@ -4,6 +4,8 @@ import { STRINGS } from "../src/i18n/strings.js";
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const index = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const localeBootstrap = fs.readFileSync(new URL("../public/locale-bootstrap.js", import.meta.url), "utf8");
+const cloudflareHeaders = fs.readFileSync(new URL("../public/_headers", import.meta.url), "utf8");
 const strings = fs.readFileSync(new URL("../src/i18n/strings.js", import.meta.url), "utf8");
 
 function sliceBetween(source, startMarker, endMarker, label) {
@@ -41,7 +43,9 @@ assert.ok((strings.match(/"app\.brand":\s*"VOX Cinemas UAE"/g) || []).length >= 
 assert.match(app, /t\("app\.title"\)/, "the header must render the Voxi product name");
 assert.match(app, /t\("app\.brand"\)/, "the header must render VOX Cinemas UAE branding");
 assert.doesNotMatch(app, /DEFAULT_CINEMA|item\.id\s*===\s*["']0002["']/, "the UAE product must not silently default to Mall of the Emirates");
-assert.match(app, /const \[cinema, setCinema\] = useState\(null\)/, "a clean launch must begin without a selected cinema");
+assert.match(app, /const \[releaseRecovery\] = useState\(takeReleaseJourneyRecovery\)/, "release recovery must be consumed once at startup");
+assert.match(app, /if \(!raw \|\| raw\.length > RELEASE_JOURNEY_RECOVERY_MAX_BYTES\) return null/, "a clean launch must have no release recovery state and oversized recovery data must fail closed");
+assert.match(app, /const \[cinema, setCinema\] = useState\(releaseRecovery\?\.cinema \|\| null\)/, "a clean launch must begin without a selected cinema while a release rollover can restore the active cinema");
 assert.match(app, /shown:\s*["']cinema picker["']/, "movie discovery without a cinema must display the UAE cinema picker");
 assert.match(app, /deterministicUiStageGuardRef\.current\s*=\s*\{\s*view:\s*["']showtimes["']/, "a movie-card click must guard the rendered showtime step from delayed model tools");
 assert.match(app, /deterministicUiStageGuardRef\.current\s*=\s*\{\s*view:\s*["']seatmap["']/, "a showtime click must guard the rendered seat map from delayed model tools");
@@ -71,5 +75,20 @@ assert.match(textStartup, /t\("app\.textStartError"\)/, "text startup must use t
 const title = index.match(/<title>([^<]+)<\/title>/i)?.[1]?.trim();
 assert.ok(title, "index.html must define a document title");
 assert.doesNotMatch(title, /ElevenLabs|Concierge/i, "the customer-facing document title must not expose vendor or legacy Concierge branding");
+const localeBootstrapTag = '<script src="/locale-bootstrap.js"></script>';
+assert.ok(index.includes(localeBootstrapTag), "index.html must load the same-origin locale bootstrap");
+assert.ok(
+  index.indexOf(localeBootstrapTag) < index.indexOf("</head>"),
+  "the locale bootstrap must run synchronously in the document head before the startup shell is painted",
+);
+const inlineExecutableScripts = [...index.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/giu)]
+  .filter(([, attributes, body]) => !/\bsrc\s*=/iu.test(attributes) && body.trim());
+assert.equal(inlineExecutableScripts.length, 0, "strict production CSP requires index.html to contain no executable inline scripts");
+assert.match(localeBootstrap, /localStorage\.getItem\("vox_locale"\) === "ar" \? "ar" : "en"/, "the external bootstrap must preserve the stored locale fallback");
+assert.match(localeBootstrap, /document\.documentElement\.lang = locale/, "the external bootstrap must set the initial document language");
+assert.match(localeBootstrap, /document\.documentElement\.dir = locale === "ar" \? "rtl" : "ltr"/, "the external bootstrap must set the initial document direction");
+const contentSecurityPolicy = cloudflareHeaders.match(/Content-Security-Policy:\s*([^\r\n]+)/iu)?.[1] || "";
+assert.match(contentSecurityPolicy, /script-src\s+'self'\s+blob:/iu, "Cloudflare CSP must allow only same-origin application scripts and required blob workers");
+assert.doesNotMatch(contentSecurityPolicy, /script-src[^;]*'unsafe-inline'/iu, "Cloudflare script policy must not require unsafe inline execution");
 
 console.log("Validated text-first WebSocket chat, protected WebRTC voice, explicit language selection, Voxi branding, and customer-safe errors.");

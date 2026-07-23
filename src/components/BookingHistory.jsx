@@ -4,7 +4,7 @@ import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 import { isCurrentBooking, sortBookingsForDisplay } from "../lib/cancellationRouting.js";
 
-export default function BookingHistory({ bookings = [], onSelect, onBack, onCancel, onRequestCancel, filter = "all" }) {
+export default function BookingHistory({ bookings = [], error = "", onSelect, onBack, onCancel, onRequestCancel, filter = "all" }) {
   const { t, dir, formatCurrency, formatDate } = useI18n();
   const cancelBooking = onCancel || onRequestCancel;
   const activeOnly = filter === "active";
@@ -27,9 +27,9 @@ export default function BookingHistory({ bookings = [], onSelect, onBack, onCanc
       </header>
 
       {!sorted.length ? (
-        <div role="status" style={{ display: "flex", minHeight: 190, flexDirection: "column", alignItems: "center", justifyContent: "center", border: `1px dashed ${C.border}`, borderRadius: 14, background: C.surfaceAlt, padding: 24, textAlign: "center", color: C.muted }}>
+        <div role={error ? "alert" : "status"} style={{ display: "flex", minHeight: 190, flexDirection: "column", alignItems: "center", justifyContent: "center", border: `1px dashed ${error ? C.danger : C.border}`, borderRadius: 14, background: error ? C.dangerSoft : C.surfaceAlt, padding: 24, textAlign: "center", color: error ? C.danger : C.muted }}>
           <Ticket size={28} color={C.primary} />
-          <p style={{ maxWidth: 250, margin: "12px 0 0", fontSize: 12, lineHeight: 1.5 }}>{t(activeOnly ? "history.activeEmpty" : "history.empty")}</p>
+          <p style={{ maxWidth: 250, margin: "12px 0 0", fontSize: 12, lineHeight: 1.5 }}>{error || t(activeOnly ? "history.activeEmpty" : "history.empty")}</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
@@ -40,7 +40,7 @@ export default function BookingHistory({ bookings = [], onSelect, onBack, onCanc
             const isDemo = booking.verified !== true
               || booking.demo === true
               || booking.paymentStatus === "simulated_not_charged"
-              || booking.bookingStatus === "confirmed_demo";
+              || ["confirmed_demo", "summary_saved", "locally_stored"].includes(booking.bookingStatus);
             const isDemoCancellation = cancelled && (isDemo || booking.refundStatus === "not_processed_demo");
             const storedPerformanceDate = booking.performanceDate || booking.sourceDate || booking.date;
             const performanceDate = storedPerformanceDate ? formatDate(storedPerformanceDate) : t("booking.unknownDate");
@@ -77,8 +77,8 @@ export default function BookingHistory({ bookings = [], onSelect, onBack, onCanc
                 </button>
                 {current && cancelBooking && (
                   <div style={{ display: "flex", justifyContent: "flex-end", borderTop: `1px solid ${C.border}`, padding: "7px 9px" }}>
-                    <button type="button" onClick={() => cancelBooking(booking)} aria-label={`${t("history.cancel")}: ${bookingLabel} · ${booking.ref}`} style={{ display: "inline-flex", minHeight: 34, alignItems: "center", justifyContent: "center", gap: 6, border: `1px solid ${C.danger}`, borderRadius: 8, background: C.dangerSoft, padding: "7px 10px", color: C.danger, fontSize: 10, fontWeight: 800, cursor: "pointer" }}>
-                      <RotateCcw size={12} /> {t("history.cancel")}
+                    <button type="button" onClick={() => cancelBooking(booking)} aria-label={`${t(isDemo ? "history.cancelLocal" : "history.cancel")}: ${bookingLabel} · ${booking.ref}`} style={{ display: "inline-flex", minHeight: 34, alignItems: "center", justifyContent: "center", gap: 6, border: `1px solid ${C.danger}`, borderRadius: 8, background: C.dangerSoft, padding: "7px 10px", color: C.danger, fontSize: 10, fontWeight: 800, cursor: "pointer" }}>
+                      <RotateCcw size={12} /> {t(isDemo ? "history.cancelLocal" : "history.cancel")}
                     </button>
                   </div>
                 )}

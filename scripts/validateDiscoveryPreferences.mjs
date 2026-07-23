@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   contextualOpenChoicePreferenceClears,
   createDiscoveryPreferences,
@@ -10,6 +11,7 @@ import {
   isOpenDiscoveryChoiceReply,
   mergeDiscoveryPreferences,
   parseAndMergeDiscoveryPreferences,
+  resolveBilingualDiscoveryMovieCandidate,
   resolveDiscoveryMovieCandidate,
   shouldTreatAsDiscoveryFilterTurn,
   unresolvedMovieTitleCandidate,
@@ -478,6 +480,84 @@ const arabicDiscoveryResults = filterDiscoveryResults({ movies, sessions, cinema
 assert.deepEqual(arabicDiscoveryResults.movies.map((movie) => movie.id), ["laugh"], "Arabic discovery must return only Arabic-language movies");
 assert.ok(arabicDiscoveryResults.sessions.every((session) => session.scheduledFilmId === "laugh" && session.cinemaId === "0002" && session.programmingDate === "2026-07-15"));
 
+const arabicComedyFirstTurn = "أريد أفلام كوميدية في مول الإمارات غداً";
+const arabicComedyFirstTurnResult = parseAndMergeDiscoveryPreferences({}, arabicComedyFirstTurn, { cinemas, movies, now: NOW });
+assert.deepEqual(
+  {
+    cinemaId: arabicComedyFirstTurnResult.preferences.cinemaId,
+    cinemaName: arabicComedyFirstTurnResult.preferences.cinemaName,
+    date: arabicComedyFirstTurnResult.preferences.date,
+    genre: arabicComedyFirstTurnResult.preferences.genre,
+    language: arabicComedyFirstTurnResult.preferences.language,
+  },
+  {
+    cinemaId: "0002",
+    cinemaName: "Mall of the Emirates",
+    date: "2026-07-15",
+    genre: "Comedy",
+    language: null,
+  },
+  "a first-turn Arabic feminine genre request must retain its cinema, date, and Comedy filter without becoming an Arabic-language filter",
+);
+assert.deepEqual(
+  getMissingDiscoveryCriteria(arabicComedyFirstTurnResult.preferences, ["cinema", "date", "movieOrPreference"]),
+  [],
+  "a complete first-turn Arabic genre request must not trigger a redundant preference question",
+);
+assert.equal(
+  shouldTreatAsDiscoveryFilterTurn(arabicComedyFirstTurn, { view: "empty", signal: arabicComedyFirstTurnResult.update }),
+  true,
+  "a complete first-turn Arabic genre request must route directly to discovery results",
+);
+const arabicComedyFirstTurnResults = filterDiscoveryResults({
+  movies,
+  sessions,
+  cinemas,
+  preferences: arabicComedyFirstTurnResult.preferences,
+});
+assert.deepEqual(
+  arabicComedyFirstTurnResults.movies.map((movie) => movie.id),
+  ["laugh"],
+  "a complete first-turn Arabic Comedy request must render a non-empty Comedy-only movie result",
+);
+assert.ok(
+  arabicComedyFirstTurnResults.movies.every((movie) => movie.genres.includes("Comedy")),
+  "every movie rendered for the Arabic Comedy request must satisfy the retained genre",
+);
+assert.ok(
+  arabicComedyFirstTurnResults.sessions.every((session) => (
+    session.scheduledFilmId === "laugh"
+    && session.cinemaId === "0002"
+    && session.programmingDate === "2026-07-15"
+  )),
+  "Arabic Comedy sessions must retain the supplied cinema and date",
+);
+
+for (const [request, expectedGenre] of [
+  ["الأفلام الكوميدية", "Comedy"],
+  ["أفلام الأكشن", "Action"],
+  ["أفلام الاكشن", "Action"],
+  ["أفلام رومانسية", "Romance"],
+  ["أفلام وثائقية", "Documentary"],
+  ["أفلام درامية", "Drama"],
+  ["أفلام موسيقية", "Musical"],
+  ["أفلام رياضية", "Sports"],
+  ["أفلام كرتونية", "Animation"],
+  ["أفلام حربية", "War"],
+  ["أفلام الخيال العلمي", "Science Fiction"],
+]) {
+  const signal = extractDiscoveryPreferencePatch(request, { movies, now: NOW });
+  assert.equal(signal.patch.genre, expectedGenre, `${request}: common Arabic genre morphology must resolve to ${expectedGenre}`);
+  assert.equal(signal.patch.language, undefined, `${request}: an Arabic-script genre term must not imply Arabic movie language`);
+}
+
+const arabicLanguageComedy = extractDiscoveryPreferencePatch("أريد أفلام كوميدية عربية", { movies, now: NOW });
+assert.equal(arabicLanguageComedy.patch.genre, "Comedy", "Arabic Comedy wording must retain the Comedy genre");
+assert.equal(arabicLanguageComedy.patch.language, "Arabic", "an explicit عربية adjective must remain an Arabic movie-language filter");
+const arabicFamily = extractDiscoveryPreferencePatch("أريد أفلام عائلية", { movies, now: NOW });
+assert.equal(arabicFamily.patch.audience, "kids_family", "the common Arabic feminine family adjective must remain an audience preference");
+assert.equal(arabicFamily.patch.genre, undefined, "an Arabic family audience request must not require the literal Family catalog genre");
+
 for (const datePhrase of ["I want to go on 17th", "I'm looking to go on, um, 17th", "17th", "I want to go on July 17th", "I want to go on 2026-07-17"]) {
   const parsedDate = extractDiscoveryPreferencePatch(datePhrase, { now: NOW });
   assert.equal(parsedDate.patch.date, "2026-07-17", `the spoken date must be retained for: ${datePhrase}`);
@@ -495,7 +575,43 @@ for (const nonDateOrdinal of [
 }
 assert.equal(extractDiscoveryPreferencePatch("July 32nd", { now: NOW }).patch.date, undefined, "an impossible month date must be rejected");
 assert.equal(extractDiscoveryPreferencePatch("31st February", { now: NOW }).patch.date, undefined, "an impossible calendar date must be rejected");
+assert.equal(extractDiscoveryPreferencePatch("2026-02-31", { now: NOW }).patch.date, undefined, "an impossible ISO date must be rejected");
+assert.equal(extractDiscoveryPreferencePatch("31/02/2026", { now: NOW }).patch.date, undefined, "an impossible numeric date must be rejected");
+assert.equal(extractDiscoveryPreferencePatch("2028-02-29", { now: NOW }).patch.date, "2028-02-29", "a valid leap-day ISO date must be retained");
+assert.equal(extractDiscoveryPreferencePatch("29/02/2028", { now: NOW }).patch.date, "2028-02-29", "a valid leap-day numeric date must be retained");
 assert.equal(extractDiscoveryPreferencePatch("January 2nd", { now: new Date("2026-12-15T08:00:00Z") }).patch.date, "2027-01-02", "a month-name request after that month has passed must roll into the next year");
+for (const datePhrase of ["24 يوليو", "يوم 24 يوليو", "يوم ٢٤ يوليو", "بتاريخ ۲۴ يوليو", "يوليو 24"]) {
+  const parsedDate = extractDiscoveryPreferencePatch(datePhrase, { now: NOW });
+  assert.equal(parsedDate.patch.date, "2026-07-24", `${datePhrase}: an Arabic month date must resolve to the requested calendar date`);
+  assert.equal(parsedDate.patch.dateSignal, "explicit");
+}
+assert.equal(extractDiscoveryPreferencePatch("٢٤/٠٧/٢٠٢٦", { now: NOW }).patch.date, "2026-07-24", "Arabic-Indic numeric dates must use the same validated date path");
+assert.equal(extractDiscoveryPreferencePatch("٢٠٢٦-٠٧-٢٤", { now: NOW }).patch.date, "2026-07-24", "Arabic-Indic ISO dates must use the same validated date path");
+assert.equal(extractDiscoveryPreferencePatch("31 فبراير", { now: NOW }).patch.date, undefined, "an impossible Arabic month date must be rejected");
+assert.equal(extractDiscoveryPreferencePatch("٣١ فبراير", { now: NOW }).patch.date, undefined, "an impossible Arabic-Indic month date must be rejected");
+assert.equal(extractDiscoveryPreferencePatch("٢٠٢٦-٠٢-٣١", { now: NOW }).patch.date, undefined, "an impossible Arabic-Indic ISO date must be rejected");
+assert.equal(
+  extractDiscoveryPreferencePatch("٢٤ يوليو", { now: new Date("2026-07-25T08:00:00Z") }).patch.date,
+  "2027-07-24",
+  "an Arabic month date that has passed must roll into the next year",
+);
+for (const weekdayPhrase of ["الجمعة", "يوم الجمعة"]) {
+  const parsedDate = extractDiscoveryPreferencePatch(weekdayPhrase, { now: NOW });
+  assert.equal(parsedDate.patch.date, "2026-07-17", `${weekdayPhrase}: an Arabic weekday must resolve to its next available occurrence`);
+  assert.equal(parsedDate.patch.dateSignal, "friday");
+}
+assert.equal(
+  extractDiscoveryPreferencePatch("الجمعة", { now: new Date("2026-07-17T08:00:00Z") }).patch.date,
+  "2026-07-17",
+  "a bare Arabic weekday may select today when today has that weekday",
+);
+for (const weekdayPhrase of ["الجمعة القادمة", "الجمعة الجاية", "يوم الجمعة القادم"]) {
+  assert.equal(
+    extractDiscoveryPreferencePatch(weekdayPhrase, { now: new Date("2026-07-17T08:00:00Z") }).patch.date,
+    "2026-07-24",
+    `${weekdayPhrase}: an explicitly upcoming Arabic weekday must advance when today has the same weekday`,
+  );
+}
 
 assert.equal(unresolvedMovieTitleCandidate("I want to watch a comedy", extractDiscoveryPreferencePatch("I want to watch a comedy", { movies, now: NOW })), null, "a genre request must not be retained as an unknown title");
 assert.equal(unresolvedMovieTitleCandidate("I want to watch a movie tomorrow", extractDiscoveryPreferencePatch("I want to watch a movie tomorrow", { movies, now: NOW })), null, "a broad movie request must not become an unknown title");
@@ -614,6 +730,30 @@ assert.equal(unresolvedMovieTitleCandidate("أريد فيلم توي ستوري 
 assert.equal(resolveDiscoveryMovieCandidate(movies, "Toy Story"), movies[0], "partial titles must reuse the protected fuzzy resolver after catalog load");
 assert.equal(resolveDiscoveryMovieCandidate(movies, "Toy Storey 5"), movies[0], "ASR-like title variants must resolve when the best candidate is unambiguous");
 assert.equal(resolveDiscoveryMovieCandidate([{ id: "a", title: "Toy Story 5" }, { id: "b", title: "Toy Story Classics" }], "Toy Story"), null, "ambiguous partial titles must request clarification");
+assert.equal(await resolveBilingualDiscoveryMovieCandidate(movies, "توي ستوري 5"), movies[0], "an Arabic transliteration must resolve the matching English catalog title");
+assert.equal((await resolveBilingualDiscoveryMovieCandidate([{ id: "moana", title: "Moana" }], "موانا"))?.id, "moana", "a one-word Arabic transliteration must resolve only when the whole title shape matches");
+assert.equal(await resolveBilingualDiscoveryMovieCandidate([{ id: "moana", title: "Moana" }], "موان"), null, "a truncated Arabic title must not resolve");
+assert.equal(await resolveBilingualDiscoveryMovieCandidate([{ id: "moana", title: "Moana" }], "موانا 2"), null, "a sequel number mismatch must not resolve the original title");
+assert.equal(await resolveBilingualDiscoveryMovieCandidate([{ id: "a", title: "Toy Story 5" }, { id: "b", title: "Toy Story Classics" }], "توي ستوري"), null, "a cross-script partial title shared by two films must remain ambiguous");
+assert.equal(await resolveBilingualDiscoveryMovieCandidate([{ id: "moana", title: "Moana" }], "افاتار"), null, "an unknown Arabic title must not fall back to the only catalog movie");
+assert.equal(await resolveBilingualDiscoveryMovieCandidate([{ id: "moana", title: "Moana" }], "مين"), null, "a short phonetic collision must not resolve Moana");
+assert.equal(await resolveBilingualDiscoveryMovieCandidate([{ id: "dune", title: "Dune" }], "دين"), null, "a short phonetic collision must not resolve Dune");
+assert.equal(await resolveBilingualDiscoveryMovieCandidate([{ id: "lenin", title: "Lenin" }], "لين"), null, "a truncated phonetic collision must not resolve Lenin");
+assert.equal((await resolveBilingualDiscoveryMovieCandidate([{ id: "alpha", title: "Alpha" }], "الفا"))?.id, "alpha", "a common ph transliteration must resolve Alpha");
+assert.equal((await resolveBilingualDiscoveryMovieCandidate([{ id: "spider", title: "Spider-Man: Brand New Day" }], "سبايدر مان"))?.id, "spider", "a distinctive cross-script partial title must resolve a unique longer title");
+for (const [title, alias] of [
+  ["Sakr w Canaria", "صقر و كناريا"],
+  ["The Odyssey", "الأوديسة"],
+  ["El Gawahergy", "الجواهرجي"],
+  ["Khali Balak Min Nafsik", "خلي بالك من نفسك"],
+  ["Shamshoun w Dalila", "شمشون و دليلة"],
+]) {
+  assert.equal(
+    (await resolveBilingualDiscoveryMovieCandidate([{ id: "current", title }], alias))?.id,
+    "current",
+    `${alias}: a curated current-title alias must resolve the official English catalog title`,
+  );
+}
 
 const imaxSignal = extractDiscoveryPreferencePatch("IMAX", { movies, now: NOW });
 assert.equal(shouldTreatAsDiscoveryFilterTurn("IMAX", { view: "movies", signal: imaxSignal }), true, "a bare criterion in active discovery must update results");
@@ -923,5 +1063,9 @@ const rawShape = filterDiscoveryResults({
 assert.deepEqual(rawShape.movies.map((movie) => movie.code), ["raw"]);
 assert.equal(rawShape.time.usedNearestFallback, true);
 assert.equal(rawShape.time.closestDeltaMinutes, 25);
+
+const discoveryPreferencesSource = await readFile(new URL("../src/lib/discoveryPreferences.js", import.meta.url), "utf8");
+assert.doesNotMatch(discoveryPreferencesSource, /^import .*crossScriptMovieTitles/m, "cross-script title data must not enter the initial discovery bundle through a static import");
+assert.match(discoveryPreferencesSource, /await import\("\.\/crossScriptMovieTitles\.js"\)/, "the bilingual fallback must load cross-script title data on demand");
 
 console.log("Validated persistent discovery preferences, combined filtering, and nearest-showtime fallback.");

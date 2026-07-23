@@ -1,4 +1,5 @@
 import { COMMON_OFFER_TERMS, OFFER_META } from "./offersData.js";
+import { getOfferKnowledgeStatus } from "./offerFreshness.js";
 
 const COPY = Object.freeze({
   en: {
@@ -29,8 +30,8 @@ const COPY = Object.freeze({
     onlyAt: (experiences, cinemas) => `${experiences.join(", ")} is available only at ${cinemas.join(", ")}.`,
     excludedAt: (experiences, cinemas, seats) => `${experiences.length ? experiences.join(", ") : "This offer"}${seats.length ? ` with ${seats.join(", ")} seats` : ""} is excluded at ${cinemas.join(", ")}.`,
     excludedExperienceSeats: (experience, seats) => `${experience} excludes ${seats.join(", ")} seats.`,
-    unpublished: "VOX currently lists this promotion, but the official detail and terms pages do not publish the eligible cards or conditions. Eligibility must be checked at VOX checkout.",
-    checkoutOnly: "Final card validation, remaining monthly allowance, and application of the offer happen at VOX checkout.",
+    unpublished: `The VOX offer snapshot checked on ${OFFER_META.verifiedDate} lists this promotion, but the official detail and terms pages do not publish the eligible cards or conditions. Eligibility must be checked in the official VOX website or app checkout.`,
+    checkoutOnly: "Final card validation, remaining monthly allowance, and application of the offer happen only in the official VOX website or app checkout.",
     cards: "Eligible cards",
     experiences: "Eligible experiences",
     limits: "Limits and requirements",
@@ -67,8 +68,8 @@ const COPY = Object.freeze({
     onlyAt: (experiences, cinemas) => `تتوفر ${experiences.join("، ")} فقط في ${cinemas.join("، ")}.`,
     excludedAt: (experiences, cinemas, seats) => `${experiences.length ? experiences.join("، ") : "هذا العرض"}${seats.length ? ` مع مقاعد ${seats.join("، ")}` : ""} غير متاح في ${cinemas.join("، ")}.`,
     excludedExperienceSeats: (experience, seats) => `تستثني ${experience} مقاعد ${seats.join("، ")}.`,
-    unpublished: "تعرض VOX هذا العرض حالياً، لكن صفحات التفاصيل والشروط الرسمية لا تنشر البطاقات المؤهلة أو الأحكام. يجب التحقق من الأهلية عند إتمام الحجز لدى VOX.",
-    checkoutOnly: "يتم التحقق النهائي من البطاقة والحد الشهري المتبقي وتطبيق العرض عند إتمام الحجز لدى VOX.",
+    unpublished: `تُدرج لقطة عروض VOX التي تمت مراجعتها بتاريخ ${OFFER_META.verifiedDate} هذا العرض، لكن صفحات التفاصيل والشروط الرسمية لا تنشر البطاقات المؤهلة أو الأحكام. يجب التحقق من الأهلية في صفحة الدفع الرسمية في موقع VOX أو تطبيقه.`,
+    checkoutOnly: "يتم التحقق النهائي من البطاقة والحد الشهري المتبقي وتطبيق العرض فقط في صفحة الدفع الرسمية في موقع VOX أو تطبيقه.",
     cards: "البطاقات المؤهلة",
     experiences: "التجارب المؤهلة",
     limits: "الحدود والمتطلبات",
@@ -140,7 +141,7 @@ function limitFacts(offer, profile, locale) {
   else if (Number.isFinite(limit.maxFreeTickets)) output.push(copy.maxFree(limit.maxFreeTickets));
   else if (Number.isFinite(limit.maxTickets)) output.push(copy.maxDiscounted(limit.maxTickets));
   else if (limit.stated === false) output.push(copy.unpublishedLimit);
-  if (limit.termsConflict) output.push(language === "ar" ? "توجد معلومات متعارضة عن الحد في الشروط المنشورة، لذلك يجب تأكيده عند إتمام الحجز." : limit.termsConflict);
+  if (limit.termsConflict) output.push(language === "ar" ? "توجد معلومات متعارضة عن الحد في الشروط المنشورة، لذلك يجب تأكيده في صفحة الدفع الرسمية في موقع VOX أو تطبيقه." : limit.termsConflict);
   if (Number.isFinite(offer?.perSessionLimit?.maxTickets)) output.push(copy.sessionTickets(offer.perSessionLimit.maxTickets));
   if (Number.isFinite(offer?.perSessionLimit?.maxFreeTickets)) output.push(copy.sessionFree(offer.perSessionLimit.maxFreeTickets));
   return output;
@@ -168,7 +169,7 @@ function profileRestrictionFacts(profile, locale) {
     output.push(copy.excludedExperienceSeats(localizedExperience(experience, language), seats));
   }
   for (const item of rules.checkoutConfirmation || []) {
-    output.push(language === "ar" ? "يجب تأكيد هذه الحالة عند إتمام الحجز بسبب اختلاف المعلومات المنشورة." : item.message);
+    output.push(language === "ar" ? "يجب تأكيد هذه الحالة في صفحة الدفع الرسمية في موقع VOX أو تطبيقه بسبب اختلاف المعلومات المنشورة." : item.message);
   }
   return unique(output);
 }
@@ -212,39 +213,46 @@ function redemptionSteps(offer, locale) {
   if (offer.id === "adcb-touchpoints") {
     return language === "ar"
       ? [
-        "اختر الفيلم وموعد العرض ثم المقاعد.",
-        "تابع إلى صفحة الدفع وتجاوز قسم العروض.",
-        "اختر ADCB TouchPoints كطريقة دفع وأدخل بيانات بطاقة ADCB في شاشة الدفع الآمنة.",
+        "لاستبدال النقاط، استخدم صفحة الدفع الرسمية في موقع أو تطبيق VOX.",
+        "اختر الفيلم وموعد العرض ثم المقاعد، وتابع إلى صفحة الدفع الرسمية وتجاوز قسم العروض.",
+        "اختر ADCB TouchPoints كطريقة دفع وأدخل بيانات بطاقة ADCB فقط في شاشة الدفع الرسمية الآمنة.",
         "استخدم النقاط للدفع كلياً أو جزئياً، ثم ادفع الرصيد المتبقي ببطاقة ADCB عند الحاجة.",
       ]
       : [
-        "Choose the movie, showtime, and seats.",
-        "Continue to payment and skip the Offers section.",
-        "Choose ADCB TouchPoints as the payment method and enter the ADCB card details only on the secure payment screen.",
+        "To redeem points, use the official VOX website or app checkout.",
+        "Choose the movie, showtime, and seats, then continue to the official payment page and skip the Offers section.",
+        "Choose ADCB TouchPoints as the payment method and enter the ADCB card details only on the official secure payment screen.",
         "Pay fully or partly with points, then use an ADCB card for any remaining balance.",
       ];
   }
   if (offer.detailsPublished === false) return [COPY[language].unpublished];
   return language === "ar"
     ? [
+      "لاستبدال العرض، استخدم صفحة الدفع الرسمية في موقع أو تطبيق VOX.",
       "اختر الفيلم وموعد العرض.",
       "سجل الدخول إلى حساب VOX.",
       "اختر المقاعد. يساوي عدد التذاكر عدد المقاعد المختارة.",
       "في خطوة عروض التذاكر، اختر العرض وتحقق من البطاقة المؤهلة.",
-      "أكد العرض وادفع بالبطاقة المؤهلة نفسها على شاشة الدفع الآمنة.",
+      "أكد العرض وادفع بالبطاقة المؤهلة نفسها على شاشة الدفع الرسمية الآمنة.",
     ]
     : [
+      "To redeem the offer, use the official VOX website or app checkout.",
       "Choose the movie and showtime.",
       "Sign in to a VOX account.",
       "Select seats. The ticket count equals the number of selected seats.",
       "At the ticket-offers step, choose the offer and verify the eligible card.",
-      "Confirm the offer and pay with the same eligible card on the secure payment screen.",
+      "Confirm the offer and pay with the same eligible card on the official secure payment screen.",
     ];
 }
 
-export function buildOfferFacts(offer, locale = "en") {
+export function buildOfferFacts(offer, locale = "en", { asOf } = {}) {
   if (!offer) return null;
   const language = languageFor(locale);
+  const knowledge = getOfferKnowledgeStatus({
+    asOf,
+    verifiedDate: offer.verifiedDate || OFFER_META.verifiedDate,
+    sourceUrl: offer.termsUrl || offer.detailUrl || offer.sourceUrl || OFFER_META.sourceUrl,
+  });
   const profiles = offer.profiles.map((profile) => buildProfileFacts(offer, profile, language));
   const foodBenefit = offer.foodBenefit
     ? language === "ar" ? FOOD_BENEFIT_AR[offer.id] || localizedOfferValue(offer.foodBenefit, language) : localizedOfferValue(offer.foodBenefit, language)
@@ -274,6 +282,11 @@ export function buildOfferFacts(offer, locale = "en") {
     termsUrl: offer.termsUrl,
     sourceUrl: offer.sourceUrl || OFFER_META.sourceUrl,
     verifiedDate: offer.verifiedDate,
+    knowledgeStatus: knowledge.status,
+    knowledgeFresh: knowledge.isFresh,
+    knowledgeValidThrough: knowledge.validThrough,
+    knowledgeGuidance: knowledge.guidance?.[language] || "",
+    currentTermsUrl: knowledge.sourceUrl,
   };
 }
 
@@ -283,21 +296,22 @@ function compactList(values, copy, maximum = 6) {
   return `${shown.join(", ")}${remaining > 0 ? `, ${copy.moreCards(remaining)}` : ""}`;
 }
 
-export function answerForOfferTopic(offer, profile = null, locale = "en", detailTopic = "summary") {
+export function answerForOfferTopic(offer, profile = null, locale = "en", detailTopic = "summary", { asOf } = {}) {
   const language = languageFor(locale);
   const copy = COPY[language];
-  const facts = buildOfferFacts(offer, language);
+  const facts = buildOfferFacts(offer, language, { asOf });
   if (!facts) return language === "ar" ? "لم يتم العثور على عرض مطابق." : "No matching offer was found.";
+  if (!facts.knowledgeFresh) return facts.knowledgeGuidance;
   const profileFacts = profile ? buildProfileFacts(offer, profile, language) : null;
   const topic = String(detailTopic || "summary").toLowerCase();
   if (!facts.detailsPublished) return `${facts.bank}: ${copy.unpublished}`;
   if (topic === "cards") {
     const cards = profileFacts?.cards?.length ? profileFacts.cards : facts.cards;
-    return `${copy.cards}: ${cards.length ? compactList(cards, copy) : language === "ar" ? "يجب التحقق من البطاقة عند إتمام الحجز." : "Card verification is required at checkout."}`;
+    return `${copy.cards}: ${cards.length ? compactList(cards, copy) : language === "ar" ? "يجب التحقق من البطاقة في صفحة الدفع الرسمية في موقع VOX أو تطبيقه." : "Card verification is required in the official VOX website or app checkout."}`;
   }
   if (topic === "experiences") {
     const experiences = profileFacts?.experiences?.length ? profileFacts.experiences : facts.experiences;
-    return `${copy.experiences}: ${experiences.join(language === "ar" ? "، " : ", ") || (language === "ar" ? "يتم تأكيدها عند إتمام الحجز." : "Confirm at checkout.")}`;
+    return `${copy.experiences}: ${experiences.join(language === "ar" ? "، " : ", ") || (language === "ar" ? "يتم تأكيدها في صفحة الدفع الرسمية في موقع VOX أو تطبيقه." : "Confirm in the official VOX website or app checkout.")}`;
   }
   if (topic === "limits") {
     const limits = profileFacts?.limits?.length ? profileFacts.limits : facts.limits;

@@ -10,8 +10,8 @@ const between = (start, end) => {
   return app.slice(from, to);
 };
 
-assert.match(app, /const \[stageVisible, setStageVisible\] = useState\(true\)/, "render visibility must be separate from logical stage state");
-assert.match(app, /const \[pausedJourney, setPausedJourney\] = useState\(\(\) => createPausedRichJourney/, "paused context must have an explicit immutable model");
+assert.match(app, /const \[stageVisible, setStageVisible\] = useState\(releaseRecovery\?\.stageVisible !== false\)/, "render visibility must stay separate from logical stage state and survive a release refresh");
+assert.match(app, /const \[pausedJourney, setPausedJourney\] = useState\(\(\) => \([\s\S]*releaseRecovery\?\.pausedJourney[\s\S]*createPausedRichJourney/, "paused context must have an explicit immutable model with one-time release recovery");
 assert.match(app, /const restoredStageToolGuardRef = useRef\(null\)/, "restored stages must be protected from delayed tools belonging to the previous topic");
 
 const pause = between("const pauseRichRenderingForTopicChange", "const clearPausedJourneyForLifecycle");
@@ -32,7 +32,21 @@ assert.match(restore, /revalidatePausedCheckout/, "checkout restoration must rev
 assert.match(restore, /entry\.view === "movies"[\s\S]*vista\.getScheduledFilms[\s\S]*vista\.getCinemaDateSessions/, "movie-card restoration must refresh the current catalog and embedded showtimes");
 assert.match(restore, /\["showtimes", "seatmap"\][\s\S]*vista\.getSessions[\s\S]*capturedSessionIds/, "showtime and seat-map restoration must intersect the paused session with the current catalog");
 assert.match(restore, /vista\.getSeatPlan/, "seat restoration must revalidate seat availability");
-assert.match(restore, /readBookings\(\)/, "history and cancellation restoration must revalidate stored bookings");
+assert.match(
+  restore,
+  /\["history", "booking", "cancellation"\][\s\S]*readBookings\(\{ strict: true \}\)[\s\S]*reason: "booking_storage_unavailable"/,
+  "history, booking, and cancellation restoration must fail closed when device storage is corrupt or unavailable",
+);
+assert.match(
+  restore,
+  /showBookingHistoryStorageError\(\{[\s\S]*notifyAgent: false[\s\S]*booking_storage_unavailable/,
+  "a failed record restore must display the explicit storage recovery panel without asking the agent to invent a result",
+);
+assert.doesNotMatch(
+  restore,
+  /\["history", "booking", "cancellation"\][\s\S]{0,500}readBookings\(\)/,
+  "paused record restoration must never use a permissive booking read",
+);
 assert.match(restore, /entry\.view === "cancellation"[\s\S]*readBookings\(\{ strict: true \}\)[\s\S]*planPausedCancellationRestoration/, "cancellation restoration must strictly re-read the booking and plan against the live flow");
 assert.match(restore, /resume_cancellation_revalidation[\s\S]*showBookingForAuthorizedCancellation/, "a missing or stale cancellation flow must be re-created only through a fresh authorized eligibility check");
 assert.match(restore, /resumeCancellationConfirmationTimer[\s\S]*armCancellationConfirmationTimer/, "a synchronized cancellation restore must receive a fresh confirmation window");
@@ -40,6 +54,24 @@ assert.match(restore, /targetSelection[\s\S]*activeCancellationMutation\(\) \|\|
 assert.match(restore, /restoreBookingWithoutConfirmation[\s\S]*showStage\(\{ view: "booking", booking: safeBooking \}\)/, "failed cancellation restoration must show a safe booking panel without stale confirmation purpose");
 assert.match(restore, /restorePausedRichStage/, "validated state must be restored through the paused-stage model");
 assert.match(restore, /restoredStageToolGuardRef\.current = \{ view:/, "a restored stage must arm the one-turn delayed-tool guard");
+const restoreContext = between("const pausedRestoreContext", "const abandonActiveBookingJourney");
+assert.match(
+  restoreContext,
+  /booking_storage_unavailable[\s\S]*device-storage error[\s\S]*Do not restart discovery or claim that the booking disappeared/,
+  "the agent must receive explicit fail-closed guidance when a paused record cannot be read",
+);
+
+const bookingCompletion = between("const handleCheckoutReviewComplete", "CLIENT TOOLS:");
+assert.match(
+  bookingCompletion,
+  /setBookings\(\(existing\) => upsertBookingRecord\(existing, completed\)\)/,
+  "a successful booking write must update the known UI record without a second permissive storage read",
+);
+assert.doesNotMatch(
+  bookingCompletion,
+  /setBookings\(readBookings\(\)\)/,
+  "booking completion must not silently empty history after a successful write",
+);
 
 const checkoutRevalidation = between("const revalidatePausedCheckout", "const restorePausedJourney");
 assert.match(checkoutRevalidation, /checkoutIdentityIsCurrent[\s\S]*pendingOrderRef\.current\?\.checkoutId === checkoutId/, "checkout revalidation must retain the exact checkout identity");
@@ -59,7 +91,14 @@ for (const [label, route, value] of [["voice", voice, "safeMessage"], ["text", t
   assert.match(route, /if \(!requestedResumeTarget\) restoredStageToolGuardRef\.current = null/, `${label} must release the delayed-tool guard only on the guest's next distinct turn`);
   assert.match(route, /isExplicitJourneyCancellationTurn/, `${label} must support deliberate active-journey cancellation`);
   assert.match(route, /isExplicitConversationEndTurn/, `${label} must clear saved journey state on explicit conversation end`);
+  assert.match(route, /const recordSelectorFaq =[\s\S]*prepareFaqContext/, `${label} must retrieve FAQ context before a history or cancellation selector fallback`);
+  assert.match(route, /const recordSelectorOffer =[\s\S]*resolveLocalOfferTextTurn/, `${label} must recognize a bank offer question before a history or cancellation selector fallback`);
+  assert.match(route, new RegExp(`isGenuineFaqQuestion\\(${value}`), `${label} must distinguish genuine FAQ questions from short booking selectors`);
+  assert.match(route, /bypassForFaq: recordSelectorFaqBypass/, `${label} must bypass both record selector resolvers for a genuine FAQ`);
+  assert.match(route, /recordSelectorFaqBypass[\s\S]{0,100}\? recordSelectorFaq/, `${label} must reuse the approved FAQ answer after bypassing the record selector`);
 }
+assert.match(text, /localOfferTurn && \(activeCheckout \|\| recordSelectorOffer \|\| !isConnected\)[\s\S]*clientTools\.show_offers/, "typed FAB questions from a record selector must open the sourced offer panel locally and preserve the paused list");
+assert.match(voice, /if \(localOfferTurn\)[\s\S]*clientTools\.show_offers/, "spoken FAB questions from a record selector must open the same sourced offer panel");
 
 for (const phraseFragment of ["continue|resume", "seats?|seat map", "showtimes?", "checkout|payment"]) {
   assert.match(app, new RegExp(phraseFragment, "i"), `restore classifier must cover ${phraseFragment}`);
@@ -90,6 +129,16 @@ assert.match(app, /cancellationBookingSummary\(displayed[\s\S]*Would you like me
 assert.match(app, /controls are already visible, but the conversational confirmation must still be accessible in text and voice[\s\S]*Speak this exact prompt once now: \$\{result\.message\}/, "visible controls must still produce the complete confirmation in text and voice");
 assert.match(app, /cancellationResultShouldRender[\s\S]*stageVisibleRef\.current[\s\S]*renderTopicRef\.current/, "background cancellation completion must not replace an unrelated topic");
 assert.match(app, /invalidatePausedRichStage\(pausedJourneyRef\.current,[\s\S]*views: \["cancellation"\][\s\S]*cancellation_completed/, "successful cancellation must clear stale cancellation rendering");
+assert.match(
+  app,
+  /setBookings\(\(existing\) => upsertBookingRecord\(existing, latestStoredBooking\)\)/,
+  "an already-cancelled result must retain its known UI record without a permissive reread",
+);
+assert.match(
+  app,
+  /setBookings\(\(existing\) => upsertBookingRecord\(existing, updated\)\)/,
+  "a completed cancellation must retain its known result regardless of post-write storage availability",
+);
 const historyContext = between("const bookingHistoryTurnContext", "const clearConversationState");
 assert.match(historyContext, /already displayed[\s\S]*Never say the list is empty[\s\S]*never ask the guest to provide a booking reference/, "a populated history list must remain authoritative in the agent response");
 

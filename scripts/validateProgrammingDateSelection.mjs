@@ -120,12 +120,27 @@ assert.ok(
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const requestedDateParser = app.slice(app.indexOf("function requestedProgrammingDate"), app.indexOf("function programmingDatesForCinema"));
+const requestedDateParserRuntime = new Function(
+  "PROGRAMMING_DATES",
+  `${app.slice(app.indexOf("const pad2"), app.indexOf("function programmingDatesForCinema"))}\nreturn requestedProgrammingDate;`,
+)(["2026-07-14", "2026-07-15"]);
+const datePromptReplyRuntime = new Function(
+  `${app.slice(app.indexOf("function resolveDatePromptReply"), app.indexOf("function isProgrammingDateOnlyReply"))}\nreturn resolveDatePromptReply;`,
+)();
+assert.equal(requestedDateParserRuntime("2026-02-31"), null, "the App date parser must reject impossible ISO dates");
+assert.equal(requestedDateParserRuntime("31/02/2026"), null, "the App date parser must reject impossible numeric dates");
+assert.equal(requestedDateParserRuntime("2028-02-29"), "2028-02-29", "the App date parser must retain a valid leap-day ISO date");
+assert.equal(requestedDateParserRuntime("29/02/2028"), "2028-02-29", "the App date parser must retain a valid leap-day numeric date");
+assert.equal(datePromptReplyRuntime("show movies on 31/02/2026", ["2026-07-31"], { view: "empty" }), null, "an invalid numeric date must not be reinterpreted as a contextual day-of-month reply");
+assert.equal(datePromptReplyRuntime("show movies on 31", ["2026-07-31"], { view: "empty" }), "2026-07-31", "a genuine contextual day-of-month reply must remain supported");
 assert.match(requestedDateParser, /ordinalDay\s*=\s*raw\.match/, "the shared typed/voice date capture must recognize context-bound spoken ordinal dates such as on 17th");
 assert.match(requestedDateParser, /\(\?=\\s\*\(\?:\$\|\[,\.\!\?;:\]/, "an ordinal embedded in a movie, screen, row, seat, or option phrase must not be treated as a date");
 assert.match(requestedDateParser, /ordinalText\.match\(\/\^\(\?:the/, "a standalone ordinal must be accepted only as a complete date reply, not inside a movie or seat choice");
 assert.match(requestedDateParser, /\(\?:st\|nd\|rd\|th\)\?/, "month-name dates must accept an ordinal suffix such as July 17th");
 assert.match(requestedDateParser, /validCalendarDate/, "month-name requests must reject impossible calendar dates");
-assert.match(app, /const userRequestedDateRef = useRef\(null\)/, "the widget must retain an unresolved guest date across client-tool calls");
+assert.match(requestedDateParser, /const direct = raw\.match\([^\n]+\)[\s\S]*?validCalendarDate/, "ISO dates must be calendar-validated before use");
+assert.match(requestedDateParser, /const numeric = raw\.match[\s\S]*?const candidate = validCalendarDate\(year, month, day\)/, "numeric dates must be calendar-validated before use");
+assert.match(app, /const userRequestedDateRef = useRef\(releaseRecovery\?\.refs\?\.userRequestedDate \|\| null\)/, "the widget must retain an unresolved guest date across client-tool calls and a release rollover");
 assert.equal((app.match(/resolveClientToolProgrammingDate\(/g) || []).length, 1, "movie-list loading must use the guarded general date resolver");
 assert.equal((app.match(/resolveVisibleSelectionProgrammingDate\(/g) || []).length, 2, "movie and session selection must bind to their visible list date");
 assert.equal(

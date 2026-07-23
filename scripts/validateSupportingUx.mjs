@@ -1,12 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import {
-  DEMO_CARD_STORAGE_KEY,
-  isLuhnValid,
-  isValidDemoExpiry,
-  sanitizeStoredCardMetadata,
-  toStoredCardMetadata,
-} from "../src/checkoutSafety.js";
+import { DEMO_CARD_STORAGE_KEY } from "../src/checkoutSafety.js";
 import {
   FALLBACK_EXPERIENCE_MEDIA,
   getExperienceMedia,
@@ -14,37 +8,22 @@ import {
 } from "../src/mediaData.js";
 import { STRINGS } from "../src/i18n/strings.js";
 
-assert.equal(isLuhnValid("4111 1111 1111 1111"), true, "the documented preview card must pass Luhn validation");
-assert.equal(isLuhnValid("4111 1111 1111 1112"), false, "invalid test PAN must fail Luhn validation");
-const july2026 = new Date(2026, 6, 13, 12, 0, 0);
-assert.equal(isValidDemoExpiry("12/30", july2026), true);
-assert.equal(isValidDemoExpiry("07/26", july2026), true, "cards remain valid through the stated expiry month");
-assert.equal(isValidDemoExpiry("06/26", july2026), false, "expiry validation must reject an elapsed month");
-assert.equal(isValidDemoExpiry("12/25", july2026), false, "expiry validation must reject an elapsed year");
-assert.equal(isValidDemoExpiry("13/30", july2026), false, "expiry validation must reject invalid months");
-
-const metadata = toStoredCardMetadata({ pan: "4111 1111 1111 1111", cvv: "123", name: "Test Guest", exp: "12/30" }, "demo-test");
-assert.deepEqual(Object.keys(metadata).sort(), ["brand", "exp", "id", "last4", "name"], "stored cards may contain display metadata only");
-assert.equal(metadata.last4, "1111");
-assert.doesNotMatch(JSON.stringify(metadata), /4111111111111111|"cvv"|"pan"/i, "PAN and security code must not survive metadata conversion");
-assert.deepEqual(
-  Object.keys(sanitizeStoredCardMetadata({ ...metadata, pan: "4111111111111111", cvv: "123" })).sort(),
-  ["brand", "exp", "id", "last4", "name"],
-  "storage hydration must strip injected sensitive fields",
-);
 assert.match(DEMO_CARD_STORAGE_KEY, /demo/i);
 
 const checkoutSource = await readFile(new URL("../src/components/Checkout.jsx", import.meta.url), "utf8");
 assert.doesNotMatch(checkoutSource, /Noorul|DEFAULT_CARDS|["']vox_cards["']/, "checkout must not seed personal or legacy default cards");
 assert.doesNotMatch(checkoutSource, /VITE_VISTA_BASE/, "Vista read-data configuration must not change checkout behavior");
 assert.match(checkoutSource, /return "demo";/, "checkout must default explicitly to simulation mode");
-assert.match(checkoutSource, /checkoutMode !== "demo"/, "simulated authorization must be gated to demo mode");
-assert.match(checkoutSource, /paymentStartedRef\.current/, "checkout must guard against duplicate payment attempts");
-assert.match(checkoutSource, /clearSensitiveForm\(false\)/, "checkout must clear sensitive form data during unmount cleanup");
-assert.match(checkoutSource, /clearTimers\(\)/, "checkout must clear pending authorization timers");
-assert.match(checkoutSource, /onPaid\?\.\(\{ method, label, checkoutId \}\)/, "payment completion may expose only a safe method label and checkout id");
-assert.doesNotMatch(checkoutSource, /\bfetch\s*\(|axios|sendText|sendContextualUpdate|clientTools/, "payment fields must never be sent from the checkout component");
-assert.match(checkoutSource, /clearSensitiveForm\(\)/, "sensitive form state must be cleared after use");
+assert.match(checkoutSource, /checkoutMode !== "demo"/, "device-summary saving must be gated to the non-transactional review mode");
+assert.match(checkoutSource, /reviewStartedRef\.current/, "checkout must guard against duplicate summary saves");
+assert.match(checkoutSource, /clearTimers\(\)/, "checkout must clear pending summary timers");
+assert.match(checkoutSource, /onComplete\?\.\(\{ checkoutId \}\)/, "summary completion may expose only the checkout identity");
+assert.doesNotMatch(checkoutSource, /\bfetch\s*\(|axios|sendText|sendContextualUpdate|clientTools/, "checkout data must never be sent from this non-transactional component");
+assert.doesNotMatch(checkoutSource, /\b(?:pan|cvv|cvc|cardNumber|cardName|expiryLabel|security code)\b/i, "review checkout must not collect cardholder data");
+assert.doesNotMatch(checkoutSource, /<input\b|<select\b|<textarea\b/, "review checkout must not render editable payment-detail controls");
+assert.equal((checkoutSource.match(/onClick=\{saveSummary\}/g) || []).length, 1, "checkout review must expose exactly one device-summary action");
+assert.match(checkoutSource, /checkout\.saveSummaryHint/, "the summary action must state its on-device boundary");
+assert.doesNotMatch(checkoutSource, /Apple Pay|Samsung Pay|walletButton|reviewCard/i, "non-integrated payment brands must not appear as checkout controls");
 
 assert.ok(getSupportedImageUrl(FALLBACK_EXPERIENCE_MEDIA), "experience fallback artwork must have a renderable URL");
 assert.equal(getExperienceMedia("UNKNOWN EXPERIENCE"), FALLBACK_EXPERIENCE_MEDIA, "unknown experiences must use fallback artwork");
@@ -57,6 +36,10 @@ const handoverSource = await readFile(new URL("../src/components/HandoverPanel.j
 const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
 const retryableLazySource = await readFile(new URL("../src/components/RetryableLazy.jsx", import.meta.url), "utf8");
 const mainSource = await readFile(new URL("../src/main.jsx", import.meta.url), "utf8");
+const voxiPromptSource = await readFile(new URL("../src/lib/voxiPrompt.js", import.meta.url), "utf8");
+const offerFactsSource = await readFile(new URL("../src/offers/offerFacts.js", import.meta.url), "utf8");
+const i18nProviderSource = await readFile(new URL("../src/i18n/I18nProvider.jsx", import.meta.url), "utf8");
+const bookingStoreSource = await readFile(new URL("../src/bookingStore.js", import.meta.url), "utf8");
 assert.match(richMediaSource, /requestedTarget != null && Number\.isFinite\(numericTarget\) && numericTarget > 0 \? numericTarget : null/, "an absent conversational seat target must not render as a stray zero above the screen");
 for (const key of ["booking.cinema", "booking.performance", "booking.status"]) assert.match(richMediaSource, new RegExp(key.replace(".", "\\.")), `${key} must be shown on booking confirmation`);
 for (const field of ["cinemaName", "booking.date", "history.cancelled", "history.active"]) assert.match(historySource, new RegExp(field.replace(".", "\\.")), `${field} must be represented in booking history`);
@@ -69,15 +52,38 @@ assert.match(richMediaSource, /uniqueDisplayParts\(s\.exp, s\.screen\)\.slice\(1
 assert.match(historySource, /booking\.performanceDate\s*\|\|\s*booking\.sourceDate\s*\|\|\s*booking\.date/, "booking history must use the actual performance date fallback chain");
 assert.match(richMediaSource, /m\.language\s*\|\|\s*""/, "movie cards must show language even when runtime is present");
 assert.match(qrSource, /booking\.qrDemoHint/, "reference QR codes must direct guests to their official VOX ticket for entry");
+assert.match(qrSource, /booking\.deviceRef/, "device-only reference QR titles must not claim a provider booking reference");
 assert.match(qrSource, /const providerQrValue =/, "verified bookings must require an explicit provider admission QR payload");
 assert.match(qrSource, /if \(!qrValue\)/, "a verified booking without a provider QR payload must not encode its bare reference as an entry ticket");
-assert.match(retryableLazySource, /useMemo\(\(\) => React\.lazy\(loader\), \[loader, attempt\]\)/, "retrying a failed lazy panel must create a fresh lazy importer instead of rethrowing React's cached rejection");
+assert.match(retryableLazySource, /React\.lazy\([\s\S]*useCurrentManifest[\s\S]*loadCurrentChunkFromManifest[\s\S]*@vite-ignore[\s\S]*retryUrl[\s\S]*: loader[\s\S]*\[loader, manifestKey, attempt, retryUrl, useCurrentManifest, failedChunkUrl\]/, "retrying a failed lazy panel must create a fresh current-release importer instead of rethrowing React's cached rejection");
+assert.match(retryableLazySource, /const onStaleVersionRef = React\.useRef\(onStaleVersion\)[\s\S]*onStaleVersionRef\.current = onStaleVersion/, "the latest stale-version callback must be retained without changing the lazy component type");
+assert.doesNotMatch(retryableLazySource, /\[[^\]]*\bonStaleVersion\b[^\]]*\]/, "stale-version callback identity changes must not remount an active lazy transport");
 assert.match(retryableLazySource, /failed to fetch dynamically imported module[\s\S]*chunkloaderror/i, "the lazy boundary must recognize deployed chunk loading failures");
-assert.match(retryableLazySource, /isChunkLoadError\(error\)[\s\S]*window\.location\.reload\(\)[\s\S]*return;[\s\S]*setAttempt\(\(current\) => current \+ 1\)/, "chunk failures must reload the page while ordinary render errors may remount the lazy panel");
+assert.match(retryableLazySource, /function buildChunkRetryUrl[\s\S]*chunk\.origin !== base\.origin[\s\S]*voxi_retry[\s\S]*return chunk\.href/, "chunk retries must use a same-origin cache-busted module URL");
+assert.match(retryableLazySource, /canUseManifest = chunkError[\s\S]*setUseCurrentManifest\(canUseManifest\)[\s\S]*setRetryUrl\([\s\S]*buildChunkRetryUrl[\s\S]*setAttempt\(nextAttempt\)/, "chunk failures must prefer the current manifest and retain a same-release cache-busted fallback");
+assert.match(retryableLazySource, /failed\.pathname !== chunk\.pathname[\s\S]*onStaleVersion[\s\S]*reloadImpl\(\)/, "a changed deployment hash must preserve the journey before refreshing to the current release");
+assert.match(appSource, /saveReleaseJourneyRecovery[\s\S]*preserveJourneyForReleaseReload[\s\S]*onStaleVersion=\{preserveJourneyForReleaseReload\}/, "release refreshes must keep bounded session-scoped journey state");
+assert.match(appSource, /RELEASE_RECOVERABLE_STAGE_VIEWS = new Set\(\[[\s\S]*"empty"[\s\S]*"discovery"/, "release recovery must preserve a safe empty or FAQ-only conversation");
+assert.match(appSource, /function isSafeReleaseJourneyRecoveryRecord[\s\S]*function takeReleaseJourneyRecovery/, "release recovery must use one bounded nested schema");
+assert.match(appSource, /const recovery = \{ \.\.\.value, version: 1, savedAt: Date\.now\(\) \};[\s\S]*if \(!isSafeReleaseJourneyRecoveryRecord\(recovery, recovery\.savedAt\)\) return false/, "unsupported recovery state must never authorize a release reload");
+assert.match(appSource, /typeof value === "boolean"[\s\S]*isSafeReleaseRecoveryLocalizedText/, "boolean cinema error state must remain safely recoverable");
+assert.match(appSource, /activeStage\?\.view === "loading"[\s\S]*view: "discovery"/, "transient loading stages must recover to an interactive discovery prompt");
+assert.match(appSource, /function isSafeReleaseRecoveryPlanMeta[\s\S]*warning[\s\S]*verified/, "release recovery must validate renderable seat-plan metadata");
+assert.match(appSource, /function releaseRecoveryTransactionsMatch[\s\S]*function isConsistentReleaseRecoveryStage/, "release recovery must reject contradictory checkout identities");
+assert.match(appSource, /checkoutPaymentActiveRef\.current[\s\S]*cancellationFlowRef\.current[\s\S]*return false/, "release rollover must not interrupt a review save or cancellation confirmation");
+assert.match(retryableLazySource, /componentRef = null[\s\S]*componentRef \? \{ ref: componentRef \}/, "the isolated transport must retain its imperative ref through the retryable lazy boundary");
 assert.match(retryableLazySource, /fallback=\{\(\{ error \}\) =>[\s\S]*onClick=\{\(\) => retry\(error\)\}/, "the retry action must classify the error captured by its boundary");
 assert.match(appSource, /loader=\{loadCheckout\}[\s\S]*errorTitle=\{t\("error\.title"\)\}/, "checkout must use the retryable lazy boundary without discarding the active App journey");
+for (const loader of ["loadElevenLabsTransport", "loadBookingHistory", "loadOffersPanel", "loadHandoverPanel"]) {
+  assert.match(appSource, new RegExp(`<RetryableLazy[\\s\\S]{0,400}loader=\\{${loader}\\}`), `${loader} must render inside its own retryable boundary`);
+}
+assert.match(appSource, /loader=\{loadElevenLabsTransport\}[\s\S]{0,240}componentRef=\{transportRef\}/, "the deferred ElevenLabs transport must keep its imperative connection API");
+assert.doesNotMatch(appSource, /\b(?:React\.)?lazy\s*\(|<Suspense\b/, "App must not contain a raw lazy render that can escape a feature-local boundary");
 assert.match(richMediaSource, /loader=\{loadBookingQRCode\}[\s\S]*retryLabel=\{t\("error\.retry"\)\}/, "the booking QR must recover from a transient chunk load failure in place");
 assert.match(mainSource, /failed to fetch dynamically imported module[\s\S]*window\.location\.reload\(\)/, "the global boundary must reload for any remaining cached lazy chunk failure");
+assert.match(mainSource, /this\.props\.t\("error\.body"\)/, "the global recovery boundary must render generic localized guidance");
+assert.doesNotMatch(mainSource, /<p\b[^>]*>\{String\(this\.state\.err/, "raw exception details must never be shown to customers");
+for (const locale of ["en", "ar"]) assert.ok(STRINGS[locale]["error.body"], `${locale}: generic recovery guidance is missing`);
 assert.match(richMediaSource, /booking\.noRefundProcessed/, "device-only cancellation must not claim that a refund was initiated");
 assert.match(richMediaSource, /pricing\?\.tiers\?\.standard/, "seat prices must come from pricing metadata");
 assert.match(richMediaSource, /seats\.demoEstimateLabel/, "estimated seat totals must defer final pricing to checkout");
@@ -92,7 +98,8 @@ for (const key of [
   "seats.standardQuoteRequired", "seats.premiumQuoteRequired", "seats.demoPricingNotice",
   "seats.quoteRequiredNotice", "seats.demoEstimateLabel", "seats.quoteRequiredLabel", "checkout.testOnly", "checkout.liveUnavailable",
   "booking.demoConfirmed", "booking.cancelledLocal", "booking.noRefundProcessed", "booking.qrDemoHint", "booking.qrReferenceOnly",
-  "history.demo", "history.cancelledLocal", "history.past", "app.paymentSimulated", "app.dateUnavailable",
+  "history.demo", "history.cancelledLocal", "history.cancelLocal", "history.past", "booking.deviceRef",
+  "checkout.saveSummary", "checkout.saveSummaryHint", "app.paymentSimulated", "app.dateUnavailable",
 ]) {
   assert.ok(STRINGS.en[key], `${key}: English copy missing`);
   assert.ok(STRINGS.ar[key], `${key}: Arabic copy missing`);
@@ -107,18 +114,29 @@ for (const locale of ["en", "ar"]) {
   );
 }
 assert.match(STRINGS.en["checkout.demoDisclaimer"], /does not charge a card or reserve cinema inventory/i, "checkout must keep its transaction-boundary disclosure");
-assert.match(STRINGS.en["checkout.demoDisclaimer"], /Never enter real payment details/i, "checkout must keep its payment-data warning");
+assert.match(STRINGS.en["checkout.demoDisclaimer"], /official VOX booking channel/i, "checkout must direct real purchases to an official channel");
+assert.match(STRINGS.en["checkout.testNotice"], /estimated amount/i, "checkout must disclose that its amount is not an authoritative VOX quote");
+assert.match(STRINGS.en["seats.demoNotice"], /official VOX booking channel/i, "seat guidance must distinguish the official booking channel from this review checkout");
+assert.match(STRINGS.en["offers.disclaimer"], /official VOX website or app checkout/i, "offer eligibility must point to the official VOX website or app checkout");
+assert.match(i18nProviderSource, /safeCurrency[\s\S]*catch[\s\S]*currency: "AED"/, "currency formatting must fail safely even if an untrusted currency reaches the renderer");
 assert.match(STRINGS.en["booking.cancelDemoQuestion"], /Mark booking .* as cancelled on this device/, "device-only cancellation must describe the persisted cancelled state");
 assert.match(STRINGS.en["booking.cancelDemoQuestion"], /will not contact VOX or issue a refund/, "device-only cancellation must keep its transaction-boundary disclosure");
 assert.match(STRINGS.en["booking.cancelledLocal"], /Marked cancelled on this device/, "device-only cancellation must not claim the stored record was removed");
-assert.equal(STRINGS.en["history.cancelledLocal"], "Cancelled", "history must show the persisted record as cancelled");
+assert.equal(STRINGS.en["history.cancelledLocal"], "Cancelled on device", "history must show the device-only cancellation boundary");
+assert.equal(STRINGS.en["history.cancelLocal"], "Mark cancelled", "history must not imply provider cancellation for a device summary");
 assert.match(STRINGS.en["booking.qrDemoHint"], /official VOX ticket/, "reference QR must direct guests to an official admission ticket");
 assert.match(handoverSource, /showDebug\s*=\s*false/, "leadership view must hide handover diagnostics by default");
 assert.match(STRINGS.en["handover.readyBody"], /No external support connection has been started/, "handover must state that it only prepares a summary");
 assert.doesNotMatch(handoverSource, /agent queue|pick up this conversation|UserRound|Headphones/i, "handover presentation must not imply a live agent or queue");
 assert.match(appSource, /connectingStep:\s*t\("handover\.preparingStep"\)/, "handover progress must say preparing rather than connecting");
 assert.doesNotMatch(appSource, /booking (?:was|is) removed from this device|Booking summary [^\n]+ removed only from this device/i, "persisted cancellations must not be described as removed records");
-assert.doesNotMatch(checkoutSource, /Apple Pay \(demo\)|Samsung Pay \(demo\)|last4} \(demo\)/, "payment labels must not leak internal demo suffixes");
+assert.match(voxiPromptSource, /Payment-detail entry is disabled in this widget/, "the voice prompt must match the checkout's disabled cardholder-data entry");
+assert.match(voxiPromptSource, /one guest-controlled Save booking summary action[\s\S]*submits no real payment or reservation/, "the voice prompt must describe only the non-transactional summary action");
+assert.doesNotMatch(voxiPromptSource, /Payment details are entered only in the on-screen checkout/, "the voice prompt must not direct guests to removed payment fields");
+assert.match(richMediaSource, /\["confirmed_demo", "summary_saved", "locally_stored"\]/, "booking cards must classify every device-summary status safely");
+assert.match(historySource, /\["confirmed_demo", "summary_saved", "locally_stored"\]/, "history must classify every device-summary status safely");
+assert.match(bookingStoreSource, /\["confirmed_demo", "summary_saved", "locally_stored"\][\s\S]*result\.verified = false[\s\S]*result\.paymentStatus = "simulated_not_charged"/, "storage normalization must fail closed for contradictory device summaries");
+assert.match(offerFactsSource, /official VOX website or app checkout/, "bank-offer redemption must point to the official VOX checkout");
 assert.doesNotMatch(appSource, /\bPrototype (?:checkout|booking|only)\b|الحجز التجريبي|نموذج تجريبي/i, "conversation copy must not label the overall experience as a prototype");
 assert.match(qrSource, /size\s*=\s*104/, "booking QR should remain compact inside the mobile widget");
 

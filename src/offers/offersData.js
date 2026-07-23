@@ -9,8 +9,8 @@ export const OFFER_META = Object.freeze({
   promotionCount: 21,
   issuerCount: 20,
   disclaimer: {
-    en: "Offer information is for guidance only. Final eligibility is verified at VOX checkout and remains subject to the bank’s current terms.",
-    ar: "معلومات العروض إرشادية. يتم التحقق من الأهلية النهائية عند إتمام الحجز لدى ڤوكس، وتظل خاضعة لشروط البنك الحالية.",
+    en: "Offer details were checked against published VOX sources on 2026-07-17 and are guidance only. Final eligibility is verified only in the official VOX website or app checkout and remains subject to the bank’s current terms.",
+    ar: "تمت مراجعة تفاصيل العروض مقابل مصادر VOX المنشورة بتاريخ 2026-07-17، وهي معلومات إرشادية فقط. يتم التحقق من الأهلية النهائية فقط في صفحة الدفع الرسمية في موقع VOX أو تطبيقه، وتظل خاضعة لشروط البنك الحالية.",
   },
 });
 
@@ -178,8 +178,8 @@ export const OFFERS = Object.freeze([
     "half_price",
     "50% off movie tickets",
     "خصم 50٪ على تذاكر السينما",
-    "VOX currently lists this 50% offer, but its official detail and terms pages do not yet publish eligible card names or conditions.",
-    "تعرض VOX حالياً هذا العرض بخصم 50٪، لكن صفحة التفاصيل والشروط الرسمية لا تنشر بعد أسماء البطاقات المؤهلة أو الأحكام.",
+    "The VOX offer snapshot checked on 2026-07-17 lists this 50% offer, but its official detail and terms pages do not publish eligible card names or conditions.",
+    "تُدرج لقطة عروض VOX التي تمت مراجعتها بتاريخ 2026-07-17 هذا العرض بخصم 50٪، لكن صفحة التفاصيل والشروط الرسمية لا تنشر أسماء البطاقات المؤهلة أو الأحكام.",
     [card(
       "sib-checkout-verification",
       "Eligibility details not yet published",
@@ -335,8 +335,8 @@ export const OFFERS = Object.freeze([
     "Private Visa Infinite adds GOLD and THEATRE; other Infinite cards cover Standard, Premier, KIDS, MAX, IMAX, Premium, Couch and 4DX.",
     "تضيف Private Visa Infinite تجربتي GOLD وTHEATRE، وتشمل بطاقات Infinite الأخرى الفئات الأساسية و4DX.",
     [
-      card("cbd-private-infinite", "Private Visa Infinite", ["CBD Private Visa Infinite", "Private Visa Infinite"], eligibility(["STANDARD", "PREMIER", "KIDS", "MAX", "IMAX", "PREMIUM", "COUCH", "4DX", "GOLD", "THEATRE"], { excludedAt: MOE_THEATRE_EXCLUSION, excludedSeatsByExperience: { IMAX: ["SAPPHIRE"] }, checkoutConfirmation: [{ experiences: ["4DX"], message: "CBD's eligibility table and written 4DX terms conflict; confirm at checkout." }] }), { maxTickets: 6, termsConflict: "The eligibility table states six tickets, while written terms state four; confirm the exact limit with CBD." }),
-      card("cbd-infinite", "Visa Infinite cards", ["CBD Visa Infinite Metal", "CBD Islamic Visa Infinite", "Visa Infinite Covered", "Visa Infinite Conventional"], eligibility(["STANDARD", "PREMIER", "KIDS", "MAX", "IMAX", "PREMIUM", "COUCH", "4DX"], { excludedSeatsByExperience: { IMAX: ["SAPPHIRE"] }, checkoutConfirmation: [{ experiences: ["4DX"], message: "CBD's eligibility table and written 4DX terms conflict; confirm at checkout." }] }), { maxTickets: 6, termsConflict: "The eligibility table states six tickets, while written terms state four; confirm the exact limit with CBD." }),
+      card("cbd-private-infinite", "Private Visa Infinite", ["CBD Private Visa Infinite", "Private Visa Infinite"], eligibility(["STANDARD", "PREMIER", "KIDS", "MAX", "IMAX", "PREMIUM", "COUCH", "4DX", "GOLD", "THEATRE"], { excludedAt: MOE_THEATRE_EXCLUSION, excludedSeatsByExperience: { IMAX: ["SAPPHIRE"] }, checkoutConfirmation: [{ experiences: ["4DX"], message: "CBD's eligibility table and written 4DX terms conflict; confirm in the official VOX website or app checkout." }] }), { maxTickets: 6, termsConflict: "The eligibility table states six tickets, while written terms state four; confirm the exact limit with CBD." }),
+      card("cbd-infinite", "Visa Infinite cards", ["CBD Visa Infinite Metal", "CBD Islamic Visa Infinite", "Visa Infinite Covered", "Visa Infinite Conventional"], eligibility(["STANDARD", "PREMIER", "KIDS", "MAX", "IMAX", "PREMIUM", "COUCH", "4DX"], { excludedSeatsByExperience: { IMAX: ["SAPPHIRE"] }, checkoutConfirmation: [{ experiences: ["4DX"], message: "CBD's eligibility table and written 4DX terms conflict; confirm in the official VOX website or app checkout." }] }), { maxTickets: 6, termsConflict: "The eligibility table states six tickets, while written terms state four; confirm the exact limit with CBD." }),
     ],
   ),
 

@@ -10,10 +10,21 @@ const AVAILABILITY_FIELDS = new Set([
   "sessions",
   "showtimes",
 ]);
-
-function normalizedTitle(value) {
-  return String(value || "").trim().normalize("NFKC").toLocaleLowerCase("en");
-}
+const OFFICIAL_MOVIE_PAGE = /^https:\/\/uae\.voxcinemas\.com\/movies\/[^/?#]+\/?$/u;
+const RUNTIME_STATUSES = new Set([
+  "content_api",
+  "official_detail_page",
+  "retained_official_detail_page",
+  "not_published",
+  "fetch_failed",
+  "deadline_exceeded",
+]);
+const DEFAULT_METADATA_COVERAGE = Object.freeze({
+  rating: 0.8,
+  language: 0.8,
+  genres: 0.8,
+  synopsis: 0.7,
+});
 
 export function validateMovieInformationCatalog(
   payload,
@@ -21,7 +32,9 @@ export function validateMovieInformationCatalog(
     minimumMovies = 80,
     now = new Date(),
     maximumAgeHours = 48,
-    requireReferenceTitles = true,
+    previousCatalog = null,
+    maximumCatalogDropRatio = 0.25,
+    minimumMetadataCoverage = DEFAULT_METADATA_COVERAGE,
   } = {},
 ) {
   const errors = [];
@@ -41,43 +54,89 @@ export function validateMovieInformationCatalog(
     }
   }
   if (movies.length < minimumMovies) errors.push(`official content catalog returned only ${movies.length} movies; expected at least ${minimumMovies}`);
+  if (Array.isArray(previousCatalog?.movies) && previousCatalog.movies.length) {
+    const minimumContinuityCount = Math.ceil(previousCatalog.movies.length * (1 - maximumCatalogDropRatio));
+    if (movies.length < minimumContinuityCount) {
+      errors.push(`official content catalog count dropped more than ${Math.round(maximumCatalogDropRatio * 100)}% (${previousCatalog.movies.length} to ${movies.length})`);
+    }
+  }
+
+  const accountingFields = ["sourceRecordCount", "acceptedRecordCount", "rejectedRecordCount"];
+  const hasSourceAccounting = accountingFields.some((field) => Number.isInteger(payload?.[field]));
+  if (hasSourceAccounting) {
+    for (const field of accountingFields) {
+      if (!Number.isInteger(payload?.[field]) || payload[field] < 0) errors.push(`${field} must be a non-negative integer`);
+    }
+    if (Number.isInteger(payload?.acceptedRecordCount) && payload.acceptedRecordCount !== movies.length) {
+      errors.push("acceptedRecordCount must equal the published movie count");
+    }
+    if (
+      accountingFields.every((field) => Number.isInteger(payload?.[field]))
+      && payload.sourceRecordCount !== payload.acceptedRecordCount + payload.rejectedRecordCount
+    ) {
+      errors.push("source record accounting does not reconcile");
+    }
+    if (Number(payload?.rejectedRecordCount) > 0) errors.push("official source records were rejected during normalization");
+  }
 
   const codes = new Set();
-  const titles = new Map();
+  const metadataCounts = {
+    rating: 0,
+    language: 0,
+    genres: 0,
+    synopsis: 0,
+  };
+  const runtimeStatusCounts = new Map();
   for (const movie of movies) {
     const code = String(movie?.code || "").trim();
     const title = String(movie?.title || "").trim();
     if (!code || !title) errors.push("each movie must contain a code and title");
     if (code && codes.has(code)) errors.push(`duplicate movie code: ${code}`);
     codes.add(code);
-    const titleKey = normalizedTitle(title);
-    if (titleKey) titles.set(titleKey, movie);
     if (movie?.sourceUrl !== MOVIE_INFORMATION_SOURCE_URL) errors.push(`${code || title || "unknown movie"} has non-official source provenance`);
-    if (!/^https:\/\/uae\.voxcinemas\.com\/movies\//u.test(String(movie?.sourcePageUrl || ""))) {
+    const sourcePageUrl = String(movie?.sourcePageUrl || "");
+    const movieUrl = String(movie?.movieUrl || "").replace(/^\/+|\/+$/gu, "");
+    if (!OFFICIAL_MOVIE_PAGE.test(sourcePageUrl)) {
       errors.push(`${code || title || "unknown movie"} is missing an official VOX UAE movie page`);
+    }
+    if (!movieUrl) errors.push(`${code || title || "unknown movie"} is missing its official movie route`);
+    else if (sourcePageUrl !== `https://uae.voxcinemas.com/movies/${movieUrl}`) {
+      errors.push(`${code || title || "unknown movie"} official movie route and source page do not match`);
     }
     for (const field of AVAILABILITY_FIELDS) {
       if (Object.hasOwn(movie || {}, field)) errors.push(`${code || title || "unknown movie"} contains availability field ${field}`);
     }
+    if (String(movie?.rating || "").trim()) metadataCounts.rating += 1;
+    if (String(movie?.languageName || movie?.language || "").trim()) metadataCounts.language += 1;
+    if (Array.isArray(movie?.genres) && movie.genres.length) metadataCounts.genres += 1;
+    if (String(movie?.synopsis || "").trim()) metadataCounts.synopsis += 1;
+
+    const runtimeStatus = String(movie?.runtimeStatus || "");
+    runtimeStatusCounts.set(runtimeStatus, (runtimeStatusCounts.get(runtimeStatus) || 0) + 1);
+    if (!RUNTIME_STATUSES.has(runtimeStatus)) errors.push(`${code || title || "unknown movie"} has an invalid runtime status`);
     if (Number(movie?.runtime) > 0) {
       const runtimeSourceUrl = String(movie?.runtimeSourceUrl || "");
-      if (runtimeSourceUrl !== MOVIE_INFORMATION_SOURCE_URL && !/^https:\/\/uae\.voxcinemas\.com\/movies\//u.test(runtimeSourceUrl)) {
+      if (runtimeSourceUrl !== MOVIE_INFORMATION_SOURCE_URL && !OFFICIAL_MOVIE_PAGE.test(runtimeSourceUrl)) {
         errors.push(`${code || title || "unknown movie"} has runtime without official source provenance`);
       }
+      if (runtimeStatus === "content_api" && runtimeSourceUrl !== MOVIE_INFORMATION_SOURCE_URL) {
+        errors.push(`${code || title || "unknown movie"} content API runtime must cite the official content API`);
+      }
+      if (runtimeStatus === "official_detail_page" && runtimeSourceUrl !== sourcePageUrl) {
+        errors.push(`${code || title || "unknown movie"} detail-page runtime must cite its own official movie page`);
+      }
+    } else if (["content_api", "official_detail_page", "retained_official_detail_page"].includes(runtimeStatus)) {
+      errors.push(`${code || title || "unknown movie"} has a verified runtime status without a runtime`);
     }
     if (FORBIDDEN_CUSTOMER_DASHES.test(JSON.stringify(movie))) errors.push(`${code || title || "unknown movie"} contains a forbidden customer-facing dash`);
   }
 
-  if (requireReferenceTitles) {
-    const ezma = movies.find((movie) => movie.code === "HO00015828" || normalizedTitle(movie.title) === "ezma");
-    if (!ezma) errors.push("official catalog must include the current reference title Ezma");
-    else {
-      if (ezma.code !== "HO00015828") errors.push("Ezma must retain official code HO00015828");
-      if (ezma.rating !== "PG15") errors.push("Ezma must retain the official PG15 age rating");
-      if (ezma.runtime !== 105) errors.push("Ezma must retain the official 105 minute runtime");
-      if (ezma.runtimeSourceUrl !== "https://uae.voxcinemas.com/movies/ezma-arabic") errors.push("Ezma runtime must cite its official VOX UAE detail page");
+  for (const [field, minimumRatio] of Object.entries(minimumMetadataCoverage)) {
+    if (!movies.length || !Number.isFinite(minimumRatio)) continue;
+    const actualRatio = (metadataCounts[field] || 0) / movies.length;
+    if (actualRatio < minimumRatio) {
+      errors.push(`${field} metadata coverage is ${(actualRatio * 100).toFixed(1)}%; expected at least ${(minimumRatio * 100).toFixed(0)}%`);
     }
-    if (!titles.has("the odyssey")) errors.push("official catalog must include the current reference title The Odyssey");
   }
 
   const enrichment = payload?.detailPageRuntimeEnrichment;
@@ -86,8 +145,40 @@ export function validateMovieInformationCatalog(
     if (enrichment.workers < 1 || enrichment.workers > 4) errors.push("detail-page runtime enrichment worker count is outside the safe bound");
     if (enrichment.retries < 1 || enrichment.retries > 2) errors.push("detail-page runtime enrichment retry count is outside the safe bound");
     if (enrichment.totalTimeoutMs < 1 || enrichment.totalTimeoutMs > 120000) errors.push("detail-page runtime enrichment total timeout is outside the safe bound");
+    for (const field of ["requestedCount", "enrichedCount", "failedCount", "timedOutCount", "retainedCount"]) {
+      if (!Number.isInteger(enrichment[field]) || enrichment[field] < 0) errors.push(`detail-page runtime enrichment ${field} must be a non-negative integer`);
+    }
+    const requestedStatusCount = movies.length - (runtimeStatusCounts.get("content_api") || 0);
+    if (enrichment.requestedCount !== requestedStatusCount) errors.push("detail-page runtime enrichment requested count does not reconcile with movie statuses");
+    if (enrichment.enrichedCount !== (runtimeStatusCounts.get("official_detail_page") || 0)) {
+      errors.push("detail-page runtime enrichment enriched count does not reconcile with movie statuses");
+    }
+    if (enrichment.retainedCount !== (runtimeStatusCounts.get("retained_official_detail_page") || 0)) {
+      errors.push("detail-page runtime enrichment retained count does not reconcile with movie statuses");
+    }
+    if (enrichment.failedCount < (runtimeStatusCounts.get("fetch_failed") || 0)) {
+      errors.push("detail-page runtime enrichment failed count is lower than the recorded failed statuses");
+    }
+    if (enrichment.timedOutCount < (runtimeStatusCounts.get("deadline_exceeded") || 0)) {
+      errors.push("detail-page runtime enrichment timed-out count is lower than the recorded timeout statuses");
+    }
+    if (enrichment.enrichedCount + enrichment.failedCount + enrichment.timedOutCount > enrichment.requestedCount) {
+      errors.push("detail-page runtime enrichment outcome counts exceed the requested count");
+    }
   }
 
   if (errors.length) throw new Error(`Movie information catalog validation failed:\n- ${[...new Set(errors)].join("\n- ")}`);
+  return payload;
+}
+
+export function validateScheduledMovieCoverage(payload, schedule) {
+  const informationCodes = new Set((payload?.movies || []).map((movie) => String(movie?.code || "").trim()).filter(Boolean));
+  const scheduledMovies = Array.isArray(schedule?.catalog) ? schedule.catalog : [];
+  const missing = scheduledMovies
+    .filter((movie) => !informationCodes.has(String(movie?.code || "").trim()))
+    .map((movie) => `${movie?.code || "missing-code"} (${movie?.title || "missing title"})`);
+  if (missing.length) {
+    throw new Error(`Movie information catalog validation failed:\n- current scheduled movies are missing from the official information catalog: ${missing.join(", ")}`);
+  }
   return payload;
 }

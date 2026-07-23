@@ -84,7 +84,7 @@ const transportIndex = sendText.indexOf("await startTextSession", fallbackIndex)
 assert.ok(cancellationIndex >= 0 && cancellationIndex < fallbackIndex, "Cancellation must be classified before the offer fallback");
 assert.ok(fallbackIndex >= 0 && fallbackIndex < dismissIndex, "Offer fallback must run before stale transactional views are dismissed");
 assert.ok(dismissIndex < transportIndex, "The general text transport path must remain after the local fallback");
-assert.match(sendText, /localOfferTurn\s*&&\s*\(activeCheckout\s*\|\|\s*!isConnected\)/, "Named offers must be handled deterministically during checkout even when transport is connected");
+assert.match(sendText, /localOfferTurn\s*&&\s*\(activeCheckout\s*\|\|\s*recordSelectorOffer\s*\|\|\s*!isConnected\)/, "Named offers must be handled deterministically during checkout or a visible record-selector journey even when transport is connected");
 assert.match(sendText, /clientTools\.show_offers\(\{/, "Fallback must open the existing rich offer panel");
 assert.match(sendText, /say\("agent", localAnswer\)/, "Fallback must publish the local detail answer");
 assert.match(sendText, /activeCheckout\s*&&\s*isConnected[\s\S]*sendContextualUpdate/, "Connected checkout must receive the exact locally published offer result without a duplicate user turn");
@@ -97,7 +97,7 @@ assert.ok(callbacksStart >= 0 && voiceMessageStart >= 0 && voiceMessageEnd > voi
 const voiceMessages = app.slice(voiceMessageStart, voiceMessageEnd);
 assert.match(voiceMessages, /resolveLocalOfferTextTurn\(safeMessage/, "Voice transcripts must use the same named-offer resolver as typed text");
 assert.match(voiceMessages, /Approved published offer result for the guest's spoken question/, "Voice must receive the grounded checkout offer result before responding");
-assert.match(voiceMessages, /checkoutOfferEvaluation[\s\S]*checkout is preserved but will be hidden[\s\S]*Do not claim the offer was applied/, "Voice offer guidance must hide but preserve checkout and avoid false application claims");
+assert.match(voiceMessages, /checkoutOfferEvaluation[\s\S]*checkout review is preserved but will be hidden[\s\S]*Do not claim the offer was applied/, "Voice offer guidance must hide but preserve checkout and avoid false application claims");
 
 const showOffersStart = app.indexOf("show_offers: async");
 const showOffersEnd = app.indexOf("handover_to_agent:", showOffersStart);

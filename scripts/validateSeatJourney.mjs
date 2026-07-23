@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { createCheckoutTargetSeatEdit, resolveCheckoutSeatEditTurn } from "../src/lib/checkoutConversationRouting.js";
+import {
+  createCheckoutTargetSeatEdit,
+  isExplicitCheckoutTicketTargetTurn,
+  resolveCheckoutSeatEditTurn,
+} from "../src/lib/checkoutConversationRouting.js";
 import { createSeatToolAuthorization, matchesSeatToolAuthorization, normalizeSeatIds, resolveSeatEditSelectionTurn, resolveSeatSelectionTurn, resolveSeatToolInput, SEAT_TOOL_AUTHORIZATION_TTL_MS } from "../src/lib/seatRouting.js";
 
 const available = ["A1", "A2", "E1", "E2", "H12"];
@@ -52,6 +56,30 @@ assert.deepEqual(addOneFromCheckout, {
   baselineSeats: ["E1", "E2"],
   explicitSeats: [],
 }, "checkout seat editing must retain the relative operation, target, and baseline seats");
+for (const text of [
+  "I don't want to remove one seat",
+  "Do not remove one seat",
+  "Never add another seat",
+  "What happens if I remove one seat?",
+  "Tell me what happens when I add a seat",
+  "Why would I remove a seat?",
+  "If I remove one seat, how much is the total?",
+  "If I add another seat, what will it cost?",
+  "Suppose I remove one seat",
+  "I am not asking you to remove a seat",
+  "I am not asking you to add another seat",
+  "Should I remove one seat?",
+  "Tell me how to remove one seat",
+  "لا تضف مقعدا",
+  "لا أريد حذف مقعد",
+  "ماذا يحدث إذا حذفت مقعدا؟",
+  "لماذا أضف مقعدا؟",
+  "إذا أضفت مقعدا، كم يصبح السعر؟",
+  "كيف أحذف مقعدا؟",
+]) {
+  assert.equal(resolveCheckoutSeatEditTurn(text, { currentSeats: ["E1", "E2"] }).requested, false, `${text}: a negated or hypothetical question must preserve checkout`);
+}
+assert.equal(resolveCheckoutSeatEditTurn("Can I add one seat?", { currentSeats: ["E1", "E2"] }).requested, true, "an affirmative checkout edit question must remain actionable");
 assert.equal(resolveCheckoutSeatEditTurn("add E3", { currentSeats: ["E1", "E2"] }).operation, "add", "an explicit checkout add command must not degrade to replacement");
 assert.equal(resolveCheckoutSeatEditTurn("remove E2", { currentSeats: ["E1", "E2"] }).operation, "remove", "an explicit checkout remove command must retain its operation");
 const explicitMultiAdd = resolveCheckoutSeatEditTurn("add E3 and E4", { currentSeats: ["E1", "E2"] });
@@ -105,6 +133,61 @@ for (const swapPhrase of ["استبدل E1 بـ E3", "غيّر E1 إلى E3", "�
   assert.deepEqual(resolveSeatEditSelectionTurn(swapPhrase, { availableSeatIds: editableSeats, currentSeats: ["E1", "E2"], seatEdit: parsedSwap }).seats, ["E2", "E3"], `${swapPhrase} must remove E1, add E3, and retain E2`);
 }
 
+const removeUnselectedEdit = resolveCheckoutSeatEditTurn("remove E3", { currentSeats: ["E1", "E2"] });
+const removeUnselected = resolveSeatEditSelectionTurn("remove E3", {
+  availableSeatIds: editableSeats,
+  currentSeats: ["E1", "E2"],
+  seatEdit: removeUnselectedEdit,
+});
+assert.equal(removeUnselected.reason, "seat_not_selected", "removing an available but unselected seat must fail locally");
+assert.deepEqual(removeUnselected.invalidSeats, ["E3"]);
+assert.deepEqual(removeUnselected.proposedSeats, ["E1", "E2"], "a rejected removal must preserve the selected seats");
+assert.equal(removeUnselected.targetCount, 2, "a rejected removal must preserve the ticket and pricing count");
+
+const addSelectedEdit = resolveCheckoutSeatEditTurn("add E1", { currentSeats: ["E1", "E2"] });
+const addSelected = resolveSeatEditSelectionTurn("add E1", {
+  availableSeatIds: editableSeats,
+  currentSeats: ["E1", "E2"],
+  seatEdit: addSelectedEdit,
+});
+assert.equal(addSelected.reason, "seat_already_selected", "adding an already-selected seat must fail locally");
+assert.deepEqual(addSelected.invalidSeats, ["E1"]);
+assert.deepEqual(addSelected.proposedSeats, ["E1", "E2"], "a rejected addition must preserve the selected seats");
+assert.equal(addSelected.targetCount, 2, "a rejected addition must preserve the ticket and pricing count");
+
+const unavailableCheckoutEdit = resolveCheckoutSeatEditTurn("remove E9", { currentSeats: ["E1", "E2"] });
+const unavailableCheckoutSeat = resolveSeatEditSelectionTurn("remove E9", {
+  availableSeatIds: editableSeats,
+  currentSeats: ["E1", "E2"],
+  seatEdit: unavailableCheckoutEdit,
+});
+assert.equal(unavailableCheckoutSeat.reason, "invalid_or_unavailable_seats", "an unavailable seat must retain the existing rejection path");
+assert.deepEqual(unavailableCheckoutSeat.invalidSeats, ["E9"]);
+
+const unselectedSwapEdit = resolveCheckoutSeatEditTurn("replace E3 with E4", { currentSeats: ["E1", "E2"] });
+const unselectedSwap = resolveSeatEditSelectionTurn("replace E3 with E4", {
+  availableSeatIds: editableSeats,
+  currentSeats: ["E1", "E2"],
+  seatEdit: unselectedSwapEdit,
+});
+assert.equal(unselectedSwap.reason, "swap_source_not_selected", "a swap source must be selected before it can be replaced");
+assert.deepEqual(unselectedSwap.invalidSeats, ["E3"]);
+assert.deepEqual(unselectedSwap.proposedSeats, ["E1", "E2"], "an invalid swap source must not add the target or change the count");
+assert.equal(unselectedSwap.targetCount, 2);
+
+for (const swapPhrase of ["replace E1 with E2", "swap E1 and E2"]) {
+  const selectedTargetEdit = resolveCheckoutSeatEditTurn(swapPhrase, { currentSeats: ["E1", "E2"] });
+  const selectedTargetSwap = resolveSeatEditSelectionTurn(swapPhrase, {
+    availableSeatIds: editableSeats,
+    currentSeats: ["E1", "E2"],
+    seatEdit: selectedTargetEdit,
+  });
+  assert.equal(selectedTargetSwap.reason, "swap_target_already_selected", `${swapPhrase}: a swap target must not already be selected`);
+  assert.deepEqual(selectedTargetSwap.invalidSeats, ["E2"]);
+  assert.deepEqual(selectedTargetSwap.proposedSeats, ["E1", "E2"], `${swapPhrase}: swapping selected seats must not shrink the selection`);
+  assert.equal(selectedTargetSwap.targetCount, 2);
+}
+
 const removeLastSeat = resolveCheckoutSeatEditTurn("remove E1", { currentSeats: ["E1"] });
 const emptyAfterRemoval = resolveSeatEditSelectionTurn("remove E1", { availableSeatIds: editableSeats, currentSeats: ["E1"], seatEdit: removeLastSeat });
 assert.equal(emptyAfterRemoval.targetMet, true);
@@ -116,6 +199,32 @@ assert.deepEqual(resolveSeatEditSelectionTurn("E3", { availableSeatIds: editable
 const quantityWithLabels = createCheckoutTargetSeatEdit(3, resolveCheckoutSeatEditTurn("I need three tickets, seats E1, E2 and E3", { currentSeats: ["E1", "E2"] }), ["E1", "E2"]);
 assert.equal(quantityWithLabels.operation, "replace");
 assert.deepEqual(quantityWithLabels.explicitSeats, ["E1", "E2", "E3"], "a quantity turn must preserve all same-turn seat labels");
+for (const text of [
+  "three tickets",
+  "I need three tickets",
+  "Please change the number of seats to three",
+  "We need three tickets for the family",
+  "I want two seats together",
+  "Can you change it to three tickets?",
+  "Please make it 3 tickets",
+  "أريد ثلاثة تذاكر",
+  "ثلاثة مقاعد",
+  "تذكرتين",
+  "أريد تذكرتين",
+  "مقعدين",
+  "أحتاج مقعدين",
+  "شخصين",
+]) {
+  assert.equal(isExplicitCheckoutTicketTargetTurn(text), true, `${text}: an explicit checkout ticket target must return to seat editing`);
+}
+for (const text of [
+  "Can I use the FAB offer for 2 tickets?",
+  "What is the refund policy for two tickets?",
+  "Are two seats eligible for the offer?",
+  "هل عرض فاب صالح لتذكرتين؟",
+]) {
+  assert.equal(isExplicitCheckoutTicketTargetTurn(text), false, `${text}: an offer or policy question must preserve checkout`);
+}
 
 const asrAddedSeat = resolveSeatEditSelectionTurn("Any three", {
   availableSeatIds: editableSeats,
@@ -179,7 +288,7 @@ for (const [label, flow] of [["voice", voiceFlow], ["typed", typedFlow]]) {
 const checkoutSeatEditRoute = app.slice(app.indexOf("const routeCheckoutSeatEditTurn"), app.indexOf("const routeCancellationTurn"));
 assert.match(checkoutSeatEditRoute, /backToSeatMapFromCheckout\([\s\S]*explicitSeats\?\.length[\s\S]*resolveVisibleSeatTurn\(text\)[\s\S]*routeSeatSelectionTurn\(text, resolvedTurn\)/, "one checkout utterance must restore the map, resolve its labels, and apply them without repetition");
 
-const finalizeSeats = app.slice(app.indexOf("const finalizeSeats"), app.indexOf("const handlePaid"));
+const finalizeSeats = app.slice(app.indexOf("const finalizeSeats"), app.indexOf("const handleCheckoutReviewComplete"));
 const clearSeatSelection = app.slice(app.indexOf("const clearSeatSelection"), app.indexOf("const refreshSeatQuote"));
 assert.match(clearSeatSelection, /clearPendingOrder\(\)[\s\S]*seatsRef\.current = \[\][\s\S]*setSelectedSeats\(\[\]\)[\s\S]*setSeatQuote\(null\)/, "the central upstream invalidator must clear actual seats, checkout, and pricing");
 assert.match(finalizeSeats, /seatsRef\.current = \[\.\.\.valid\][\s\S]*setSelectedSeats\(\[\.\.\.valid\]\)/, "confirmed seat state must stay synchronized with checkout and Back navigation");
@@ -191,7 +300,7 @@ assert.match(finalizeSeats, /ticketQuantity:\s*valid\.length/, "checkout ticket 
 assert.match(finalizeSeats, /catch \(error\) \{[\s\S]{0,180}!selectionIsCurrent\(\)[\s\S]{0,100}stale: true/, "an abandoned pricing error must be treated as stale rather than rendered on a newer panel");
 
 const selectSeats = app.slice(app.indexOf("select_seats: async"), app.indexOf("show_booking_summary:"));
-const sharedSeatConfirmation = app.slice(app.indexOf("const priceSeatSelection"), app.indexOf("const handlePaid"));
+const sharedSeatConfirmation = app.slice(app.indexOf("const priceSeatSelection"), app.indexOf("const handleCheckoutReviewComplete"));
 const touchSeatConfirmation = app.slice(app.indexOf("const confirmSeats"), app.indexOf("const completeCancellation"));
 assert.match(selectSeats, /resolveSeatToolInput\(seats, \{ availableSeatIds, currentSeats: seatsRef\.current \}\)/, "the client tool must use the tested invalid-seat/fallback resolver");
 assert.match(selectSeats, /invalidSeats\.length[\s\S]*invalid or unavailable/, "explicit invalid or unavailable seats must fail before pricing");
@@ -207,7 +316,7 @@ assert.match(selectSeats, /completedOrder\?\.checkoutId && sameSeatSelection\(id
 assert.match(app, /result\.currentView === "seatmap"[\s\S]*do not say the seat map remains visible/, "stale confirmation messaging must reflect the panel actually rendered after Back");
 assert.match(selectSeats, /stageRef\.current\.view === "checkout"[\s\S]*alreadyConfirmed:\s*true/, "duplicate seat tools must be idempotent once checkout is visible");
 assert.match(app, /visibleStageView === "checkout" && stage\.order && pendingOrder\?\.checkoutId === stage\.order\.checkoutId/, "a checkout may render only while its matching order is active and visible");
-assert.match(prompt, /confirmed select_seats result means checkout is displayed; it does not mean payment or booking confirmation/, "the agent must not turn seat confirmation into a fake booking or reference");
+assert.match(prompt, /confirmed select_seats result means checkout review is displayed; it does not mean payment or booking confirmation/, "the agent must not turn seat confirmation into a fake booking or reference");
 assert.doesNotMatch(app, /TicketQuantityControl|ticketQuantityRef|quantity_mismatch/, "the separate ticket quantity stage and exact-count gate must be removed");
 assert.match(app, /current\.length >= MAX_TICKETS/, "seat selection must be limited only by the booking maximum");
 assert.match(app, /const backToSeatMapFromCheckout[\s\S]*restoredSeats[\s\S]*view:\s*"seatmap"/, "checkout Back must restore the editable seat map and its selected seats");

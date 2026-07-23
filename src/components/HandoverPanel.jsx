@@ -52,6 +52,7 @@ export function HandoverPanel({
 
   return (
     <section
+      aria-labelledby="handover-heading"
       aria-live="polite"
       aria-busy={!isReady}
       data-testid="handover-panel"
@@ -82,7 +83,7 @@ export function HandoverPanel({
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px 8px" }}>
-              <h2 style={{ margin: 0, fontSize: 16, lineHeight: 1.25, color: C.text }}>{title}</h2>
+              <h2 id="handover-heading" style={{ margin: 0, fontSize: 16, lineHeight: 1.25, color: C.text }}>{title}</h2>
               <span style={{
                 borderRadius: 999,
                 background: C.surfaceAlt,

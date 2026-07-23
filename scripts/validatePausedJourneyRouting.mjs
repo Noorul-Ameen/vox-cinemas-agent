@@ -45,5 +45,18 @@ assert.equal(pausedResumeTarget("pay now", { affirmativeRecoveryPending: true })
 assert.equal(isResumeCheckoutTurn("Return to checkout"), true);
 assert.equal(pausedResumeTarget("What does PG mean?"), null);
 assert.equal(pausedResumeTarget("Cancel my booking"), null, "record cancellation must not be mistaken for journey restoration");
+for (const targetedSelection of [
+  "Open booking E2E420",
+  "Show booking reference WLR215D",
+  "Open booking Playwright Family Night",
+  "Show showtime 18:30",
+  "Open seats A1 A2",
+]) {
+  assert.equal(
+    pausedResumeTarget(targetedSelection),
+    null,
+    `${targetedSelection}: a targeted selection must not be intercepted as a generic paused-stage restore`,
+  );
+}
 
 console.log("Validated English and Arabic paused-stage routing for booking, showtimes, seats, checkout, cancellation, history, and generic last-step restoration.");

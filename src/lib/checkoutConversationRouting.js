@@ -63,6 +63,14 @@ export function resolveCheckoutSeatEditTurn(value, { currentSeats = [] } = {}) {
   const baselineSeats = normalizeBaselineSeats(currentSeats);
   const explicitSeats = explicitSeatLabels(text);
   if (!text) return Object.freeze({ requested: false, operation: null, amount: null, targetCount: null, baselineSeats, explicitSeats });
+  const guardedEditQuestion = /\b(?:do\s+not|don't|dont|never|no\s+longer)\b[\s\S]*\b(?:add|include|remove|delete|drop|deselect|replace|change|swap|edit|modify|update)\b/iu.test(text)
+    || /\b(?:i|we)\s+(?:do\s+not|don't|dont)\s+(?:want|need|intend)\s+to\s+(?:add|remove|replace|change|edit|update)\b/iu.test(text)
+    || /\b(?:i|we)\s+(?:am|are)\s+not\s+asking\s+(?:you\s+)?to\s+(?:add|remove|replace|change|edit|update)\b/iu.test(text)
+    || /^(?:if\s+i|if\s+we|suppose\s+i|suppose\s+we|assuming\s+i|assuming\s+we|imagine\s+i|imagine\s+we|what\s+happens\s+(?:if|when)|tell\s+me\s+what\s+happens\s+(?:if|when)|what\s+if|why\s+would|how\s+would|should\s+i|should\s+we|tell\s+me\s+how\s+to|how\s+(?:do|can|could|would)\s+(?:i|we))\b[\s\S]*\b(?:add|include|remove|delete|drop|deselect|replace|change|swap|edit|modify|update)\b/iu.test(text)
+    || /(?:لا\s+(?:تضف|تحذف|تزل|تغير|تبدل)|لا\s+(?:اريد|أريد|احتاج|أحتاج)\s+(?:ان|أن)?\s*(?:اضيف|أضيف|اضافة|إضافة|احذف|أحذف|حذف|اغير|أغير|تغيير)|(?:اذا|إذا|لو)\s+(?:اضفت|أضفت|حذفت|غيرت|غيّرت)|ماذا\s+يحدث\s+(?:اذا|إذا)|لماذا\s+(?:اضف|أضف|اضيف|أضيف|احذف|أحذف|اغير|أغير)|هل\s+تنصحني|كيف\s+(?:اضيف|أضيف|احذف|أحذف|اغير|أغير)).*(?:مقعد|مقاعد)/u.test(text);
+  if (guardedEditQuestion) {
+    return Object.freeze({ requested: false, operation: null, amount: null, targetCount: null, baselineSeats, explicitSeats });
+  }
 
   const englishSwap = text.match(/\b(?:replace|change)\s+(?:(?:my|the)\s+)?(?:seat\s+)?([a-z])\s*(\d{1,2})\s+(?:with|for|to)\s+(?:(?:my|the)\s+)?(?:seat\s+)?([a-z])\s*(\d{1,2})\b/iu)
     || text.match(/\bswap\s+(?:(?:my|the)\s+)?(?:seat\s+)?([a-z])\s*(\d{1,2})\s+(?:with|for|to|and)\s+(?:(?:my|the)\s+)?(?:seat\s+)?([a-z])\s*(\d{1,2})\b/iu)
@@ -188,6 +196,39 @@ function isCheckoutSeatEditTurnLegacy(value) {
 
 export function isCheckoutSeatEditTurn(value) {
   return resolveCheckoutSeatEditTurn(value).requested;
+}
+
+export function isExplicitCheckoutTicketTargetTurn(value) {
+  const text = clean(value).toLowerCase();
+  if (!text) return false;
+  const count = "(?:one|two|three|four|five|six|seven|eight|nine|ten|\\d{1,2})";
+  const units = "(?:people|persons?|tickets?|seats?)";
+  const bareTarget = new RegExp(`^(?:the\\s+)?${count}\\s*${units}(?:\\s+please)?$`, "iu");
+  const requestedTarget = new RegExp(
+    `^(?:please\\s+)?(?:i|we)\\s+(?:need|want|would\\s+like)\\s+${count}\\s*${units}(?:\\s+(?:for\\s+(?:my|our|the)\\s+family|together|in\\s+total|total))?(?:\\s+please)?$`,
+    "iu",
+  );
+  const imperativeTarget = new RegExp(
+    `^(?:please\\s+)?(?:give\\s+me|book|select|choose)\\s+${count}\\s*${units}(?:\\s+please)?$`,
+    "iu",
+  );
+  const adjustedTarget = new RegExp(
+    `^(?:please\\s+)?(?:make|change|set|update)\\b[\\s\\S]*\\b(?:tickets?|seats?)\\b[\\s\\S]*\\b${count}\\b(?:\\s+please)?$`,
+    "iu",
+  );
+  const adjustedCountFirstTarget = new RegExp(
+    `^(?:please\\s+)?(?:(?:can|could|would|will)\\s+you\\s+)?(?:make|change|set|update)\\b[\\s\\S]*?(?:to\\s+)?${count}\\s*${units}(?:\\s+please)?$`,
+    "iu",
+  );
+  if (bareTarget.test(text) || requestedTarget.test(text) || imperativeTarget.test(text) || adjustedTarget.test(text) || adjustedCountFirstTarget.test(text)) return true;
+
+  const arabicUnits = /(?:تذكرتين|تذاكر|تذكرة|تذكره|مقعدين|مقاعد|مقعد|شخصين|أشخاص|اشخاص|شخص)/u;
+  const arabicRequest = /^(?:من فضلك\s+)?(?:أريد|اريد|أحتاج|احتاج|أبي|ابي|أبغى|ابغى|نريد)\s+[\s\S]*(?:تذكرتين|تذاكر|تذكرة|تذكره|مقعدين|مقاعد|مقعد|شخصين|أشخاص|اشخاص|شخص)(?:\s+من فضلك)?$/u;
+  const arabicAdjustment = /^(?:من فضلك\s+)?(?:اجعل|غيّر|غير|عدّل|عدل|اضبط)\b/u;
+  const arabicBare = /^(?:(?:واحد(?:ة)?|اثنان|اثنين|اتنين|ثلاثة|ثلاث|أربعة|اربعة|أربع|اربع|خمسة|خمس|ستة|ست|سبعة|سبع|ثمانية|ثمان|تسعة|تسع|عشرة|عشر|\d{1,2})\s*(?:تذاكر|تذكرة|تذكره|مقاعد|مقعد|أشخاص|اشخاص|شخص)|تذكرتين|مقعدين|شخصين)$/u;
+  return arabicBare.test(text)
+    || arabicRequest.test(text)
+    || (arabicAdjustment.test(text) && arabicUnits.test(text));
 }
 
 export function createCheckoutTargetSeatEdit(targetCount, parsedEdit, currentSeats = []) {

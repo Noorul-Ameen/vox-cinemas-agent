@@ -10,7 +10,7 @@ export default function BookingQRCode({ booking, size = 104 }) {
   const isReferenceOnly = booking?.verified !== true
     || booking?.demo === true
     || booking?.paymentStatus === "simulated_not_charged"
-    || booking?.bookingStatus === "confirmed_demo";
+    || ["confirmed_demo", "summary_saved", "locally_stored"].includes(booking?.bookingStatus);
   const providerQrValue = [
     booking?.qrPayload,
     booking?.qrCode,
@@ -36,7 +36,7 @@ export default function BookingQRCode({ booking, size = 104 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, borderTop: `1px dashed ${C.border}`, padding: "15px 20px" }}>
       <div data-qr-value={qrValue} aria-label={`${hint}: ${ref}`} style={{ display: "grid", placeItems: "center", border: `1px solid ${C.border}`, borderRadius: 12, background: C.surface, padding: 9 }}>
-        <QRCodeSVG value={qrValue} size={size} level="M" marginSize={0} title={isReferenceOnly ? `${t("booking.ref")} ${ref}` : hint} />
+        <QRCodeSVG value={qrValue} size={size} level="M" marginSize={0} title={isReferenceOnly ? `${t("booking.deviceRef")} ${ref}` : hint} />
       </div>
       <div style={{ maxWidth: 260, fontSize: 10, lineHeight: 1.4, color: isReferenceOnly ? C.warning : C.muted, textAlign: "center" }}>{hint}</div>
     </div>

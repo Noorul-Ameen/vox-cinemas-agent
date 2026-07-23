@@ -1,3 +1,5 @@
+import { sanitizeSensitiveConversationText } from "./sensitiveText.js";
+
 export const HANDOVER_SCHEMA_VERSION = "voxi.oneview-handover.v1";
 
 export const HANDOVER_TRIGGER = Object.freeze({
@@ -89,12 +91,15 @@ function stableHash(value) {
  * retaining enough prose for an agent to understand the customer's intent.
  */
 export function sanitizeTranscriptText(value, maxLength = 600) {
-  let text = safeString(value, maxLength);
+  let text = value === null || value === undefined
+    ? ""
+    : String(value).replace(/\s+/g, " ").trim();
   if (!text) return "";
+  text = sanitizeSensitiveConversationText(text).safeText
+    .replace(/\[(?:payment number )?removed\]/gi, REDACTED_PAYMENT);
 
   // Labelled values can be sensitive even when they contain only three or four digits.
   text = text
-    .replace(/\b((?:cvv|cvc|security\s*code)\s*(?::|is)?\s*)[\d\s-]{2,7}\d\b/gi, `$1${REDACTED_PAYMENT}`)
     .replace(/\b((?:exp(?:iry|iration)?(?:\s*date)?)\s*(?::|is)?\s*)\d{1,2}\s*[\/-]\s*\d{2,4}\b/gi, `$1${REDACTED_PAYMENT}`)
     .replace(/\b((?:card|account|iban|phone|mobile)(?:\s*(?:number|no\.?))?\s*(?::|is)?\s*)(?:\d[\s.-]*){3,}\d\b/gi, `$1${REDACTED_PAYMENT}`);
 
@@ -105,7 +110,10 @@ export function sanitizeTranscriptText(value, maxLength = 600) {
   // showtime/date combinations such as "20:30 on 08/15".
   text = text.replace(/\d{6,}/g, REDACTED_NUMERIC);
 
-  return text.replace(/(?:\[redacted numeric data\]\s*){2,}/gi, `${REDACTED_NUMERIC} `).trim();
+  return text
+    .replace(/(?:\[redacted numeric data\]\s*){2,}/gi, `${REDACTED_NUMERIC} `)
+    .trim()
+    .slice(0, maxLength);
 }
 
 /**
@@ -284,7 +292,7 @@ function derivedSummary(context, trigger) {
 }
 
 /**
- * Creates the allowlist-only payload that the prototype presents as the
+ * Creates the allowlist-only payload that Voxi presents as the prepared
  * OneView handover event. The function has no clock or random-number side
  * effects: callers supply requestedAt/conversationId when those are available.
  */
@@ -339,9 +347,9 @@ export function buildHandoverPayload(input = {}) {
     },
     integration: {
       destination: "OneView",
-      payloadMode: "prototype",
+      payloadMode: "local_summary_only",
       paymentDataIncluded: false,
-      transcriptSanitization: "digit-heavy-redaction.v1",
+      transcriptSanitization: "bilingual-credential-redaction.v2",
     },
   });
 }

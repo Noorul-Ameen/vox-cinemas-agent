@@ -8,6 +8,7 @@ import {
   resolveMovieForInformationQuestion,
   resolveRatingMeaning,
 } from "./movieRating.js";
+import { isExplicitMovieTransactionTurn } from "./movieInformationPrefilter.js";
 
 const clean = (value) => normalizeCustomerFacingText(String(value ?? "").replace(/\s+/g, " ").trim());
 const localeText = (locale, en, ar) => locale === "ar" ? ar : en;
@@ -36,6 +37,7 @@ const DISCOVERY_COMMAND_PATTERN = /^(?:show|find|list|suggest|recommend|book|i w
 export function classifyMovieInformationQuestion(input) {
   const text = clean(typeof input === "object" && input !== null ? input.text ?? input.query : input);
   if (!text) return null;
+  if (isExplicitMovieTransactionTurn(text)) return null;
   const normalizedText = normalize(text);
   const pluralDiscoveryCollection = /\b(?:movies|films|showtimes|options|choices)\b/iu.test(normalizedText)
     && !/\b(?:these|those|their)\b/iu.test(normalizedText);
@@ -45,7 +47,6 @@ export function classifyMovieInformationQuestion(input) {
   const rating = isMovieRatingQuestion(text) || /\b(?:ratings|certificates)\b|(?:التصنيفات|التقييمات)/iu.test(text);
   if (rating && DISCOVERY_COMMAND_PATTERN.test(normalizedText) && /\b(?:g|pg|pg13|pg15|15\+|18\+|21\+|18tc)\b/i.test(text)) return null;
   if (rating) return "rating";
-  if (SYNOPSIS_PATTERN.test(text)) return "synopsis";
   if (SUBTITLE_PATTERN.test(text)) return "subtitles";
   if (LANGUAGE_PATTERN.test(text)) return "language";
   if (RUNTIME_PATTERN.test(text)) return "runtime";
@@ -54,6 +55,7 @@ export function classifyMovieInformationQuestion(input) {
   if (TRAILER_PATTERN.test(text)) return "trailer";
   if (RELEASE_PATTERN.test(text)) return "release";
   if (DETAILS_PATTERN.test(text)) return "details";
+  if (SYNOPSIS_PATTERN.test(text)) return "synopsis";
   return null;
 }
 
@@ -188,7 +190,7 @@ function answerForTopic({ topic, movie, query, locale, sessions, viewerAge }) {
     const subtitles = subtitlesFor(movie);
     return subtitles.length
       ? localeText(locale, `${title} lists subtitles in ${subtitles.join(", ")}.`, `الترجمة المدرجة لفيلم ${title} هي ${subtitles.join("، ")}.`)
-      : localeText(locale, `The current VOX listing does not specify subtitles for ${title}. Please verify subtitle availability for the exact session at checkout.`, `لا تحدد قائمة ڤوكس الحالية ترجمة لفيلم ${title}. تحقق من توفر الترجمة للعرض المحدد عند الدفع.`);
+      : localeText(locale, `The current VOX listing does not specify subtitles for ${title}. Please verify subtitle availability for the exact session on the official VOX website or app.`, `لا تحدد قائمة ڤوكس الحالية ترجمة لفيلم ${title}. تحقق من توفر الترجمة للعرض المحدد عبر موقع VOX الرسمي أو تطبيقه.`);
   }
   if (topic === "runtime") {
     const runtime = runtimeFor(movie);

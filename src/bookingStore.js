@@ -20,6 +20,106 @@ const CUSTOMER_TEXT_FIELDS = [
   "refundRoute",
   "refundReference",
 ];
+const STORED_TEXT_FIELDS = [
+  ...CUSTOMER_TEXT_FIELDS,
+  "movieId",
+  "movieSynopsis",
+  "cinemaId",
+  "sessionId",
+  "ownerId",
+  "date",
+  "sourceDate",
+  "performanceDate",
+  "programmingDate",
+  "showtimeAt",
+  "showtime",
+  "time",
+  "posterUrl",
+  "pricingMode",
+  "quoteId",
+  "paymentStatus",
+  "bookingStatus",
+  "refundStatus",
+  "paidWith",
+  "checkoutId",
+];
+const STORED_NUMBER_FIELDS = [
+  "movieRuntime",
+  "subtotal",
+  "feeTotal",
+  "total",
+  "ticketQuantity",
+  "refundAmount",
+];
+const STORED_BOOLEAN_FIELDS = [
+  "cancelled",
+  "demo",
+  "verified",
+  "pricingVerified",
+  "inventoryVerified",
+  "reservationVerified",
+  "simulationOnly",
+  "refundApplied",
+];
+const STORED_DATE_FIELDS = ["createdAt", "cancelledAt"];
+
+function isOptionalString(value) {
+  return value === null || value === undefined || typeof value === "string";
+}
+
+function isOptionalFiniteNumber(value) {
+  return value === null || value === undefined || (typeof value === "number" && Number.isFinite(value));
+}
+
+function isOptionalAedCurrency(value) {
+  return value === null
+    || value === undefined
+    || value === ""
+    || (typeof value === "string" && value.trim().toUpperCase() === "AED");
+}
+
+function isValidTextArray(value) {
+  return Array.isArray(value) && value.every((item) => typeof item === "string" || typeof item === "number");
+}
+
+function isValidFees(value) {
+  if (!Array.isArray(value)) return false;
+  return value.every((fee) => {
+    if (!fee || typeof fee !== "object" || Array.isArray(fee)) return false;
+    for (const field of ["name", "label", "description"]) {
+      if (own(fee, field) && !isOptionalString(fee[field])) return false;
+    }
+    if (own(fee, "currency") && !isOptionalAedCurrency(fee.currency)) return false;
+    for (const field of ["amount", "value", "total"]) {
+      if (own(fee, field) && !isOptionalFiniteNumber(fee[field])) return false;
+    }
+    return true;
+  });
+}
+
+function isStructurallyValidBooking(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (typeof value.ref !== "string" || !refKey(value.ref) || value.ref.length > 128) return false;
+
+  for (const field of STORED_TEXT_FIELDS) {
+    if (own(value, field) && !isOptionalString(value[field])) return false;
+  }
+  if (own(value, "currency") && !isOptionalAedCurrency(value.currency)) return false;
+  for (const field of STORED_NUMBER_FIELDS) {
+    if (own(value, field) && !isOptionalFiniteNumber(value[field])) return false;
+  }
+  for (const field of STORED_BOOLEAN_FIELDS) {
+    if (own(value, field) && typeof value[field] !== "boolean") return false;
+  }
+  for (const field of STORED_DATE_FIELDS) {
+    if (own(value, field) && !isOptionalString(value[field])) return false;
+  }
+  if (own(value, "seats") && !(typeof value.seats === "string" || isValidTextArray(value.seats))) return false;
+  if (own(value, "movieGenres") && !isValidTextArray(value.movieGenres)) return false;
+  if (own(value, "tint") && !(value.tint === null || value.tint === undefined || isValidTextArray(value.tint))) return false;
+  if (own(value, "fees") && !isValidFees(value.fees)) return false;
+  return true;
+}
 
 export class BookingStorageError extends Error {
   constructor(message, { code = "BOOKING_STORAGE_ERROR", cause } = {}) {
@@ -45,13 +145,13 @@ function normalizeSeats(value) {
 }
 
 function normalizeBooking(value, { partial = false } = {}) {
-  if (!value || typeof value !== "object" || !refKey(value.ref)) return null;
+  if (!isStructurallyValidBooking(value)) return null;
   const result = { ...value, ref: String(value.ref).trim() };
 
   if (own(value, "seats")) result.seats = normalizeSeats(value.seats);
   else if (!partial) result.seats = [];
 
-  if (own(value, "currency")) result.currency = value.currency || "AED";
+  if (own(value, "currency")) result.currency = value.currency ? value.currency.trim().toUpperCase() : "AED";
   else if (!partial) result.currency = "AED";
 
   if (own(value, "cancelled")) result.cancelled = Boolean(value.cancelled);
@@ -74,6 +174,14 @@ function normalizeBooking(value, { partial = false } = {}) {
           ...(typeof fee.description === "string" ? { description: normalizeCustomerFacingText(fee.description) } : {}),
         }
       : fee);
+  }
+
+  if (["confirmed_demo", "summary_saved", "locally_stored"].includes(String(result.bookingStatus || "").toLowerCase())) {
+    result.demo = true;
+    result.verified = false;
+    result.paymentStatus = "simulated_not_charged";
+    result.inventoryVerified = false;
+    result.reservationVerified = false;
   }
 
   if (result.cancelled) {
@@ -120,6 +228,12 @@ function coalesceBookings(bookings) {
   return order.map((key) => byRef.get(key));
 }
 
+function assertValidStoredBookings(bookings) {
+  if (!Array.isArray(bookings) || bookings.some((booking) => !normalizeBooking(booking))) {
+    throw new TypeError("Booking storage contains an invalid booking record.");
+  }
+}
+
 function decodeStoredValue(raw) {
   const parsed = JSON.parse(raw || "[]");
   if (Array.isArray(parsed)) return { bookings: parsed, legacy: true };
@@ -162,7 +276,9 @@ function readAllBookings({ strict = false } = {}) {
     return [];
   }
   try {
-    return coalesceBookings(decodeStoredValue(storage.getItem(BOOKING_STORAGE_KEY)).bookings);
+    const decoded = decodeStoredValue(storage.getItem(BOOKING_STORAGE_KEY));
+    if (strict) assertValidStoredBookings(decoded.bookings);
+    return coalesceBookings(decoded.bookings);
   } catch (cause) {
     if (strict) throw new BookingStorageError("Stored bookings could not be read.", { code: "STORAGE_CORRUPT", cause });
     return [];
@@ -273,6 +389,7 @@ export function getBookingStorageStatus() {
       });
     }
     const value = decodeStoredValue(raw);
+    assertValidStoredBookings(value.bookings);
     return Object.freeze({
       available: true,
       valid: true,

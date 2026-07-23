@@ -5,13 +5,15 @@ import { C } from "../theme.js";
 import { getMediaUrl, getOfferMedia } from "../mediaData.js";
 import { COMMON_OFFER_TERMS, OFFER_META, OFFERS } from "../offers/offersData.js";
 import { benefitLabel, buildOfferFacts, buildProfileFacts } from "../offers/offerFacts.js";
+import { getOfferKnowledgeStatus } from "../offers/offerFreshness.js";
 import { offerContextFingerprint } from "../offers/offerContext.js";
 import { ELIGIBILITY, evaluateOfferEligibility, searchOffers } from "../offers/offerResolver.js";
 
 const COPY = {
   en: {
     title: "Bank offers",
-    subtitle: "{promotions} current promotions across {issuers} offer groups",
+    subtitle: "{promotions} published promotions across {issuers} offer groups. Snapshot {verified}",
+    verificationSubtitle: "Offer information from {issuers} issuer groups was last verified on {verified}.",
     search: "Search bank or card",
     searchLabel: "Search bank offers",
     cardLabel: "Card to check",
@@ -24,6 +26,11 @@ const COPY = {
     guestTerm: "TouchPoints can be used by a VOX member or guest; online-booking rules still apply.",
     foodBenefit: "A secondary Candy Bar benefit may apply; review the full bank terms.",
     verified: "Reference checked",
+    lastVerified: "Last verified",
+    identityOnly: "Cards and card groups in the last verified listing",
+    currentVerificationNeeded: "Current benefit and eligibility require verification.",
+    currentTerms: "Current official terms",
+    staleCheckoutGuidance: "Confirm the card and current offer in the official VOX website or app checkout before relying on it.",
     detailsNeeded: "Details needed to assess eligibility: {fields}.",
     exactCardNeeded: "Choose the exact card name so eligibility is not guessed.",
     membershipLabel: "VOX account status",
@@ -43,14 +50,14 @@ const COPY = {
       monthlyTicketsUsed: "monthly offer usage",
       monthlySpend: "monthly retail spend",
       cinema: "cinema",
-      checkoutVerification: "VOX checkout verification",
+      checkoutVerification: "official VOX website or app checkout verification",
     },
     source: "Official offer page",
     back: "Go back",
     expand: "Show offer details",
     collapse: "Hide offer details",
     atAGlance: "At a glance",
-    activePromotions: "Current promotions",
+    activePromotions: "Published promotions",
     cardTiers: "Cards, limits, and experiences",
     benefit: "Ticket benefit",
     experiences: "Eligible experiences",
@@ -62,8 +69,8 @@ const COPY = {
     officialDetails: "Official details",
     officialTerms: "Full terms",
     checkoutOnly: "Guidance only, not applied",
-    checkoutVerification: "VOX checkout verification",
-    noPublishedDetails: "VOX lists this promotion, but its official detail and terms pages do not publish the eligible cards or conditions.",
+    checkoutVerification: "Official VOX website or app checkout verification",
+    noPublishedDetails: "The VOX snapshot checked on 2026-07-17 lists this promotion, but its official detail and terms pages do not publish the eligible cards or conditions.",
     profileCards: "Cards in this tier",
     noCardList: "No exact card list is published.",
     selectHint: "Select your exact card to check it against the current showtime context.",
@@ -76,7 +83,8 @@ const COPY = {
   },
   ar: {
     title: "عروض البنوك",
-    subtitle: "{promotions} عرضاً حالياً ضمن {issuers} مجموعة عروض",
+    subtitle: "{promotions} عرضاً منشوراً ضمن {issuers} مجموعة عروض. لقطة {verified}",
+    verificationSubtitle: "تم التحقق آخر مرة من معلومات عروض {issuers} جهة إصدار بتاريخ {verified}.",
     search: "ابحث عن البنك أو البطاقة",
     searchLabel: "البحث في عروض البنوك",
     cardLabel: "البطاقة المطلوب التحقق منها",
@@ -89,6 +97,11 @@ const COPY = {
     guestTerm: "يمكن استخدام TouchPoints كعضو أو كضيف، مع استمرار شروط الحجز عبر الإنترنت.",
     foodBenefit: "قد تنطبق ميزة إضافية لدى الكاندي بار؛ راجع شروط البنك الكاملة.",
     verified: "تاريخ مراجعة المرجع",
+    lastVerified: "آخر تحقق",
+    identityOnly: "البطاقات ومجموعات البطاقات في آخر قائمة تم التحقق منها",
+    currentVerificationNeeded: "يجب التحقق من الميزة والأهلية الحالية.",
+    currentTerms: "الشروط الرسمية الحالية",
+    staleCheckoutGuidance: "أكد البطاقة والعرض الحالي في صفحة الدفع الرسمية في موقع VOX أو تطبيقه قبل الاعتماد عليه.",
     detailsNeeded: "نحتاج إلى هذه التفاصيل لتقييم الأهلية: {fields}.",
     exactCardNeeded: "اختر الاسم الدقيق للبطاقة حتى لا يتم تخمين الأهلية.",
     membershipLabel: "حالة حساب VOX",
@@ -108,14 +121,14 @@ const COPY = {
       monthlyTicketsUsed: "الاستخدام الشهري للعرض",
       monthlySpend: "الإنفاق الشهري لدى البنك",
       cinema: "السينما",
-      checkoutVerification: "التحقق عند إتمام الحجز لدى VOX",
+      checkoutVerification: "التحقق في صفحة الدفع الرسمية في موقع VOX أو تطبيقه",
     },
     source: "صفحة العرض الرسمية",
     back: "رجوع",
     expand: "عرض تفاصيل العرض",
     collapse: "إخفاء تفاصيل العرض",
     atAGlance: "نظرة سريعة",
-    activePromotions: "العروض الحالية",
+    activePromotions: "العروض المنشورة",
     cardTiers: "البطاقات والحدود والتجارب",
     benefit: "ميزة التذاكر",
     experiences: "التجارب المؤهلة",
@@ -127,8 +140,8 @@ const COPY = {
     officialDetails: "التفاصيل الرسمية",
     officialTerms: "الشروط الكاملة",
     checkoutOnly: "للاسترشاد فقط، لم يتم تطبيقه",
-    checkoutVerification: "التحقق عند إتمام الحجز لدى VOX",
-    noPublishedDetails: "تعرض VOX هذا العرض، لكن صفحات التفاصيل والشروط الرسمية لا تنشر البطاقات المؤهلة أو الأحكام.",
+    checkoutVerification: "التحقق في صفحة الدفع الرسمية في موقع VOX أو تطبيقه",
+    noPublishedDetails: "تُدرج لقطة VOX التي تمت مراجعتها بتاريخ 2026-07-17 هذا العرض، لكن صفحات التفاصيل والشروط الرسمية لا تنشر البطاقات المؤهلة أو الأحكام.",
     profileCards: "البطاقات في هذه الفئة",
     noCardList: "لم يتم نشر قائمة دقيقة للبطاقات.",
     selectHint: "اختر بطاقتك بدقة للتحقق منها مقابل سياق موعد العرض الحالي.",
@@ -168,11 +181,11 @@ function Status({ result, copy, language }) {
     ? result.status === ELIGIBILITY.ELIGIBLE
       ? "هذه البطاقة مدرجة ضمن الفئات المؤهلة للسياق المحدد."
       : result.status === ELIGIBILITY.INELIGIBLE
-        ? "لا تتحقق جميع شروط هذا العرض في السياق المحدد؛ راجع الشروط أو أكد الأهلية عند الدفع."
+        ? "لا تتحقق جميع شروط هذا العرض في السياق المحدد؛ راجع الشروط أو أكد الأهلية في صفحة الدفع الرسمية في موقع VOX أو تطبيقه."
         : detailsReason
     : result.reason;
   const advisory = language === "ar" && result.advisory
-    ? "يتم التأكيد النهائي للأهلية عند إتمام الحجز لدى ڤوكس."
+    ? "يتم التأكيد النهائي للأهلية في صفحة الدفع الرسمية في موقع VOX أو تطبيقه."
     : result.advisory;
   return (
     <div role="status" aria-live="polite" style={{ borderRadius: 10, background: view.background, padding: "9px 10px" }}>
@@ -211,7 +224,7 @@ function InfoPill({ children, tone = "primary" }) {
 
 function DetailSection({ title, icon: Icon = Info, children, open = false }) {
   return (
-    <details className="offer-detail-section" defaultOpen={open} style={{ borderTop: `1px solid ${C.border}`, padding: "2px 0 1px" }}>
+    <details className="offer-detail-section" open={open || undefined} style={{ borderTop: `1px solid ${C.border}`, padding: "2px 0 1px" }}>
       <summary className="offer-detail-summary" style={{ display: "flex", alignItems: "center", gap: 7, color: C.text, cursor: "pointer", listStyle: "none", fontSize: 12, fontWeight: 800 }}>
         <Icon size={14} aria-hidden="true" color={C.primary} />
         <span style={{ flex: 1 }}>{title}</span>
@@ -285,11 +298,47 @@ function CampaignDetails({ offer, language, copy }) {
   );
 }
 
-function OfferRow({ offer, expanded, onToggle, selectedProfileId, onProfileChange, language, copy, context }) {
+function safeCardIdentities(offer, language) {
+  const isUnsafeIdentity = (value) => /(?:\beligib(?:le|ility)\b|\bpayment\b|\bpay with points\b|\badcb points\b)/iu.test(String(value || ""));
+  const aliases = offer.profiles
+    .flatMap((profile) => profile.aliases || [])
+    .filter((value) => value && !isUnsafeIdentity(value));
+  if (aliases.length) return [...new Set(aliases)];
+  return [...new Set(offer.profiles
+    .map((profile) => localized(profile.name, language))
+    .filter((value) => value && !isUnsafeIdentity(value)))];
+}
+
+function StaleOfferDisclosure({ offer, facts, copy, language }) {
+  const cardIdentities = safeCardIdentities(offer, language);
+  return (
+    <div>
+      <div role="note" style={{ borderRadius: 9, background: C.warningSoft, padding: "9px 10px", color: C.warning, fontSize: 10, lineHeight: 1.5 }}>
+        {facts.knowledgeGuidance}
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <div style={{ marginBottom: 6, color: C.muted, fontSize: 10, fontWeight: 800 }}>{copy.identityOnly}</div>
+        <ChipList items={cardIdentities} emptyText={copy.noCardList} />
+      </div>
+
+      <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 9, color: C.muted, fontSize: 10, lineHeight: 1.5 }}>
+        <div>{copy.lastVerified}: <time dateTime={facts.verifiedDate}>{facts.verifiedDate}</time></div>
+        <div style={{ marginTop: 4 }}>{copy.staleCheckoutGuidance}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 7 }}>
+          <a className="offer-official-link" href={facts.sourceUrl} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 3, color: C.primary }}>{copy.source}<ExternalLink size={11} aria-hidden="true" /></a>
+          <a className="offer-official-link" href={facts.currentTermsUrl} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 3, color: C.primary }}>{copy.currentTerms}<ExternalLink size={11} aria-hidden="true" /></a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OfferRow({ offer, expanded, onToggle, selectedProfileId, onProfileChange, language, copy, context, knowledgeAsOf }) {
   const isRtl = language === "ar";
   const profile = offer.profiles.find((item) => item.id === selectedProfileId) || null;
-  const result = evaluateOfferEligibility(offer, profile, context);
-  const facts = buildOfferFacts(offer, language);
+  const result = evaluateOfferEligibility(offer, profile, context, { asOf: knowledgeAsOf });
+  const facts = buildOfferFacts(offer, language, { asOf: knowledgeAsOf });
   const Arrow = isRtl ? ChevronLeft : ChevronRight;
 
   return (
@@ -303,16 +352,20 @@ function OfferRow({ offer, expanded, onToggle, selectedProfileId, onProfileChang
         aria-label={`${expanded ? copy.collapse : copy.expand}: ${localized(offer.bank, language)}`}
         style={{ display: "flex", width: "100%", alignItems: "center", gap: 10, border: 0, background: "transparent", padding: "11px 12px", color: C.text, textAlign: isRtl ? "right" : "left", cursor: "pointer" }}
       >
-        <OfferMedia media={getOfferMedia(offer)} />
+        <OfferMedia media={facts.knowledgeFresh ? getOfferMedia(offer) : null} />
         <span style={{ minWidth: 0, flex: 1 }}>
           <span style={{ display: "block", overflow: "hidden", color: C.text, fontSize: 13, fontWeight: 800, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{localized(offer.bank, language)}</span>
-          <span style={{ display: "block", marginTop: 2, overflow: "hidden", color: C.muted, fontSize: 11, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{localized(offer.headline, language)}{offer.promotionCount > 1 ? ` (${offer.promotionCount})` : ""}</span>
+          <span style={{ display: "block", marginTop: 2, overflow: "hidden", color: C.muted, fontSize: 11, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{facts.knowledgeFresh ? <>{localized(offer.headline, language)}{offer.promotionCount > 1 ? ` (${offer.promotionCount})` : ""}</> : copy.currentVerificationNeeded}</span>
         </span>
         <Arrow size={16} aria-hidden="true" color={C.muted} style={{ transform: expanded ? "rotate(90deg)" : undefined, transition: "transform .15s ease" }} />
       </button>
 
       {expanded && (
-        <div id={`offer-details-${offer.id}`} role="region" aria-label={`${localized(offer.bank, language)} ${copy.activePromotions}`} style={{ borderTop: `1px solid ${C.border}`, padding: "11px 12px 12px" }}>
+        <div id={`offer-details-${offer.id}`} role="region" aria-label={facts.knowledgeFresh ? `${localized(offer.bank, language)} ${copy.activePromotions}` : localized(offer.bank, language)} style={{ borderTop: `1px solid ${C.border}`, padding: "11px 12px 12px" }}>
+          {!facts.knowledgeFresh ? (
+            <StaleOfferDisclosure offer={offer} facts={facts} copy={copy} language={language} />
+          ) : (
+            <>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 9 }}>
             <InfoPill><Ticket size={10} aria-hidden="true" />{benefitLabel(offer, profile, language)}</InfoPill>
             <InfoPill tone="warning"><ShieldCheck size={10} aria-hidden="true" />{copy.checkoutOnly}</InfoPill>
@@ -374,6 +427,8 @@ function OfferRow({ offer, expanded, onToggle, selectedProfileId, onProfileChang
               <span style={{ color: C.muted }}>{copy.termsChecked}: {offer.verifiedDate}</span>
             </div>
           </DetailSection>
+            </>
+          )}
         </div>
       )}
     </article>
@@ -392,6 +447,7 @@ export function OffersPanel({
   onSelectionChange,
   error,
   onRetry,
+  knowledgeAsOf,
 }) {
   const language = String(locale).toLowerCase().startsWith("ar") ? "ar" : "en";
   const copy = COPY[language];
@@ -405,6 +461,11 @@ export function OffersPanel({
   const contextWithMembership = { ...context, cinemaName: cinemaName || context.cinemaName, experience: experience || context.experience, isMember: membership };
   const resolvedContext = { ...contextWithMembership, fingerprint: offerContextFingerprint(contextWithMembership) };
   const touchpointsOnly = visibleOffers.length === 1 && visibleOffers[0]?.id === "adcb-touchpoints";
+  const knowledge = getOfferKnowledgeStatus({
+    asOf: knowledgeAsOf,
+    verifiedDate: OFFER_META.verifiedDate,
+    sourceUrl: OFFER_META.sourceUrl,
+  });
 
   React.useEffect(() => {
     setQuery(initialQuery);
@@ -428,7 +489,12 @@ export function OffersPanel({
         <span aria-hidden="true" style={{ display: "grid", width: 34, height: 34, placeItems: "center", borderRadius: 9, background: C.primarySoft, color: C.primary }}><CreditCard size={17} /></span>
         <div className="offers-panel-header-copy" style={{ minWidth: 0, flex: 1 }}>
           <h2 id="offers-heading" style={{ margin: 0, color: C.text, fontSize: 16, lineHeight: 1.2 }}>{copy.title}</h2>
-          <div style={{ marginTop: 2, color: C.muted, fontSize: 11, lineHeight: 1.35 }}>{copy.subtitle.replace("{promotions}", OFFER_META.promotionCount).replace("{issuers}", OFFER_META.issuerCount)}</div>
+          <div style={{ marginTop: 2, color: C.muted, fontSize: 11, lineHeight: 1.35 }}>
+            {(knowledge.isFresh ? copy.subtitle : copy.verificationSubtitle)
+              .replace("{promotions}", OFFER_META.promotionCount)
+              .replace("{issuers}", OFFER_META.issuerCount)
+              .replace("{verified}", OFFER_META.verifiedDate)}
+          </div>
         </div>
       </header>
 
@@ -445,7 +511,7 @@ export function OffersPanel({
         />
       </label>
 
-      <label className="offer-membership-control" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(150px, 190px)", alignItems: "center", gap: 8, marginBottom: 9, color: C.muted, fontSize: 11 }}>
+      {knowledge.isFresh && <label className="offer-membership-control" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(150px, 190px)", alignItems: "center", gap: 8, marginBottom: 9, color: C.muted, fontSize: 11 }}>
         <span style={{ flex: 1, fontWeight: 700 }}>{copy.membershipLabel}</span>
         <select
           className="offer-membership-select"
@@ -459,7 +525,7 @@ export function OffersPanel({
               || null;
             const nextContextBase = { ...resolvedContext, isMember: nextMembership };
             const nextContext = { ...nextContextBase, fingerprint: offerContextFingerprint(nextContextBase) };
-            if (selectedOffer && selectedProfile) onSelectionChange?.(evaluateOfferEligibility(selectedOffer, selectedProfile, nextContext));
+            if (selectedOffer && selectedProfile) onSelectionChange?.(evaluateOfferEligibility(selectedOffer, selectedProfile, nextContext, { asOf: knowledgeAsOf }));
           }}
           style={{ width: "100%", maxWidth: 190, border: `1px solid ${C.border}`, borderRadius: 8, background: C.surface, padding: "8px", color: C.text, fontSize: 12 }}
         >
@@ -467,9 +533,9 @@ export function OffersPanel({
           <option value="member">{copy.membershipMember}</option>
           <option value="guest">{copy.membershipGuest}</option>
         </select>
-      </label>
+      </label>}
 
-      <p style={{ margin: "0 1px 10px", color: C.muted, fontSize: 11, lineHeight: 1.4 }}>{touchpointsOnly ? copy.guestTerm : copy.commonTerm}</p>
+      {knowledge.isFresh && <p style={{ margin: "0 1px 10px", color: C.muted, fontSize: 11, lineHeight: 1.4 }}>{touchpointsOnly ? copy.guestTerm : copy.commonTerm}</p>}
       <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
         {!error && visibleOffers.map((offer) => (
           <OfferRow
@@ -483,18 +549,19 @@ export function OffersPanel({
                 const profile = offer.profiles.find((item) => item.id === profiles[offer.id])
                   || offer.profiles.find((item) => item.noCardRequired)
                   || null;
-                if (profile) onSelectionChange?.(evaluateOfferEligibility(offer, profile, resolvedContext));
+                if (profile) onSelectionChange?.(evaluateOfferEligibility(offer, profile, resolvedContext, { asOf: knowledgeAsOf }));
               }
             }}
             selectedProfileId={profiles[offer.id] || ""}
             onProfileChange={(profileId) => {
               setProfiles((current) => ({ ...current, [offer.id]: profileId }));
               const profile = offer.profiles.find((item) => item.id === profileId) || null;
-              onSelectionChange?.(evaluateOfferEligibility(offer, profile, resolvedContext));
+              onSelectionChange?.(evaluateOfferEligibility(offer, profile, resolvedContext, { asOf: knowledgeAsOf }));
             }}
             language={language}
             copy={copy}
             context={resolvedContext}
+            knowledgeAsOf={knowledgeAsOf}
           />
         ))}
         {error && <div role="alert" style={{ border: `1px dashed ${C.warning}`, borderRadius: 11, background: C.warningSoft, padding: 18, color: C.text, fontSize: 11, textAlign: "center" }}>
@@ -505,17 +572,17 @@ export function OffersPanel({
       </div>
 
       <footer style={{ marginTop: 12, borderTop: `1px solid ${C.border}`, paddingTop: 10, color: C.muted, fontSize: 10, lineHeight: 1.5 }}>
-        <div>{localized(OFFER_META.disclaimer, language)}</div>
+        <div>{knowledge.isFresh ? localized(OFFER_META.disclaimer, language) : knowledge.guidance?.[language]}</div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 5 }}>
           <span>{copy.verified}: <time dateTime={OFFER_META.verifiedDate}>{OFFER_META.verifiedDate}</time></span>
           <a className="offer-official-link" href={OFFER_META.sourceUrl} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 3, color: C.primary }}>{copy.source}<ExternalLink size={10} aria-hidden="true" /></a>
         </div>
-        <details style={{ marginTop: 5 }}>
+        {knowledge.isFresh && <details style={{ marginTop: 5 }}>
           <summary className="offer-footer-summary" style={{ cursor: "pointer" }}>{language === "ar" ? "الشروط العامة" : "Common terms"}</summary>
           <ul style={{ margin: "5px 0 0", paddingInlineStart: 17 }}>
             {(touchpointsOnly ? COMMON_OFFER_TERMS[language].slice(1) : COMMON_OFFER_TERMS[language]).map((term, index) => <li key={`${term}-${index}`} style={{ marginTop: 3 }}>{term}</li>)}
           </ul>
-        </details>
+        </details>}
       </footer>
     </section>
   );

@@ -1,4 +1,5 @@
 import { OFFER_META, OFFERS } from "./offersData.js";
+import { getOfferKnowledgeStatus } from "./offerFreshness.js";
 
 export const ELIGIBILITY = Object.freeze({
   ELIGIBLE: "eligible",
@@ -158,7 +159,7 @@ function failure(offer, profile, reason, context) {
   };
 }
 
-function needsDetails(offer, profile, reason, context, missingFields = []) {
+function needsDetails(offer, profile, reason, context, missingFields = [], details = {}) {
   return {
     status: ELIGIBILITY.CARD_REQUIRED,
     eligible: false,
@@ -166,15 +167,36 @@ function needsDetails(offer, profile, reason, context, missingFields = []) {
     cardProfile: profile,
     effectiveBenefit: profile?.benefit || offer?.benefit || null,
     reason,
-    advisory: "Final eligibility is confirmed at VOX checkout.",
+    advisory: "Final eligibility is confirmed only in the official VOX website or app checkout.",
     context,
     contextFingerprint: context?.fingerprint || null,
     missingFields: [...new Set(missingFields)],
+    ...details,
   };
 }
 
-export function evaluateOfferEligibility(offer, profile, context = {}) {
+export function evaluateOfferEligibility(offer, profile, context = {}, { asOf } = {}) {
   if (!offer) return { status: ELIGIBILITY.CARD_REQUIRED, eligible: false, offer: null, cardProfile: null, effectiveBenefit: null, reason: "Choose a bank offer first.", advisory: "", context, contextFingerprint: context?.fingerprint || null };
+  const knowledge = getOfferKnowledgeStatus({
+    asOf,
+    verifiedDate: offer.verifiedDate || OFFER_META.verifiedDate,
+    sourceUrl: offer.termsUrl || offer.detailUrl || offer.sourceUrl || OFFER_META.sourceUrl,
+  });
+  if (!knowledge.isFresh) {
+    return needsDetails(
+      offer,
+      profile,
+      knowledge.guidance.en,
+      context,
+      ["checkoutVerification"],
+      {
+        knowledgeStatus: knowledge.status,
+        knowledgeVerifiedDate: knowledge.verifiedDate,
+        knowledgeValidThrough: knowledge.validThrough,
+        currentTermsUrl: knowledge.sourceUrl,
+      },
+    );
+  }
   if (!profile && !offer.profiles.some((item) => item.noCardRequired)) {
     return { status: ELIGIBILITY.CARD_REQUIRED, eligible: false, offer, cardProfile: null, effectiveBenefit: offer.benefit, reason: `Tell me the exact ${offer.bank.en} card to check eligibility.`, advisory: "", context, contextFingerprint: context?.fingerprint || null };
   }
@@ -191,7 +213,7 @@ export function evaluateOfferEligibility(offer, profile, context = {}) {
     return needsDetails(
       offer,
       selectedProfile,
-      "VOX currently lists this promotion, but has not published the eligible cards or conditions. Check eligibility at VOX checkout.",
+      `The VOX offer snapshot checked on ${OFFER_META.verifiedDate} lists this promotion, but the eligible cards or conditions are not published. Check eligibility in the official VOX website or app checkout.`,
       normalizedContext,
       ["checkoutVerification"],
     );
@@ -311,7 +333,7 @@ export function evaluateOfferEligibility(offer, profile, context = {}) {
       monthlySpend: "monthly retail spend",
       cinema: "cinema",
       seatType: "seat category",
-      checkoutVerification: "VOX checkout verification",
+      checkoutVerification: "official VOX website or app checkout verification",
     };
     const readable = missingFields.map((field) => labels[field]).join(", ");
     return needsDetails(offer, selectedProfile, `More details are needed: ${readable}.`, normalizedContext, missingFields);
@@ -322,7 +344,7 @@ export function evaluateOfferEligibility(offer, profile, context = {}) {
   if (limit?.termsConflict) advisories.push(limit.termsConflict);
   const confirmation = rules.checkoutConfirmation?.find((rule) => !rule.experiences?.length || rule.experiences.includes(experience));
   if (confirmation) advisories.push(confirmation.message);
-  advisories.push("Final eligibility is confirmed at VOX checkout.");
+  advisories.push("Final eligibility is confirmed only in the official VOX website or app checkout.");
 
   return {
     status: ELIGIBILITY.ELIGIBLE,
@@ -370,7 +392,7 @@ export function resolveOffer(query, context = {}, offers = OFFERS) {
         offer: null,
         cardProfile: null,
         reason: "That card name can match more than one published offer. Tell me the issuing bank and exact card name.",
-        advisory: "Final eligibility is confirmed at VOX checkout.",
+        advisory: "Final eligibility is confirmed only in the official VOX website or app checkout.",
         context,
         missingFields: ["bank", "card"],
       };
@@ -394,7 +416,7 @@ export function resolveOffer(query, context = {}, offers = OFFERS) {
         offer: selectedOffer,
         cardProfile: null,
         reason: `That description matches more than one ${selectedOffer.bank.en} card. Tell me the exact card name.`,
-        advisory: "Final eligibility is confirmed at VOX checkout.",
+        advisory: "Final eligibility is confirmed only in the official VOX website or app checkout.",
         context,
         missingFields: ["card"],
       };
@@ -407,7 +429,7 @@ export function resolveOffer(query, context = {}, offers = OFFERS) {
   if (!selectedProfile) {
     const cardHint = cardHintAfterBank(query, selectedOffer);
     if (cardHint) {
-      return { status: ELIGIBILITY.INELIGIBLE, eligible: false, offer: selectedOffer, cardProfile: null, reason: `“${cardHint}” is not in the published eligible-card list for ${selectedOffer.bank.en}.`, advisory: "Check the exact card name or confirm at VOX checkout.", context };
+      return { status: ELIGIBILITY.INELIGIBLE, eligible: false, offer: selectedOffer, cardProfile: null, reason: `“${cardHint}” is not in the published eligible-card list for ${selectedOffer.bank.en}.`, advisory: "Check the exact card name or confirm in the official VOX website or app checkout.", context };
     }
     return evaluateOfferEligibility(selectedOffer, null, context);
   }
@@ -436,7 +458,7 @@ export function resolveOfferForBankAndCard(bankQuery, cardQuery, context = {}, o
     return { status: ELIGIBILITY.INELIGIBLE, eligible: false, offer: null, cardProfile: null, effectiveBenefit: null, reason: `I could not match that bank to the ${OFFER_META.promotionCount} published VOX UAE promotions.`, advisory: "", context, contextFingerprint: context?.fingerprint || null };
   }
   if (!selected.cardMatch || selected.cardMatch.score < 0.72) {
-    return { status: ELIGIBILITY.INELIGIBLE, eligible: false, offer: selected.offer, cardProfile: null, reason: `That card is not in the published eligible-card list for ${selected.offer.bank.en}.`, advisory: "Check the exact card name or confirm at VOX checkout.", context };
+    return { status: ELIGIBILITY.INELIGIBLE, eligible: false, offer: selected.offer, cardProfile: null, reason: `That card is not in the published eligible-card list for ${selected.offer.bank.en}.`, advisory: "Check the exact card name or confirm in the official VOX website or app checkout.", context };
   }
   if (runnerUp?.cardMatch?.score >= 0.72 && selected.cardMatch.score - runnerUp.cardMatch.score < 0.04) {
     return {
@@ -445,7 +467,7 @@ export function resolveOfferForBankAndCard(bankQuery, cardQuery, context = {}, o
       offer: selected.offer,
       cardProfile: null,
       reason: "That bank and card description is ambiguous. Use the full issuing-bank and card names.",
-      advisory: "Final eligibility is confirmed at VOX checkout.",
+      advisory: "Final eligibility is confirmed only in the official VOX website or app checkout.",
       context,
       missingFields: ["bank", "card"],
     };

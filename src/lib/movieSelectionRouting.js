@@ -1,4 +1,4 @@
-import { resolveDiscoveryMovieCandidate } from "./discoveryPreferences.js";
+import { resolveBilingualDiscoveryMovieCandidate } from "./discoveryPreferences.js";
 import { isAmbiguousMovieSelectionUtterance } from "./discoveryResultContext.js";
 
 const clean = (value) => String(value || "")
@@ -21,24 +21,31 @@ const INFORMATION_ONLY = /\b(?:about|details?|information|review|rating|trailer|
  * This deliberately reuses the established fuzzy movie resolver and rejects
  * generic references and informational questions.
  */
-export function resolveVisibleMovieSelectionTurn({ text, stage } = {}) {
+export async function resolveVisibleMovieSelectionTurn({ text, stage } = {}) {
   if (stage?.view !== "movies" || !Array.isArray(stage.movies) || !stage.movies.length) return null;
   const query = clean(text);
   if (!query || isAmbiguousMovieSelectionUtterance(query)) return null;
 
   const explicitTitleQuery = query.replace(/^(?:(?:i(?:'|’)d|i\s+would)\s+like|i\s+(?:choose|chose|select|selected|pick|picked|want)|choose|chose|select|selected|pick|picked|book|watch|اخترت|أختار|اختار|سأختار|أريد|اريد|أود|اود|احجز|أحجز|سأشاهد|اشاهد)\s+(?:(?:the\s+)?(?:movie|film)\s+|فيلم\s+)?/iu, "").trim();
-  const movie = resolveDiscoveryMovieCandidate(stage.movies, query)
-    || (explicitTitleQuery !== query ? resolveDiscoveryMovieCandidate(stage.movies, explicitTitleQuery) : null);
+  const directMovie = await resolveBilingualDiscoveryMovieCandidate(stage.movies, query);
+  const movie = directMovie
+    || (explicitTitleQuery !== query
+      ? await resolveBilingualDiscoveryMovieCandidate(stage.movies, explicitTitleQuery)
+      : null);
   if (!movie) return null;
 
   const title = comparableTitle(movie.title);
   const turn = comparableTitle(query);
   const bareTitle = turn === title;
+  const bilingualBareTitle = Boolean(
+    directMovie
+    && /\p{Script=Arabic}/u.test(query) !== /\p{Script=Arabic}/u.test(String(movie.title || "")),
+  );
   const qualifiedBareTitle = turn === `movie ${title}`
     || turn === `film ${title}`
     || turn === `the movie ${title}`
     || turn === `the film ${title}`
     || turn === `فيلم ${title}`;
 
-  return bareTitle || qualifiedBareTitle || (EXPLICIT_SELECTION.test(query) && !INFORMATION_ONLY.test(query)) ? movie : null;
+  return bareTitle || bilingualBareTitle || qualifiedBareTitle || (EXPLICIT_SELECTION.test(query) && !INFORMATION_ONLY.test(query)) ? movie : null;
 }

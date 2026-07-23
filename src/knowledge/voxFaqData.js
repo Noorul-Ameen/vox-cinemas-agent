@@ -211,8 +211,8 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
       ar: Object.freeze(["عرض البنك", "عرض البطاقة", "عرض تذاكر", "خصم ببطاقتي", "لماذا بطاقتي غير موجودة", "استخدام العرض"]),
     }),
     answer: Object.freeze({
-      en: "Bank offers require a VOX account and appear only when they apply to the selected showtime and eligible card. Choose a showtime and provide the bank and card product so current eligibility can be checked. An offer is not confirmed until checkout accepts it.",
-      ar: "تتطلب العروض البنكية حساب ڤوكس، ولا تظهر إلا عندما تنطبق على موعد العرض والبطاقة المؤهلة. اختر موعد العرض وحدد البنك ونوع البطاقة للتحقق من الأهلية الحالية. لا يُعد العرض مؤكداً إلا بعد قبوله عند الدفع.",
+      en: "Bank offers require a VOX account and appear only when they apply to the selected showtime and eligible card. Choose a showtime and provide the bank and card product so current eligibility can be checked. An offer is not confirmed until it is accepted in the official VOX website or app checkout.",
+      ar: "تتطلب العروض البنكية حساب ڤوكس، ولا تظهر إلا عندما تنطبق على موعد العرض والبطاقة المؤهلة. اختر موعد العرض وحدد البنك ونوع البطاقة للتحقق من الأهلية الحالية. لا يُعد العرض مؤكداً إلا بعد قبوله عند إتمام الحجز عبر موقع VOX الرسمي أو تطبيقه.",
     }),
     delivery: Object.freeze({
       kind: "api",
@@ -393,8 +393,8 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
       ar: Object.freeze(["رصيد ڤوكس", "محفظة ڤوكس", "انتهاء الرصيد", "أين رصيد الاسترداد", "استخدام الرصيد عند الدفع", "رصيد للطعام"]),
     }),
     answer: Object.freeze({
-      en: "In the UAE, 1 VOX credit equals AED 1. Credit is valid for 90 days, is shown in My Account under Wallet, can be used online for tickets and F&B, and is applied automatically at checkout while logged in. It cannot be exchanged for cash.",
-      ar: "في الإمارات يعادل رصيد ڤوكس واحد درهماً إماراتياً واحداً. يكون الرصيد صالحاً لمدة 90 يوماً، ويظهر في المحفظة ضمن حسابي، ويمكن استخدامه إلكترونياً للتذاكر والطعام والمشروبات، ويُطبق تلقائياً عند الدفع بعد تسجيل الدخول. ولا يمكن تحويله إلى نقد.",
+      en: "In the UAE, 1 VOX credit equals AED 1. Credit is valid for 90 days, is shown in My Account under Wallet, can be used online for tickets and F&B, and is applied automatically in the official VOX website or app checkout while logged in. It cannot be exchanged for cash.",
+      ar: "في الإمارات يعادل رصيد ڤوكس واحد درهماً إماراتياً واحداً. يكون الرصيد صالحاً لمدة 90 يوماً، ويظهر في المحفظة ضمن حسابي، ويمكن استخدامه إلكترونياً للتذاكر والطعام والمشروبات، ويُطبق تلقائياً عند إتمام الحجز عبر موقع VOX الرسمي أو تطبيقه بعد تسجيل الدخول. ولا يمكن تحويله إلى نقد.",
     }),
     delivery: STATIC,
     metadata: metadata({

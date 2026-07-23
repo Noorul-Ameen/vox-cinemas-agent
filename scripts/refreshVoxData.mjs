@@ -146,7 +146,12 @@ try {
   await run(process.execPath, extractorArgs, "extract official VOX UAE schedule");
   await retainPreviouslyVerifiedMedia();
   await run(process.execPath, [resolve(root, "scripts/validateShowtimeRefresh.mjs"), nextJson, currentJson], "validate freshness and completeness");
-  await run(process.execPath, [resolve(root, "scripts/validateMovieInformationCatalog.mjs"), nextMovieInformation, nextJson], "validate official movie information catalog");
+  await run(process.execPath, [
+    resolve(root, "scripts/validateMovieInformationCatalog.mjs"),
+    nextMovieInformation,
+    nextJson,
+    currentMovieInformation,
+  ], "validate official movie information catalog");
   await run(python, [resolve(root, "convert_extraction.py"), nextJson, nextModule], "generate Vista-shaped browser data");
   await run(process.execPath, [
     resolve(root, "scripts/generateSnapshotAssets.mjs"),

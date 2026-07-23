@@ -71,7 +71,7 @@ assert.ok(resumableCheckoutRefs.length > 0, "checkout restoration must use a sav
 const resumableCheckoutRef = resumableCheckoutRefs[0];
 
 const clearPendingOrder = sliceBetween(app, "const clearPendingOrder", "const clearSeatSelection", "pending checkout cleanup");
-assert.match(clearPendingOrder, /checkoutPaymentActiveRef\.current[\s\S]*return false/, "active payment authorization must prevent any route from clearing its pending order");
+assert.match(clearPendingOrder, /checkoutPaymentActiveRef\.current[\s\S]*return false/, "an active summary save must prevent any route from clearing its pending order");
 assert.match(clearPendingOrder, /pendingOrderRef\.current\s*=\s*null[\s\S]*setPendingOrder\(null\)/, "pending checkout cleanup must clear ref and React state");
 assert.match(clearPendingOrder, new RegExp(`${resumableCheckoutRef}\\.current\\s*=\\s*null`), "pending checkout cleanup must also clear the saved checkout stage");
 
@@ -161,6 +161,15 @@ const cinemaSelection = sliceBetween(app, "const chooseCinema", "const chooseDat
 assert.match(cinemaSelection, /clearSeatSelection\(\)/, "choosing a different cinema must invalidate the previous checkout");
 const dateSelection = sliceBetween(app, "const chooseDate", "const restoreHistoryReturn", "date selection");
 assert.match(dateSelection, /(?:applyProgrammingDate|clearSeatSelection)\(/, "choosing a date must invalidate the previous checkout");
+const checkoutReturn = sliceBetween(app, "const restoreCheckoutReturnTarget", "const restoreCinemaReturn", "shared checkout side-panel return");
+const historyReturn = sliceBetween(app, "const restoreHistoryReturn", "const openHistory", "history return");
+assert.match(historyReturn, /async\s*\(\)/, "returning from booking history must allow checkout revalidation to complete");
+assert.match(historyReturn, /restoreCheckoutReturnTarget\(target,\s*"history_back"\)/, "returning from booking history to checkout must use the shared session, seat, and pricing revalidation path");
+assert.match(checkoutReturn, /restorePausedJourney\(\{\s*target:\s*"checkout",\s*source\s*\}\)/, "all temporary side-panel returns must revalidate checkout");
+assert.ok(checkoutReturn.indexOf("restorePausedJourney(") < checkoutReturn.indexOf("showStage({\n        view: \"seatmap\""), "side-panel return must attempt checkout revalidation before any safe fallback");
+const cinemaReturn = sliceBetween(app, "const restoreCinemaReturn", "const restoreHistoryReturn", "cinema return");
+assert.match(cinemaReturn, /restoreCheckoutReturnTarget\(target,\s*"cinema_back"\)/, "returning from cinema selection to checkout must revalidate session, seats, and pricing");
+assert.match(mainRender, /onBack=\{\(\) => \{ beginDirectUiUserTurn\(\); void restoreCinemaReturn\(\); \}\}/, "cinema picker Back must use the revalidated return path");
 
 for (const [label, source] of [
   ["cinema picker", sliceBetween(app, "const openCinemaPicker", "const chooseCinema", "cinema picker")],
@@ -176,17 +185,47 @@ assert.match(editSeats, /restoredSeats\s*=\s*\[\.\.\.\(order\.seats/, "Edit seat
 assert.match(editSeats, /clearPendingOrder\(\)/, "editing seats must invalidate the old checkout total before repricing");
 assert.match(editSeats, /view:\s*["']seatmap["']/, "Edit seats must return to the seat map");
 
-const paymentCompletion = sliceBetween(app, "const handlePaid", "CLIENT TOOLS", "payment completion");
-const successfulPayment = paymentCompletion.slice(paymentCompletion.indexOf("setBookings(readBookings())"));
-assert.match(successfulPayment, /clearPendingOrder\(\)/, "successful payment must remove the resumable checkout");
+const checkoutSeatEditRoute = sliceBetween(app, "const routeCheckoutSeatEditTurn", "const isActiveCancellationTargetRepeat", "checkout seat-edit routing");
+assert.ok(
+  checkoutSeatEditRoute.indexOf("resolveSeatEditSelectionTurn(") < checkoutSeatEditRoute.indexOf("backToSeatMapFromCheckout("),
+  "an explicit checkout seat edit must be validated before checkout can be cleared or replaced",
+);
+for (const reason of [
+  "invalid_or_unavailable_seats",
+  "seat_already_selected",
+  "seat_not_selected",
+  "swap_source_or_target_required",
+  "swap_source_not_selected",
+  "swap_target_already_selected",
+]) {
+  assert.match(app, new RegExp(`CHECKOUT_SEAT_EDIT_REJECTION_REASONS[\\s\\S]*"${reason}"`), `${reason} must preserve the current checkout`);
+}
+const rejectedCheckoutPrefix = checkoutSeatEditRoute.slice(0, checkoutSeatEditRoute.indexOf("const restored = backToSeatMapFromCheckout"));
+assert.match(rejectedCheckoutPrefix, /checkoutPreserved:\s*true[\s\S]*seatEditFailureMessage\(preflight\)/, "a rejected explicit edit must return truthful guidance while preserving checkout");
+assert.doesNotMatch(rejectedCheckoutPrefix, /clearPendingOrder\(|setSeatQuote\(|showStage\(/, "checkout preflight rejection must not mutate seats, pricing, or the visible checkout");
+const seatResultContext = sliceBetween(app, "const seatSelectionResultContext", "const routeCheckoutSeatEditTurn", "seat result agent context");
+assert.ok(
+  seatResultContext.indexOf("result?.checkoutPreserved") < seatResultContext.indexOf("stageRef.current.view !== \"seatmap\""),
+  "checkout-preserved guidance must run before the generic seat-map result branch",
+);
+assert.match(seatResultContext, /No seat, ticket count, price, fee, total, or checkout identifier changed/, "the agent must receive exact unchanged-checkout grounding");
+assert.match(seatResultContext, /Do not call select_seats/, "a rejected checkout edit must not trigger an agent seat tool call");
 
-assert.match(checkout, /onPaymentStateChange/, "checkout must report active authorization state to its parent");
-assert.match(checkout, /onPaymentStateChange\?\.\(true\)/, "checkout must lock panel navigation when authorization starts");
-assert.match(checkout, /onPaymentStateChange\?\.\(false\)/, "checkout must release the navigation lock when authorization settles or is cancelled");
-assert.ok((checkout.match(/onPaymentStateChange\?\.\(false\)/g) || []).length >= 2, "checkout must release its payment lock on both completion and cancellation or cleanup");
+const reviewCompletion = sliceBetween(app, "const handleCheckoutReviewComplete", "CLIENT TOOLS", "checkout review completion");
+const successfulReview = reviewCompletion.slice(reviewCompletion.indexOf("setBookings((existing) => upsertBookingRecord(existing, completed))"));
+assert.ok(successfulReview.length > 0, "a completed review must retain the persisted summary in the visible booking state");
+assert.match(successfulReview, /clearPendingOrder\(\)/, "a completed review must remove the resumable checkout");
+assert.match(reviewCompletion, /paymentStatus:\s*"simulated_not_charged"/, "checkout review completion must remain uncharged");
+assert.match(reviewCompletion, /bookingStatus:\s*"summary_saved"/, "checkout review completion must persist only a device summary");
+assert.doesNotMatch(reviewCompletion, /paidWith|paymentStatus:\s*"paid"|reservationVerified:\s*true/, "checkout review completion must not create paid or reserved state");
+
+assert.match(checkout, /onReviewStateChange/, "checkout must report active summary-save state to its parent");
+assert.match(checkout, /onReviewStateChange\?\.\(true\)/, "checkout must lock panel navigation when summary saving starts");
+assert.match(checkout, /onReviewStateChange\?\.\(false\)/, "checkout must release the navigation lock when summary saving settles or is cancelled");
+assert.ok((checkout.match(/onReviewStateChange\?\.\(false\)/g) || []).length >= 2, "checkout must release its review lock on both completion and cancellation or cleanup");
 const stageTransition = sliceBetween(app, "const showStage", "const commitDiscoveryPreferences", "stage transition guard");
-assert.match(stageTransition, /checkoutPaymentActiveRef\.current/, "stage transitions must inspect active payment authorization");
-assert.match(stageTransition, /stageRef\.current\??\.view\s*===\s*["']checkout["'][\s\S]*next\.view\s*!==\s*["']checkout["']/, "active authorization must block displacement from checkout");
-assert.match(mainRender, /<RetryableLazy\b[^>]*loader=\{loadCheckout\}[\s\S]{0,1200}onPaymentStateChange=/, "App must connect retryable checkout authorization state to the displacement guard");
+assert.match(stageTransition, /checkoutPaymentActiveRef\.current/, "stage transitions must inspect an active checkout review save");
+assert.match(stageTransition, /stageRef\.current\??\.view\s*===\s*["']checkout["'][\s\S]*next\.view\s*!==\s*["']checkout["']/, "an active summary save must block displacement from checkout");
+assert.match(mainRender, /<RetryableLazy\b[^>]*loader=\{loadCheckout\}[\s\S]{0,1200}onReviewStateChange=/, "App must connect checkout review state to the displacement guard");
 
-console.log("Validated checkout continuity: FAQ hiding with preserved state, exact EN/AR text and voice resume, checkout revalidation, intentional invalidation, edit-seat repricing, payment lock, and completion cleanup.");
+console.log("Validated checkout continuity: FAQ hiding with preserved state, exact EN/AR text and voice resume, checkout revalidation, intentional invalidation, edit-seat repricing, review lock, and summary cleanup.");
