@@ -2,12 +2,15 @@ name: Refresh VOX UAE showtimes
 
 on:
   schedule:
-    - cron: "30 1 * * *"
+    # 06:30 Asia/Dubai, 30 minutes after the 06:00 programming-day cutoff.
+    - cron: "30 2 * * *"
+    # 10:30 Asia/Dubai on Thursday, a second weekly publication check.
     - cron: "30 6 * * 4"
   workflow_dispatch:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: vox-uae-showtime-refresh
@@ -20,19 +23,19 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Check out main
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: main
           fetch-depth: 0
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: npm
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
 
@@ -43,14 +46,87 @@ jobs:
         run: npm run refresh:data
 
       - name: Commit generated schedule when changed
+        id: commit
         shell: bash
         run: |
+          set -euo pipefail
           if git diff --quiet -- data/vox_showtimes_full.json data/vox_movie_information_catalog.json src/mockVistaData.js src/generated/voxSnapshotManifest.js public/data/vox-snapshot; then
             echo "VOX has not published a schedule change."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "VOXi Showtimes Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/vox_showtimes_full.json data/vox_movie_information_catalog.json src/mockVistaData.js src/generated/voxSnapshotManifest.js public/data/vox-snapshot
           git commit -m "Refresh VOX UAE showtimes"
-          git push origin HEAD:main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Rebase, revalidate, and publish with bounded retries
+        if: steps.commit.outputs.changed == 'true'
+        shell: bash
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+          MAX_PUSH_ATTEMPTS: "3"
+        run: |
+          set -euo pipefail
+
+          for attempt in $(seq 1 "$MAX_PUSH_ATTEMPTS"); do
+            echo "Publish attempt ${attempt} of ${MAX_PUSH_ATTEMPTS}."
+
+            if ! git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main; then
+              echo "::warning::Could not fetch origin/main on attempt ${attempt}."
+            elif ! git rebase origin/main; then
+              git rebase --abort || true
+              echo "::error::The refreshed schedule conflicts with a newer main commit. No schedule was published."
+              exit 1
+            else
+              npm run validate
+              npm run build
+              git diff --check origin/main..HEAD
+
+              if git -c credential.interactive=never push origin HEAD:main; then
+                echo "Published the refreshed schedule on attempt ${attempt}."
+                exit 0
+              fi
+
+              echo "::warning::The push was not accepted on attempt ${attempt}; main may have advanced."
+            fi
+
+            if [ "$attempt" -lt "$MAX_PUSH_ATTEMPTS" ]; then
+              sleep $((attempt * 2))
+            fi
+          done
+
+          echo "::error::The refreshed schedule was not published after ${MAX_PUSH_ATTEMPTS} attempts."
+          exit 1
+
+      - name: Report refresh failure
+        if: failure()
+        shell: bash
+        timeout-minutes: 2
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ALERT_TITLE: VOXi automated showtime refresh failed
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          alert_body=$(printf '%s\n\n%s\n%s\n%s\n' \
+            "The automated VOX UAE showtime refresh did not complete successfully." \
+            "Run: ${RUN_URL}" \
+            "Trigger: ${GITHUB_EVENT_NAME}" \
+            "Commit: ${GITHUB_SHA}")
+          issue_number=$(gh issue list \
+            --state open \
+            --search '"VOXi automated showtime refresh failed" in:title' \
+            --limit 10 \
+            --json number,title \
+            --jq 'map(select(.title == "VOXi automated showtime refresh failed")) | first | .number // empty')
+
+          if [ -n "$issue_number" ]; then
+            gh issue comment "$issue_number" --body "$alert_body"
+          else
+            gh issue create --title "$ALERT_TITLE" --body "$alert_body"
+          fi
