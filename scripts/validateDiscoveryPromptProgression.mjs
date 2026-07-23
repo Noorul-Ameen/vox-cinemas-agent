@@ -217,6 +217,16 @@ assert.ok(
   guardCallIndex < transportMessageFlow.lastIndexOf("say(role, displayedMessage)"),
   "the rendered-card claim guard must run before an agent message is added to the visible conversation",
 );
+assert.match(
+  app,
+  /const visibleNoResultsReason = stageVisibleRef\.current\s*&&\s*stageRef\.current\.view === "movies"\s*&&\s*!stageRef\.current\.movies\?\.length/,
+  "contextual open-choice recovery must only inspect an immediately visible empty movie result",
+);
+assert.match(
+  app,
+  /const contextualOpenChoiceOnly = isOpenDiscoveryChoiceReply\(rawTurn\)[\s\S]*rawPreferencePatch\.provided\.every[\s\S]*visibleNoResultsReason === "no_results_for_criteria"\s*&&\s*contextualOpenChoiceOnly[\s\S]*shown: "preference clarification"/,
+  "an ambiguous multi-criterion empty result must request one preference change without reloading an unchanged result",
+);
 
 const seed = createDiscoveryPreferences({
   cinemaId: mall.id,

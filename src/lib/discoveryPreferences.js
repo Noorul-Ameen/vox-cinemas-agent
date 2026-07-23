@@ -586,8 +586,28 @@ export function isOpenDiscoveryChoiceReply(input) {
   if (REPLACEMENT_MOVIE_DISCOVERY.test(text)) return true;
   // The preference can share a turn with a cinema, date, or time. Recognize
   // an unambiguous open-choice phrase before applying the exact-reply matrix.
-  if (/\b(?:anything(?:\s+(?:is|would be))?\s+(?:fine|okay|ok|good)|anything\s+(?:works|will\s+do)|whatever\s+(?:works|is\s+fine)|no\s+(?:particular|specific)\s+preference|any\s+(?:suitable\s+|available\s+)?(?:movie|film)|show\s+me\s+(?:anything|whatever)(?:\s+(?:available|suitable))?|surprise\s+me|you\s+(?:choose|pick|decide)|your\s+choice)\b|(?:\u0627\u064a|\u0623\u064a)\s+\u0634\u064a(?:\u0621|\u0626)(?:\s+\u0645\u0646\u0627\u0633\u0628)?|(?:\u0627\u064a|\u0623\u064a)\s+\u0641\u064a\u0644\u0645|\u0639\u0644\u0649\s+\u0630\u0648\u0642\u0643|\u0627\u062e\u062a\u0627\u0631\s+(?:\u0627\u0646\u062a|\u0623\u0646\u062a)|\u0641\u0627\u062c\u0626\u0646\u064a/iu.test(text)) return true;
+  if (/\b(?:anything(?:\s+(?:is|would be))?\s+(?:fine|okay|ok|good)|anything\s+(?:works|will\s+do)|whatever\s+(?:works|is\s+fine)|no\s+(?:particular|specific)\s+preference|any\s+(?:suitable\s+|available\s+)?(?:movie|film)|any\s+option\s+works|show\s+me\s+(?:(?:anything|whatever)(?:\s+(?:available|suitable))?|what\s+is\s+available)|i(?:\s+am|\s+m)?\s+flexible|surprise\s+me|you\s+(?:choose|pick|decide)|your\s+choice)\b|(?:\u0627\u064a|\u0623\u064a)\s+\u0634\u064a(?:\u0621|\u0626)(?:\s+\u0645\u0646\u0627\u0633\u0628)?|(?:\u0627\u064a|\u0623\u064a)\s+\u0641\u064a\u0644\u0645|\u0639\u0644\u0649\s+\u0630\u0648\u0642\u0643|\u0627\u062e\u062a\u0627\u0631\s+(?:\u0627\u0646\u062a|\u0623\u0646\u062a)|\u0641\u0627\u062c\u0626\u0646\u064a/iu.test(text)) return true;
   return /^(?:(?:yes|okay|ok|sure|please)\s+)?(?:anything(?:\s+(?:is|would be))?\s+(?:fine|okay|ok|good)|anything\s+(?:works|will\s+do|goes|available|suitable)|(?:i\s+m\s+)?(?:fine|okay|ok)\s+with\s+anything|whatever(?:\s+(?:is|you have|s available|you recommend))?(?:\s+(?:fine|works))?|no\s+(?:other\s+|particular\s+|specific\s+)?preference|i\s+(?:do not|don t)\s+(?:mind|have\s+a\s+preference)|you\s+(?:choose|pick|decide)|your\s+choice|surprise\s+me|any\s+(?:suitable\s+|available\s+)?(?:movie|film)(?:\s+is\s+fine)?|show\s+me\s+(?:anything|whatever)(?:\s+(?:available|suitable))?|(?:اي|أي)\s+شي(?:ء|ئ)(?:\s+مناسب)?|(?:اي|أي)\s+فيلم|ما\s+عندي\s+تفضيل|(?:لا|ما)\s+فرق|على\s+ذوقك|اختار\s+(?:انت|أنت)|فاجئني)$/iu.test(text);
+}
+
+const OPEN_CHOICE_NO_RESULT_CLEARS = Object.freeze({
+  no_language_match: ["language"],
+  no_genre_match: ["genre"],
+  no_experience_match: ["experience"],
+  no_audience_match: ["audience"],
+  no_suitable_time: ["preferredTime", "timeRangeStart", "timeRangeEnd", "timeBand"],
+  movie_unavailable_for_criteria: ["movieId", "movieTitle"],
+});
+
+/**
+ * Interpret an open-choice reply against the immediately visible empty result.
+ * The same reply keeps existing filters when a visible empty result has not
+ * proved that one or more optional criteria are incompatible.
+ */
+export function contextualOpenChoicePreferenceClears({ input, noResultsReason, preferences = {} } = {}) {
+  if (!isOpenDiscoveryChoiceReply(input)) return [];
+  const candidates = OPEN_CHOICE_NO_RESULT_CLEARS[noResultsReason] || [];
+  return candidates.filter((key) => preferences?.[key] != null);
 }
 
 export function createDiscoveryPreferences(seed = {}) {
@@ -1175,6 +1195,7 @@ export function filterDiscoveryResults({
     return true;
   });
 
+  const sessionsBeforeTimeBand = baseSessions.length;
   if (criteria.timeBand && TIME_BANDS[criteria.timeBand]) {
     const [start, end] = TIME_BANDS[criteria.timeBand];
     baseSessions = baseSessions.filter((session) => {
@@ -1186,9 +1207,9 @@ export function filterDiscoveryResults({
   const hasTimeRange = Boolean(criteria.timeRangeStart && criteria.timeRangeEnd);
   const requestedTimeLabel = hasTimeRange
     ? `${criteria.timeRangeStart} to ${criteria.timeRangeEnd}`
-    : criteria.preferredTime;
+    : criteria.preferredTime || criteria.timeBand;
   const timeMetadata = {
-    requested: Boolean(criteria.preferredTime || hasTimeRange),
+    requested: Boolean(criteria.preferredTime || hasTimeRange || criteria.timeBand),
     requestedTime: requestedTimeLabel,
     requestedRange: hasTimeRange,
     rangeStart: hasTimeRange ? criteria.timeRangeStart : null,
@@ -1197,7 +1218,9 @@ export function filterDiscoveryResults({
     exactTimeMatch: false,
     exactSessionCount: 0,
     usedNearestFallback: false,
-    matchKind: criteria.preferredTime || hasTimeRange ? "unavailable" : "not_requested",
+    matchKind: criteria.timeBand
+      ? (baseSessions.length ? "band" : "unavailable")
+      : criteria.preferredTime || hasTimeRange ? "unavailable" : "not_requested",
     closestDeltaMinutes: null,
     toleranceMinutes: timeToleranceMinutes,
     closestTimes: [],
@@ -1290,6 +1313,7 @@ export function filterDiscoveryResults({
   if (!filteredMovies.length && !filteredSessions.length) {
     const suppliedContentCriteria = [criteria.experience, criteria.language, criteria.genre, criteria.audience, criteria.movieId || criteria.movieTitle].filter(Boolean);
     if ((criteria.preferredTime || hasTimeRange) && baseSessions.length) noResultsReason = "no_suitable_time";
+    else if (criteria.timeBand && sessionsBeforeTimeBand > 0 && baseSessions.length === 0) noResultsReason = "no_suitable_time";
     else if (suppliedContentCriteria.length > 1) noResultsReason = "no_results_for_criteria";
     else if (criteria.experience) noResultsReason = "no_experience_match";
     else if (criteria.language) noResultsReason = "no_language_match";
@@ -1309,7 +1333,7 @@ export function filterDiscoveryResults({
       inputMovies: movieList.length,
       inputSessions: sessionList.length,
       metadataMatchedMovies: metadataMovies.length,
-      sessionsBeforeTimeFilter: baseSessions.length,
+      sessionsBeforeTimeFilter: sessionsBeforeTimeBand,
       returnedMovies: filteredMovies.length,
       returnedSessions: filteredSessions.length,
     },

@@ -1,16 +1,16 @@
 {
   "schemaVersion": "voxi.elevenlabs-agent-contract.v1",
-  "contractVersion": "2026-07-22.2",
+  "contractVersion": "2026-07-23.1",
   "publicAgentId": "agent_0001kx3xc0b4f6s8dqy9qnejm4qr",
   "firstMessageTemplate": "{{voxi_session_opening}}",
   "prompt": {
     "source": "src/lib/voxiPrompt.js",
     "exportName": "VOXI_AGENT_PROMPT",
-    "version": "2026-07-22.2",
+    "version": "2026-07-23.1",
     "hashAlgorithm": "sha256",
     "hashNormalization": "utf8_lf",
     "hashScope": "export_value",
-    "sha256": "8d6747a745286f6b3e8b6acef83762f267eab0649cbb8504b6dc1d9f5d8ae0b8"
+    "sha256": "12101dcb5d5f89626cfebe68bb5d2d32e835192d2c15edcc96c492a9f6404c5a"
   },
   "transport": {
     "voiceConnectionType": "webrtc",

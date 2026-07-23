@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  contextualOpenChoicePreferenceClears,
   createDiscoveryPreferences,
   extractDiscoveryPreferencePatch,
   filterDiscoveryResults,
@@ -113,6 +114,104 @@ assert.equal(openChoiceTurn.preferences.cinemaId, "0002", "anything is fine must
 assert.equal(openChoiceTurn.preferences.date, "2026-07-23", "anything is fine must retain the selected date");
 assert.equal(openChoiceTurn.preferences.movieTitle, null, "anything is fine must never become a movie title");
 assert.equal(unresolvedMovieTitleCandidate("anything is fine", openChoiceTurn.update), null, "the open-choice reply must not be queued as an unresolved movie title");
+const languageNoResultClears = contextualOpenChoicePreferenceClears({
+  input: "anything is fine",
+  noResultsReason: "no_language_match",
+  preferences: openChoiceTurn.preferences,
+});
+assert.deepEqual(
+  languageNoResultClears,
+  ["language"],
+  "an open-choice reply to a verified language no-result must clear only the unavailable language",
+);
+const recoveredOpenChoicePreferences = mergeDiscoveryPreferences(openChoiceTurn.preferences, {
+  clear: languageNoResultClears,
+  patch: { openChoice: true },
+}).preferences;
+assert.equal(recoveredOpenChoicePreferences.cinemaId, "0002", "contextual recovery must retain the selected cinema");
+assert.equal(recoveredOpenChoicePreferences.date, "2026-07-23", "contextual recovery must retain the selected date");
+assert.equal(recoveredOpenChoicePreferences.language, null, "contextual recovery must clear the proven unavailable language");
+assert.equal(recoveredOpenChoicePreferences.openChoice, true, "contextual recovery must retain the open choice");
+const recoveredOpenChoiceResults = filterDiscoveryResults({
+  movies: reportedFrenchJourneyMovies,
+  sessions: reportedFrenchJourneySessions,
+  cinemas,
+  preferences: recoveredOpenChoicePreferences,
+});
+assert.deepEqual(
+  recoveredOpenChoiceResults.movies.map((movie) => movie.id),
+  ["french-film", "english-film"],
+  "the original French no-result journey must recover by rendering available same-cinema and same-date movies",
+);
+
+const allOptionalPreferences = createDiscoveryPreferences({
+  movieId: "missing-movie",
+  movieTitle: "Missing Movie",
+  genre: "Comedy",
+  language: "French",
+  experience: "IMAX",
+  audience: "family",
+  preferredTime: "20:00",
+  timeRangeStart: "19:00",
+  timeRangeEnd: "21:00",
+  timeBand: "evening",
+  cinemaId: "0002",
+  cinemaName: "Mall of the Emirates",
+  city: "Dubai",
+  date: "2026-07-23",
+});
+for (const [noResultsReason, expectedClears] of [
+  ["no_language_match", ["language"]],
+  ["no_genre_match", ["genre"]],
+  ["no_experience_match", ["experience"]],
+  ["no_audience_match", ["audience"]],
+  ["no_suitable_time", ["preferredTime", "timeRangeStart", "timeRangeEnd", "timeBand"]],
+  ["movie_unavailable_for_criteria", ["movieId", "movieTitle"]],
+]) {
+  const clears = contextualOpenChoicePreferenceClears({ input: "anything is fine", noResultsReason, preferences: allOptionalPreferences });
+  assert.deepEqual(clears, expectedClears, `${noResultsReason}: contextual recovery must clear only optional incompatible criteria`);
+  assert.equal(clears.includes("cinemaId"), false, `${noResultsReason}: contextual recovery must not clear cinema`);
+  assert.equal(clears.includes("date"), false, `${noResultsReason}: contextual recovery must not clear date`);
+}
+assert.deepEqual(
+  contextualOpenChoicePreferenceClears({
+    input: "\u0623\u064a \u0634\u064a\u0621 \u0645\u0646\u0627\u0633\u0628",
+    noResultsReason: "no_language_match",
+    preferences: openChoiceTurn.preferences,
+  }),
+  ["language"],
+  "the equivalent Arabic open-choice reply must recover from the same verified language no-result",
+);
+assert.deepEqual(
+  contextualOpenChoicePreferenceClears({
+    input: "anything is fine",
+    noResultsReason: "no_results_for_criteria",
+    preferences: openChoiceTurn.preferences,
+  }),
+  [],
+  "an ambiguous combined zero-result must ask what to change instead of silently broadening the list",
+);
+assert.deepEqual(
+  contextualOpenChoicePreferenceClears({
+    input: "anything is fine",
+    noResultsReason: null,
+    preferences: openChoiceTurn.preferences,
+  }),
+  [],
+  "the same open-choice reply must keep retained filters without empty-result context",
+);
+assert.deepEqual(
+  contextualOpenChoicePreferenceClears({
+    input: "maybe later",
+    noResultsReason: "no_language_match",
+    preferences: openChoiceTurn.preferences,
+  }),
+  [],
+  "an unrelated reply must not clear a retained filter",
+);
+for (const openChoiceReply of ["any option works", "show me what is available", "I'm flexible"]) {
+  assert.equal(isOpenDiscoveryChoiceReply(openChoiceReply), true, `${openChoiceReply}: a clear flexible-choice reply must be recognized`);
+}
 assert.deepEqual(
   getMissingDiscoveryCriteria(openChoiceTurn.preferences, ["cinema", "date", "movieOrPreference"]),
   [],
@@ -729,6 +828,15 @@ const emptyFamilyComedy = filterDiscoveryResults({
   preferences: { cinemaId: "0002", date: "2026-07-17", genre: "Comedy", audience: "kids_family" },
 });
 assert.equal(emptyFamilyComedy.noResultsReason, "no_results_for_criteria", "an empty criteria intersection must expose its deterministic reason");
+const emptyMorningBand = filterDiscoveryResults({
+  movies,
+  sessions,
+  cinemas,
+  preferences: { cinemaId: "0002", date: "2026-07-17", timeBand: "morning" },
+});
+assert.equal(emptyMorningBand.sessions.length, 0, "the unavailable morning band fixture must return no sessions");
+assert.equal(emptyMorningBand.noResultsReason, "no_suitable_time", "a time-band-only miss must be classified as a time miss");
+assert.equal(emptyMorningBand.counts.sessionsBeforeTimeFilter, 1, "time-band classification must preserve the number of sessions before time filtering");
 
 const changedBookingContext = mergeDiscoveryPreferences(
   { cinemaId: "0002", date: "2026-07-15", preferredTime: "18:00" },

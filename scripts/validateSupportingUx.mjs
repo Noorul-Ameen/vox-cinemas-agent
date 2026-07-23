@@ -57,6 +57,7 @@ const handoverSource = await readFile(new URL("../src/components/HandoverPanel.j
 const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
 const retryableLazySource = await readFile(new URL("../src/components/RetryableLazy.jsx", import.meta.url), "utf8");
 const mainSource = await readFile(new URL("../src/main.jsx", import.meta.url), "utf8");
+assert.match(richMediaSource, /requestedTarget != null && Number\.isFinite\(numericTarget\) && numericTarget > 0 \? numericTarget : null/, "an absent conversational seat target must not render as a stray zero above the screen");
 for (const key of ["booking.cinema", "booking.performance", "booking.status"]) assert.match(richMediaSource, new RegExp(key.replace(".", "\\.")), `${key} must be shown on booking confirmation`);
 for (const field of ["cinemaName", "booking.date", "history.cancelled", "history.active"]) assert.match(historySource, new RegExp(field.replace(".", "\\.")), `${field} must be represented in booking history`);
 assert.match(historySource, /const current = isCurrentBooking\(booking\)/, "booking history must classify each record using the shared current-booking rules");

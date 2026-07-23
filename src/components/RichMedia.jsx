@@ -227,7 +227,8 @@ export function SeatMap({ movie, session, plan = [], selected = [], requestedTar
   const quotedFeeTotal = exactQuote?.feeTotal != null ? Number(exactQuote.feeTotal) : Number.NaN;
   const total = Number.isFinite(quotedTotal) ? quotedTotal : estimatedTotal;
   const totalCurrency = exactQuote?.currency || currency;
-  const target = Number.isFinite(Number(requestedTarget)) ? Number(requestedTarget) : null;
+  const numericTarget = Number(requestedTarget);
+  const target = requestedTarget != null && Number.isFinite(numericTarget) && numericTarget > 0 ? numericTarget : null;
   const standardLabel = hasDemoEstimate
     ? t("seats.standardEstimate", { price: formatCurrency(standardPrice, currency) })
     : t("seats.standardQuoteRequired");

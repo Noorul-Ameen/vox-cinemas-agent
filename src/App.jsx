@@ -40,7 +40,7 @@ import {
   selectRestorableRichStage,
 } from "./lib/pausedRichJourney.js";
 import { isAffirmativeContinuationTurn, isResumeCheckoutTurn, isResumeOnlyTurn, pausedResumeTarget } from "./lib/pausedJourneyRouting.js";
-import { createDiscoveryPreferences, extractDiscoveryPreferencePatch, filterDiscoveryResults, formatDiscoveryTimePreference, getMissingDiscoveryCriteria, hasDiscoveryTimePreference, mergeDiscoveryPreferences, parseAndMergeDiscoveryPreferences, resolveDiscoveryMovieCandidate, shouldTreatAsDiscoveryFilterTurn, unresolvedMovieTitleCandidate } from "./lib/discoveryPreferences.js";
+import { contextualOpenChoicePreferenceClears, createDiscoveryPreferences, extractDiscoveryPreferencePatch, filterDiscoveryResults, formatDiscoveryTimePreference, getMissingDiscoveryCriteria, hasDiscoveryTimePreference, isOpenDiscoveryChoiceReply, mergeDiscoveryPreferences, parseAndMergeDiscoveryPreferences, resolveDiscoveryMovieCandidate, shouldTreatAsDiscoveryFilterTurn, unresolvedMovieTitleCandidate } from "./lib/discoveryPreferences.js";
 import { discoveryQuestionForLocale, localizedStageMessage, localizeDiscoveryStage } from "./lib/discoveryPromptLocalization.js";
 import { buildAuthoritativeDiscoveryContext, buildMovieSelectionGroundingContext } from "./lib/discoveryResultContext.js";
 import { createLocalDeterministicToolAuthorization, shouldBlockConcurrentDeterministicToolCall } from "./lib/deterministicToolRouting.js";
@@ -1717,13 +1717,49 @@ export default function App() {
 
   const routeDiscoveryTurn = async (text, { cinemaOverride = null, dateOverride = null, preferencesAlreadyApplied = false } = {}) => {
     const rawTurn = String(text || "").trim();
-    const locationIntent = resolveLocationIntent(CINEMAS, rawTurn);
     const rawPreferencePatch = extractDiscoveryPreferencePatch(rawTurn, {
       cinemas: CINEMAS,
       movies: [...DISCOVERY_MOVIE_CATALOG, ...filmsRef.current].filter(Boolean),
       now: new Date(),
       timeZone: "Asia/Dubai",
     });
+    const contextualOpenChoiceOnly = isOpenDiscoveryChoiceReply(rawTurn)
+      && rawPreferencePatch.provided.every((key) => ["openChoice", "recommendationIntent"].includes(key));
+    const visibleNoResultsReason = stageVisibleRef.current && stageRef.current.view === "movies" && !stageRef.current.movies?.length
+      ? stageRef.current.discovery?.noResultsReason
+      : null;
+    if (visibleNoResultsReason === "no_results_for_criteria" && contextualOpenChoiceOnly) {
+      const retained = discoveryPreferencesRef.current;
+      const hasOptionalCriteria = Boolean(retained.movieId || retained.movieTitle || retained.genre || retained.language
+        || retained.experience || retained.audience || hasDiscoveryTimePreference(retained));
+      const errorByLocale = localePair(
+        hasOptionalCriteria
+          ? "Those preferences do not have a matching showtime together. Tell me which one to change, such as movie, genre, language, experience, audience, or time. I will keep your cinema and date."
+          : "There are no movies published for this cinema and date. Choose another cinema or date to continue.",
+        hasOptionalCriteria
+          ? "لا توجد جلسة عرض تطابق جميع هذه التفضيلات معاً. أخبرني أي تفضيل تريد تغييره، مثل الفيلم أو النوع أو اللغة أو التجربة أو الجمهور أو الوقت. سأحتفظ بالسينما والتاريخ."
+          : "لا توجد أفلام منشورة لهذه السينما وهذا التاريخ. اختر سينما أو تاريخاً آخر للمتابعة.",
+      );
+      const reason = errorByLocale[localeRef.current];
+      showStage({ ...stageRef.current, error: reason, errorByLocale });
+      return {
+        shown: "preference clarification",
+        movies: [],
+        missing: [hasOptionalCriteria ? "one preference to change" : "cinema or date"],
+        preferences: retained,
+        availabilityStatus: "clarification_required",
+        reason,
+      };
+    }
+    const contextualPreferenceClears = contextualOpenChoicePreferenceClears({
+      input: rawTurn,
+      noResultsReason: contextualOpenChoiceOnly ? visibleNoResultsReason : null,
+      preferences: discoveryPreferencesRef.current,
+    });
+    if (contextualPreferenceClears.length) {
+      commitDiscoveryPreferences({ clear: contextualPreferenceClears, patch: { openChoice: true } });
+    }
+    const locationIntent = resolveLocationIntent(CINEMAS, rawTurn);
     const directCinemaReply = Boolean(cinemaOverride && isDirectCinemaSelectionUtterance({
       text: rawTurn,
       view: stageRef.current.view,

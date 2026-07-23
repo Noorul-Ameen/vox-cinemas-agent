@@ -28,10 +28,11 @@ const toxicVariants = merged.filter((movie) => movie.title === "Toxic");
 assert.deepEqual(toxicVariants.map((movie) => movie.id), ["HO00015725", "HO00015727", "HO00015731", "HO00015757"], "Toxic must retain all official code variants");
 assert.deepEqual(toxicVariants.map((movie) => movie.languageName), ["Kannada", "Hindi", "Tamil", "Malayalam"], "Toxic must retain all official language variants");
 const mergedByTitle = new Map(merged.map((movie) => [movie.title.normalize("NFKC").toLocaleLowerCase("en"), movie]));
-const currentByTitle = new Map(schedule.catalog.map((movie) => [movie.title.normalize("NFKC").toLocaleLowerCase("en"), movie]));
-for (const [titleKey, currentMovie] of currentByTitle) {
-  const mergedMovie = mergedByTitle.get(titleKey);
-  assert.ok(mergedMovie, `merged information catalog lost current scheduled title ${currentMovie.title}`);
+const mergedById = new Map(merged.map((movie) => [movie.id, movie]));
+for (const currentMovie of schedule.catalog) {
+  assert.ok(currentMovie.code, `${currentMovie.title}: every current schedule variant must have a stable code`);
+  const mergedMovie = mergedById.get(currentMovie.code);
+  assert.ok(mergedMovie, `merged information catalog lost current scheduled variant ${currentMovie.title} (${currentMovie.code})`);
   assert.equal(mergedMovie.id, currentMovie.code, `${currentMovie.title}: current schedule code must take precedence`);
   assert.equal(mergedMovie.rating, currentMovie.rating, `${currentMovie.title}: current schedule rating must take precedence`);
   assert.equal(mergedMovie.runtime, currentMovie.runtime, `${currentMovie.title}: current schedule runtime must take precedence`);
