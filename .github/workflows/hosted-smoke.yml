@@ -1,0 +1,65 @@
+name: Hosted VOXi smoke
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Validate VOXi
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hosted-voxi-smoke
+  cancel-in-progress: true
+
+jobs:
+  hosted-smoke:
+    name: Verify Cloudflare release
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PLAYWRIGHT_BASE_URL: https://voxi-ai.pages.dev
+      PLAYWRIGHT_HOSTED_SMOKE: "1"
+      EXPECTED_RELEASE_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
+      HOSTED_DEPLOY_TIMEOUT_MS: "900000"
+    steps:
+      - name: Check out validated source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for matching Cloudflare commit and snapshot
+        run: node scripts/waitForHostedSnapshot.mjs
+
+      - name: Run hosted release smoke
+        run: npm run test:e2e:hosted
+
+      - name: Upload hosted Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-hosted-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
