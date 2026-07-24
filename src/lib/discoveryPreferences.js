@@ -207,7 +207,7 @@ const LANGUAGE_ALIASES = Object.freeze([
   ["Kannada", ["kannada", "kan", "كانادا"]],
   ["Malayalam", ["malayalam", "مالايالامية", "مالايالام"]],
   ["English", ["english", "إنجليزي", "انجليزي", "الإنجليزية", "الانجليزية"]],
-  ["Arabic", ["arabic", "عربي", "عربية", "العربية"]],
+  ["Arabic", ["arabic", "عربي", "عربية", "العربية", "بالعربي", "بالعربية", "ناطق بالعربية", "مدبلج بالعربية"]],
   ["Spanish", ["spanish", "espanol", "español", "إسباني", "اسباني"]],
   ["Korean", ["korean", "كوري", "الكورية"]],
   ["Punjabi", ["punjabi", "بنجابي"]],

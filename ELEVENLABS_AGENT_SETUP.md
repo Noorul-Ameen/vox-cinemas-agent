@@ -2,19 +2,19 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-23.3`
+Prompt contract version: `2026-07-24.1`
 
-Prompt value SHA-256: `dc8d1af309c247a642c155e017e2b26b4caf1b3801c429f5f8a883ff5f3ca467`
+Prompt value SHA-256: `9daa241841ccb6321673f47c560bb9e374677d5f421b27bae3ecb94fa210f4e2`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 
 VOXi is the bilingual AI assistant for VOX Cinemas UAE. Keep the product and welcome globally branded as VOX Cinemas UAE. Mall of the Emirates is one selectable cinema, not the global product identity.
 
-## Dashboard verification status, 23 July 2026
+## Dashboard verification status, 24 July 2026
 
-Status: REPOSITORY CONTRACT `2026-07-23.3` IS PUBLISHED AND READ BACK FROM THE TARGET ELEVENLABS AGENT. LIVE ACOUSTIC VOICE VERIFICATION IS STILL REQUIRED.
+Status: CONTRACT `2026-07-24.1` IS PUBLISHED AND READ BACK. LIVE ACOUSTIC VOICE VERIFICATION IS STILL REQUIRED.
 
-- Contract `2026-07-23.3` was published to the target agent and read back on 23 July 2026. All 74 non-empty prompt statements matched the repository source in order.
+- Contract `2026-07-24.1` was published and read back on 24 July 2026. It adds microphone seat-tool ownership and exact voice transcript display requirements.
 - The published prompt preserves `{{voxi_session_opening}}`, the configured English and Arabic voices, all client-tool names, and EU residency while aligning the agent with the device-only Save booking summary checkout.
 - The eight existing client-tool names, `{{voxi_session_opening}}`, English and Arabic configuration, and voice assignments were checked after publication and remained unchanged.
 - The dashboard still uses the correct target agent, bilingual language configuration, `{{voxi_session_opening}}`, Agent language override, Text only override, and exact client-tool names. Detect language remains off.
@@ -499,7 +499,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 1. Confirm the dashboard target is `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`.
 2. Confirm all eight exact client-tool names and schemas match `config/elevenlabs-agent-contract.json`.
 3. Enable Wait for response on all eight tools. Confirm `show_seat_map` returns after map loading and never waits for a later seat-selection turn.
-4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-23.3`.
+4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-24.1`.
 5. Set the first message to `{{voxi_session_opening}}`.
 6. Confirm the dashboard detects `voxi_session_opening` from the first-message template. The widget supplies all 13 contract variables when it starts a session; do not create unsupported manual placeholders for variables that the dashboard does not expose.
 7. Configure English and Arabic support, then disable the automatic `language_detection` system tool.

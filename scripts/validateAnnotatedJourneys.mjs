@@ -463,7 +463,7 @@ const textFlow = app.slice(app.indexOf("const sendText"), app.indexOf("const sen
 for (const [name, flow] of [["voice", voiceFlow], ["text", textFlow]]) {
   assert.match(flow, /const checkoutSeatEditTurn =/, `${name} must classify checkout seat-edit turns locally`);
   assert.match(flow, /stageRef\.current\.view !== "checkout"\) restoreActiveCheckout\(\)/, `${name} must restore a hidden checkout before editing seats`);
-  assert.ok(flow.indexOf("checkoutSeatEditTurn") < flow.indexOf("resolveVisibleSeatTurn"), `${name} must return to the seat map before resolving a visible seat confirmation`);
+  assert.ok(flow.indexOf("checkoutSeatEditTurn") < flow.lastIndexOf("resolveVisibleSeatTurn"), `${name} must return to the seat map before resolving a visible seat confirmation`);
 }
 const checkoutBack = app.slice(app.indexOf("const backToSeatMapFromCheckout"), app.indexOf("const executeCancellationMutation"));
 assert.match(checkoutBack, /activeCheckoutStage\(\)\) restoreActiveCheckout\(\)/, "edit seats must also work when another panel temporarily covers checkout");

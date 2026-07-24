@@ -9,21 +9,20 @@ Repository: <https://github.com/Noorul-Ameen/vox-cinemas-agent>
 ## Current release
 
 - Branch: `main`
-- Validated runtime and data source commit: `4797e37c38e2d20ce7d7e7bf18d9898b78c89e79`
-- Snapshot: `20260723-08c005696287764d`
-- Hosted asset: `/assets/index-CUILGygO.js`
-- Hosted asset size: 889,919 bytes
+- Release source: `main`
+- Snapshot: `20260724-8da7b33793bd2182`
+- Built asset: `/assets/index-Bts2SRO5.js`
 - Hosted asset cache policy: immutable
-- Schedule coverage: 2026-07-23 through 2026-08-12
-- Schedule: 10,388 sessions, 35 films, 22 cinemas, and 21 dates
-- Sessions today: 817
-- Sessions tomorrow: 1,408
-- Schedule shards: 320
-- Official movie-information records: 83
-- ElevenLabs contract: `2026-07-23.3`
-- ElevenLabs prompt SHA-256: `dc8d1af309c247a642c155e017e2b26b4caf1b3801c429f5f8a883ff5f3ca467`
+- Schedule coverage: 2026-07-24 through 2026-08-12
+- Schedule: 9,645 sessions, 35 films, 22 cinemas, and 20 dates
+- Sessions today: 1,407
+- Sessions tomorrow: 1,402
+- Schedule shards: 299
+- Official movie-information records: 96
+- ElevenLabs contract: `2026-07-24.1`
+- ElevenLabs prompt SHA-256: `9daa241841ccb6321673f47c560bb9e374677d5f421b27bae3ecb94fa210f4e2`
 
-Production `release.json` is the source of truth for the current deployment commit after non-runtime documentation and workflow updates. The runtime and data source above was deployed with the listed snapshot and passed the complete hosted validation.
+Production `release.json` is the source of truth for the current deployment commit. The runtime and data source above passed the complete local validation before publication.
 
 ## Product coverage
 
@@ -84,7 +83,7 @@ Protected integration behavior includes:
 - Explicit English and Arabic language routing
 - Shared text and voice journey state
 
-Contract `2026-07-23.3` was published and read back from the target dashboard. Its prompt SHA-256 is `dc8d1af309c247a642c155e017e2b26b4caf1b3801c429f5f8a883ff5f3ca467`.
+Contract `2026-07-24.1` was published and read back from the target dashboard on 24 July 2026. Its prompt SHA-256 is `9daa241841ccb6321673f47c560bb9e374677d5f421b27bae3ecb94fa210f4e2`.
 
 Controlled Chrome microphone-denial recovery passed after 45 seconds and retained the active state. Live Chrome also passed an Arabic rating query, and the movie list remained visible. Acoustic English and Arabic recognition and audible output still require human acceptance in a normal HTTPS browser.
 
@@ -94,14 +93,14 @@ Public agent authentication or origin allowlisting and an approved conversation-
 
 The current official VOX UAE public-site snapshot contains:
 
-- 10,388 sessions
+- 9,645 sessions
 - 35 films
 - 22 cinemas
-- 21 dates from 2026-07-23 through 2026-08-12
-- 817 sessions today
-- 1,408 sessions tomorrow
-- 320 versioned schedule shards
-- 83 official movie-information records
+- 20 dates from 2026-07-24 through 2026-08-12
+- 1,407 sessions today
+- 1,402 sessions tomorrow
+- 299 versioned schedule shards
+- 96 official movie-information records
 
 The snapshot is not live inventory. It does not provide seat holds, payment, official ticket QR issuance, provider cancellation, provider refunds, or customer-care handover.
 

@@ -5863,6 +5863,21 @@ export default function App() {
       if (role === "user") {
         if (pendingAuthoritativeMovieAnswerRef.current?.displayedAt) pendingAuthoritativeMovieAnswerRef.current = null;
         if (!hasMeaningfulTurnContent(safeMessage)) return;
+        // A voice seat authorization is valid for one final transcript only.
+        // Clear any older authorization before interpreting the next guest turn.
+        seatToolAuthorizationRef.current = null;
+        const earlyVoiceSeatTurn = resolveVisibleSeatTurn(safeMessage);
+        if (!earlyVoiceSeatTurn.reason && Array.isArray(earlyVoiceSeatTurn.seats) && earlyVoiceSeatTurn.seats.length > 0) {
+          // The SDK does not await the async onMessage callback. Arm the
+          // authorization before this handler reaches its first await so an
+          // immediate agent tool call cannot race ahead of the transcript.
+          seatToolAuthorizationRef.current = createSeatToolAuthorization({
+            seats: earlyVoiceSeatTurn.seats,
+            sessionEpoch: sessionEpochRef.current,
+            stageRevision: stageRevisionRef.current,
+            planContext: planContextRef.current,
+          });
+        }
         const voiceTurnSequence = ++userTurnSequenceRef.current;
         const voiceTurnIsCurrent = () => userTurnSequenceRef.current === voiceTurnSequence;
         requestEpochRef.current += 1;
@@ -6040,7 +6055,7 @@ export default function App() {
           updateIntentFromText(safeMessage);
           return;
         }
-        let seatTurn = decision === null ? resolveVisibleSeatTurn(safeMessage) : { requested: false, seats: [] };
+        let seatTurn = decision === null ? earlyVoiceSeatTurn : { requested: false, seats: [] };
         let directSeatSelection = Boolean(seatTurn.requested);
         const checkoutResumeTurn = activeCheckout && (isResumeCheckoutTurn(safeMessage)
           || (stageRef.current.view !== "checkout" && isResumeOnlyTurn(safeMessage)));
@@ -6275,14 +6290,22 @@ export default function App() {
         else if (activeCheckout && !checkoutOfferEvaluation && !explicitDiscoveryTurn && !directCancellation && !historyRequest.requested) conversation.sendContextualUpdate?.("A checkout review remains preserved. If this is an unrelated question, it is hidden until the guest explicitly asks to return to checkout.");
         if (details.requestedSeatTarget) conversation.sendContextualUpdate?.(`The guest would like ${details.requestedSeatTarget} tickets. Treat this only as a target and guide them to select ${details.requestedSeatTarget} seats. The number of selected seats is the actual ticket count and controls pricing.`);
         if (directSeatSelection) {
-          conversation.sendContextualUpdate?.("The widget is applying the guest's visible seat selection now. Wait for the widget result; do not claim checkout, payment, booking confirmation, a reference, or a QR yet.");
-          void routeSeatSelectionTurn(safeMessage, seatTurn).then((result) => {
+          const canAuthorizeSeatTool = !seatTurn.reason && Array.isArray(seatTurn.seats) && seatTurn.seats.length > 0;
+          if (canAuthorizeSeatTool) {
+            if (stageRef.current.view === "seatmap" && !pendingOrderRef.current?.checkoutId) {
+              seatToolAuthorizationRef.current = createSeatToolAuthorization({
+                seats: seatTurn.seats,
+                sessionEpoch: sessionEpochRef.current,
+                stageRevision: stageRevisionRef.current,
+                planContext: planContextRef.current,
+              });
+            }
+            conversation.sendContextualUpdate?.(`The microphone guest selected seats ${seatTurn.seats.join(", ")} from the visible seat map. Call select_seats exactly once now with exactly those labels and wait for its result before replying. Do not merely describe the selection, and do not claim payment, booking confirmation, a reference, or a QR.`);
+          } else {
+            const result = await routeSeatSelectionTurn(safeMessage, seatTurn);
             if (!voiceTurnIsCurrent()) return;
-            conversation.sendContextualUpdate?.(seatSelectionResultContext(result));
-          }).catch((error) => {
-            if (!voiceTurnIsCurrent()) return;
-            conversation.sendContextualUpdate?.(`The seat confirmation failed: ${error?.message || "unknown error"}. The seat map remains visible; do not claim checkout or booking completion.`);
-          });
+            conversation.sendContextualUpdate?.(`${seatSelectionResultContext(result)} Do not call select_seats for this invalid or incomplete seat turn.`);
+          }
         }
         if (historyRequest.requested) {
           conversation.sendContextualUpdate?.(`${bookingHistoryTurnContext(visibleHistory, { activeOnly: historyRequest.activeOnly })} Do not call another booking-history tool.`);
@@ -6340,9 +6363,15 @@ export default function App() {
         if (pendingMovieAnswer && Date.now() - pendingMovieAnswer.at > 30000) pendingAuthoritativeMovieAnswerRef.current = null;
         if (pendingMovieAnswer?.displayedAt) return;
         const claimStage = stageVisibleRef.current ? stageRef.current : { view: "empty", pausedView: selectRestorableRichStage(pausedJourneyRef.current)?.view || null };
-        const authoritativeMessage = pendingMovieAnswer?.answer || safeMessage;
+        // In voice mode the SDK agent response event is the transcript of the
+        // audio that was actually played. Keep it byte-for-byte aligned with
+        // the spoken reply. Text mode retains the defensive state-claim guard.
+        const exactVoiceTranscript = sessionModeRef.current === "voice";
+        const authoritativeMessage = exactVoiceTranscript ? safeMessage : (pendingMovieAnswer?.answer || safeMessage);
         const displayedMessage = role === "agent"
-          ? guardAgentStateClaim(
+          ? exactVoiceTranscript
+            ? authoritativeMessage
+            : guardAgentStateClaim(
             guardMovieDisplayClaim(authoritativeMessage, claimStage, localeRef.current),
             {
               stage: claimStage,

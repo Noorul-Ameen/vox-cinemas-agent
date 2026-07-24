@@ -101,6 +101,10 @@ for (const [explicitVenue, expectedId] of [
   ["Dubai Festival City", "0105"],
   ["أبوظبي مول", "0036"],
   ["سيتي سنتر الشارقة", "0035"],
+  ["مول الامارت", "0002"],
+  ["فوكس مول الإمارات", "0002"],
+  ["سيتي سنتر ديره", "0001"],
+  ["ياس مول ابوظبي", "0012"],
 ]) {
   assert.equal(
     resolveCinemaCandidate(cinemas, explicitVenue)?.id,
@@ -117,6 +121,7 @@ assert.match(app, /\.replace\(\/\\bcitizen\\s\+\(\?:and\\s\+\)\?data\\b\/giu, ci
 assert.match(app, /\.replace\(\/\\bdcc\\b\/giu, cinema\.name\)/, "the DCC speech-recognition alias must be normalized before a typed turn reaches the agent");
 assert.match(app, /const agentFacingValue = normalizeCinemaAsrForAgent\(value, details\.cinema\)[\s\S]*queuePendingEcho\(agentFacingValue\)[\s\S]*conversation\.sendUserMessage\(agentFacingValue\)/, "typed cinema aliases must use the same normalized value for SDK echo suppression and agent input");
 assert.match(app, /pendingTypedMessagesRef\.current\.filter\(\(item\) => item\.text !== agentFacingValue\)/, "a failed normalized text send must remove the matching pending SDK echo");
+assert.match(app, /const exactVoiceTranscript = sessionModeRef\.current === "voice"[\s\S]*exactVoiceTranscript \? safeMessage/, "the visible microphone transcript must use the exact SDK agent response that produced the spoken audio");
 
 assert.equal(isCinemaSelectionTurn({
   view: "movies",

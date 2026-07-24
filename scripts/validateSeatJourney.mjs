@@ -284,6 +284,10 @@ for (const [label, flow] of [["voice", voiceFlow], ["typed", typedFlow]]) {
   assert.match(flow, /seatSelectionResultContext\(/, `${label} must tell the agent which stage is actually rendered`);
   assert.match(flow, /routeCheckoutSeatEditTurn\(/, `${label} must apply explicit seat labels on the same checkout-edit turn`);
 }
+assert.match(voiceFlow, /seatToolAuthorizationRef\.current = null[\s\S]*const earlyVoiceSeatTurn = resolveVisibleSeatTurn\(safeMessage\)[\s\S]*createSeatToolAuthorization\([\s\S]*const voiceTurnSequence/, "the microphone seat authorization must be armed before the async transcript router can yield");
+assert.match(voiceFlow, /Call select_seats exactly once now/, "an authorized microphone seat turn must direct the live agent through the protected client tool");
+assert.doesNotMatch(voiceFlow, /void routeSeatSelectionTurn\(safeMessage, seatTurn\)/, "valid microphone seats must not race a local confirmation against the live agent tool call");
+assert.match(prompt, /For a microphone voice turn with exact seats[\s\S]*call select_seats exactly once[\s\S]*wait for its result before speaking/, "the published prompt must make the voice seat tool call mandatory");
 
 const checkoutSeatEditRoute = app.slice(app.indexOf("const routeCheckoutSeatEditTurn"), app.indexOf("const routeCancellationTurn"));
 assert.match(checkoutSeatEditRoute, /backToSeatMapFromCheckout\([\s\S]*explicitSeats\?\.length[\s\S]*resolveVisibleSeatTurn\(text\)[\s\S]*routeSeatSelectionTurn\(text, resolvedTurn\)/, "one checkout utterance must restore the map, resolve its labels, and apply them without repetition");

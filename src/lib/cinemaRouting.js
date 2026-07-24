@@ -16,7 +16,7 @@ export const CINEMA_ALIASES = Object.freeze({
   "0004": ["city centre ajman", "سيتي سنتر عجمان"],
   "0055": ["city centre al zahia", "سيتي سنتر الزاهية", "الزاهية"],
   // Observed voice transcription of "City Centre Deira".
-  "0001": ["city centre deira", "city center deira", "deira city centre", "deira", "dcc", "citizen and data", "سيتي سنتر ديرة", "ديرة"],
+  "0001": ["city centre deira", "city center deira", "deira city centre", "deira", "dcc", "citizen and data", "سيتي سنتر ديرة", "سيتي سنتر ديره", "ديرة", "ديره"],
   "0006": ["city centre fujairah", "سيتي سنتر الفجيرة", "الفجيرة"],
   "0005": ["city centre mirdif", "city center mirdif", "سيتي سنتر مردف", "مردف"],
   "0035": ["city centre sharjah", "سيتي سنتر الشارقة"],
@@ -28,7 +28,7 @@ export const CINEMA_ALIASES = Object.freeze({
   // frequent transcription of “Mall of the Emirates” in a voice turn.
   "0002": [
     "mall of the emirates", "mall of emirates", "mall emirates", "model emirates",
-    "maul emirates", "mole emirates", "moe", "مول الإمارات", "مول الامارات",
+    "maul emirates", "mole emirates", "moe", "مول الإمارات", "مول الامارات", "مول الامارت", "مول امارات", "فوكس مول الإمارات", "فوكس مول الامارات",
   ],
   "0007": ["mercato", "ميركاتو"],
   "0014": ["nation towers", "نيشن تاورز"],
@@ -36,7 +36,7 @@ export const CINEMA_ALIASES = Object.freeze({
   "0104": ["reem mall", "الريم مول", "ريم مول"],
   "0046": ["galleria al maryah", "the galleria al maryah island", "الغاليريا المارية", "جاليريا المارية"],
   "0057": ["wafi mall", "wafi city", "وافي مول", "وافي"],
-  "0012": ["yas mall", "ياس مول"],
+  "0012": ["yas mall", "ياس مول", "ياس مول أبوظبي", "ياس مول ابوظبي"],
 });
 
 export function normalizeCinemaText(value) {
