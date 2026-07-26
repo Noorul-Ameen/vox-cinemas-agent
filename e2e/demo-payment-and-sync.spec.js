@@ -24,8 +24,8 @@ async function reachMovieGridByText(page, preference) {
 
   const dateGroup = page.getByRole("group", { name: "Choose a date" });
   if (await dateGroup.isVisible().catch(() => false)) {
-    const firstDate = dateGroup.getByRole("button").first();
-    const dateChoice = (await firstDate.getAttribute("aria-label")) || (await firstDate.innerText());
+    const nextDate = dateGroup.getByRole("button").nth(1);
+    const dateChoice = (await nextDate.getAttribute("aria-label")) || (await nextDate.innerText());
     await sendText(page, dateChoice.replace(/^[^,]+,\s*/, ""));
   }
 
@@ -117,8 +117,8 @@ test("a movie title supplied before cinema and date is selected without being re
   await sendText(page, "Mall of the Emirates");
   const dateGroup = page.getByRole("group", { name: "Choose a date" });
   await expect(dateGroup).toBeVisible();
-  const firstDate = dateGroup.getByRole("button").first();
-  const dateChoice = (await firstDate.getAttribute("aria-label")) || (await firstDate.innerText());
+  const nextDate = dateGroup.getByRole("button").nth(1);
+  const dateChoice = (await nextDate.getAttribute("aria-label")) || (await nextDate.innerText());
   await sendText(page, dateChoice.replace(/^[^,]+,\s*/, ""));
 
   await expect(page.getByText(/Select a showtime/).first()).toBeVisible();
