@@ -4035,9 +4035,13 @@ export default function App() {
     return trackedPromise;
   };
 
-  const handleCheckoutReviewComplete = async ({ checkoutId }) => {
+  const handleCheckoutReviewComplete = async ({ checkoutId, payment }) => {
     const order = pendingOrderRef.current;
-    if (!order || checkoutId !== order.checkoutId) return;
+    if (!order || checkoutId !== order.checkoutId) return false;
+    const { sanitizeDemoPaymentReceipt } = await import("./lib/demoPaymentReceipt.js");
+    const safeDemoPayment = sanitizeDemoPaymentReceipt(payment, order.total);
+    if (!safeDemoPayment) return false;
+    const { payableTotal } = safeDemoPayment.amounts;
     if (!filterCurrentSessions([{ date: order.programmingDate || order.date, time: order.showtime }]).available.length) {
       checkoutPaymentActiveRef.current = false;
       const currentMovie = stageRef.current.movie;
@@ -4070,7 +4074,9 @@ export default function App() {
           completed = {
             ...order,
             ref,
-            reviewedWith: "checkout_review",
+            reviewedWith: "dummy_payment_processor",
+            total: payableTotal,
+            demoPayment: safeDemoPayment,
             cancelled: false,
             demo: true,
             verified: false,
@@ -4138,7 +4144,7 @@ export default function App() {
     clearPausedJourneyForLifecycle("completed", "booking_completed");
     say("system", t("app.paymentSimulated", { ref }));
     resetClarificationFailures();
-    conversation.sendContextualUpdate?.(`The widget saved a non-verified booking summary with device reference ${ref} for ${order.movieTitle} at ${order.cinemaName} on ${order.performanceDate || order.date} ${order.showtime}, seats ${order.seats.join(", ")}, total ${order.currency || "AED"} ${order.total}. No payment was charged and no VOX inventory was reserved. The deterministic system notice already states this outcome, so do not add another completion response. Never describe this summary as confirmed, paid, reserved, an admission ticket, or a ready QR.`);
+    conversation.sendContextualUpdate?.(`Dummy receipt ${ref}, ${order.currency || "AED"} ${payableTotal}. No real charge or reservation. Do not reply or claim confirmation.`);
     return true;
   };
 
@@ -7131,13 +7137,13 @@ export default function App() {
       return;
     }
     const checkoutForSummarySave = activeCheckoutStage();
-    const saveSummaryRequested = /\b(?:save|store|create)\s+(?:this\s+|my\s+|the\s+)?(?:booking\s+)?summary\b|(?:احفظ|حفظ)\s+(?:ملخص\s+)?(?:الحجز|حجزي)/iu.test(value);
+    const saveSummaryRequested = /\b(?:save|store|create)\s+(?:this\s+|my\s+|the\s+)?(?:booking\s+)?summary\b|\bpay(?: now)?\b|\bprocess (?:the )?(?:dummy )?payment\b|(?:احفظ|حفظ)\s+(?:ملخص\s+)?(?:الحجز|حجزي)|(?:ادفع الآن|عالج الدفع التجريبي)/iu.test(value);
     if (saveSummaryRequested && checkoutForSummarySave) {
       setInput("");
       if (stageRef.current.view !== "checkout") restoreActiveCheckout();
       say("agent", localeRef.current === "ar"
-        ? "تحقق من طريقة دفع في بوابة الاختبار قبل الحفظ. لم يتم خصم مبلغ أو حجز تذكرة."
-        : "Validate a method in the test gateway before saving. Nothing was charged or reserved.");
+        ? "راجع التقسيم النهائي وعالج الدفع التجريبي على الشاشة. لا خصم أو حجز حقيقي."
+        : "Review the final split and process the dummy payment on screen. No real transaction occurs.");
       return;
     }
     if (checkoutPaymentActiveRef.current) {

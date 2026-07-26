@@ -2,9 +2,9 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-26.2`
+Prompt contract version: `2026-07-26.3`
 
-Prompt value SHA-256: `ab63454636c67b893315c39f4da60e6fe946ed53c4d5995b31377c18e34dbbbd`
+Prompt value SHA-256: `d7844a5c1c2537659e4b91a26faa14c5ba8b20fccddfe94e6d50869ef3a9b6dc`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 
@@ -12,10 +12,10 @@ VOXi is the bilingual AI assistant for VOX Cinemas UAE. Keep the product and wel
 
 ## Dashboard verification status, 26 July 2026
 
-Status: CONTRACT `2026-07-26.1` IS SYNCHRONIZED IN THE REPOSITORY. THE `show_offers` TOOL SCHEMA IS SAVED IN THE DASHBOARD. PROMPT PUBLICATION AND LIVE ACOUSTIC VOICE VERIFICATION ARE STILL REQUIRED.
+Status: CONTRACT `2026-07-26.3` IS SYNCHRONIZED IN THE REPOSITORY. DASHBOARD PROMPT PUBLICATION AND LIVE ACOUSTIC VOICE VERIFICATION ARE STILL REQUIRED.
 
-- Contract `2026-07-26.2` adds the bounded on-screen test gateway, test-card offer outcomes, VOX Wallet and SHARE points validation, and rendered-discovery response synchronization.
-- The prompt preserves `{{voxi_session_opening}}`, the configured English and Arabic voices, all client-tool names, and EU residency while keeping every test-gateway method non-transactional and guest-controlled.
+- Contract `2026-07-26.3` adds selectable dummy card offers, combined SHARE and VOX Wallet funding, card remainder calculation, a separate final review, simulated processing, and a device-local dummy receipt.
+- The prompt preserves `{{voxi_session_opening}}`, the configured English and Arabic voices, all client-tool names, and EU residency while keeping every dummy-payment action non-transactional and guest-controlled.
 - The eight existing client-tool names, `{{voxi_session_opening}}`, English and Arabic configuration, and voice assignments were checked after publication and remained unchanged.
 - The dashboard still uses the correct target agent, bilingual language configuration, `{{voxi_session_opening}}`, Agent language override, Text only override, and exact client-tool names. Detect language remains off.
 - The English primary voice and Arabic voice override remain configured. No connection type, client tool, worklet, or EU residency setting was changed.
@@ -279,7 +279,7 @@ Parameters:
 
 Agent rule:
 
-> Read the returned verification and source fields literally. A device-only record is a saved booking summary, not a paid or provider-confirmed admission booking.
+> Read the returned verification and source fields literally. A processed dummy receipt may be described as dummy processing only when the record explicitly confirms it, together with the fact that no real charge or reservation occurred. Any other device-only record is a saved booking summary, not a paid or provider-confirmed admission booking.
 
 ## `show_booking_for_cancellation`
 
@@ -455,7 +455,9 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 ## Core prompt safeguards
 
 - Never ask the guest in chat to say or type a card number, expiry, CVV, OTP, password, Emirates ID, or bank credential. The on-screen test gateway accepts only its two published test card numbers, rejects all other numbers, and never transmits or stores the entered value. Never direct the guest to enter a real card.
-- The current checkout lets the guest validate a published test card offer, a test VOX Wallet balance, or test SHARE points. It never applies an offer, deducts funds, redeems points, charges a card, or submits a reservation. Method selection, validation, and Save validated checkout summary are guest-controlled on-screen actions. Voice or chat instructions must never select a method or trigger completion.
+- The dummy checkout lets the guest select any published offer, use the published eligible or ineligible test card, combine optional SHARE points and VOX Wallet value, fund the remainder with a test card, review the final split, and simulate processing. It never applies a real offer, deducts real funds, redeems real points, charges a card, or submits a reservation.
+- Offer selection, test-card entry, SHARE and wallet amounts, final review, and Process dummy payment are guest-controlled on-screen actions. Voice or chat instructions must never select a method or trigger processing.
+- A processed dummy receipt can be acknowledged only after authoritative widget context confirms it, and the response must state that no real charge or reservation occurred.
 - Keep `show_seat_map` non-blocking with respect to customer interaction. When the guest names seats, call `select_seats` with those labels.
 - Never introduce a separate checkout quantity stage or quantity controls. One selected seat is one ticket. Selected seats are the source of checkout ticket count, pricing, fees, and totals. A pre-seat quantity supplied to `show_offers` is eligibility guidance only and does not select seats or determine checkout.
 - Treat "I need three tickets" and similar utterances only as a conversational target. Guide the guest to select three seats, but allow checkout with the seats actually selected.
@@ -505,7 +507,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 1. Confirm the dashboard target is `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`.
 2. Confirm all eight exact client-tool names and schemas match `config/elevenlabs-agent-contract.json`.
 3. Enable Wait for response on all eight tools. Confirm `show_seat_map` returns after map loading and never waits for a later seat-selection turn.
-4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-26.1`.
+4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-26.3`.
 5. Set the first message to `{{voxi_session_opening}}`.
 6. Confirm the dashboard detects `voxi_session_opening` from the first-message template. The widget supplies all 13 contract variables when it starts a session; do not create unsupported manual placeholders for variables that the dashboard does not expose.
 7. Configure English and Arabic support, then disable the automatic `language_detection` system tool.
@@ -528,7 +530,10 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 24. During a paused journey, disconnect voice and continue in text. Verify neither the disconnect nor the voice-to-text switch clears the paused state.
 25. Test cancellation by reference, movie, performance date, relative date, exact showtime, time band, cinema, displayed list position, "this movie", and combined criteria.
 26. Create an ambiguous cancellation match and verify Voxi asks only for the smallest differentiating detail. Select a unique target and verify its confirmation states only movie, cinema, performance date, showtime, booking reference, cancellation or refund impact, and one yes/no question.
-27. Verify that explicitly abandoning the current booking journey clears it, while cancelling an existing booking record remains a separate cancellation flow. In checkout, verify the published eligible test card passes, the second published test card reports not eligible, and VOX Wallet and SHARE points validate their test balances. Verify method selection, validation, and Save validated checkout summary remain on-screen actions and create only an on-device summary without payment, redemption, or reservation.
+27. Verify that explicitly abandoning the current booking journey clears it, while cancelling an existing booking record remains a separate cancellation flow. In checkout, select several published offers and verify the eligible test card passes while the second test card is not eligible.
+28. Verify no-redemption, SHARE-only, wallet-only, combined SHARE plus wallet, card-only, and three-way split funding. Confirm every source is capped at its test balance and the funding sum equals the payable amount.
+29. Verify the separate final payment summary before selecting Process dummy payment. Confirm processing creates a device-local dummy receipt and never performs a real charge, point redemption, wallet deduction, or seat reservation.
+30. Repeat the complete dummy-payment journey in English and Arabic using text input, then run it in Chromium, Firefox, and WebKit.
 
 ## Contract update procedure
 

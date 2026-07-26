@@ -1,10 +1,11 @@
 import React from "react";
 import { QRCodeSVG } from "qrcode.react";
+import DemoPaymentReceiptDetails from "./DemoPaymentReceiptDetails.jsx";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 import { C } from "../theme.js";
 
 export default function BookingQRCode({ booking, size = 104 }) {
-  const { t } = useI18n();
+  const { t, locale, formatCurrency } = useI18n();
   const ref = String(booking?.ref || "").trim();
   if (!ref || booking?.cancelled) return null;
   const isReferenceOnly = booking?.verified !== true
@@ -34,11 +35,18 @@ export default function BookingQRCode({ booking, size = 104 }) {
   const hint = t(isReferenceOnly ? "booking.qrDemoHint" : "booking.qrHint");
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, borderTop: `1px dashed ${C.border}`, padding: "15px 20px" }}>
-      <div data-qr-value={qrValue} aria-label={`${hint}: ${ref}`} style={{ display: "grid", placeItems: "center", border: `1px solid ${C.border}`, borderRadius: 12, background: C.surface, padding: 9 }}>
-        <QRCodeSVG value={qrValue} size={size} level="M" marginSize={0} title={isReferenceOnly ? `${t("booking.deviceRef")} ${ref}` : hint} />
+    <React.Fragment>
+      {booking?.demoPayment?.status === "processed" ? (
+        <div style={{ borderTop: `1px dashed ${C.border}`, padding: "10px 18px" }}>
+          <DemoPaymentReceiptDetails booking={booking} locale={locale} formatCurrency={formatCurrency} />
+        </div>
+      ) : null}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7, borderTop: `1px dashed ${C.border}`, padding: "15px 20px" }}>
+        <div data-qr-value={qrValue} aria-label={`${hint}: ${ref}`} style={{ display: "grid", placeItems: "center", border: `1px solid ${C.border}`, borderRadius: 12, background: C.surface, padding: 9 }}>
+          <QRCodeSVG value={qrValue} size={size} level="M" marginSize={0} title={isReferenceOnly ? `${t("booking.deviceRef")} ${ref}` : hint} />
+        </div>
+        <div style={{ maxWidth: 260, fontSize: 10, lineHeight: 1.4, color: isReferenceOnly ? C.warning : C.muted, textAlign: "center" }}>{hint}</div>
       </div>
-      <div style={{ maxWidth: 260, fontSize: 10, lineHeight: 1.4, color: isReferenceOnly ? C.warning : C.muted, textAlign: "center" }}>{hint}</div>
-    </div>
+    </React.Fragment>
   );
 }

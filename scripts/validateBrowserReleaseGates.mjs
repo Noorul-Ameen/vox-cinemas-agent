@@ -40,7 +40,7 @@ for (const requiredGate of [
   /420px widget/,
   /FORBIDDEN_DASH_PATTERN/,
   /microphone denial is recoverable/,
-  /checkout gateway saves a device-local summary/,
+  /checkout gateway processes a device-local dummy receipt/,
   /typed cancellation stays in the booking flow/,
   /bank offers render detailed FAB guidance/,
   /corrupt booking storage fails closed/,

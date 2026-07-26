@@ -1,154 +1,146 @@
-import React, { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Check, ChevronLeft } from "lucide-react";
-import { C } from "../theme.js";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useI18n } from "../i18n/I18nProvider.jsx";
-import DemoPaymentGateway from "./DemoPaymentGateway.jsx";
 
-function resolveCheckoutMode(mode) {
-  const explicitMode = String(mode || "").trim().toLowerCase();
-  if (explicitMode === "live" || explicitMode === "demo") return explicitMode;
-  // Vista configuration controls read data only. Checkout remains simulated unless
-  // a future integration explicitly opts this component into another mode.
-  return "demo";
+const DemoPaymentGateway = lazy(() => import("./DemoPaymentGateway.jsx"));
+
+const pause = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+function safeMoneyFormatter(dir, currency) {
+  const locale = dir === "rtl" ? "ar-AE" : "en-AE";
+  return (value) => new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currency || "AED",
+    minimumFractionDigits: 2,
+  }).format(Number(value) || 0);
 }
 
-export default function Checkout({ order, onComplete, onCancel, onRetry, onReviewStateChange, mode }) {
-  const { t, dir, formatCurrency } = useI18n();
-  const checkoutMode = resolveCheckoutMode(mode);
-  const seats = Array.isArray(order?.seats) ? order.seats : [];
-  const currency = order?.currency || "AED";
-  const subtotal = order?.subtotal != null && Number.isFinite(Number(order.subtotal)) ? Number(order.subtotal) : null;
-  const feeTotal = order?.feeTotal != null && Number.isFinite(Number(order.feeTotal)) ? Number(order.feeTotal) : null;
-  const [saving, setSaving] = useState(false);
-  const [done, setDone] = useState(false);
-  const timersRef = useRef([]);
-  const mountedRef = useRef(true);
-  const reviewStartedRef = useRef(false);
-  const completionSentRef = useRef(false);
+export default function Checkout({
+  order = {},
+  checkoutId,
+  dir: requestedDir,
+  onBack,
+  onEditSeats,
+  onCancel,
+  onComplete,
+  onReviewStateChange,
+}) {
+  const i18n = useI18n();
+  const dir = requestedDir || i18n.dir || "ltr";
+  const ar = dir === "rtl";
+  const currency = order.currency || "AED";
+  const fallbackMoney = safeMoneyFormatter(dir, currency);
+  const money = (value) => typeof i18n.formatCurrency === "function"
+    ? i18n.formatCurrency(value, currency)
+    : fallbackMoney(value);
+  const seatCount = Array.isArray(order.seats) ? order.seats.length : Number(order.ticketCount) || 0;
+  const [status, setStatus] = useState("ready");
+  const [receipt, setReceipt] = useState(null);
+  const [error, setError] = useState("");
 
-  const clearTimers = () => {
-    timersRef.current.forEach((timer) => window.clearTimeout(timer));
-    timersRef.current = [];
+  const copy = ar ? {
+    eyebrow: "الدفع التجريبي",
+    title: "مراجعة إتمام الحجز",
+    subtitle: "اختر العرض وطريقة تقسيم المبلغ. ستظهر لك مراجعة نهائية قبل المعالجة التجريبية.",
+    tickets: "التذاكر",
+    seats: "المقاعد",
+    total: "إجمالي الطلب",
+    back: "تعديل المقاعد",
+    loading: "جار تحميل بوابة الدفع التجريبية...",
+    processing: "جار معالجة الدفع التجريبي",
+    processingHelp: "نحاكي التحقق من العرض وتقسيم المبلغ وإصدار الإيصال. لا يتم خصم أي مبلغ حقيقي.",
+    approved: "تمت معالجة الدفع التجريبي",
+    approvedHelp: "تم إنشاء إيصال تجريبي على هذا الجهاز. لم يتم تنفيذ دفع أو حجز حقيقي.",
+    failed: "تعذر إكمال المعالجة التجريبية. راجع تفاصيل الدفع وحاول مرة أخرى.",
+  } : {
+    eyebrow: "Dummy checkout",
+    title: "Checkout review",
+    subtitle: "Choose an offer and funding split. You will see a final review before dummy processing.",
+    tickets: "Tickets",
+    seats: "Seats",
+    total: "Order total",
+    back: "Edit seats",
+    loading: "Loading dummy payment gateway...",
+    processing: "Processing dummy payment",
+    processingHelp: "Simulating offer validation, split funding, and receipt creation. No real money is charged.",
+    approved: "Dummy payment processed",
+    approvedHelp: "A dummy receipt was created on this device. No real payment or reservation occurred.",
+    failed: "Dummy processing could not be completed. Review the payment details and try again.",
   };
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      reviewStartedRef.current = true;
-      onReviewStateChange?.(false);
-      clearTimers();
-    };
-  }, [onReviewStateChange]);
+  useEffect(() => () => onReviewStateChange?.(false), [onReviewStateChange]);
 
-  const cancelCheckout = () => {
-    reviewStartedRef.current = true;
-    onReviewStateChange?.(false);
-    clearTimers();
-    onCancel?.();
-  };
-
-  const saveSummary = () => {
-    if (checkoutMode !== "demo" || reviewStartedRef.current) return;
-    reviewStartedRef.current = true;
+  const processPayment = async (plan) => {
+    if (!plan?.valid || plan?.simulated !== true || status !== "ready") return;
+    setError("");
+    setStatus("processing");
     onReviewStateChange?.(true);
-    setSaving(true);
-    const checkoutId = order?.checkoutId;
-    const prepareTimer = window.setTimeout(() => {
-      if (!mountedRef.current) return;
-      setDone(true);
-      const completionTimer = window.setTimeout(() => {
-        if (!mountedRef.current || completionSentRef.current) return;
-        completionSentRef.current = true;
-        onComplete?.({ checkoutId });
-      }, 350);
-      timersRef.current.push(completionTimer);
-    }, 450);
-    timersRef.current.push(prepareTimer);
+    const nextReceipt = {
+      ...plan,
+      status: "processed",
+      simulated: true,
+      transactionRef: `DUMMY-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+      processedAt: new Date().toISOString(),
+    };
+    try {
+      await pause(800);
+      setReceipt(nextReceipt);
+      setStatus("complete");
+      await pause(550);
+      const accepted = await onComplete?.({ checkoutId: checkoutId || order.checkoutId, payment: nextReceipt });
+      if (accepted === false) throw new Error("The dummy receipt was rejected.");
+    } catch {
+      setError(copy.failed);
+      setStatus("ready");
+      setReceipt(null);
+    } finally {
+      onReviewStateChange?.(false);
+    }
   };
 
-  const header = (
-    <>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-        <button type="button" aria-label={t("checkout.editSeats")} onClick={cancelCheckout} style={backButton}>
-          <ChevronLeft size={18} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />
-          <span>{t("checkout.editSeats")}</span>
-        </button>
-        <div style={{ minWidth: 0 }}>
-          <h2 id="checkout-heading" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: C.text }}>{t("checkout.title")}</h2>
-          <div style={{ overflow: "hidden", fontSize: 11, color: C.muted, textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            <bdi dir="auto">{order?.movieTitle}</bdi> · <span dir="ltr">{order?.showtime}</span> · {t("checkout.seatsLabel")} <span dir="ltr">{seats.join(", ")}</span>
-          </div>
-        </div>
-      </div>
-      <div style={summaryCard}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <span style={{ fontSize: 13, color: C.muted }}>{t(seats.length === 1 ? "checkout.oneSeatCount" : "checkout.manySeatCount", { count: seats.length })} · <span dir="ltr">{order?.screen}</span></span>
-          <span dir="ltr" style={{ fontSize: 18, fontWeight: 800, color: C.text }}>{formatCurrency(order?.total || 0, currency)}</span>
-        </div>
-        {subtotal != null && <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "4px 12px", marginTop: 9, borderTop: `1px solid ${C.border}`, paddingTop: 8, color: C.muted, fontSize: 10 }}>
-          <span>{t("checkout.subtotal")}</span><span dir="ltr">{formatCurrency(subtotal, currency)}</span>
-          {feeTotal != null && <><span>{t("checkout.fees")}</span><span dir="ltr">{formatCurrency(feeTotal, currency)}</span></>}
-          <strong style={{ color: C.text }}>{t("checkout.total")}</strong><strong dir="ltr" style={{ color: C.text }}>{formatCurrency(order?.total || 0, currency)}</strong>
-        </div>}
-      </div>
-    </>
-  );
-
-  if (checkoutMode === "live") {
+  if (status === "processing" || status === "complete") {
     return (
-      <section aria-labelledby="checkout-heading">
-        {header}
-        <div role="alert" style={unavailableCard}>
-          <AlertTriangle size={26} color={C.warning} aria-hidden="true" />
-          <div style={{ marginTop: 10, color: C.text, fontSize: 15, fontWeight: 800 }}>{t("checkout.liveUnavailable")}</div>
-          <p style={{ margin: "6px 0 0", color: C.muted, fontSize: 12, lineHeight: 1.5 }}>{t("checkout.liveUnavailableBody")}</p>
-          {onRetry && <button type="button" onClick={onRetry} style={{ ...actionButton, marginTop: 12, background: C.primary }}>{t("error.retry")}</button>}
+      <section className="checkout" dir={dir} aria-labelledby="checkout-heading" data-testid="dummy-payment-processing" style={{ display: "grid", placeItems: "center", minHeight: 420, padding: 24, textAlign: "center" }}>
+        <div style={{ display: "grid", gap: 12, justifyItems: "center", maxWidth: 470 }}>
+          <div aria-hidden="true" style={{ width: 54, height: 54, borderRadius: "50%", border: "5px solid #f2d6d7", borderTopColor: "#e11b22", animation: status === "processing" ? "spin 900ms linear infinite" : "none" }} />
+          <p style={{ margin: 0, color: "#e11b22", fontSize: 12, fontWeight: 850, letterSpacing: ".08em", textTransform: "uppercase" }}>{copy.eyebrow}</p>
+          <h2 id="checkout-heading" style={{ margin: 0 }}>{status === "processing" ? copy.processing : copy.approved}</h2>
+          <p style={{ margin: 0, color: "#6f6876", lineHeight: 1.55 }}>{status === "processing" ? copy.processingHelp : copy.approvedHelp}</p>
+          {receipt?.amounts ? <strong>{money(receipt.amounts.payableTotal)}</strong> : null}
+          {receipt?.transactionRef ? <code>{receipt.transactionRef}</code> : null}
         </div>
-      </section>
-    );
-  }
-
-  if (saving) {
-    return (
-      <section aria-labelledby="checkout-heading" style={{ display: "flex", minHeight: 320, flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-        <h2 id="checkout-heading" style={visuallyHidden}>{t("checkout.title")}</h2>
-        <div style={{ marginBottom: 10, borderRadius: 999, background: C.warningSoft, padding: "4px 9px", color: C.warning, fontSize: 10, fontWeight: 900, letterSpacing: ".08em" }}>{t("checkout.testOnly")}</div>
-        <div style={{ display: "flex", width: 64, height: 64, alignItems: "center", justifyContent: "center", borderRadius: 20, background: done ? C.successSoft : C.primarySoft, marginBottom: 18 }}>
-          {done ? <Check size={30} color={C.green} /> : <div style={spinner} />}
-        </div>
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <div style={{ color: C.text, fontSize: 16, fontWeight: 700 }}>{done ? t("checkout.approved") : t("checkout.authorizing")}</div>
-        <div style={{ marginTop: 6, color: C.muted, fontSize: 12 }}>{done ? t("checkout.confirming") : t("checkout.demoAuth")}</div>
-        <div dir="ltr" style={{ marginTop: 14, color: C.text, fontSize: 22, fontWeight: 800 }}>{formatCurrency(order?.total || 0, order?.currency || "AED")}</div>
       </section>
     );
   }
 
   return (
-    <section aria-labelledby="checkout-heading">
-      {header}
-      <div id="checkout-safety-notice" role="note" style={demoNotice}>
-        <strong>{t("checkout.testOnly")}</strong> · {t("checkout.testNotice")}
+    <section className="checkout" dir={dir} aria-labelledby="checkout-heading" data-testid="checkout" style={{ display: "grid", gap: 18 }}>
+      <header style={{ display: "grid", gap: 7 }}>
+        <p style={{ margin: 0, color: "#e11b22", fontSize: 12, fontWeight: 850, letterSpacing: ".08em", textTransform: "uppercase" }}>{copy.eyebrow}</p>
+        <h2 id="checkout-heading" style={{ margin: 0 }}>{copy.title}</h2>
+        <p style={{ margin: 0, color: "#6f6876", lineHeight: 1.55 }}>{copy.subtitle}</p>
+      </header>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, padding: 14, borderRadius: 16, background: "#f7f4f1" }}>
+        <div><small>{copy.tickets}</small><strong style={{ display: "block" }}>{ar ? `${seatCount} مقاعد` : `${seatCount} seats`}</strong></div>
+        <div><small>{copy.seats}</small><strong style={{ display: "block" }}>{Array.isArray(order.seats) ? order.seats.join(", ") : order.seats || "-"}</strong></div>
+        <div><small>{copy.total}</small><strong style={{ display: "block" }}>{money(order.total)}</strong></div>
       </div>
 
-      <DemoPaymentGateway
-        amount={order?.total || 0}
-        currency={order?.currency || "AED"}
-        dir={dir}
-        formatCurrency={formatCurrency}
-        onApprove={saveSummary}
-      />
+      {error ? <p role="alert" style={{ margin: 0, color: "#b42318" }}>{error}</p> : null}
+      <Suspense fallback={<p>{copy.loading}</p>}>
+        <DemoPaymentGateway
+          amount={order.total}
+          ticketCount={seatCount || 1}
+          currency={currency}
+          dir={dir}
+          formatCurrency={money}
+          onProcess={processPayment}
+        />
+      </Suspense>
 
-      <div style={{ marginTop: 10, color: C.muted, fontSize: 10, textAlign: "center" }}>{t("checkout.demoDisclaimer")}</div>
+      <button type="button" onClick={onCancel || onEditSeats || onBack} style={{ justifySelf: "start", border: 0, background: "transparent", color: "#17151d", font: "inherit", fontWeight: 800, padding: "8px 0", cursor: "pointer" }}>
+        {copy.back}
+      </button>
     </section>
   );
 }
-
-const backButton = { display: "inline-flex", minHeight: 44, flexShrink: 0, alignItems: "center", gap: 3, border: "none", background: "none", color: C.primary, cursor: "pointer", padding: "4px 2px", fontSize: 11, fontWeight: 700 };
-const summaryCard = { border: `1px solid ${C.border}`, borderRadius: 12, background: C.surfaceAlt, padding: "12px 14px", marginBottom: 12 };
-const demoNotice = { border: `1px solid ${C.warning}`, borderRadius: 10, background: C.warningSoft, padding: "9px 11px", marginBottom: 12, color: C.text, fontSize: 10, lineHeight: 1.45 };
-const unavailableCard = { border: `1px solid ${C.warning}`, borderRadius: 14, background: C.warningSoft, padding: 20, textAlign: "center" };
-const spinner = { width: 26, height: 26, border: `3px solid ${C.border}`, borderTopColor: C.primary, borderRadius: "50%", animation: "spin 0.9s linear infinite" };
-const actionButton = { border: "none", borderRadius: 10, padding: 12, color: C.onPrimary, cursor: "pointer", fontSize: 14, fontWeight: 700 };
-const visuallyHidden = { position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", clipPath: "inset(50%)", whiteSpace: "nowrap" };
