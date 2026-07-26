@@ -72,6 +72,16 @@ const browseOfferContext = buildOfferEvaluationContext({
   eligibility: { ticketCount: 2 },
 });
 assert.equal(browseOfferContext.ticketCount, 2, "pre-seat ticket count must reach offer eligibility");
+const emptySeatSessionOfferContext = buildOfferEvaluationContext({
+  view: "offers",
+  originView: "movies",
+  session: {
+    cinema: { id: "moe", name: "Mall of the Emirates" },
+    selectedSeats: [],
+  },
+  eligibility: { ticketCount: 2 },
+});
+assert.equal(emptySeatSessionOfferContext.ticketCount, 2, "an empty seat list must not overwrite the requested ticket count with zero");
 
 const localOffer = resolveLocalOfferTextTurn("Show me FAB card offers for two tickets");
 assert.equal(localOffer?.ticketCount, 2, "written ticket quantities must remain distinct from monthly usage");

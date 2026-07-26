@@ -7432,7 +7432,11 @@ export default function App() {
       && isAmbiguousBareBookingTurn(value);
     if (ambiguousMovieBooking) {
       setInput("");
-      const titles = stageRef.current.movies.slice(0, 5).map((movie) => movie.title).filter(Boolean).join(", ");
+      const titles = (Array.isArray(stageRef.current.movies) ? stageRef.current.movies : [])
+        .slice(0, 5)
+        .map((movie) => movie.title)
+        .filter(Boolean)
+        .join(", ");
       const englishClarification = titles
         ? `Please name the movie you want from the visible options: ${titles}.`
         : "Please name the movie, cinema, and date you want to book.";
