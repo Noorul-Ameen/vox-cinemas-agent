@@ -182,8 +182,8 @@ failReads = false;
 const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
 assert.match(
   appSource,
-  /crypto\.getRandomValues\(new Uint8Array\(12\)\)/,
-  "local summary references must use browser cryptographic randomness when available",
+  /crypto\.getRandomValues\(new Uint8Array\(5\)\)/,
+  "restored seven-character local summary references must use browser cryptographic randomness when available",
 );
 assert.match(
   appSource,

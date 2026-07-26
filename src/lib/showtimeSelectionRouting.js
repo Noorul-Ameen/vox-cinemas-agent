@@ -33,6 +33,14 @@ function possibleHoursForChoice(match) {
   return [...new Set([twelveHour, twelveHour + 12])];
 }
 
+export function isVisibleShowtimeSelectionAttempt({ text, stage } = {}) {
+  if (stage?.view !== "showtimes" || !Array.isArray(stage.sessions) || !stage.sessions.length) return false;
+  const value = String(text || "").trim();
+  if (!value || INFORMATION_ONLY.test(value)) return false;
+  if (HOUR_ONLY_CHOICE.test(value) || parseSpokenShowtimeHourChoice(value)) return true;
+  return Boolean(extractDiscoveryPreferencePatch(value, { expectingTime: true }).patch.preferredTime);
+}
+
 /**
  * Resolve one exact, visible showtime from a conversational time choice.
  * Ambiguous same-time sessions remain unresolved until the guest names the

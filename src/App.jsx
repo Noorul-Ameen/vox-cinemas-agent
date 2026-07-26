@@ -50,7 +50,7 @@ import { createLocalDeterministicToolAuthorization, shouldBlockConcurrentDetermi
 import { loadMovieInformationCatalog } from "./lib/movieInformationCatalog.js";
 import { isPotentialMovieInformationTurn } from "./lib/movieInformationPrefilter.js";
 import { localizeCinemaName } from "./lib/catalogLocalization.js";
-import { resolveVisibleShowtimeSelectionTurn, visibleShowtimeSelectionCandidates } from "./lib/showtimeSelectionRouting.js";
+import { isVisibleShowtimeSelectionAttempt, resolveVisibleShowtimeSelectionTurn, visibleShowtimeSelectionCandidates } from "./lib/showtimeSelectionRouting.js";
 import { createSeatToolAuthorization, matchesSeatToolAuthorization, normalizeSeatIds, resolveSeatEditSelectionTurn, resolveSeatSelectionTurn, resolveSeatToolInput } from "./lib/seatRouting.js";
 import { filterBookableSessions } from "./lib/showtimeAvailability.js";
 import { beginOwnedSessionSwitch, canRestorePreviousSession, endTransportWithRetirement, finalizeOwnedSessionStart, finalizeOwnedSessionSwitch, resetOwnedSessionSwitch, startTransportWithRetirement, waitForLazyTransport } from "./lib/transportStart.js";
@@ -92,6 +92,14 @@ const resolveVisibleMovieSelectionTurnLazy = async (args, { isCurrent = () => tr
   if (!isCurrent()) return null;
   const movie = await resolveVisibleMovieSelectionTurn(args);
   return isCurrent() ? movie : null;
+};
+const routePendingVisibleMovieLazy = async (args) => {
+  const { routePendingVisibleMovie } = await import("./lib/movieSelectionRouting.js");
+  return routePendingVisibleMovie(args);
+};
+const showtimeClarificationLazy = async (args) => {
+  const { showtimeClarification } = await import("./lib/showtimeClarification.js");
+  return showtimeClarification(args);
 };
 
 const CINEMAS = vista.getCinemas();
@@ -1275,13 +1283,10 @@ function saveReleaseJourneyRecovery(value) {
 const BOOKING_REFERENCE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function bookingReferenceCandidate() {
   try {
-    const bytes = crypto.getRandomValues(new Uint8Array(12));
+    const bytes = crypto.getRandomValues(new Uint8Array(5));
     return `WL${Array.from(bytes, (value) => BOOKING_REFERENCE_ALPHABET[value % BOOKING_REFERENCE_ALPHABET.length]).join("")}`;
   } catch {
-    const fallback = `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
-      .replace(/[^a-z0-9]/gi, "")
-      .toUpperCase();
-    return `WL${fallback.slice(0, 16).padEnd(16, "X")}`;
+    return `WL${Math.random().toString(36).slice(2, 7).toUpperCase().padEnd(5, "X")}`;
   }
 }
 
@@ -2581,9 +2586,11 @@ export default function App() {
       unresolvedMovieTitleCandidate(rawTurn, rawPreferencePatch)
       || plausibleBareTitleReply
     );
-    if (likelyUnresolvedTitle) pendingDiscoveryTurnRef.current = rawTurn;
+    const explicitMovieSelectionTurn = rawTurn && !locationIntent && !directCinemaReply && !dateOnlyReply
+      && Boolean(rawPreferencePatch.patch.movieId || rawPreferencePatch.patch.movieTitle);
+    if (likelyUnresolvedTitle || explicitMovieSelectionTurn) pendingDiscoveryTurnRef.current = rawTurn;
     else if (
-      directCinemaReply || rawPreferencePatch.patch.movieId || rawPreferencePatch.patch.movieTitle || rawPreferencePatch.patch.openChoice
+      rawPreferencePatch.patch.openChoice
       || rawPreferencePatch.clear.includes("movieId") || rawPreferencePatch.clear.includes("movieTitle")
       || /\b(?:any movie|another movie|something else|start over|reset)\b|(?:فيلم آخر|فيلم اخر|ابدأ من جديد)/iu.test(rawTurn)
     ) pendingDiscoveryTurnRef.current = "";
@@ -2754,7 +2761,17 @@ export default function App() {
     if (missing.includes("unsupported_language_afghan")) return showDiscoveryPrompt(["unsupported_language_afghan"], preferences);
     if (missing.includes("educational")) return showDiscoveryPrompt(["educational"], preferences);
     if (missing.includes("preference") && !pendingDiscoveryTurnRef.current) return showDiscoveryPrompt(missing.filter((item) => item === "preference"), preferences);
+    const pendingMovieSelectionTurn = pendingDiscoveryTurnRef.current;
     const result = await loadDiscoveryForCinema(target, preferences.date, preferences, combinedRawTurn);
+    const pendingResult = pendingMovieSelectionTurn && await routePendingVisibleMovieLazy({
+      result,
+      text: pendingMovieSelectionTurn,
+      route: routeVisibleMovieSelection,
+    });
+    if (pendingResult) {
+      pendingDiscoveryTurnRef.current = "";
+      return pendingResult;
+    }
     if (discoveryPreferencesRef.current.movieId || discoveryPreferencesRef.current.movieTitle) pendingDiscoveryTurnRef.current = "";
     return result;
   };
@@ -6116,10 +6133,11 @@ export default function App() {
         let ambiguousShowtimeCandidates = decision === null && !activeCheckout && !directMovieSelection && !directShowtimeSelection
           ? visibleShowtimeSelectionCandidates({ text: safeMessage, stage: stageRef.current })
           : [];
-        let ambiguousShowtimeSelection = ambiguousShowtimeCandidates.length > 1;
+        let ambiguousShowtimeSelection = !directShowtimeSelection
+          && isVisibleShowtimeSelectionAttempt({ text: safeMessage, stage: stageRef.current });
         let groundedContinuationRestore = null;
-        if (!stageVisibleRef.current && (directSeatSelection || directShowtimeSelection || directMovieSelection)) {
-          const continuationView = directSeatSelection ? "seatmap" : directShowtimeSelection ? "showtimes" : "movies";
+        if (!stageVisibleRef.current && (directSeatSelection || directShowtimeSelection || directMovieSelection || ambiguousShowtimeSelection)) {
+          const continuationView = directSeatSelection ? "seatmap" : (directShowtimeSelection || ambiguousShowtimeSelection) ? "showtimes" : "movies";
           const retained = selectRestorableRichStage(pausedJourneyRef.current, { view: continuationView });
           if (retained) {
             groundedContinuationRestore = await restorePausedJourney({ target: continuationView, source: "voice_grounded_continuation" });
@@ -6132,7 +6150,8 @@ export default function App() {
               } else if (continuationView === "showtimes") {
                 directShowtimeSelection = resolveVisibleShowtimeSelectionTurn({ text: safeMessage, stage: stageRef.current });
                 ambiguousShowtimeCandidates = directShowtimeSelection ? [] : visibleShowtimeSelectionCandidates({ text: safeMessage, stage: stageRef.current });
-                ambiguousShowtimeSelection = ambiguousShowtimeCandidates.length > 1;
+                ambiguousShowtimeSelection = !directShowtimeSelection
+                  && isVisibleShowtimeSelectionAttempt({ text: safeMessage, stage: stageRef.current });
               } else {
                 directMovieSelection = await resolveVisibleMovieSelectionTurnLazy(
                   { text: safeMessage, stage: stageRef.current },
@@ -6321,10 +6340,13 @@ export default function App() {
           });
         }
         if (ambiguousShowtimeSelection) {
-          const options = ambiguousShowtimeCandidates
-            .map((session) => `${session.time} ${session.exp || session.experience || "standard"}`)
-            .join(", ");
-          conversation.sendContextualUpdate?.(`The guest's showtime wording matches more than one visible option: ${options}. The verified showtimes remain visible. Ask only which exact time and experience they want. Do not call a display tool and do not say the booking is paused.`);
+          const clarification = await showtimeClarificationLazy({
+            candidates: ambiguousShowtimeCandidates,
+            sessions: stageRef.current.sessions,
+            voice: true,
+          });
+          if (!voiceTurnIsCurrent()) return;
+          conversation.sendContextualUpdate?.(clarification);
         }
         if (groundedContinuationRestore && !groundedContinuationRestore.restored) {
           conversation.sendContextualUpdate?.(pausedRestoreContext(groundedContinuationRestore));
@@ -7404,10 +7426,11 @@ export default function App() {
     let ambiguousShowtimeCandidates = decision === null && !activeCheckout && !directMovieSelection && !directShowtimeSelection
       ? visibleShowtimeSelectionCandidates({ text: value, stage: stageRef.current })
       : [];
-    let ambiguousShowtimeSelection = ambiguousShowtimeCandidates.length > 1;
+    let ambiguousShowtimeSelection = !directShowtimeSelection
+      && isVisibleShowtimeSelectionAttempt({ text: value, stage: stageRef.current });
     let groundedContinuationRestore = null;
-    if (!stageVisibleRef.current && (directSeatSelection || directShowtimeSelection || directMovieSelection)) {
-      const continuationView = directSeatSelection ? "seatmap" : directShowtimeSelection ? "showtimes" : "movies";
+    if (!stageVisibleRef.current && (directSeatSelection || directShowtimeSelection || directMovieSelection || ambiguousShowtimeSelection)) {
+      const continuationView = directSeatSelection ? "seatmap" : (directShowtimeSelection || ambiguousShowtimeSelection) ? "showtimes" : "movies";
       const retained = selectRestorableRichStage(pausedJourneyRef.current, { view: continuationView });
       if (retained) {
         groundedContinuationRestore = await restorePausedJourney({ target: continuationView, source: "text_grounded_continuation" });
@@ -7420,7 +7443,8 @@ export default function App() {
           } else if (continuationView === "showtimes") {
             directShowtimeSelection = resolveVisibleShowtimeSelectionTurn({ text: value, stage: stageRef.current });
             ambiguousShowtimeCandidates = directShowtimeSelection ? [] : visibleShowtimeSelectionCandidates({ text: value, stage: stageRef.current });
-            ambiguousShowtimeSelection = ambiguousShowtimeCandidates.length > 1;
+            ambiguousShowtimeSelection = !directShowtimeSelection
+              && isVisibleShowtimeSelectionAttempt({ text: value, stage: stageRef.current });
           } else {
             directMovieSelection = await resolveVisibleMovieSelectionTurnLazy(
               { text: value, stage: stageRef.current },
@@ -7460,12 +7484,13 @@ export default function App() {
     }
     if (ambiguousShowtimeSelection) {
       setInput("");
-      const options = ambiguousShowtimeCandidates
-        .map((session) => `${session.time} ${session.exp || session.experience || "STANDARD"}`)
-        .join(", ");
-      say("agent", localeRef.current === "ar"
-        ? `يوجد أكثر من عرض مطابق. اذكر الوقت والتجربة بالضبط: ${options}.`
-        : `More than one visible showtime matches. Please name the exact time and experience: ${options}.`);
+      const clarification = await showtimeClarificationLazy({
+        candidates: ambiguousShowtimeCandidates,
+        sessions: stageRef.current.sessions,
+        locale: localeRef.current,
+      });
+      if (!typedTurnIsCurrent()) return;
+      say("agent", clarification);
       return;
     }
     const actionIntent = classifyFaqActionIntent(value);
@@ -7679,6 +7704,10 @@ export default function App() {
       const visibleMovies = Array.isArray(currentStage.movies) ? currentStage.movies : [];
       const discoveryAnswer = currentStage.error
         ? localizedStageMessage(currentStage, "error", localeRef.current)
+        : discoveryRouteResult.selectedMovie
+          ? (localeRef.current === "ar"
+              ? `تم اختيار ${discoveryRouteResult.selectedMovie.title}. تظهر ${discoveryRouteResult.showtimes.length} مواعيد عرض.`
+              : `${discoveryRouteResult.selectedMovie.title} is selected. ${discoveryRouteResult.showtimes.length} showtimes are visible.`)
         : currentStage.view === "movies" && visibleMovies.length
           ? (localeRef.current === "ar"
               ? `عدد الأفلام المطابقة لطلبك: ${visibleMovies.length}. اختر الفيلم بكتابة اسمه.`

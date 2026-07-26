@@ -4,8 +4,8 @@ export const DEMO_CARD_NUMBERS = Object.freeze({
 });
 
 export const DEMO_CARD_OFFER_PERCENT = 20;
-export const DEMO_WALLET_BALANCE = 500;
-export const DEMO_SHARE_POINTS = 5000;
+export const DEMO_WALLET_BALANCE = 30;
+export const DEMO_SHARE_POINTS = 10;
 export const DEMO_SHARE_POINTS_PER_AED = 10;
 
 const EPSILON = 0.011;

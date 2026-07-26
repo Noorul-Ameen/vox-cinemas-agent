@@ -64,6 +64,22 @@ async function reachCheckoutByText(page) {
   await expect(page.getByText("Checkout review", { exact: true }).last()).toBeVisible();
 }
 
+async function selectedMovieTitleFromGrid(page) {
+  const cards = await reachMovieGridByText(page, "Show me any movie");
+  const firstMovie = cards.first();
+  const movieAria = await firstMovie.locator('[aria-label^="Relevant showtimes for "]').getAttribute("aria-label");
+  const movieTitle = String(movieAria || "").replace(/^Relevant showtimes for\s+/i, "").trim();
+  expect(movieTitle).not.toBe("");
+  return movieTitle;
+}
+
+async function reachShowtimesByText(page) {
+  const movieTitle = await selectedMovieTitleFromGrid(page);
+  await sendText(page, movieTitle);
+  await expect(page.getByText(/Select a showtime/).first()).toBeVisible();
+  return movieTitle;
+}
+
 test.beforeEach(async ({ page }) => {
   await page.route(/^https:\/\/[^/]*elevenlabs\.(?:io|com)\//i, (route) => route.abort("blockedbyclient"));
   await page.routeWebSocket(/^wss:\/\/[^/]*elevenlabs\.(?:io|com)\//i, (socket) => socket.close());
@@ -92,9 +108,54 @@ test("Arabic typed date is consumed once and renders the retained horror results
   await expect(page.locator("main")).not.toContainText(STALE_ARABIC_DISCOVERY_QUESTION);
 });
 
+test("a movie title supplied before cinema and date is selected without being requested again", async ({ page }) => {
+  const movieTitle = await selectedMovieTitleFromGrid(page);
+  await page.getByRole("button", { name: "Start a new conversation" }).click();
+
+  await sendText(page, movieTitle);
+  await sendText(page, "Mall of the Emirates");
+  const dateGroup = page.getByRole("group", { name: "Choose a date" });
+  await expect(dateGroup).toBeVisible();
+  const firstDate = dateGroup.getByRole("button").first();
+  const dateChoice = (await firstDate.getAttribute("aria-label")) || (await firstDate.innerText());
+  await sendText(page, dateChoice.replace(/^[^,]+,\s*/, ""));
+
+  await expect(page.getByText(/Select a showtime/).first()).toBeVisible();
+  await expect(page.locator("main")).toContainText(`${movieTitle} is selected.`);
+  await expect(page.locator("main")).not.toContainText(/Type the movie title to choose it/);
+});
+
+test("an unmatched typed showtime hour keeps the rendered showtime options visible in English and Arabic", async ({ page }) => {
+  await reachShowtimesByText(page);
+  const showtimeButtons = page.locator("main button").filter({ hasText: /\d{1,2}:\d{2}/ });
+  const initialCount = await showtimeButtons.count();
+  expect(initialCount).toBeGreaterThan(0);
+  const visibleHours = new Set();
+  for (let index = 0; index < initialCount; index += 1) {
+    const text = await showtimeButtons.nth(index).innerText();
+    const match = text.match(/(\d{1,2}):\d{2}/);
+    if (match) visibleHours.add((Number(match[1]) % 12) || 12);
+  }
+  const unmatchedHour = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 11, 12].find((hour) => !visibleHours.has(hour));
+  expect(unmatchedHour).toBeTruthy();
+
+  await sendText(page, String(unmatchedHour));
+  await expect(page.getByText(/Select a showtime/).first()).toBeVisible();
+  await expect(showtimeButtons).toHaveCount(initialCount);
+  await expect(page.locator("main")).toContainText("The current options remain visible");
+
+  await page.getByRole("button", { name: "العربية" }).click();
+  await sendText(page, String(unmatchedHour));
+  await expect(showtimeButtons).toHaveCount(initialCount);
+  await expect(page.locator("main")).toContainText("بقيت مواعيد العرض ظاهرة");
+});
+
 test("typed journey reaches final review and processes a three-way dummy payment", async ({ page }) => {
   await reachCheckoutByText(page);
   await expect(page.getByTestId("dummy-payment-gateway")).toBeVisible();
+  await expect(page.getByTestId("combined-payment-options")).toBeVisible();
+  await expect(page.getByTestId("combined-payment-options")).toContainText("10 points available");
+  await expect(page.getByTestId("combined-payment-options")).toContainText("Dummy balance AED 30");
 
   await sendText(page, "pay now");
   await expect(page.getByTestId("dummy-payment-gateway")).toBeVisible();
@@ -110,30 +171,34 @@ test("typed journey reaches final review and processes a three-way dummy payment
   await expect(page.getByText("Eligible for every selected offer").last()).toBeVisible();
 
   await page.getByLabel("Use SHARE points").check();
-  await page.getByLabel("SHARE value in AED").fill("10");
+  await page.getByLabel("SHARE value in AED").fill("1");
   await page.getByLabel("Use VOX Wallet").check();
-  await page.getByLabel("Wallet value in AED").fill("20");
+  await page.getByLabel("Wallet value in AED").fill("30");
 
   await expect(page.getByText(/Dummy offer discount/).locator("..")).toContainText(/AED\s*42\.00/);
-  await expect(page.getByText(/Card remainder/).locator("..")).toContainText(/AED\s*12\.00/);
+  await expect(page.getByText(/Card remainder/).locator("..")).toContainText(/AED\s*11\.00/);
   await expect(page.getByTestId("review-dummy-payment")).toBeEnabled();
   await page.getByTestId("review-dummy-payment").click();
   await expect(page.getByText("Final payment summary")).toBeVisible();
-  await expect(page.getByText("SHARE points").locator("..")).toContainText(/AED\s*10\.00/);
-  await expect(page.getByText("VOX Wallet").locator("..")).toContainText(/AED\s*20\.00/);
+  await expect(page.getByText("SHARE points").locator("..")).toContainText(/AED\s*1\.00/);
+  await expect(page.getByText("VOX Wallet").locator("..")).toContainText(/AED\s*30\.00/);
   await page.getByTestId("process-dummy-payment").click();
   await expect(page.getByText("Processing dummy payment")).toBeVisible();
   await expect(page.getByText("Dummy payment receipt")).toBeVisible();
   await expect(page.getByText(/No real payment or seat reservation occurred/)).toBeVisible();
+  await expect(page.getByText(/^WL[A-HJ-NP-Z2-9]{5}$/).first()).toBeVisible();
 });
 
-test("Arabic checkout can use wallet only and process a dummy receipt", async ({ page }) => {
+test("Arabic checkout processes a combined SHARE, wallet, and card payment", async ({ page }) => {
   await reachCheckoutByText(page);
   await page.getByRole("button", { name: "العربية" }).click();
   await expect(page.getByTestId("dummy-payment-gateway")).toBeVisible();
 
+  await page.getByTestId("eligible-test-card").click();
+  await page.getByLabel("استخدام نقاط SHARE").check();
+  await page.getByLabel("قيمة SHARE بالدرهم").fill("1");
   await page.getByLabel("استخدام محفظة VOX").check();
-  await page.getByLabel("قيمة المحفظة بالدرهم").fill("84");
+  await page.getByLabel("قيمة المحفظة بالدرهم").fill("30");
   await expect(page.getByTestId("review-dummy-payment")).toBeEnabled();
   await page.getByTestId("review-dummy-payment").click();
   await expect(page.getByText("ملخص الدفع النهائي")).toBeVisible();
