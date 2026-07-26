@@ -75,6 +75,14 @@ const historySource = await readFile(new URL("../src/components/BookingHistory.j
 const qrSource = await readFile(new URL("../src/components/BookingQRCode.jsx", import.meta.url), "utf8");
 const handoverSource = await readFile(new URL("../src/components/HandoverPanel.jsx", import.meta.url), "utf8");
 const appSource = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+const typedGatewayCompletionStart = appSource.indexOf("const checkoutForSummarySave");
+const typedGatewayCompletion = appSource.slice(
+  typedGatewayCompletionStart,
+  appSource.indexOf("if (checkoutPaymentActiveRef.current)", typedGatewayCompletionStart),
+);
+assert.match(typedGatewayCompletion, /restoreActiveCheckout\(\)/, "a typed summary request must restore the guest-controlled gateway");
+assert.match(typedGatewayCompletion, /Validate a method in the test gateway before saving/, "typed summary guidance must require on-screen validation");
+assert.doesNotMatch(typedGatewayCompletion, /handleCheckoutReviewComplete\(/, "typed chat must never bypass payment-method validation or complete checkout");
 const retryableLazySource = await readFile(new URL("../src/components/RetryableLazy.jsx", import.meta.url), "utf8");
 const mainSource = await readFile(new URL("../src/main.jsx", import.meta.url), "utf8");
 const voxiPromptSource = await readFile(new URL("../src/lib/voxiPrompt.js", import.meta.url), "utf8");

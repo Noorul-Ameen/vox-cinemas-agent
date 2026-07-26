@@ -220,7 +220,7 @@ test("direct UI journey reaches checkout with seat-derived ticket count", async 
   await expectNoForbiddenCustomerFacingDashes(page);
 });
 
-test("checkout review saves a device-local summary with reference QR disclosure", async ({ page }) => {
+test("checkout gateway saves a device-local summary with reference QR disclosure", async ({ page }) => {
   const { input } = await reachCheckout(page, 2);
   await input.fill("Can I pre order food and collect it at the cinema?");
   await input.press("Enter");
@@ -231,8 +231,11 @@ test("checkout review saves a device-local summary with reference QR disclosure"
   await input.press("Enter");
   await expect(page.getByText("Checkout review", { exact: true }).last()).toBeVisible();
 
-  await input.fill("Save this booking summary");
-  await input.press("Enter");
+  const saveSummary = page.getByRole("button", { name: /Save validated checkout summary/ });
+  await expect(saveSummary).toBeDisabled();
+  await page.getByRole("button", { name: /Eligible test card/ }).click();
+  await expect(saveSummary).toBeEnabled();
+  await saveSummary.click();
 
   await expect(page.getByText("Booking summary", { exact: true }).last()).toBeVisible({ timeout: 8_000 });
   await expect(page.getByText(/No payment was charged and no cinema reservation was submitted/)).toBeVisible();

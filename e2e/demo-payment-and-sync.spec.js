@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const STALE_DISCOVERY_QUESTION = /which genre|what genre|what kind of movie|what are you in the mood for/iu;
+const STALE_ARABIC_DISCOVERY_QUESTION = /أي نوع|ما نوع|ماذا تفضل/iu;
 
 async function sendText(page, text) {
   const input = page.locator("input[aria-label]").last();
@@ -75,9 +76,30 @@ test("typed horror discovery keeps the response synchronized with the rendered m
   await expect(page.locator("main")).not.toContainText(STALE_DISCOVERY_QUESTION);
 });
 
+test("Arabic typed date is consumed once and renders the retained horror results", async ({ page }) => {
+  await page.getByRole("button", { name: "العربية" }).click();
+  await sendText(page, "أريد أفلام رعب في مول الإمارات");
+  const dateGroup = page.getByRole("group", { name: "اختر التاريخ" });
+  await expect(dateGroup).toBeVisible();
+  const firstDate = dateGroup.getByRole("button").first();
+  const displayedDate = (await firstDate.getAttribute("aria-label")) || (await firstDate.innerText());
+  await sendText(page, displayedDate.replace(/^[^،,]+[،,]\s*/, ""));
+
+  await expect(page.getByRole("heading", { name: "اختر فيلماً" })).toBeVisible();
+  const cards = page.getByRole("region", { name: "اختر فيلماً" }).getByRole("button");
+  await expect(cards.first()).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(/لم أتمكن من مطابقة/u);
+  await expect(page.locator("main")).not.toContainText(STALE_ARABIC_DISCOVERY_QUESTION);
+});
+
 test("typed journey reaches the test gateway and validates every published outcome", async ({ page }) => {
   await reachCheckoutByText(page);
   await expect(page.getByRole("heading", { name: "Test payment gateway" })).toBeVisible();
+
+  await sendText(page, "save booking summary");
+  await expect(page.getByRole("heading", { name: "Test payment gateway" })).toBeVisible();
+  await expect(page.getByText(/Validate a method in the test gateway before saving/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /Save validated checkout summary/ })).toBeDisabled();
 
   await page.getByRole("button", { name: /Not eligible test card/ }).click();
   await expect(page.getByText("This test card is not eligible for the card offer.")).toBeVisible();
