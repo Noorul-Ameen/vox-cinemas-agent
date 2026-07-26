@@ -127,12 +127,18 @@ const requestedDateParserRuntime = new Function(
 const datePromptReplyRuntime = new Function(
   `${app.slice(app.indexOf("function resolveDatePromptReply"), app.indexOf("function isProgrammingDateOnlyReply"))}\nreturn resolveDatePromptReply;`,
 )();
+const dateOnlyReplyRuntime = new Function(
+  `${app.slice(app.indexOf("function isProgrammingDateOnlyReply"), app.indexOf("function guardMovieDisplayClaim"))}\nreturn isProgrammingDateOnlyReply;`,
+)();
 assert.equal(requestedDateParserRuntime("2026-02-31"), null, "the App date parser must reject impossible ISO dates");
 assert.equal(requestedDateParserRuntime("31/02/2026"), null, "the App date parser must reject impossible numeric dates");
 assert.equal(requestedDateParserRuntime("2028-02-29"), "2028-02-29", "the App date parser must retain a valid leap-day ISO date");
 assert.equal(requestedDateParserRuntime("29/02/2028"), "2028-02-29", "the App date parser must retain a valid leap-day numeric date");
 assert.equal(datePromptReplyRuntime("show movies on 31/02/2026", ["2026-07-31"], { view: "empty" }), null, "an invalid numeric date must not be reinterpreted as a contextual day-of-month reply");
 assert.equal(datePromptReplyRuntime("show movies on 31", ["2026-07-31"], { view: "empty" }), "2026-07-31", "a genuine contextual day-of-month reply must remain supported");
+assert.equal(dateOnlyReplyRuntime("26 يوليو", "2026-07-26"), true, "an Arabic day and month reply must be owned only by date selection");
+assert.equal(dateOnlyReplyRuntime("الأحد، 26 يوليو", "2026-07-26"), true, "an Arabic displayed date label must be owned only by date selection");
+assert.equal(dateOnlyReplyRuntime("Minions 26 يوليو", "2026-07-26"), false, "a movie title containing an Arabic date must not be reduced to a date-only reply");
 assert.match(requestedDateParser, /ordinalDay\s*=\s*raw\.match/, "the shared typed/voice date capture must recognize context-bound spoken ordinal dates such as on 17th");
 assert.match(requestedDateParser, /\(\?=\\s\*\(\?:\$\|\[,\.\!\?;:\]/, "an ordinal embedded in a movie, screen, row, seat, or option phrase must not be treated as a date");
 assert.match(requestedDateParser, /ordinalText\.match\(\/\^\(\?:the/, "a standalone ordinal must be accepted only as a complete date reply, not inside a movie or seat choice");
