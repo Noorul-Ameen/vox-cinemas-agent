@@ -87,8 +87,6 @@ for (const requiredCrossBrowserGate of [
 }
 
 assert.match(validationWorkflow, /upload-artifact/, "Validation CI must upload Playwright artifacts.");
-assert.match(validationWorkflow, /playwright install --with-deps chromium firefox webkit/, "Validation CI must install Chromium, Firefox, and WebKit.");
-assert.match(hostedWorkflow, /playwright install --with-deps chromium firefox webkit/, "Hosted CI must install Chromium, Firefox, and WebKit.");
 for (const [name, source] of [
   ["validation", validationWorkflow],
   ["hosted smoke", hostedWorkflow],
@@ -123,6 +121,13 @@ assert.match(appSource, /isReleaseRecoveryCurrency[\s\S]*isSafeReleaseRecoveryTr
 assert.match(appSource, /onStaleVersion=\{preserveJourneyForReleaseReload\}/, "Lazy release refreshes must receive the active journey recovery callback.");
 
 const scripts = JSON.parse(packageJson).scripts || {};
+for (const installScript of ["pretest:e2e", "pretest:e2e:cross-browser", "pretest:e2e:hosted"]) {
+  assert.equal(
+    scripts[installScript],
+    "playwright install --with-deps chromium firefox webkit",
+    `${installScript} must provision Chromium, Firefox, WebKit, and their host dependencies.`,
+  );
+}
 assert.equal(
   scripts["test:e2e"],
   "playwright test e2e/voxi-widget.spec.js e2e/voxi-accessibility.spec.js e2e/cross-browser-text.spec.js",
