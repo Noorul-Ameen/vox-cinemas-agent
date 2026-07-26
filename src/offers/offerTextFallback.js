@@ -6,6 +6,30 @@ const ENGLISH_OFFER_INTENT = /\b(?:offer|offers|deal|deals|discount|discounts|pr
 const ARABIC_OFFER_INTENT = /(?:عرض|عروض|خصم|خصومات|تخفيض|ترويج|مؤهل|مؤهلة|الأهلية|اهلية|أهلية|بطاق|استفادة|استخدام)/u;
 const NAMED_OFFER_USE_INTENT = /\b(?:(?:can|could|may|would|do)\s+i\s+(?:use|apply)|pay\s+with)\b/i;
 const GENERIC_CARD_TIER = /\b(?:visa|mastercard)\s+(?:infinite|signature|platinum|gold|classic|titanium|world|world elite|black|premier|rewards)\b/i;
+const TICKET_WORDS = Object.freeze({
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+});
+
+function ticketCountFromText(text) {
+  const numeric = String(text || "").match(/\b(\d{1,2})\s*(?:tickets?|seats?)\b/i);
+  if (numeric) {
+    const count = Number(numeric[1]);
+    return count >= 1 && count <= 10 ? count : null;
+  }
+  const words = Object.entries(TICKET_WORDS).find(([word]) => new RegExp(`\\b${word}\\s+(?:tickets?|seats?)\\b`, "i").test(text));
+  if (words) return words[1];
+  const arabic = String(text || "").match(/(?:تذكرتين|مقعدين)/u);
+  return arabic ? 2 : null;
+}
 
 const TOPIC_PATTERNS = Object.freeze([
   ["cards", /\b(?:card|cards|eligible card|which cards?|qualif(?:y|ies|ied))\b|(?:بطاق|البطاقات|المؤهلة)/iu],
@@ -44,6 +68,7 @@ export function resolveLocalOfferTextTurn(query, { locale = "en" } = {}) {
     bankName: result.offer.bank.en,
     cardName: selectedProfile?.name?.en || "",
     detailTopic,
+    ticketCount: ticketCountFromText(text),
     answer: answerForOfferTopic(result.offer, selectedProfile, responseLocale, detailTopic),
   };
 }

@@ -354,7 +354,7 @@ export function buildOfferEvaluationContext({
     screen: canonical.screen,
     seatType: canonical.seatType || firstText(eligibility.seatType),
     selectedSeats,
-    ticketCount: hasSeatSelection ? selectedSeats.length : null,
+    ticketCount: hasSeatSelection ? selectedSeats.length : finiteNumber(eligibility.ticketCount),
     subtotal: canonical.subtotal,
     feeTotal: canonical.feeTotal,
     orderTotal: canonical.orderTotal,

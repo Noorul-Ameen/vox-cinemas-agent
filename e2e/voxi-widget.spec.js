@@ -151,11 +151,7 @@ test("microphone denial is recoverable and typed booking history remains usable"
   const input = page.locator("input[aria-label]").last();
   await expect(input).toBeEnabled();
   await input.fill("Show my booking history");
-  await expect(input).toHaveValue("Show my booking history");
-  await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
-  await input.fill("");
-
-  await page.getByRole("button", { name: "Saved summaries" }).first().click();
+  await input.press("Enter");
   await expect(page.getByRole("heading", { name: "Saved booking summaries" })).toBeVisible();
   await expect(page.getByText(/No saved summaries yet/)).toBeVisible();
   await expectNoForbiddenCustomerFacingDashes(page);
@@ -176,12 +172,21 @@ test("direct UI journey reaches checkout with seat-derived ticket count", async 
 
   const firstMovieCard = page.locator('main button:has([aria-label^="Relevant showtimes for "])').first();
   await expect(firstMovieCard).toBeVisible();
-  await firstMovieCard.click();
+  const movieAriaLabel = await firstMovieCard.locator('[aria-label^="Relevant showtimes for "]').getAttribute("aria-label");
+  const movieTitle = String(movieAriaLabel || "").replace(/^Relevant showtimes for /, "");
+  expect(movieTitle).not.toEqual("");
+  await input.fill(`I want ${movieTitle}`);
+  await input.press("Enter");
   await expect(page.getByText(/Select a showtime/).first()).toBeVisible();
 
   const showtimeButton = page.locator("main button").filter({ hasText: /\d{1,2}:\d{2}/ }).first();
   await expect(showtimeButton).toBeVisible();
-  await showtimeButton.click();
+  const showtimeText = await showtimeButton.innerText();
+  const showtime = showtimeText.match(/\d{1,2}:\d{2}/)?.[0];
+  const experience = showtimeText.match(/\b(?:4DX|GOLD|IMAX|KIDS|MAX|ONYX|PREMIER|STANDARD|THEATRE)\b/i)?.[0] || "";
+  expect(showtime).toBeTruthy();
+  await input.fill(`Yes, use ${showtime} ${experience}`.trim());
+  await input.press("Enter");
   await expect(page.getByText(/Tap seats/).first()).toBeVisible();
 
   const availableSeats = page.locator('main button[aria-label^="Seat "]:not([disabled])');
@@ -216,8 +221,18 @@ test("direct UI journey reaches checkout with seat-derived ticket count", async 
 });
 
 test("checkout review saves a device-local summary with reference QR disclosure", async ({ page }) => {
-  await reachCheckout(page, 2);
-  await page.getByRole("button", { name: /Save booking summary/ }).click();
+  const { input } = await reachCheckout(page, 2);
+  await input.fill("Can I pre order food and collect it at the cinema?");
+  await input.press("Enter");
+  await expect(page.getByText(/Voxi cannot place a food order inside this conversation/)).toBeVisible();
+  await expect(page.getByRole("button", { name: /Return to checkout review/ })).toBeVisible();
+
+  await input.fill("Return to checkout review");
+  await input.press("Enter");
+  await expect(page.getByText("Checkout review", { exact: true }).last()).toBeVisible();
+
+  await input.fill("Save this booking summary");
+  await input.press("Enter");
 
   await expect(page.getByText("Booking summary", { exact: true }).last()).toBeVisible({ timeout: 8_000 });
   await expect(page.getByText(/No payment was charged and no cinema reservation was submitted/)).toBeVisible();
@@ -248,19 +263,22 @@ test("language control switches the complete interface direction", async ({ page
   await expect(applicationRoot).toHaveAttribute("lang", "en");
   await expect(applicationRoot).toHaveAttribute("dir", "ltr");
 
-  await page.getByRole("button", { name: "العربية" }).click();
+  const input = page.locator("input[aria-label]").last();
+  await input.fill("Switch the conversation and interface to Arabic.");
+  await input.press("Enter");
   await expect(applicationRoot).toHaveAttribute("lang", "ar");
   await expect(applicationRoot).toHaveAttribute("dir", "rtl");
   await expect(page.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "false");
   await expectNoForbiddenCustomerFacingDashes(page);
 
-  const input = page.locator("input[aria-label]").last();
-  await input.fill("اعرض حجوزاتي");
-  await input.press("Enter");
+  const arabicInput = page.locator("input[aria-label]").last();
+  await arabicInput.fill("اعرض حجوزاتي");
+  await arabicInput.press("Enter");
   await expect(page.getByRole("heading", { name: "ملخصات الحجز المحفوظة" })).toBeVisible();
   await expect(page.getByText(/لا توجد ملخصات محفوظة بعد/)).toBeVisible();
 
-  await page.getByRole("button", { name: "English" }).click();
+  await arabicInput.fill("Switch the interface and conversation to English.");
+  await arabicInput.press("Enter");
   await expect(applicationRoot).toHaveAttribute("lang", "en");
   await expect(applicationRoot).toHaveAttribute("dir", "ltr");
 });

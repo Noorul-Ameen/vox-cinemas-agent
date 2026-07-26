@@ -47,6 +47,7 @@ const EXPECTED_TOOL_PARAMETERS = Object.freeze({
     "detailTopic",
     "format",
     "seatType",
+    "ticketCount",
     "isMember",
     "monthlyTicketsUsed",
     "monthlySpend",
@@ -160,7 +161,10 @@ assert.deepEqual(selectSeatsTool.parameters.required, ["seats"]);
 assert.equal(selectSeatsTool.parameters.properties.seats.type, "array");
 const offersTool = contract.tools.find(({ name }) => name === "show_offers");
 assert.deepEqual(offersTool.parameters.properties.detailTopic.enum, EXPECTED_DETAIL_TOPICS);
-assert.ok(!Object.hasOwn(offersTool.parameters.properties, "ticketCount"), "offer ticket count must remain locally derived from selected seats");
+assert.equal(offersTool.parameters.properties.ticketCount.type, "integer");
+assert.equal(offersTool.parameters.properties.ticketCount.minimum, 1);
+assert.equal(offersTool.parameters.properties.ticketCount.maximum, 10);
+assert.match(offersTool.parameters.properties.ticketCount.description, /separate from monthlyTicketsUsed/i);
 assert.ok(!Object.hasOwn(offersTool.parameters.properties, "orderTotal"), "offer order total must remain locally derived from checkout");
 
 assert.equal(contract.prompt.source, "src/lib/voxiPrompt.js");
