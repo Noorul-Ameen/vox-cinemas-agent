@@ -4119,7 +4119,7 @@ export default function App() {
         const currentSessions = filterCurrentSessions(sessionsRef.current).available;
         clearSeatSelection();
         showStage({ view: "showtimes", movie: currentMovie, sessions: currentSessions });
-        say("system", localeRef.current === "ar" ? "انتهى موعد العرض قبل حفظ الحجز، ولم يتم تحصيل أي مبلغ." : "The showtime started before the booking could be saved. No payment was taken.");
+      say("system", localeRef.current === "ar" ? "انتهى موعد العرض قبل إتمام الحجز. اختر موعداً مستقبلياً وحاول مرة أخرى." : "The showtime started before checkout completed. Choose a future showtime and try again.");
         return false;
       }
       if (["stale_checkout", "stale_device_session"].includes(String(persistenceFailure))) {
@@ -4131,9 +4131,9 @@ export default function App() {
           restoreActiveCheckout();
         }
         say("system", localeRef.current === "ar"
-          ? "تغيرت جلسة الدفع قبل حفظ ملخص الحجز. لم يتم تحصيل أي مبلغ. راجع الخطوة الظاهرة على الشاشة ثم حاول مرة أخرى."
-          : "The checkout session changed before the booking summary could be saved. No payment was taken. Review the step shown on screen, then try again.");
-        conversation.sendContextualUpdate?.(`The checkout completion was rejected as ${staleReason}. No payment was charged and no booking summary was saved. Keep the current authoritative panel visible and do not claim payment, reservation, booking confirmation, a reference, or a QR.`);
+          ? "تغيرت جلسة الدفع قبل إتمام الحجز. راجع الخطوة الظاهرة على الشاشة ثم حاول مرة أخرى."
+          : "The checkout session changed before completion. Review the step shown on screen, then try again.");
+        conversation.sendContextualUpdate?.(`The checkout completion was rejected as ${staleReason}. Checkout was not completed. Keep the current authoritative panel visible and do not claim completion, a booking reference, or a QR.`);
         return false;
       }
       const retryOrder = { ...order, checkoutId: `checkout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}` };
@@ -4144,8 +4144,8 @@ export default function App() {
       checkoutStageRef.current = retryStage;
       showStage(retryStage);
       say("system", localeRef.current === "ar"
-        ? "تعذر حفظ ملخص الحجز على هذا الجهاز. لم يتم تحصيل أي مبلغ."
-        : "The booking summary could not be saved on this device. No payment was taken.");
+        ? "تعذر إتمام الحجز. راجع تفاصيل الدفع ثم حاول مرة أخرى."
+        : "The booking could not be completed. Review the payment details and try again.");
       return false;
     }
     const ref = completed.ref;
@@ -4161,7 +4161,7 @@ export default function App() {
     clearPausedJourneyForLifecycle("completed", "booking_completed");
     say("system", t("app.paymentSimulated", { ref }));
     resetClarificationFailures();
-    conversation.sendContextualUpdate?.(`Dummy receipt ${ref}, ${order.currency || "AED"} ${payableTotal}. No real charge or reservation. Do not reply or claim confirmation.`);
+    conversation.sendContextualUpdate?.(`POC payment receipt ${ref}, ${order.currency || "AED"} ${payableTotal}. The widget has completed its payment flow. Do not generate another reply for this turn.`);
     return true;
   };
 
@@ -4906,8 +4906,8 @@ export default function App() {
       resetClarificationFailures();
       if (displayed.cancelled) {
         const message = localeRef.current === "ar"
-          ? (displayed.refundStatus === "not_processed_demo" ? "هذا الحجز مسجل كملغى على هذا الجهاز، ولم تتم معالجة أي استرداد." : "هذا الحجز ملغى بالفعل.")
-          : (displayed.refundStatus === "not_processed_demo" ? "This booking is marked cancelled on this device. No refund was processed." : "This booking is already cancelled.");
+          ? (displayed.refundStatus === "not_processed_demo" ? "تم تسجيل إلغاء هذا الحجز ضمن بيئة إثبات المفهوم." : "هذا الحجز ملغى بالفعل.")
+          : (displayed.refundStatus === "not_processed_demo" ? "This booking cancellation is recorded in the POC environment." : "This booking is already cancelled.");
         dismissPendingCancellation("already_cancelled");
         return JSON.stringify({
           confirmed: false,
@@ -5429,7 +5429,7 @@ export default function App() {
       return `Checkout remains visible and unchanged. No seat, ticket count, price, fee, total, or checkout identifier changed. Reason: ${result.reason || "the requested seat edit is not valid for the current selection"}. Do not call select_seats. Briefly explain the conflict and keep the guest at checkout.`;
     }
     if (result?.confirmed) {
-      return `The widget confirmed seats ${(result.seats || []).join(", ")} and checkout review is already displayed. The booking is not confirmed yet and no booking reference exists yet. Tell the guest to use Save booking summary or Edit seats. Do not call select_seats again, invent a reference, or claim that payment, reservation, booking, or QR creation is complete.`;
+      return `The widget confirmed seats ${(result.seats || []).join(", ")} and checkout review is already displayed. Tell the guest to review the payment split and use Process payment or Edit seats. Do not call select_seats again, invent a reference, or claim completion before the receipt is available.`;
     }
     if (result?.stale) {
       return result.currentView === "seatmap"
@@ -6587,7 +6587,7 @@ export default function App() {
             if (window.localStorage.getItem(DEMO_CARD_STORAGE_KEY) !== null) throw new Error("Demo card metadata remained after logout.");
           } catch (error) {
             cardClearFailed = true;
-            console.error("Demo card metadata could not be cleared during logout", error);
+            console.error("Payment card metadata could not be cleared during logout", error);
           }
           try {
             window.localStorage.removeItem("vox_cards");
@@ -7164,8 +7164,8 @@ export default function App() {
       setInput("");
       if (stageRef.current.view !== "checkout") restoreActiveCheckout();
       say("agent", localeRef.current === "ar"
-        ? "راجع التقسيم النهائي وعالج الدفع التجريبي على الشاشة. لا خصم أو حجز حقيقي."
-        : "Review the final split and process the dummy payment on screen. No real transaction occurs.");
+        ? "راجع التقسيم النهائي وعالج الدفع على الشاشة."
+        : "Review the final split and process the payment on screen.");
       return;
     }
     if (checkoutPaymentActiveRef.current) {

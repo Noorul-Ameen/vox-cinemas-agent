@@ -152,8 +152,8 @@ test("microphone denial is recoverable and typed booking history remains usable"
   await expect(input).toBeEnabled();
   await input.fill("Show my booking history");
   await input.press("Enter");
-  await expect(page.getByRole("heading", { name: "Saved booking summaries" })).toBeVisible();
-  await expect(page.getByText(/No saved summaries yet/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "My bookings" })).toBeVisible();
+  await expect(page.getByText(/No bookings yet/)).toBeVisible();
   await expectNoForbiddenCustomerFacingDashes(page);
 });
 
@@ -220,7 +220,7 @@ test("direct UI journey reaches checkout with seat-derived ticket count", async 
   await expectNoForbiddenCustomerFacingDashes(page);
 });
 
-test("checkout gateway processes a device-local dummy receipt with reference QR disclosure", async ({ page }) => {
+test("checkout gateway processes a POC payment receipt with reference QR disclosure", async ({ page }) => {
   const { input } = await reachCheckout(page, 2);
   await input.fill("Can I pre order food and collect it at the cinema?");
   await input.press("Enter");
@@ -239,10 +239,10 @@ test("checkout gateway processes a device-local dummy receipt with reference QR 
   await expect(page.getByText("Final payment summary")).toBeVisible();
   await page.getByTestId("process-dummy-payment").click();
 
-  await expect(page.getByText("Dummy payment receipt", { exact: true }).last()).toBeVisible({ timeout: 8_000 });
-  await expect(page.getByText(/No real payment or seat reservation occurred/)).toBeVisible();
-  await expect(page.getByText(/use your official VOX ticket for cinema entry/i)).toBeVisible();
-  await expect(page.getByText("Device reference", { exact: true })).toBeVisible();
+  await expect(page.getByText("Payment receipt", { exact: true }).last()).toBeVisible({ timeout: 8_000 });
+  await expect(page.getByText(/Payment processed in the POC environment/)).toBeVisible();
+  await expect(page.getByText(/use the official VOX ticket for cinema admission/i)).toBeVisible();
+  await expect(page.getByText("Booking reference", { exact: true })).toBeVisible();
   await expect(page.getByText("Booking ref", { exact: true })).toHaveCount(0);
 
   const qr = page.locator("[data-qr-value]");
@@ -263,7 +263,7 @@ test("checkout gateway processes a device-local dummy receipt with reference QR 
       simulated: true,
     },
   });
-  expect(stored.bookings[0].demoPayment.transactionRef).toMatch(/^DUMMY-/);
+  expect(stored.bookings[0].demoPayment.transactionRef).toMatch(/^TXN-/);
   expect(stored.bookings[0].seats).toHaveLength(2);
   await expect(qr).toHaveAttribute("data-qr-value", stored.bookings[0].ref);
   await expectNoForbiddenCustomerFacingDashes(page);
@@ -285,8 +285,8 @@ test("language control switches the complete interface direction", async ({ page
   const arabicInput = page.locator("input[aria-label]").last();
   await arabicInput.fill("اعرض حجوزاتي");
   await arabicInput.press("Enter");
-  await expect(page.getByRole("heading", { name: "ملخصات الحجز المحفوظة" })).toBeVisible();
-  await expect(page.getByText(/لا توجد ملخصات محفوظة بعد/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "حجوزاتي" })).toBeVisible();
+  await expect(page.getByText(/لا توجد حجوزات بعد/)).toBeVisible();
 
   await arabicInput.fill("Switch the interface and conversation to English.");
   await arabicInput.press("Enter");
@@ -358,8 +358,8 @@ test("booking history renders a valid localStorage booking", async ({ page }) =>
     }));
   }, booking);
 
-  await page.getByRole("button", { name: "Saved summaries" }).first().click();
-  await expect(page.getByRole("heading", { name: "Saved booking summaries" })).toBeVisible();
+  await page.getByRole("button", { name: "Bookings" }).first().click();
+  await expect(page.getByRole("heading", { name: "My bookings" })).toBeVisible();
   await expect(page.getByText("Playwright Family Night", { exact: true })).toBeVisible();
   await expect(page.getByText("E2E420", { exact: true })).toBeVisible();
   await expect(page.getByText("D4, D5", { exact: true })).toBeVisible();
@@ -416,7 +416,7 @@ test("typed booking reference opens the matching visible history record", async 
     }));
   }, bookings);
 
-  await page.getByRole("button", { name: "Saved summaries" }).first().click();
+  await page.getByRole("button", { name: "Bookings" }).first().click();
   await expect(page.getByText("E2E420", { exact: true })).toBeVisible();
   const input = page.locator("input[aria-label]").last();
   await input.fill("Open booking E2E420");
@@ -487,9 +487,9 @@ test("typed cancellation stays in the booking flow when a movie title is selecte
   await expect(page.getByText("Choose a movie", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: /Yes, (?:cancel booking|mark cancelled)/ }).click();
-  const cancellationSuccess = page.getByText("Marked cancelled on this device", { exact: true }).first();
+  const cancellationSuccess = page.getByText("Cancelled", { exact: true }).first();
   await expect(cancellationSuccess).toBeVisible();
-  await expect(page.getByText(/no refund was processed/i).first()).toBeVisible();
+  await expect(page.getByText(/Cancellation recorded in the POC environment/i).first()).toBeVisible();
 
   const storedAfterCancellation = await page.evaluate(() => JSON.parse(localStorage.getItem("vox_bookings") || "null"));
   const familyBooking = storedAfterCancellation.bookings.find((booking) => booking.ref === "E2ECAN1");
@@ -528,11 +528,11 @@ test("bank offers render detailed FAB guidance and official sources", async ({ p
 
 test("corrupt booking storage fails closed and recovers after repair", async ({ page }) => {
   await page.evaluate(() => localStorage.setItem("vox_bookings", "{corrupt"));
-  await page.getByRole("button", { name: "Saved summaries" }).first().click();
+  await page.getByRole("button", { name: "Bookings" }).first().click();
 
   const storageError = page.getByText(/Saved booking summaries cannot be read from this device|Restore site storage and try again/).first();
   await expect(storageError).toBeVisible();
-  await expect(page.getByText(/No saved summaries yet/)).toHaveCount(0);
+  await expect(page.getByText(/No bookings yet/)).toHaveCount(0);
 
   await page.evaluate(() => {
     localStorage.setItem("vox_bookings", JSON.stringify({
@@ -552,8 +552,8 @@ test("corrupt booking storage fails closed and recovers after repair", async ({ 
     (socket) => socket.close(),
   );
   await recoveredPage.goto("/");
-  await recoveredPage.getByRole("button", { name: "Saved summaries" }).first().click();
-  await expect(recoveredPage.getByText(/No saved summaries yet/)).toBeVisible();
+  await recoveredPage.getByRole("button", { name: "Bookings" }).first().click();
+  await expect(recoveredPage.getByText(/No bookings yet/)).toBeVisible();
   await recoveredPage.close();
   await expect(storageError).toBeVisible();
   await expectNoForbiddenCustomerFacingDashes(page);
@@ -576,10 +576,10 @@ test("valid JSON with unsafe booking field types fails closed", async ({ page })
     }));
   });
 
-  await page.getByRole("button", { name: "Saved summaries" }).first().click();
+  await page.getByRole("button", { name: "Bookings" }).first().click();
   await expect(page.getByText(/Saved booking summaries cannot be read from this device|Restore site storage and try again/).first()).toBeVisible();
   await expect(page.getByText("Unsafe title", { exact: true })).toHaveCount(0);
-  await expect(page.getByText(/No saved summaries yet/)).toHaveCount(0);
+  await expect(page.getByText(/No bookings yet/)).toHaveCount(0);
   await expectNoForbiddenCustomerFacingDashes(page);
 });
 
@@ -602,7 +602,7 @@ test("unsupported stored booking currency fails closed before formatting", async
     }));
   });
 
-  await page.getByRole("button", { name: "Saved summaries" }).first().click();
+  await page.getByRole("button", { name: "Bookings" }).first().click();
   await expect(page.getByText(/Saved booking summaries cannot be read from this device|Restore site storage and try again/).first()).toBeVisible();
   await expect(page.getByText("Currency guard", { exact: true })).toHaveCount(0);
   await expect(page.getByText(/Something went wrong/)).toHaveCount(0);
@@ -813,9 +813,9 @@ test("denied booking storage stays fail-closed and a restored page recovers", as
   await page.reload();
   await expect(page.locator(".voxi-widget")).toBeVisible();
 
-  await page.getByRole("button", { name: "Saved summaries" }).first().click();
+  await page.getByRole("button", { name: "Bookings" }).first().click();
   await expect(page.getByText(/Saved booking summaries cannot be read from this device|Restore site storage and try again/).first()).toBeVisible();
-  await expect(page.getByText(/No saved summaries yet/)).toHaveCount(0);
+  await expect(page.getByText(/No bookings yet/)).toHaveCount(0);
 
   await expect(page.locator(".voxi-widget")).toBeVisible();
 
@@ -830,8 +830,8 @@ test("denied booking storage stays fail-closed and a restored page recovers", as
   );
   await recoveredPage.goto("/");
   await expect(recoveredPage.locator(".voxi-widget")).toBeVisible();
-  await recoveredPage.getByRole("button", { name: "Saved summaries" }).first().click();
-  await expect(recoveredPage.getByText(/No saved summaries yet/)).toBeVisible();
+  await recoveredPage.getByRole("button", { name: "Bookings" }).first().click();
+  await expect(recoveredPage.getByText(/No bookings yet/)).toBeVisible();
   await recoveredPage.close();
   await expectNoForbiddenCustomerFacingDashes(page);
 });

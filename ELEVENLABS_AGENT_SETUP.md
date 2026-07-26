@@ -2,9 +2,9 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-26.3`
+Prompt contract version: `2026-07-26.4`
 
-Prompt value SHA-256: `d7844a5c1c2537659e4b91a26faa14c5ba8b20fccddfe94e6d50869ef3a9b6dc`
+Prompt value SHA-256: `7104ad504392a78991c718fc914b16be648b4fab2f61a75e723eeebbd8080b58`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 
@@ -507,7 +507,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 1. Confirm the dashboard target is `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`.
 2. Confirm all eight exact client-tool names and schemas match `config/elevenlabs-agent-contract.json`.
 3. Enable Wait for response on all eight tools. Confirm `show_seat_map` returns after map loading and never waits for a later seat-selection turn.
-4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-26.3`.
+4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-26.4`.
 5. Set the first message to `{{voxi_session_opening}}`.
 6. Confirm the dashboard detects `voxi_session_opening` from the first-message template. The widget supplies all 13 contract variables when it starts a session; do not create unsupported manual placeholders for variables that the dashboard does not expose.
 7. Configure English and Arabic support, then disable the automatic `language_detection` system tool.

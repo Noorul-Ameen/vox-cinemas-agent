@@ -12,7 +12,7 @@ export function sanitizeDemoPaymentReceipt(payment, expectedTotal) {
   const funded = amounts.shareAed + amounts.walletAed + amounts.cardAed;
   const valid = payment?.simulated === true
     && payment?.status === "processed"
-    && /^DUMMY-[A-Z0-9-]+$/.test(String(payment?.transactionRef || ""))
+    && /^TXN-[A-Z0-9-]+$/.test(String(payment?.transactionRef || ""))
     && values.every(Number.isFinite)
     && Math.abs(amounts.originalTotal - Number(expectedTotal)) < 0.011
     && amounts.originalTotal > 0

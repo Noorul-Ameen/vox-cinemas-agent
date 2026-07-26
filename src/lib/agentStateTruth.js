@@ -43,9 +43,9 @@ function checkoutGuidance(stage, pendingOrder, locale) {
   const order = pendingOrder || stage?.order || {};
   const seats = Array.isArray(order.seats) ? order.seats.filter(Boolean) : [];
   if (locale === "ar") {
-    return `${seats.length ? `المقاعد المحددة ${seats.join("، ")} ظاهرة. ` : ""}راجع التقسيم النهائي واختر معالجة الدفع التجريبي على الشاشة، أو ارجع لتغيير المقاعد. لم يتم تأكيد الحجز بعد، ولن يحدث دفع أو حجز حقيقي.`;
+    return `${seats.length ? `المقاعد المحددة ${seats.join("، ")} ظاهرة. ` : ""}راجع التقسيم النهائي واختر معالجة الدفع على الشاشة، أو ارجع لتغيير المقاعد. لم يتم تأكيد الحجز بعد، وسيتم إنشاء مرجع الحجز بعد اكتمال المعالجة.`;
   }
-  return `${seats.length ? `Selected seats ${seats.join(", ")} are shown in checkout. ` : ""}Review the final split and select Process dummy payment on screen, or go back to change seats. The booking is not confirmed yet, and no real payment or reservation will occur.`;
+  return `${seats.length ? `Selected seats ${seats.join(", ")} are shown in checkout. ` : ""}Review the final split and select Process payment on screen, or go back to change seats. The booking is not confirmed yet, and the booking reference will be generated after processing completes.`;
 }
 
 function seatMapGuidance(locale) {
@@ -60,13 +60,13 @@ function savedSummaryGuidance(booking, locale) {
   const hasDemoPayment = booking?.demoPayment?.status === "processed";
   if (hasDemoPayment) {
     return locale === "ar"
-      ? `تم حفظ إيصال الدفع التجريبي على هذا الجهاز${ref ? ` بالمرجع ${ref}` : ""}. لم يحدث دفع أو حجز حقيقي.`
-      : `Your dummy receipt is saved on this device${ref ? ` with reference ${ref}` : ""}. No real payment or reservation occurred.`;
+      ? `إيصال الدفع متاح${ref ? ` بمرجع الحجز ${ref}` : ""} ضمن بيئة إثبات المفهوم.`
+      : `Your payment receipt is available${ref ? ` with booking reference ${ref}` : ""} in the POC environment.`;
   }
   if (locale === "ar") {
-    return `تم حفظ ملخص الحجز${title ? ` لفيلم ${title}` : ""} على هذا الجهاز${ref ? ` بالمرجع ${ref}` : ""}. لم يتم تحصيل أي دفعة أو إرسال حجز إلى السينما.`;
+    return `الحجز${title ? ` لفيلم ${title}` : ""} ظاهر${ref ? ` بمرجع الحجز ${ref}` : ""} ضمن بيئة إثبات المفهوم.`;
   }
-  return `Your booking summary${title ? ` for ${title}` : ""} is saved on this device${ref ? ` with reference ${ref}` : ""}. No payment was charged and no cinema reservation was submitted.`;
+  return `Your booking${title ? ` for ${title}` : ""} is available${ref ? ` with booking reference ${ref}` : ""} in the POC environment.`;
 }
 
 function cancelledSummaryGuidance(booking, locale) {
@@ -81,9 +81,9 @@ function cancelledSummaryGuidance(booking, locale) {
 function preservedCheckoutGuidance(pendingOrder, locale) {
   const seats = Array.isArray(pendingOrder?.seats) ? pendingOrder.seats.filter(Boolean) : [];
   if (locale === "ar") {
-    return `تم حفظ مراجعة إتمام الحجز${seats.length ? ` للمقاعد ${seats.join("، ")}` : ""}، لكنها غير معروضة الآن. اطلب العودة إلى شاشة المراجعة لعرضها، أو اطلب تعديل المقاعد. لن يتم إرسال دفعة أو حجز.`;
+    return `تم حفظ مراجعة إتمام الحجز${seats.length ? ` للمقاعد ${seats.join("، ")}` : ""}، لكنها غير معروضة الآن. اطلب العودة إلى شاشة المراجعة لعرضها، أو اطلب تعديل المقاعد.`;
   }
-  return `Your checkout review${seats.length ? ` for seats ${seats.join(", ")}` : ""} is preserved but is not currently shown. Ask to return to checkout to display it, or ask to edit seats. No payment or reservation will be submitted.`;
+  return `Your checkout review${seats.length ? ` for seats ${seats.join(", ")}` : ""} is preserved but is not currently shown. Ask to return to checkout to display it, or ask to edit seats.`;
 }
 
 const emptyBookingHistoryClaim = (value) => /\b(?:no|zero)\s+(?:(?:current|active|saved|recent|existing|previous|on-device)\s+){0,3}(?:bookings?|reservations?|booking summaries?)\b|\b(?:do(?:n't| not)|can(?:not|'t)|could(?:n't| not)|did(?:n't| not)|am unable to)\s+(?:see|find|locate|access|have)\b[\s\S]{0,70}\b(?:bookings?|reservations?|booking summaries?)\b|\b(?:there (?:are|is)|you have|i (?:can|could) find)\s+(?:currently\s+)?(?:no|not any)\b[\s\S]{0,50}\b(?:bookings?|reservations?|booking summaries?)\b|(?:لا توجد|لا يوجد|ليس لديك|ما عندك|لم أجد|لا أجد|لم يتم العثور على|لا تظهر)[\s\S]{0,60}(?:حجوزات|حجز)/iu.test(value);

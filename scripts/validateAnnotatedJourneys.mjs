@@ -384,8 +384,8 @@ for (const claim of [
   "Use the QR code on screen for admission.",
 ]) {
   const guarded = guardAgentStateClaim(claim, { stage: savedBooking, locale: "en" });
-  assert.match(guarded, /booking summary.*saved on this device/i, "saved summaries must use saved-summary language");
-  assert.match(guarded, /no payment was charged/i, "saved summaries must preserve the no-charge boundary");
+  assert.match(guarded, /booking.*booking reference WLTEST1.*POC environment/i, "POC bookings must use booking-reference language");
+  assert.doesNotMatch(guarded, /provider-confirmed|bank|reservation is confirmed/i, "POC bookings must not invent provider confirmation");
 }
 assert.match(
   guardAgentStateClaim("Checkout is displayed. Complete payment.", {
@@ -471,7 +471,7 @@ assert.match(checkoutBack, /requestedSeatTargetRef\.current = requestedTarget[\s
 
 const paymentCompletion = app.slice(app.indexOf("const handleCheckoutReviewComplete"), app.indexOf("CLIENT TOOLS"));
 assert.match(paymentCompletion, /\["stale_checkout", "stale_device_session"\][\s\S]*checkoutPaymentActiveRef\.current = false/, "stale checkout outcomes must release the payment navigation lock");
-assert.match(paymentCompletion, /checkout session changed[\s\S]*No payment was taken/i, "stale checkout outcomes must display a no-charge recovery message");
+assert.match(paymentCompletion, /checkout session changed[\s\S]*Checkout was not completed[\s\S]*do not claim completion, a booking reference, or a QR/i, "stale checkout outcomes must preserve an incomplete-state recovery message");
 assert.doesNotMatch(paymentCompletion, /sendUiTurn\(`Booking summary/, "completion must not trigger a duplicate agent response after the deterministic summary notice");
 const cancellationRouting = app.slice(app.indexOf("const routeCancellationTurn"), app.indexOf("const cancellationResultContext"));
 assert.match(cancellationRouting, /const explicitLifecycleTarget = resolution\.matchedBy\?\.length > 0/, "a cancelled or ineligible summary must require an explicit conversational selector");
@@ -481,7 +481,7 @@ const cancellationCompletion = app.slice(app.indexOf("const executeCancellationM
 assert.match(cancellationCompletion, /if \(isDemoSimulation\) \{[\s\S]*deterministic system notice already states this outcome/, "device-only cancellation must not elicit a duplicate agent completion after its deterministic notice");
 
 assert.match(prompt, /never describe the pending checkout as confirmed/i, "the voice prompt must prohibit premature checkout confirmation");
-assert.match(prompt, /Never call it a confirmed booking, successful payment, reservation, admission ticket, or ready QR/i, "the voice prompt must distinguish a saved summary from a verified booking");
+assert.match(prompt, /Do not claim external bank capture, VOX inventory confirmation, or provider verification unless authoritative provider context explicitly confirms it/i, "the voice prompt must distinguish a POC receipt from provider verification");
 assert.match(prompt, /DCC/i, "the voice prompt must recognize the DCC alias grounding");
 
 assert.match(app, /const VISIBLE_TRANSCRIPT_MESSAGES = 8/, "long transcripts must use a bounded recent-message view");
@@ -501,7 +501,7 @@ for (const locale of ["en", "ar"]) {
 }
 
 assert.doesNotMatch(STRINGS.en["app.paymentSimulated"], /environment|prototype|demo|simulation/i, "the saved-summary notice must remain leadership-ready");
-assert.match(STRINGS.en["app.paymentSimulated"], /No payment was charged/, "the saved-summary notice must remain transactionally truthful");
-assert.doesNotMatch(STRINGS.en["checkout.demoDisclaimer"], /environment|prototype|demo|simulation/i, "checkout safety copy must avoid product-wide implementation labels");
+assert.match(STRINGS.en["app.paymentSimulated"], /Payment processed[\s\S]*Booking reference/, "the completed checkout notice must state the processed result and reference");
+assert.match(STRINGS.en["checkout.demoDisclaimer"], /POC environment/i, "checkout must identify the POC boundary without repetitive simulation language");
 
 console.log("Validated annotated DCC discovery, transcript truth, checkout seat editing, saved-summary wording, and full-history access for text and voice.");

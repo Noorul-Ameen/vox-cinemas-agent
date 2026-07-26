@@ -29,8 +29,8 @@ assert.doesNotMatch(checkoutSource, /Noorul|DEFAULT_CARDS|["']vox_cards["']/, "c
 assert.doesNotMatch(checkoutSource, /VITE_VISTA_BASE/, "Vista read-data configuration must not change checkout behavior");
 assert.match(checkoutSource, /status !== "ready"/, "checkout must guard against duplicate dummy processing");
 assert.match(checkoutSource, /onReviewStateChange\?\.\(false\)/, "checkout must release its navigation lock when processing ends or unmounts");
-assert.match(checkoutSource, /onComplete\?\.\(\{ checkoutId: checkoutId \|\| order\.checkoutId, payment: nextReceipt \}\)/, "completion must expose the checkout identity and dummy receipt");
-assert.match(checkoutSource, /DemoPaymentGateway/, "checkout must render the dummy payment gateway");
+assert.match(checkoutSource, /onComplete\?\.\(\{ checkoutId: checkoutId \|\| order\.checkoutId, payment: nextReceipt \}\)/, "completion must expose the checkout identity and payment receipt");
+assert.match(checkoutSource, /DemoPaymentGateway/, "checkout must render the POC payment gateway");
 assert.match(checkoutSource, /onProcess=\{processPayment\}/, "only a valid reviewed plan may reach dummy processing");
 assert.doesNotMatch(`${checkoutSource}\n${demoGatewaySource}`, /\bfetch\s*\(|axios|sendText|sendContextualUpdate|clientTools/, "test checkout data must never leave the non-transactional components");
 assert.doesNotMatch(demoGatewaySource, /\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b/, "test payment values must remain in memory and must not be persisted");
@@ -44,7 +44,7 @@ assert.match(demoGatewaySource, /VOX Wallet/, "the gateway must expose VOX Walle
 assert.match(demoGatewaySource, /SHARE points/, "the gateway must expose SHARE points validation");
 assert.match(demoGatewaySource, /disabled=\{!plan\.valid\}/, "an incomplete or failed plan must block final payment review");
 assert.match(demoGatewaySource, /Final payment summary/, "the guest must receive a separate final review before processing");
-assert.match(demoGatewaySource, /Process dummy payment/, "dummy processing must remain a guest-controlled on-screen action");
+assert.match(demoGatewaySource, /Process payment/, "payment processing must remain a guest-controlled on-screen action");
 assert.match(demoGatewaySource, /OFFERS\.map/, "all published offer groups must be selectable");
 assert.doesNotMatch(`${checkoutSource}\n${demoGatewaySource}`, /Apple Pay|Samsung Pay|walletButton|reviewCard/i, "non-integrated payment brands must not appear as checkout controls");
 
@@ -121,7 +121,7 @@ const typedGatewayCompletion = appSource.slice(
   appSource.indexOf("if (checkoutPaymentActiveRef.current)", typedGatewayCompletionStart),
 );
 assert.match(typedGatewayCompletion, /restoreActiveCheckout\(\)/, "a typed summary request must restore the guest-controlled gateway");
-assert.match(typedGatewayCompletion, /review the final split and process the dummy payment on screen/i, "typed guidance must require on-screen review and processing");
+assert.match(typedGatewayCompletion, /review the final split and process the payment on screen/i, "typed guidance must require on-screen review and processing");
 assert.doesNotMatch(typedGatewayCompletion, /handleCheckoutReviewComplete\(/, "typed chat must never bypass final review or trigger dummy processing");
 const retryableLazySource = await readFile(new URL("../src/components/RetryableLazy.jsx", import.meta.url), "utf8");
 const mainSource = await readFile(new URL("../src/main.jsx", import.meta.url), "utf8");
@@ -202,28 +202,26 @@ for (const locale of ["en", "ar"]) {
     `${locale}: leadership-facing UI may describe the bounded dummy payment but must not label the product a prototype`,
   );
 }
-assert.match(STRINGS.en["checkout.demoDisclaimer"], /does not charge a card or reserve cinema inventory/i, "checkout must keep its transaction-boundary disclosure");
-assert.match(STRINGS.en["checkout.demoDisclaimer"], /official VOX booking channel/i, "checkout must direct real purchases to an official channel");
+assert.match(STRINGS.en["checkout.demoDisclaimer"], /POC environment/i, "checkout must keep a concise POC boundary disclosure");
 assert.match(STRINGS.en["checkout.testNotice"], /estimated amount/i, "checkout must disclose that its amount is not an authoritative VOX quote");
 assert.match(STRINGS.en["seats.demoNotice"], /official VOX booking channel/i, "seat guidance must distinguish the official booking channel from this review checkout");
 assert.match(STRINGS.en["offers.disclaimer"], /official VOX website or app checkout/i, "offer eligibility must point to the official VOX website or app checkout");
 assert.match(i18nProviderSource, /safeCurrency[\s\S]*catch[\s\S]*currency: "AED"/, "currency formatting must fail safely even if an untrusted currency reaches the renderer");
-assert.match(STRINGS.en["booking.cancelDemoQuestion"], /Mark booking .* as cancelled on this device/, "device-only cancellation must describe the persisted cancelled state");
-assert.match(STRINGS.en["booking.cancelDemoQuestion"], /will not contact VOX or issue a refund/, "device-only cancellation must keep its transaction-boundary disclosure");
-assert.match(STRINGS.en["booking.cancelledLocal"], /Marked cancelled on this device/, "device-only cancellation must not claim the stored record was removed");
-assert.equal(STRINGS.en["history.cancelledLocal"], "Cancelled on device", "history must show the device-only cancellation boundary");
-assert.equal(STRINGS.en["history.cancelLocal"], "Mark cancelled", "history must not imply provider cancellation for a device summary");
+assert.match(STRINGS.en["booking.cancelDemoQuestion"], /Cancel booking .* in the POC environment/, "POC cancellation must identify the booking and transaction boundary");
+assert.equal(STRINGS.en["booking.cancelledLocal"], "Cancelled", "POC cancellation must use concise customer-facing status");
+assert.equal(STRINGS.en["history.cancelledLocal"], "Cancelled", "history must use the same cancelled status");
+assert.equal(STRINGS.en["history.cancelLocal"], "Cancel booking", "history must expose a clear cancellation action");
 assert.match(STRINGS.en["booking.qrDemoHint"], /official VOX ticket/, "reference QR must direct guests to an official admission ticket");
 assert.match(handoverSource, /showDebug\s*=\s*false/, "leadership view must hide handover diagnostics by default");
 assert.match(STRINGS.en["handover.readyBody"], /No external support connection has been started/, "handover must state that it only prepares a summary");
 assert.doesNotMatch(handoverSource, /agent queue|pick up this conversation|UserRound|Headphones/i, "handover presentation must not imply a live agent or queue");
 assert.match(appSource, /connectingStep:\s*t\("handover\.preparingStep"\)/, "handover progress must say preparing rather than connecting");
 assert.doesNotMatch(appSource, /booking (?:was|is) removed from this device|Booking summary [^\n]+ removed only from this device/i, "persisted cancellations must not be described as removed records");
-assert.match(voxiPromptSource, /two published test card numbers[\s\S]*without transmitting or storing it/, "the voice prompt must describe the bounded test-card contract");
-assert.match(voxiPromptSource, /combine optional SHARE points and VOX Wallet value[\s\S]*never charges a real card/, "the voice prompt must keep split funding non-transactional");
-assert.match(voxiPromptSource, /final review[\s\S]*Process dummy payment[\s\S]*guest-controlled on-screen actions/, "the voice prompt must leave every payment-step choice to the guest");
-assert.match(voxiPromptSource, /dummy payment was processed only after authoritative widget context/, "processed receipt claims must synchronize with authoritative UI state");
-assert.match(voxiPromptSource, /Never ask in chat for a card number[\s\S]*Never ask the guest to enter a real card/, "the agent must never solicit card details in chat");
+assert.match(voxiPromptSource, /two published card profiles[\s\S]*without transmitting or storing it/, "the voice prompt must describe the bounded card-profile contract");
+assert.match(voxiPromptSource, /combine optional SHARE points and VOX Wallet value[\s\S]*Do not claim external bank capture/, "the voice prompt must preserve the POC transaction boundary");
+assert.match(voxiPromptSource, /final review[\s\S]*Process payment[\s\S]*guest-controlled on-screen actions/, "the voice prompt must leave every payment-step choice to the guest");
+assert.match(voxiPromptSource, /payment was processed only after authoritative widget context/, "processed receipt claims must synchronize with authoritative UI state");
+assert.match(voxiPromptSource, /Never ask in chat for a card number[\s\S]*protected on-screen payment controls/, "the agent must never solicit card details in chat");
 assert.match(richMediaSource, /\["confirmed_demo", "summary_saved", "locally_stored"\]/, "booking cards must classify every device-summary status safely");
 assert.match(historySource, /\["confirmed_demo", "summary_saved", "locally_stored"\]/, "history must classify every device-summary status safely");
 assert.match(bookingStoreSource, /\["confirmed_demo", "summary_saved", "locally_stored"\][\s\S]*result\.verified = false[\s\S]*result\.paymentStatus = "simulated_not_charged"/, "storage normalization must fail closed for contradictory device summaries");

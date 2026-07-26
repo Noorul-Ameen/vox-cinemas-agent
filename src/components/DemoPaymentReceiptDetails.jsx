@@ -14,23 +14,23 @@ export default function DemoPaymentReceiptDetails({ booking, locale, formatCurre
   const payment = booking?.demoPayment;
   if (payment?.status !== "processed") return null;
   const copy = ar ? {
-    title: "إيصال الدفع التجريبي",
-    ready: "اكتملت المعالجة على هذا الجهاز. لم يحدث دفع أو حجز مقعد حقيقي.",
+    title: "إيصال الدفع",
+    ready: "تمت معالجة الدفع في بيئة إثبات المفهوم.",
     original: "الإجمالي الأصلي",
     offer: "عرض البطاقة",
     share: "SHARE المستخدم",
     wallet: "محفظة VOX المستخدمة",
-    card: "بطاقة الاختبار المستخدمة",
-    transaction: "المعاملة التجريبية",
+    card: "البطاقة المستخدمة",
+    transaction: "مرجع المعاملة",
   } : {
-    title: "Dummy payment receipt",
-    ready: "Processed on this device. No real payment or seat reservation occurred.",
+    title: "Payment receipt",
+    ready: "Payment processed in the POC environment.",
     original: "Original total",
     offer: "Card offer",
     share: "SHARE used",
     wallet: "VOX Wallet used",
-    card: "Test card used",
-    transaction: "Dummy transaction",
+    card: "Card used",
+    transaction: "Transaction reference",
   };
   const money = (value) => formatCurrency(value, booking.currency || "AED");
   const offer = payment.offer;

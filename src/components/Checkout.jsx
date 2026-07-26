@@ -38,33 +38,33 @@ export default function Checkout({
   const [error, setError] = useState("");
 
   const copy = ar ? {
-    eyebrow: "الدفع التجريبي",
+    eyebrow: "إتمام الدفع",
     title: "مراجعة إتمام الحجز",
-    subtitle: "اختر العرض وطريقة تقسيم المبلغ. ستظهر لك مراجعة نهائية قبل المعالجة التجريبية.",
+    subtitle: "اختر العرض وطريقة تقسيم المبلغ. ستظهر لك مراجعة نهائية قبل معالجة الدفع.",
     tickets: "التذاكر",
     seats: "المقاعد",
     total: "إجمالي الطلب",
     back: "تعديل المقاعد",
-    loading: "جار تحميل بوابة الدفع التجريبية...",
-    processing: "جار معالجة الدفع التجريبي",
-    processingHelp: "نحاكي التحقق من العرض وتقسيم المبلغ وإصدار الإيصال. لا يتم خصم أي مبلغ حقيقي.",
-    approved: "تمت معالجة الدفع التجريبي",
-    approvedHelp: "تم إنشاء إيصال تجريبي على هذا الجهاز. لم يتم تنفيذ دفع أو حجز حقيقي.",
-    failed: "تعذر إكمال المعالجة التجريبية. راجع تفاصيل الدفع وحاول مرة أخرى.",
+    loading: "جار تحميل خيارات الدفع...",
+    processing: "جار معالجة الدفع",
+    processingHelp: "جار التحقق من العرض وتقسيم المبلغ وإنشاء الإيصال.",
+    approved: "تمت معالجة الدفع",
+    approvedHelp: "تم إنشاء إيصال الدفع بنجاح.",
+    failed: "تعذر إكمال معالجة الدفع. راجع التفاصيل وحاول مرة أخرى.",
   } : {
-    eyebrow: "Dummy checkout",
+    eyebrow: "Checkout",
     title: "Checkout review",
-    subtitle: "Choose an offer and funding split. You will see a final review before dummy processing.",
+    subtitle: "Choose an offer and funding split. You will see a final review before payment processing.",
     tickets: "Tickets",
     seats: "Seats",
     total: "Order total",
     back: "Edit seats",
-    loading: "Loading dummy payment gateway...",
-    processing: "Processing dummy payment",
-    processingHelp: "Simulating offer validation, split funding, and receipt creation. No real money is charged.",
-    approved: "Dummy payment processed",
-    approvedHelp: "A dummy receipt was created on this device. No real payment or reservation occurred.",
-    failed: "Dummy processing could not be completed. Review the payment details and try again.",
+    loading: "Loading payment options...",
+    processing: "Processing payment",
+    processingHelp: "Validating the offer, split funding, and receipt details.",
+    approved: "Payment processed",
+    approvedHelp: "The payment receipt was created successfully.",
+    failed: "Payment processing could not be completed. Review the details and try again.",
   };
 
   useEffect(() => () => onReviewStateChange?.(false), [onReviewStateChange]);
@@ -78,7 +78,7 @@ export default function Checkout({
       ...plan,
       status: "processed",
       simulated: true,
-      transactionRef: `DUMMY-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
+      transactionRef: `TXN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`,
       processedAt: new Date().toISOString(),
     };
     try {
@@ -87,7 +87,7 @@ export default function Checkout({
       setStatus("complete");
       await pause(550);
       const accepted = await onComplete?.({ checkoutId: checkoutId || order.checkoutId, payment: nextReceipt });
-      if (accepted === false) throw new Error("The dummy receipt was rejected.");
+      if (accepted === false) throw new Error("The payment receipt was rejected.");
     } catch {
       setError(copy.failed);
       setStatus("ready");
