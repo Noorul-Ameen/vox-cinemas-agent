@@ -1,4 +1,5 @@
 import { formatDiscoveryTimePreference, hasDiscoveryTimePreference } from "./discoveryPreferences.js";
+import { localizeCatalogValue, localizeCinemaName } from "./catalogLocalization.js";
 
 const clean = (value) => String(value || "").replace(/\s+/g, " ").trim();
 const cleanCinemaName = (value) => clean(value).replace(/^VOX\s*[\u2013\u2014-]?\s*/iu, "");
@@ -26,9 +27,9 @@ function preferenceLabels(preferences = {}, locale = "en") {
       : preferences.timeBand;
   return [
     preferences.movieTitle,
-    preferences.language ? (locale === "ar" ? `اللغة ${preferences.language}` : `${preferences.language} language`) : null,
-    preferences.genre ? (locale === "ar" ? `نوع ${preferences.genre}` : `${preferences.genre} genre`) : null,
-    preferences.experience ? (locale === "ar" ? `تجربة ${preferences.experience}` : `${preferences.experience} experience`) : null,
+    preferences.language ? (locale === "ar" ? `اللغة ${localizeCatalogValue(preferences.language, locale)}` : `${preferences.language} language`) : null,
+    preferences.genre ? (locale === "ar" ? `نوع ${localizeCatalogValue(preferences.genre, locale)}` : `${preferences.genre} genre`) : null,
+    preferences.experience ? (locale === "ar" ? `تجربة ${localizeCatalogValue(preferences.experience, locale)}` : `${preferences.experience} experience`) : null,
     preferences.audience === "kids_family" ? (locale === "ar" ? "أطفال وعائلات" : "kids and family") : null,
     timePreference,
   ].map(clean).filter(Boolean);
@@ -41,7 +42,7 @@ export function buildDiscoveryNoResultsMessage({
   noResultsReason = "no_results_for_criteria",
   locale = "en",
 } = {}) {
-  const cinema = cleanCinemaName(cinemaName || preferences.cinemaName);
+  const cinema = localizeCinemaName(cleanCinemaName(cinemaName || preferences.cinemaName), locale);
   const requestedDate = displayDate(date || preferences.date, locale);
   const labels = preferenceLabels(preferences, locale);
   const contentLabels = preferenceLabels({ ...preferences, preferredTime: null, timeRangeStart: null, timeRangeEnd: null, timeBand: null }, locale);
@@ -57,8 +58,8 @@ export function buildDiscoveryNoResultsMessage({
   let action;
   if (locale === "ar") {
     if (singleContent && preferences.movieTitle) [statement, action] = [`لا توجد عروض متاحة لفيلم ${preferences.movieTitle}`, "يمكنك تغيير التاريخ أو السينما."];
-    else if (singleContent && preferences.language) [statement, action] = [`لا توجد أفلام باللغة ${preferences.language}`, "يمكنك تغيير التاريخ أو السينما أو لغة الفيلم."];
-    else if (singleContent && preferences.genre) [statement, action] = [`لا توجد أفلام من نوع ${preferences.genre}`, "يمكنك تغيير التاريخ أو السينما أو النوع."];
+    else if (singleContent && preferences.language) [statement, action] = [`لا توجد أفلام باللغة ${localizeCatalogValue(preferences.language, locale)}`, "يمكنك تغيير التاريخ أو السينما أو لغة الفيلم."];
+    else if (singleContent && preferences.genre) [statement, action] = [`لا توجد أفلام من نوع ${localizeCatalogValue(preferences.genre, locale)}`, "يمكنك تغيير التاريخ أو السينما أو النوع."];
     else if (singleContent && preferences.experience) [statement, action] = [`لا توجد عروض بتجربة ${preferences.experience}`, "يمكنك تغيير التاريخ أو السينما أو التجربة."];
     else if (singleContent && preferences.audience === "kids_family") [statement, action] = ["لا توجد أفلام مناسبة للأطفال والعائلات", "يمكنك تغيير التاريخ أو السينما."];
     else if (timeOnly) [statement, action] = [`لا توجد مواعيد عرض مناسبة${rangeSuffix || (preferences.preferredTime ? ` حوالي ${preferences.preferredTime}` : "")}`, "يمكنك تغيير الوقت أو التاريخ أو السينما."];

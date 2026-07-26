@@ -34,6 +34,8 @@ assert.equal(explicitLanguageRequest("Would you switch to English please?"), "en
 assert.equal(explicitLanguageRequest("Set the language to English"), "en");
 assert.equal(explicitLanguageRequest("Use English please"), "en");
 assert.equal(explicitLanguageRequest("كمل عربي"), "ar");
+assert.equal(explicitLanguageRequest("تابع بالعربية"), "ar");
+assert.equal(explicitLanguageRequest("تابع بالإنجليزية"), "en");
 assert.equal(explicitLanguageRequest("تكلم بالعربية"), "ar");
 assert.equal(explicitLanguageRequest("تحدث بالعربية"), "ar");
 assert.equal(explicitLanguageRequest("كمل بالعربي"), "ar");

@@ -49,6 +49,7 @@ import { buildAuthoritativeDiscoveryContext, buildMovieSelectionGroundingContext
 import { createLocalDeterministicToolAuthorization, shouldBlockConcurrentDeterministicToolCall } from "./lib/deterministicToolRouting.js";
 import { loadMovieInformationCatalog } from "./lib/movieInformationCatalog.js";
 import { isPotentialMovieInformationTurn } from "./lib/movieInformationPrefilter.js";
+import { localizeCinemaName } from "./lib/catalogLocalization.js";
 import { resolveVisibleShowtimeSelectionTurn, visibleShowtimeSelectionCandidates } from "./lib/showtimeSelectionRouting.js";
 import { createSeatToolAuthorization, matchesSeatToolAuthorization, normalizeSeatIds, resolveSeatEditSelectionTurn, resolveSeatSelectionTurn, resolveSeatToolInput } from "./lib/seatRouting.js";
 import { filterBookableSessions } from "./lib/showtimeAvailability.js";
@@ -6193,7 +6194,7 @@ export default function App() {
           }
         }
         if (!movieInformation?.handled) dismissStaleTransactionalView({ text: safeMessage, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
-        const checkoutFaq = activeCheckout && !localOfferTurn && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection && !ambiguousShowtimeSelection
+        const checkoutFaq = activeCheckout && !preInformationDiscoveryFilterTurn && !localOfferTurn && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection && !ambiguousShowtimeSelection
           ? await prepareFaqContext(safeMessage)
           : { matches: [], context: "" };
         const discoveryFilterTurn = movieInformation?.handled || checkoutFaq.matches.length || recordSelectorFaqBypass || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection
@@ -7193,7 +7194,7 @@ export default function App() {
       if (restoreResult.restored) {
         const restoredView = stageRef.current.view;
         say("agent", localeRef.current === "ar"
-          ? `تمت استعادة ${restoredView === "checkout" ? "مراجعة الدفع" : "الخطوة السابقة"}.`
+          ? `تمت استعادة ${restoredView === "checkout" ? "مراجعة إتمام الحجز" : "الخطوة السابقة"}.`
           : `${restoredView === "checkout" ? "Checkout review" : "Your previous step"} is ready.`);
         updateIntentFromText(value);
         return;
@@ -7231,7 +7232,7 @@ export default function App() {
       say("agent", visibleHistory?.storageUnavailable
         ? (localeRef.current === "ar" ? "تعذر قراءة ملخصات الحجز المحفوظة على هذا الجهاز." : "Saved booking summaries could not be read on this device.")
         : count
-          ? (localeRef.current === "ar" ? `تم عرض ${count} من ملخصات الحجز المحفوظة.` : `I found ${count} saved booking ${count === 1 ? "summary" : "summaries"} on this device.`)
+          ? (localeRef.current === "ar" ? `عدد ملخصات الحجز المحفوظة المعروضة: ${count}.` : `I found ${count} saved booking ${count === 1 ? "summary" : "summaries"} on this device.`)
           : (localeRef.current === "ar" ? "لا توجد ملخصات حجز محفوظة على هذا الجهاز." : "There are no saved booking summaries on this device."));
       return;
     }
@@ -7362,8 +7363,10 @@ export default function App() {
     if (movieInformation?.handled) {
       setInput("");
       if (movieInformation.movie) movieInformationMovieRef.current = movieInformation.movie;
+      const hidUnrelatedOfferPanel = stageVisibleRef.current && stageRef.current.view === "offers";
+      if (hidUnrelatedOfferPanel) pauseRichRenderingForTopicChange("movie_information_topic_change", "movie_information");
       say("agent", movieInformation.answer);
-      conversation.sendContextualUpdate?.(`${movieInformation.context}\nThe widget already displayed this exact answer for the typed turn. Keep the current ${stageRef.current.view} panel and every retained booking field unchanged. Do not generate another reply unless the guest speaks or types again.`);
+      conversation.sendContextualUpdate?.(`${movieInformation.context}\nThe widget already displayed this exact answer for the typed turn. ${hidUnrelatedOfferPanel ? "The unrelated offer panel was hidden." : `Keep the current ${stageRef.current.view} panel and every retained booking field unchanged.`} Do not generate another reply unless the guest speaks or types again.`);
       return;
     }
     let seatTurn = decision === null ? resolveVisibleSeatTurn(value) : { requested: false, seats: [] };
@@ -7508,7 +7511,7 @@ export default function App() {
       return;
     }
     dismissStaleTransactionalView({ text: value, actionIntent: directCancellation ? "cancellation" : actionIntent, historyRequested: historyRequest.requested, cancellationReply: decision !== null });
-    const checkoutFaq = activeCheckout && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection && !ambiguousShowtimeSelection
+    const checkoutFaq = activeCheckout && !preInformationDiscoveryFilterTurn && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection && !ambiguousShowtimeSelection
       ? await prepareFaqContext(value)
       : { matches: [], context: "" };
     const discoveryFilterTurn = checkoutFaq.matches.length || recordSelectorFaqBypass || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection
@@ -7621,7 +7624,7 @@ export default function App() {
       const showtimes = Array.isArray(directMovieRouteResult.result?.showtimes) ? directMovieRouteResult.result.showtimes : [];
       say("agent", showtimes.length
         ? (localeRef.current === "ar"
-            ? `تم اختيار ${directMovieSelection.title}. تظهر الآن ${showtimes.length} مواعيد عرض متاحة.`
+            ? `تم اختيار ${directMovieSelection.title}. عدد مواعيد العرض المتاحة الآن: ${showtimes.length}.`
             : `${directMovieSelection.title} is selected. ${showtimes.length} verified showtime ${showtimes.length === 1 ? "option is" : "options are"} now visible.`)
         : (localeRef.current === "ar"
             ? `تم اختيار ${directMovieSelection.title}، لكن لا يوجد موعد عرض قابل للحجز حالياً.`
@@ -7644,10 +7647,13 @@ export default function App() {
         if (!typedTurnIsCurrent()) return;
         const failureMessage = seatEditFailureMessage(seatResult);
         const chosenSeats = Array.isArray(seatResult?.valid) ? seatResult.valid : [];
+        const chosenSeatSummary = chosenSeats.length
+          ? (localeRef.current === "ar" ? ` ${chosenSeats.join("، ")}` : ` ${chosenSeats.join(", ")}`)
+          : "";
         say("agent", failureMessage || (stageRef.current.view === "checkout"
           ? (localeRef.current === "ar"
-              ? `تم اختيار المقاعد ${chosenSeats.join("، ")}. مراجعة الدفع جاهزة.`
-              : `Seats ${chosenSeats.join(", ")} are selected. Checkout review is ready.`)
+              ? `تم اختيار المقاعد${chosenSeatSummary}. مراجعة إتمام الحجز جاهزة.`
+              : `Seats${chosenSeatSummary} are selected. Checkout review is ready.`)
           : (localeRef.current === "ar"
               ? "تم تحديث اختيار المقاعد في الخريطة الظاهرة."
               : "The seat selection has been updated on the visible map.")));
@@ -7666,7 +7672,7 @@ export default function App() {
         ? localizedStageMessage(currentStage, "error", localeRef.current)
         : currentStage.view === "movies" && visibleMovies.length
           ? (localeRef.current === "ar"
-              ? `وجدت ${visibleMovies.length} أفلام تطابق طلبك. اختر الفيلم بكتابة اسمه.`
+              ? `عدد الأفلام المطابقة لطلبك: ${visibleMovies.length}. اختر الفيلم بكتابة اسمه.`
               : `I found ${visibleMovies.length} ${visibleMovies.length === 1 ? "movie" : "movies"} matching your request. Type the movie title to choose it.`)
           : currentStage.question || (localeRef.current === "ar"
               ? "تم تحديث نتائج البحث وفق طلبك."
@@ -8786,7 +8792,7 @@ export default function App() {
       case "cinemas":
         return t("cinema.title");
       case "movies":
-        return [t("movies.title"), cinema ? stripVox(cinema.name) : "", scheduleDate].filter(Boolean).join(". ");
+        return [t("movies.title"), cinema ? localizeCinemaName(stripVox(cinema.name), locale) : "", scheduleDate].filter(Boolean).join(". ");
       case "showtimes":
         return [t("showtimes.select"), stage.movie?.title].filter(Boolean).join(". ");
       case "seatmap":
@@ -8841,7 +8847,7 @@ export default function App() {
               </div>
             </div>
             <div style={{ display: "flex", flexShrink: 0, alignItems: "center", gap: 4 }}>
-              <TopButton label={cinema ? `${t("app.changeCinema")}: ${stripVox(cinema.name)}` : t("app.chooseCinema")} onClick={openCinemaPicker}><MapPin size={14} /></TopButton>
+              <TopButton label={cinema ? `${t("app.changeCinema")}: ${localizeCinemaName(stripVox(cinema.name), locale)}` : t("app.chooseCinema")} onClick={openCinemaPicker}><MapPin size={14} /></TopButton>
               <TopButton label={t("app.offers")} onClick={openOffers}><BadgePercent size={14} /></TopButton>
               <TopButton label={t("app.history")} onClick={openHistory}><History size={14} /></TopButton>
               <TopButton label={t("app.restart")} onClick={() => restartConversation("manual_restart")}><RotateCcw size={14} /></TopButton>

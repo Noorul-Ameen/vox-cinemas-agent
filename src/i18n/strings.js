@@ -275,7 +275,7 @@ export const STRINGS = {
     "app.errorPrefix": "خطأ",
     "app.conversation": "المحادثة",
     "app.send": "إرسال",
-    "app.showEarlierMessages": "عرض {count} رسائل سابقة",
+    "app.showEarlierMessages": "عرض الرسائل السابقة ({count})",
     "app.showRecentMessages": "عرض الرسائل الأخيرة",
     "app.cinemaChanged": "تم تغيير السينما إلى {cinema}.",
     "app.paymentSimulated": "تم حفظ ملخص الحجز على هذا الجهاز. لم يتم تحصيل أي دفعة أو إرسال حجز إلى السينما. مرجع الجهاز {ref}.",

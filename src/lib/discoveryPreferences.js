@@ -621,7 +621,7 @@ function explicitClears(text) {
   if (isReplacementMovieDiscovery(text)) {
     ["preferredTime", "timeRangeStart", "timeRangeEnd", "timeRangeStrict", "timeBand"].forEach((key) => clear.add(key));
   }
-  const filterClearRequest = /\b(?:remove|clear|drop|reset)\b.*\b(?:filters?|preferences?)\b|(?:امسح|احذف|الغ|ألغي).*(?:الفلاتر|المرشحات|التفضيلات)/u.test(text);
+  const filterClearRequest = /\b(?:remove|clear|drop|reset)\b.*\b(?:filters?|preferences?)\b|(?:امسح|احذف|الغ|ألغي|أزل|ازل).*(?:الفلاتر|المرشحات|التفضيلات|عوامل\s+التصفية)/u.test(text);
   if (filterClearRequest) {
     const optionalKeys = ["preferredTime", "timeRangeStart", "timeRangeEnd", "timeRangeStrict", "timeBand", "genre", "audience", "language", "experience", "openChoice", "recommendationIntent"];
     const clearEverythingOptional = /\b(?:all|every)\b|(?:كل|جميع)/u.test(text);
@@ -712,7 +712,7 @@ export function extractDiscoveryPreferencePatch(input, {
   const text = normalizeText(discoveryInput);
   const patch = {};
   const clear = explicitClears(text);
-  const filterClearRequest = /\b(?:remove|clear|drop|reset)\b.*\b(?:filters?|preferences?)\b|(?:\u0627\u0645\u0633\u062d|\u0627\u062d\u0630\u0641|\u0627\u0644\u063a|\u0623\u0644\u063a\u064a).*(?:\u0627\u0644\u0641\u0644\u0627\u062a\u0631|\u0627\u0644\u0645\u0631\u0634\u062d\u0627\u062a|\u0627\u0644\u062a\u0641\u0636\u064a\u0644\u0627\u062a)/u.test(text);
+  const filterClearRequest = /\b(?:remove|clear|drop|reset)\b.*\b(?:filters?|preferences?)\b|(?:\u0627\u0645\u0633\u062d|\u0627\u062d\u0630\u0641|\u0627\u0644\u063a|\u0623\u0644\u063a\u064a|\u0623\u0632\u0644|\u0627\u0632\u0644).*(?:\u0627\u0644\u0641\u0644\u0627\u062a\u0631|\u0627\u0644\u0645\u0631\u0634\u062d\u0627\u062a|\u0627\u0644\u062a\u0641\u0636\u064a\u0644\u0627\u062a|\u0639\u0648\u0627\u0645\u0644\s+\u0627\u0644\u062a\u0635\u0641\u064a\u0629)/u.test(text);
   const replacementIntent = isExplicitContentReplacement(text) ? "content" : null;
   if (!text) return { patch, clear: [...clear], provided: [], hasDiscoverySignal: false, replacementIntent };
 

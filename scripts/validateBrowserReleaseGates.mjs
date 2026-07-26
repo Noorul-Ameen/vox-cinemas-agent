@@ -8,6 +8,7 @@ const [
   config,
   deterministicSpec,
   hostedSpec,
+  crossBrowserSpec,
   validationWorkflow,
   hostedWorkflow,
   packageJson,
@@ -19,6 +20,7 @@ const [
   read("playwright.config.js"),
   read("e2e/voxi-widget.spec.js"),
   read("e2e/hosted-smoke.spec.js"),
+  read("e2e/cross-browser-text.spec.js"),
   read(".github/workflows/validate.yml"),
   read(".github/workflows/hosted-smoke.yml"),
   read("package.json"),
@@ -30,6 +32,8 @@ const [
 
 assert.match(config, /PLAYWRIGHT_BASE_URL/, "Playwright must support a hosted base URL.");
 assert.match(config, /webServer:\s*hostedBaseUrl[\s\S]*undefined/, "A hosted run must not start the local preview server.");
+assert.match(config, /name:\s*"firefox-text"[\s\S]*Desktop Firefox/, "Firefox must run the typed cross-browser journey.");
+assert.match(config, /name:\s*"webkit-safari-engine-text"[\s\S]*Desktop Safari/, "WebKit must provide Safari-engine typed journey coverage.");
 
 for (const requiredGate of [
   /CSP console violation/,
@@ -71,6 +75,17 @@ assert.match(hostedSpec, /text\\\/html/, "Hosted smoke must require the custom H
 assert.match(hostedSpec, /no-store/, "Hosted smoke must require no-store on snapshot responses.");
 assert.match(hostedSpec, /The requested Voxi resource is not available/, "Hosted smoke must assert the custom missing-resource marker.");
 
+for (const requiredCrossBrowserGate of [
+  /Show me movies tomorrow at Mall of the Emirates after 7 PM/,
+  /Choose \$\{movieTitle\}/,
+  /Select seats \$\{seatLabels\[0\]\} and \$\{seatLabels\[1\]\}/,
+  /تابع بالعربية/,
+  /العودة إلى مراجعة إتمام الحجز/,
+  /widget must not overflow/,
+]) {
+  assert.match(crossBrowserSpec, requiredCrossBrowserGate, `Missing cross-browser typed gate: ${requiredCrossBrowserGate}`);
+}
+
 assert.match(validationWorkflow, /upload-artifact/, "Validation CI must upload Playwright artifacts.");
 for (const [name, source] of [
   ["validation", validationWorkflow],
@@ -106,12 +121,20 @@ assert.match(appSource, /isReleaseRecoveryCurrency[\s\S]*isSafeReleaseRecoveryTr
 assert.match(appSource, /onStaleVersion=\{preserveJourneyForReleaseReload\}/, "Lazy release refreshes must receive the active journey recovery callback.");
 
 const scripts = JSON.parse(packageJson).scripts || {};
+for (const installScript of ["pretest:e2e", "pretest:e2e:cross-browser", "pretest:e2e:hosted"]) {
+  assert.equal(
+    scripts[installScript],
+    "playwright install --with-deps chromium firefox webkit",
+    `${installScript} must provision Chromium, Firefox, WebKit, and their host dependencies.`,
+  );
+}
 assert.equal(
   scripts["test:e2e"],
-  "playwright test e2e/voxi-widget.spec.js e2e/voxi-accessibility.spec.js",
-  "The default browser suite must include deterministic journey and accessibility coverage.",
+  "playwright test e2e/voxi-widget.spec.js e2e/voxi-accessibility.spec.js e2e/cross-browser-text.spec.js",
+  "The default browser suite must include deterministic, accessibility, and cross-browser text coverage.",
 );
-assert.equal(scripts["test:e2e:hosted"], "playwright test e2e/hosted-smoke.spec.js", "Hosted tests must use a separate command.");
+assert.equal(scripts["test:e2e:cross-browser"], "playwright test e2e/cross-browser-text.spec.js", "Cross-browser text coverage must remain directly runnable.");
+assert.equal(scripts["test:e2e:hosted"], "playwright test e2e/hosted-smoke.spec.js e2e/cross-browser-text.spec.js", "Hosted tests must include release smoke and cross-browser text coverage.");
 assert.match(scripts.validate || "", /validateAccessibility\.mjs/, "The main validation command must include accessibility source checks.");
 
 console.log("Validated deterministic and hosted browser release gates.");
