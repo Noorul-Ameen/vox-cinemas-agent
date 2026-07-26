@@ -423,11 +423,12 @@ function timeRangeFromText(text, timeBand) {
 }
 
 function directionalTimeRangeFromText(text, timeBand) {
-  const endpoint = `(${CLOCK_HOUR_TOKEN})(?::([0-5]\\d))?\\s*(?:(?:at|in\\s+the)\\s+)?(${DAY_PART_TOKEN})?`;
+  const endpoint = `(?:(?:at|the\\s+hour|الساعة)\\s+)?(${CLOCK_HOUR_TOKEN})(?::([0-5]\\d))?\\s*(?:(?:at|in\\s+the)\\s+)?(${DAY_PART_TOKEN})?`;
+  const directionBoundary = `(?=[\\s\\u064b-\\u065f]|$)`;
   const patterns = [
-    ["after", new RegExp(`(?:^|\\s)(?:after|later\\s+than|بعد)\\s+${endpoint}(?=\\s|$)`, "u")],
-    ["after", new RegExp(`(?:^|\\s)(?:from|من)\\s+${endpoint}\\s+(?:onwards?|or\\s+later|فما\\s+بعد|وما\\s+بعد|فصاعدا)(?=\\s|$)`, "u")],
-    ["before", new RegExp(`(?:^|\\s)(?:before|earlier\\s+than|قبل)\\s+${endpoint}(?=\\s|$)`, "u")],
+    ["after", new RegExp(`(?:^|\\s)(?:after|later\\s+than|بعد)\\s+${endpoint}${directionBoundary}`, "u")],
+    ["after", new RegExp(`(?:^|\\s)(?:from|من)\\s+${endpoint}\\s+(?:onwards?|or\\s+later|فما\\s+بعد|وما\\s+بعد|فصاعدا)${directionBoundary}`, "u")],
+    ["before", new RegExp(`(?:^|\\s)(?:before|earlier\\s+than|قبل)\\s+${endpoint}${directionBoundary}`, "u")],
   ];
   for (const [direction, pattern] of patterns) {
     const match = text.match(pattern);
@@ -711,10 +712,11 @@ export function extractDiscoveryPreferencePatch(input, {
   const text = normalizeText(discoveryInput);
   const patch = {};
   const clear = explicitClears(text);
+  const filterClearRequest = /\b(?:remove|clear|drop|reset)\b.*\b(?:filters?|preferences?)\b|(?:\u0627\u0645\u0633\u062d|\u0627\u062d\u0630\u0641|\u0627\u0644\u063a|\u0623\u0644\u063a\u064a).*(?:\u0627\u0644\u0641\u0644\u0627\u062a\u0631|\u0627\u0644\u0645\u0631\u0634\u062d\u0627\u062a|\u0627\u0644\u062a\u0641\u0636\u064a\u0644\u0627\u062a)/u.test(text);
   const replacementIntent = isExplicitContentReplacement(text) ? "content" : null;
   if (!text) return { patch, clear: [...clear], provided: [], hasDiscoverySignal: false, replacementIntent };
 
-  const openChoice = isOpenDiscoveryChoiceReply(discoveryInput);
+  const openChoice = filterClearRequest || isOpenDiscoveryChoiceReply(discoveryInput);
   if (openChoice) {
     patch.openChoice = true;
     clear.add("recommendationIntent");

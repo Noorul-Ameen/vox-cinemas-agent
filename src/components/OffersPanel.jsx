@@ -32,6 +32,7 @@ const COPY = {
     currentTerms: "Current official terms",
     staleCheckoutGuidance: "Confirm the card and current offer in the official VOX website or app checkout before relying on it.",
     detailsNeeded: "Details needed to assess eligibility: {fields}.",
+    ticketCountCheck: "Ticket count used for this eligibility check: {count}.",
     exactCardNeeded: "Choose the exact card name so eligibility is not guessed.",
     membershipLabel: "VOX account status",
     membershipUnknown: "Not provided",
@@ -103,6 +104,7 @@ const COPY = {
     currentTerms: "الشروط الرسمية الحالية",
     staleCheckoutGuidance: "أكد البطاقة والعرض الحالي في صفحة الدفع الرسمية في موقع VOX أو تطبيقه قبل الاعتماد عليه.",
     detailsNeeded: "نحتاج إلى هذه التفاصيل لتقييم الأهلية: {fields}.",
+    ticketCountCheck: "عدد التذاكر المستخدم في هذا التحقق: {count}.",
     exactCardNeeded: "اختر الاسم الدقيق للبطاقة حتى لا يتم تخمين الأهلية.",
     membershipLabel: "حالة حساب VOX",
     membershipUnknown: "غير محددة",
@@ -497,6 +499,12 @@ export function OffersPanel({
           </div>
         </div>
       </header>
+
+      {Number.isInteger(Number(resolvedContext.ticketCount)) && Number(resolvedContext.ticketCount) >= 1 && (
+        <div role="status" style={{ marginBottom: 10, border: `1px solid ${C.primary}`, borderRadius: 9, background: C.primarySoft, padding: "8px 10px", color: C.text, fontSize: 11, lineHeight: 1.4 }}>
+          {copy.ticketCountCheck.replace("{count}", String(resolvedContext.ticketCount))}
+        </div>
+      )}
 
       <label className="offers-search-field" style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, border: `1px solid ${C.border}`, borderRadius: 11, background: C.surface, padding: "8px 10px" }}>
         <Search size={15} aria-hidden="true" color={C.muted} />

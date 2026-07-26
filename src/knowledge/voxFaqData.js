@@ -233,9 +233,9 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
   Object.freeze({
     id: "wheelchair-accessibility",
     topic: "accessibility",
-    priority: 91,
+    priority: 95,
     utterances: Object.freeze({
-      en: Object.freeze(["wheelchair access", "wheelchair spaces", "accessible seating", "people of determination", "pod accessibility"]),
+      en: Object.freeze(["wheelchair access", "wheelchair spaces", "accessible seating", "people of determination", "pod accessibility", "accessibility support", "what accessibility support is available", "accessible services"]),
       ar: Object.freeze(["دخول الكرسي المتحرك", "أماكن الكراسي المتحركة", "مقاعد مهيأة", "أصحاب الهمم", "سهولة الوصول"]),
     }),
     answer: Object.freeze({

@@ -44,6 +44,15 @@ export function classifyOfferDetailTopic(query = "") {
   const text = String(query);
   return TOPIC_PATTERNS.find(([, pattern]) => pattern.test(text))?.[0] || "summary";
 }
+
+export function offerTicketCountAcknowledgement(ticketCount, { locale = "en" } = {}) {
+  const count = Number(ticketCount);
+  if (!Number.isInteger(count) || count < 1 || count > 10) return "";
+  return locale === "ar"
+    ? `عدد التذاكر المستخدم في هذا التحقق هو ${count}، وهو منفصل عن الاستخدام الشهري للعرض.`
+    : `Ticket count for this eligibility check: ${count}. This is separate from monthly offer usage.`;
+}
+
 export function resolveLocalOfferTextTurn(query, { locale = "en" } = {}) {
   const text = String(query || "").trim();
   if (!text || CANCELLATION_OR_REFUND.test(text)) return null;

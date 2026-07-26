@@ -42,6 +42,7 @@ import {
   selectRestorableRichStage,
 } from "./lib/pausedRichJourney.js";
 import { isAffirmativeContinuationTurn, isResumeCheckoutTurn, isResumeOnlyTurn, pausedResumeTarget } from "./lib/pausedJourneyRouting.js";
+import { isAmbiguousBareBookingTurn } from "./lib/bookingIntentRouting.js";
 import { contextualOpenChoicePreferenceClears, createDiscoveryPreferences, extractDiscoveryPreferencePatch, filterDiscoveryResults, formatDiscoveryTimePreference, getMissingDiscoveryCriteria, hasDiscoveryTimePreference, isOpenDiscoveryChoiceReply, mergeDiscoveryPreferences, parseAndMergeDiscoveryPreferences, resolveBilingualDiscoveryMovieCandidate, shouldTreatAsDiscoveryFilterTurn, unresolvedMovieTitleCandidate } from "./lib/discoveryPreferences.js";
 import { discoveryQuestionForLocale, localizedStageMessage, localizeDiscoveryStage } from "./lib/discoveryPromptLocalization.js";
 import { buildAuthoritativeDiscoveryContext, buildMovieSelectionGroundingContext } from "./lib/discoveryResultContext.js";
@@ -71,7 +72,7 @@ import { OFFER_META } from "./offers/offersData.js";
 import { answerForOfferTopic, buildOfferFacts } from "./offers/offerFacts.js";
 import { buildOfferEvaluationContext, shouldInvalidateOfferResult } from "./offers/offerContext.js";
 import { resolveOffer, resolveOfferForBankAndCard } from "./offers/offerResolver.js";
-import { resolveLocalOfferTextTurn } from "./offers/offerTextFallback.js";
+import { offerTicketCountAcknowledgement, resolveLocalOfferTextTurn } from "./offers/offerTextFallback.js";
 import { classifyFaqActionIntent, isGenuineFaqQuestion } from "./knowledge/faqRouting.js";
 import * as vista from "./vistaClient.js";
 
@@ -5083,6 +5084,7 @@ export default function App() {
         : result?.advisory || "";
       const facts = buildOfferFacts(result?.offer, toolLocale);
       const topicAnswer = answerForOfferTopic(result?.offer, result?.cardProfile, toolLocale, detailTopic || "summary");
+      const ticketCountAcknowledgement = offerTicketCountAcknowledgement(context.ticketCount, { locale: toolLocale });
       return JSON.stringify({
         shown: "offer card",
         checkoutPreserved,
@@ -5094,6 +5096,7 @@ export default function App() {
         headline: localizedHeadline,
         detailTopic: detailTopic || "summary",
         eligibility: result?.status || "ineligible",
+        ticketCount: context.ticketCount,
         showtimeRequired,
         selectedShowtime: context.selectedShowtime,
         missingFields: result?.missingFields || [],
@@ -5117,7 +5120,7 @@ export default function App() {
           termsUrl: facts.termsUrl,
           verifiedDate: facts.verifiedDate,
         } : null,
-        answer: `${topicAnswer}${effectiveCardName ? ` ${localizedReason}` : ""}${localizedAdvisory ? ` ${localizedAdvisory}` : ""}`,
+        answer: `${topicAnswer}${effectiveCardName ? ` ${localizedReason}` : ""}${localizedAdvisory ? ` ${localizedAdvisory}` : ""}${ticketCountAcknowledgement ? ` ${ticketCountAcknowledgement}` : ""}`,
         context,
         contextFingerprint: context.fingerprint,
         disclaimer,
@@ -6072,14 +6075,15 @@ export default function App() {
           || (stageRef.current.view !== "checkout" && isResumeOnlyTurn(safeMessage)));
         if (checkoutResumeTurn) restoreActiveCheckout();
         const resumeOnlyTurn = !directSeatSelection && (isResumeOnlyTurn(safeMessage) || checkoutResumeTurn);
-        const preInformationMovieSelection = decision === null && !activeCheckout && !directCancellation
+        const preInformationDiscoveryFilterTurn = decision === null && !directCancellation && isDiscoveryFilterTurn(safeMessage);
+        const preInformationMovieSelection = decision === null && !activeCheckout && !directCancellation && !preInformationDiscoveryFilterTurn
           ? await resolveVisibleMovieSelectionTurnLazy(
               { text: safeMessage, stage: stageRef.current },
               { isCurrent: voiceTurnIsCurrent },
             )
           : null;
         if (!voiceTurnIsCurrent()) return;
-        const movieInformation = decision === null && !directCancellation && !preInformationMovieSelection
+        const movieInformation = decision === null && !directCancellation && !preInformationMovieSelection && !preInformationDiscoveryFilterTurn
           ? await resolveMovieInformation(safeMessage, { isCurrent: voiceTurnIsCurrent })
           : null;
         if (!voiceTurnIsCurrent()) return;
@@ -6136,6 +6140,23 @@ export default function App() {
             }
           }
         }
+        const ambiguousBareBooking = decision === null
+          && !activeCheckout
+          && !directMovieSelection
+          && !directShowtimeSelection
+          && !directSeatSelection
+          && isAmbiguousBareBookingTurn(safeMessage);
+        if (ambiguousBareBooking) {
+          const visibleTitles = Array.isArray(stageRef.current.movies)
+            ? stageRef.current.movies.slice(0, 5).map((movie) => movie.title).filter(Boolean)
+            : [];
+          const clarification = visibleTitles.length
+            ? `Ask the guest to name one visible movie: ${visibleTitles.join(", ")}.`
+            : "Ask the guest to name the movie, cinema, and date they want.";
+          conversation.sendContextualUpdate?.(`The guest used an ambiguous bare booking phrase. ${clarification} Do not treat this as a private or group booking enquiry and do not select anything by assumption.`);
+          updateIntentFromText(safeMessage);
+          return;
+        }
         const actionIntent = classifyFaqActionIntent(safeMessage);
         const localOfferTurn = decision === null
           && !cancellationFlowRef.current
@@ -6161,6 +6182,7 @@ export default function App() {
               bankName: localOfferTurn.bankName,
               cardName: localOfferTurn.cardName,
               detailTopic: localOfferTurn.detailTopic,
+              ticketCount: localOfferTurn.ticketCount,
             });
             const offerResult = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
             if (!voiceTurnIsCurrent()) return;
@@ -6174,7 +6196,9 @@ export default function App() {
         const checkoutFaq = activeCheckout && !localOfferTurn && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection && !ambiguousShowtimeSelection
           ? await prepareFaqContext(safeMessage)
           : { matches: [], context: "" };
-        const discoveryFilterTurn = movieInformation?.handled || checkoutFaq.matches.length || recordSelectorFaqBypass || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection ? false : isDiscoveryFilterTurn(safeMessage);
+        const discoveryFilterTurn = movieInformation?.handled || checkoutFaq.matches.length || recordSelectorFaqBypass || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection
+          ? false
+          : preInformationDiscoveryFilterTurn || isDiscoveryFilterTurn(safeMessage);
         const faq = localOfferTurn
           ? { matches: [], context: "" }
           : checkoutFaq.matches.length
@@ -7323,14 +7347,15 @@ export default function App() {
             : "The seat map could not be restored. The checkout summary was not changed.")));
       return;
     }
-    const preInformationMovieSelection = turnCancellationDecision === null && !activeCheckout && !directCancellation
+    const preInformationDiscoveryFilterTurn = decision === null && !directCancellation && isDiscoveryFilterTurn(value);
+    const preInformationMovieSelection = turnCancellationDecision === null && !activeCheckout && !directCancellation && !preInformationDiscoveryFilterTurn
       ? await resolveVisibleMovieSelectionTurnLazy(
           { text: value, stage: stageRef.current },
           { isCurrent: typedTurnIsCurrent },
         )
       : null;
     if (!typedTurnIsCurrent()) return;
-    const movieInformation = turnCancellationDecision === null && !directCancellation && !preInformationMovieSelection
+    const movieInformation = turnCancellationDecision === null && !directCancellation && !preInformationMovieSelection && !preInformationDiscoveryFilterTurn
       ? await resolveMovieInformation(value, { isCurrent: typedTurnIsCurrent })
       : null;
     if (!typedTurnIsCurrent()) return;
@@ -7400,17 +7425,21 @@ export default function App() {
         }
       }
     }
-    const ambiguousMovieBooking = !directMovieSelection
-      && stageRef.current.view === "movies"
-      && Array.isArray(stageRef.current.movies)
-      && stageRef.current.movies.length > 1
-      && /^(?:book|choose|select|pick|watch)\s+(?:it|one|a movie|the movie)(?:\s+please)?[.!?،]*$/iu.test(value);
+    const ambiguousMovieBooking = !activeCheckout
+      && !directMovieSelection
+      && !directShowtimeSelection
+      && !directSeatSelection
+      && isAmbiguousBareBookingTurn(value);
     if (ambiguousMovieBooking) {
       setInput("");
       const titles = stageRef.current.movies.slice(0, 5).map((movie) => movie.title).filter(Boolean).join(", ");
-      say("agent", localeRef.current === "ar"
+      const englishClarification = titles
+        ? `Please name the movie you want from the visible options: ${titles}.`
+        : "Please name the movie, cinema, and date you want to book.";
+      const arabicClarification = titles
         ? `اذكر اسم الفيلم الذي تريده من الخيارات الظاهرة: ${titles}.`
-        : `Please name the movie you want from the visible options: ${titles}.`);
+        : "اذكر اسم الفيلم والسينما والتاريخ الذي تريد حجزه.";
+      say("agent", localeRef.current === "ar" ? arabicClarification : englishClarification);
       return;
     }
     if (ambiguousShowtimeSelection) {
@@ -7478,7 +7507,9 @@ export default function App() {
     const checkoutFaq = activeCheckout && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection && !ambiguousShowtimeSelection
       ? await prepareFaqContext(value)
       : { matches: [], context: "" };
-    const discoveryFilterTurn = checkoutFaq.matches.length || recordSelectorFaqBypass || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection ? false : isDiscoveryFilterTurn(value);
+    const discoveryFilterTurn = checkoutFaq.matches.length || recordSelectorFaqBypass || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection
+      ? false
+      : preInformationDiscoveryFilterTurn || isDiscoveryFilterTurn(value);
     const faq = localOfferTurn
       ? { matches: [], context: "" }
       : checkoutFaq.matches.length
