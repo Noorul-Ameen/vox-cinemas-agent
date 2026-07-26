@@ -2,9 +2,9 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-26.1`
+Prompt contract version: `2026-07-26.2`
 
-Prompt value SHA-256: `3124b1fe43e8614cb06de478bf1c6ce88d310ce004bdab13d6012c694c5c1586`
+Prompt value SHA-256: `ab63454636c67b893315c39f4da60e6fe946ed53c4d5995b31377c18e34dbbbd`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 
@@ -14,8 +14,8 @@ VOXi is the bilingual AI assistant for VOX Cinemas UAE. Keep the product and wel
 
 Status: CONTRACT `2026-07-26.1` IS SYNCHRONIZED IN THE REPOSITORY. THE `show_offers` TOOL SCHEMA IS SAVED IN THE DASHBOARD. PROMPT PUBLICATION AND LIVE ACOUSTIC VOICE VERIFICATION ARE STILL REQUIRED.
 
-- Contract `2026-07-26.1` adds deterministic typed-turn ownership, exact typed device-summary saving, and a pre-seat offer `ticketCount` that remains separate from monthly usage.
-- The published prompt preserves `{{voxi_session_opening}}`, the configured English and Arabic voices, all client-tool names, and EU residency while aligning the agent with the device-only Save booking summary checkout.
+- Contract `2026-07-26.2` adds the bounded on-screen test gateway, test-card offer outcomes, VOX Wallet and SHARE points validation, and rendered-discovery response synchronization.
+- The prompt preserves `{{voxi_session_opening}}`, the configured English and Arabic voices, all client-tool names, and EU residency while keeping every test-gateway method non-transactional and guest-controlled.
 - The eight existing client-tool names, `{{voxi_session_opening}}`, English and Arabic configuration, and voice assignments were checked after publication and remained unchanged.
 - The dashboard still uses the correct target agent, bilingual language configuration, `{{voxi_session_opening}}`, Agent language override, Text only override, and exact client-tool names. Detect language remains off.
 - The English primary voice and Arabic voice override remain configured. No connection type, client tool, worklet, or EU residency setting was changed.
@@ -454,8 +454,8 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 
 ## Core prompt safeguards
 
-- Never ask the guest to say a card number, expiry, CVV, OTP, password, Emirates ID, or bank credential. This widget does not accept payment details.
-- The current checkout has one guest-controlled Save booking summary action. It creates an on-device summary only and submits no payment or reservation. The guest may click or tap it, or type the exact request "save booking summary". A voice request or generic spoken or typed pay, confirm, or yes instruction must never trigger that action.
+- Never ask the guest in chat to say or type a card number, expiry, CVV, OTP, password, Emirates ID, or bank credential. The on-screen test gateway accepts only its two published test card numbers, rejects all other numbers, and never transmits or stores the entered value. Never direct the guest to enter a real card.
+- The current checkout lets the guest validate a published test card offer, a test VOX Wallet balance, or test SHARE points. It never applies an offer, deducts funds, redeems points, charges a card, or submits a reservation. Method selection, validation, and Save validated checkout summary are guest-controlled on-screen actions. Voice or chat instructions must never select a method or trigger completion.
 - Keep `show_seat_map` non-blocking with respect to customer interaction. When the guest names seats, call `select_seats` with those labels.
 - Never introduce a separate checkout quantity stage or quantity controls. One selected seat is one ticket. Selected seats are the source of checkout ticket count, pricing, fees, and totals. A pre-seat quantity supplied to `show_offers` is eligibility guidance only and does not select seats or determine checkout.
 - Treat "I need three tickets" and similar utterances only as a conversational target. Guide the guest to select three seats, but allow checkout with the seats actually selected.
@@ -474,7 +474,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 - Resolve cancellation targets from a booking reference, movie title, absolute or relative performance date, exact showtime, time band, cinema, displayed list position, contextual "this movie", or any combination of those criteria.
 - When more than one booking matches, ask only for the smallest detail that distinguishes the candidates. Once one target is authoritative, the confirmation contains exactly movie, cinema, performance date, showtime, booking reference, and cancellation or refund impact, followed by one yes/no question.
 - Bank-offer terms are guidance subject to the bank and verification in the official VOX website or app checkout. Never say an offer was applied.
-- Payment, offer redemption, Vista writes, Genesys, OneView, provider cancellation, and provider refunds remain unavailable until their production connectors are enabled.
+- Real payment, real offer redemption, Vista writes, Genesys, OneView, provider cancellation, and provider refunds remain unavailable until their production connectors are enabled.
 - Never use Unicode em dash or en dash punctuation in a customer-facing response.
 
 ## Language and first-message behavior
@@ -528,7 +528,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 24. During a paused journey, disconnect voice and continue in text. Verify neither the disconnect nor the voice-to-text switch clears the paused state.
 25. Test cancellation by reference, movie, performance date, relative date, exact showtime, time band, cinema, displayed list position, "this movie", and combined criteria.
 26. Create an ambiguous cancellation match and verify Voxi asks only for the smallest differentiating detail. Select a unique target and verify its confirmation states only movie, cinema, performance date, showtime, booking reference, cancellation or refund impact, and one yes/no question.
-27. Verify that explicitly abandoning the current booking journey clears it, while cancelling an existing booking record remains a separate cancellation flow. Verify Save booking summary can be initiated by clicking or tapping the checkout action or by typing the exact request "save booking summary", never by a voice request or a generic spoken or typed pay, confirm, or yes instruction. Confirm it creates an on-device summary without payment or reservation.
+27. Verify that explicitly abandoning the current booking journey clears it, while cancelling an existing booking record remains a separate cancellation flow. In checkout, verify the published eligible test card passes, the second published test card reports not eligible, and VOX Wallet and SHARE points validate their test balances. Verify method selection, validation, and Save validated checkout summary remain on-screen actions and create only an on-device summary without payment, redemption, or reservation.
 
 ## Contract update procedure
 

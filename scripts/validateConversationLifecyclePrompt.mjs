@@ -98,8 +98,8 @@ assert.match(
 
 assert.match(
   VOXI_AGENT_PROMPT,
-  /guest may click or tap Save booking summary, or type the exact request "save booking summary"[\s\S]*device-local, unpaid summary/i,
-  "the on-device summary must remain an explicit guest-controlled click, tap, or exact typed request",
+  /payment method and the final Save validated checkout summary action must remain guest-controlled on-screen selections/i,
+  "the on-device summary must require guest-controlled on-screen method validation and completion",
 );
 assert.match(
   VOXI_AGENT_PROMPT,

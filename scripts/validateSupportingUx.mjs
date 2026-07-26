@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { DEMO_CARD_STORAGE_KEY } from "../src/checkoutSafety.js";
+import { guardAgentStateClaim } from "../src/lib/agentStateTruth.js";
+import {
+  DEMO_CARD_NUMBERS,
+  DEMO_SHARE_POINTS,
+  DEMO_WALLET_BALANCE,
+  formatDemoCardNumber,
+  maskDemoCardNumber,
+  validateDemoCardOffer,
+  validateDemoSharePoints,
+  validateDemoWallet,
+} from "../src/lib/demoPaymentGateway.js";
 import {
   FALLBACK_EXPERIENCE_MEDIA,
   getExperienceMedia,
@@ -11,6 +22,7 @@ import { STRINGS } from "../src/i18n/strings.js";
 assert.match(DEMO_CARD_STORAGE_KEY, /demo/i);
 
 const checkoutSource = await readFile(new URL("../src/components/Checkout.jsx", import.meta.url), "utf8");
+const demoGatewaySource = await readFile(new URL("../src/components/DemoPaymentGateway.jsx", import.meta.url), "utf8");
 assert.doesNotMatch(checkoutSource, /Noorul|DEFAULT_CARDS|["']vox_cards["']/, "checkout must not seed personal or legacy default cards");
 assert.doesNotMatch(checkoutSource, /VITE_VISTA_BASE/, "Vista read-data configuration must not change checkout behavior");
 assert.match(checkoutSource, /return "demo";/, "checkout must default explicitly to simulation mode");
@@ -18,12 +30,41 @@ assert.match(checkoutSource, /checkoutMode !== "demo"/, "device-summary saving m
 assert.match(checkoutSource, /reviewStartedRef\.current/, "checkout must guard against duplicate summary saves");
 assert.match(checkoutSource, /clearTimers\(\)/, "checkout must clear pending summary timers");
 assert.match(checkoutSource, /onComplete\?\.\(\{ checkoutId \}\)/, "summary completion may expose only the checkout identity");
-assert.doesNotMatch(checkoutSource, /\bfetch\s*\(|axios|sendText|sendContextualUpdate|clientTools/, "checkout data must never be sent from this non-transactional component");
-assert.doesNotMatch(checkoutSource, /\b(?:pan|cvv|cvc|cardNumber|cardName|expiryLabel|security code)\b/i, "review checkout must not collect cardholder data");
-assert.doesNotMatch(checkoutSource, /<input\b|<select\b|<textarea\b/, "review checkout must not render editable payment-detail controls");
-assert.equal((checkoutSource.match(/onClick=\{saveSummary\}/g) || []).length, 1, "checkout review must expose exactly one device-summary action");
-assert.match(checkoutSource, /checkout\.saveSummaryHint/, "the summary action must state its on-device boundary");
-assert.doesNotMatch(checkoutSource, /Apple Pay|Samsung Pay|walletButton|reviewCard/i, "non-integrated payment brands must not appear as checkout controls");
+assert.match(checkoutSource, /DemoPaymentGateway/, "checkout must render the test payment gateway");
+assert.match(checkoutSource, /onApprove=\{saveSummary\}/, "only a validated gateway method may reach the existing local-summary action");
+assert.doesNotMatch(`${checkoutSource}\n${demoGatewaySource}`, /\bfetch\s*\(|axios|sendText|sendContextualUpdate|clientTools/, "test checkout data must never leave the non-transactional components");
+assert.doesNotMatch(demoGatewaySource, /\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b/, "test payment values must remain in memory and must not be persisted");
+assert.doesNotMatch(demoGatewaySource, /\b(?:cvv|cvc|cardName|expiryLabel|security code|one-time password|otp)\b/i, "the test gateway must not collect authentication or real cardholder details");
+assert.match(demoGatewaySource, /inputMode="numeric"/, "the published test-card field must use a numeric mobile keyboard");
+assert.match(demoGatewaySource, /autoComplete="off"/, "the published test-card field must not invite browser payment autofill");
+assert.match(demoGatewaySource, /maxLength=\{19\}/, "the test-card field must remain bounded to a formatted 16-digit number");
+assert.match(demoGatewaySource, /DEMO_CARD_NUMBERS\.eligible/, "the eligible published test card must be exposed");
+assert.match(demoGatewaySource, /DEMO_CARD_NUMBERS\.notEligible/, "the not-eligible published test card must be exposed");
+assert.match(demoGatewaySource, /VOX Wallet/, "the gateway must expose VOX Wallet validation");
+assert.match(demoGatewaySource, /SHARE points/, "the gateway must expose SHARE points validation");
+assert.match(demoGatewaySource, /disabled=\{!result\?\.eligible\}/, "an incomplete or failed validation must block checkout-summary completion");
+assert.doesNotMatch(`${checkoutSource}\n${demoGatewaySource}`, /Apple Pay|Samsung Pay|walletButton|reviewCard/i, "non-integrated payment brands must not appear as checkout controls");
+
+assert.equal(formatDemoCardNumber(DEMO_CARD_NUMBERS.eligible), "4111 1111 1111 1111", "eligible test card formatting must be deterministic");
+assert.equal(maskDemoCardNumber(DEMO_CARD_NUMBERS.notEligible), "**** **** **** 4444", "test card masking must expose only the final four digits");
+assert.equal(validateDemoCardOffer(DEMO_CARD_NUMBERS.eligible).status, "eligible", "the eligible test card must pass offer validation");
+assert.equal(validateDemoCardOffer(DEMO_CARD_NUMBERS.notEligible).status, "not_eligible", "the second test card must return a not-eligible result");
+assert.equal(validateDemoCardOffer("4000000000000000").status, "unrecognized", "every unpublished card number must fail closed");
+assert.equal(validateDemoWallet(84).eligible, true, "the published test wallet balance must validate a normal checkout amount");
+assert.equal(validateDemoWallet(DEMO_WALLET_BALANCE + 1).status, "insufficient", "wallet validation must fail above the test balance");
+assert.equal(validateDemoSharePoints(84).eligible, true, "the published SHARE balance must validate a normal checkout amount");
+assert.equal(validateDemoSharePoints(DEMO_SHARE_POINTS).status, "insufficient", "SHARE validation must account for the points conversion");
+
+const visibleHorrorMovies = {
+  view: "movies",
+  movies: [{ title: "Horror One" }, { title: "Horror Two" }],
+  cinema: { name: "Mall of the Emirates" },
+};
+const correctedEnglishDiscovery = guardAgentStateClaim("Which genre would you like?", { stage: visibleHorrorMovies, locale: "en" });
+assert.match(correctedEnglishDiscovery, /2 movie options are shown/i, "visible horror results must replace a stale English genre question");
+assert.doesNotMatch(correctedEnglishDiscovery, /\bgenre\b/i, "corrected English copy must not ask for the already supplied genre");
+const correctedArabicDiscovery = guardAgentStateClaim("أي نوع من الأفلام تفضل؟", { stage: visibleHorrorMovies, locale: "ar" });
+assert.doesNotMatch(correctedArabicDiscovery, /أي نوع|ما نوع|ماذا تفضل/u, "visible movie results must replace a stale Arabic preference question");
 
 assert.ok(getSupportedImageUrl(FALLBACK_EXPERIENCE_MEDIA), "experience fallback artwork must have a renderable URL");
 assert.equal(getExperienceMedia("UNKNOWN EXPERIENCE"), FALLBACK_EXPERIENCE_MEDIA, "unknown experiences must use fallback artwork");
@@ -130,9 +171,10 @@ assert.match(STRINGS.en["handover.readyBody"], /No external support connection h
 assert.doesNotMatch(handoverSource, /agent queue|pick up this conversation|UserRound|Headphones/i, "handover presentation must not imply a live agent or queue");
 assert.match(appSource, /connectingStep:\s*t\("handover\.preparingStep"\)/, "handover progress must say preparing rather than connecting");
 assert.doesNotMatch(appSource, /booking (?:was|is) removed from this device|Booking summary [^\n]+ removed only from this device/i, "persisted cancellations must not be described as removed records");
-assert.match(voxiPromptSource, /Payment-detail entry is disabled in this widget/, "the voice prompt must match the checkout's disabled cardholder-data entry");
-assert.match(voxiPromptSource, /one guest-controlled Save booking summary action[\s\S]*submits no real payment or reservation/, "the voice prompt must describe only the non-transactional summary action");
-assert.doesNotMatch(voxiPromptSource, /Payment details are entered only in the on-screen checkout/, "the voice prompt must not direct guests to removed payment fields");
+assert.match(voxiPromptSource, /two published test card numbers[\s\S]*without transmitting or storing it/, "the voice prompt must describe the bounded test-card contract");
+assert.match(voxiPromptSource, /test VOX Wallet balance[\s\S]*test SHARE points[\s\S]*never apply an offer[\s\S]*charge a card/, "the voice prompt must keep all gateway validation non-transactional");
+assert.match(voxiPromptSource, /payment method[\s\S]*Save validated checkout summary action[\s\S]*guest-controlled on-screen selections/, "the voice prompt must leave every payment-step choice to the guest");
+assert.match(voxiPromptSource, /Never ask in chat for a card number[\s\S]*Never ask the guest to enter a real card/, "the agent must never solicit card details in chat");
 assert.match(richMediaSource, /\["confirmed_demo", "summary_saved", "locally_stored"\]/, "booking cards must classify every device-summary status safely");
 assert.match(historySource, /\["confirmed_demo", "summary_saved", "locally_stored"\]/, "history must classify every device-summary status safely");
 assert.match(bookingStoreSource, /\["confirmed_demo", "summary_saved", "locally_stored"\][\s\S]*result\.verified = false[\s\S]*result\.paymentStatus = "simulated_not_charged"/, "storage normalization must fail closed for contradictory device summaries");

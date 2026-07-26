@@ -9,7 +9,7 @@
     "build": "vite build && node scripts/validateColdLoadBudget.mjs",
     "preview": "vite preview",
     "pretest:e2e": "playwright install --with-deps chromium firefox webkit",
-    "test:e2e": "playwright test e2e/voxi-widget.spec.js e2e/voxi-accessibility.spec.js e2e/cross-browser-text.spec.js",
+    "test:e2e": "playwright test e2e/voxi-widget.spec.js e2e/voxi-accessibility.spec.js e2e/cross-browser-text.spec.js e2e/demo-payment-and-sync.spec.js",
     "pretest:e2e:cross-browser": "playwright install --with-deps chromium firefox webkit",
     "test:e2e:cross-browser": "playwright test e2e/cross-browser-text.spec.js",
     "pretest:e2e:hosted": "playwright install --with-deps chromium firefox webkit",

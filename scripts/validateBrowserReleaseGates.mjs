@@ -130,8 +130,8 @@ for (const installScript of ["pretest:e2e", "pretest:e2e:cross-browser", "pretes
 }
 assert.equal(
   scripts["test:e2e"],
-  "playwright test e2e/voxi-widget.spec.js e2e/voxi-accessibility.spec.js e2e/cross-browser-text.spec.js",
-  "The default browser suite must include deterministic, accessibility, and cross-browser text coverage.",
+  "playwright test e2e/voxi-widget.spec.js e2e/voxi-accessibility.spec.js e2e/cross-browser-text.spec.js e2e/demo-payment-and-sync.spec.js",
+  "The default browser suite must include deterministic, accessibility, cross-browser text, payment, and response-synchronization coverage.",
 );
 assert.equal(scripts["test:e2e:cross-browser"], "playwright test e2e/cross-browser-text.spec.js", "Cross-browser text coverage must remain directly runnable.");
 assert.equal(scripts["test:e2e:hosted"], "playwright test e2e/hosted-smoke.spec.js e2e/cross-browser-text.spec.js", "Hosted tests must include release smoke and cross-browser text coverage.");
