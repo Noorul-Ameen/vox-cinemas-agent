@@ -470,12 +470,9 @@ function isProgrammingDateOnlyReply(text, resolvedDate = requestedProgrammingDat
   const month = "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
   const day = "\\d{1,2}(?:st|nd|rd|th)?";
   const weekday = "(?:sun(?:day)?|mon(?:day)?|tue(?:sday)?|wed(?:nesday)?|thu(?:rsday)?|fri(?:day)?|sat(?:urday)?)";
-  const arabicMonth = "(?:يناير|فبراير|مارس|أبريل|ابريل|مايو|يونيو|يوليو|أغسطس|اغسطس|سبتمبر|أكتوبر|اكتوبر|نوفمبر|ديسمبر)";
-  const arabicDay = "[0-9\\u0660-\\u0669]{1,2}";
-  const arabicWeekday = "(?:الأحد|الاحد|الاثنين|الثلاثاء|الأربعاء|الاربعاء|الخميس|الجمعة|السبت)";
-  const englishDateOnly = new RegExp(`^(?:today|tonight|tomorrow|day after tomorrow|${weekday}|(?:on|next|this)\\s+${weekday}|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[/-]\\d{1,2}(?:[/-]\\d{2,4})?|(?:on\\s+)?(?:the\\s+)?${day}|(?:on\\s+)?(?:the\\s+)?${day}\\s+${month}|${month}\\s+${day})(?:\\s+please)?$`, "i");
-  const arabicDateOnly = new RegExp(`^(?:اليوم|الليلة|غدا|غداً|بعد غد|${arabicWeekday}|(?:${arabicWeekday}\\s+)?${arabicDay}\\s+${arabicMonth}|${arabicMonth}\\s+${arabicDay})(?:\\s+من فضلك)?$`, "iu");
-  return englishDateOnly.test(normalized) || arabicDateOnly.test(normalized);
+  const arabicWeekday = "(?:ال[اأ]حد|الاثنين|الثلاثاء|ال[اأ]ربعاء|الخميس|الجمعة|السبت)";
+  return new RegExp(`^(?:today|tonight|tomorrow|day after tomorrow|${weekday}|(?:on|next|this)\\s+${weekday}|\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[/-]\\d{1,2}(?:[/-]\\d{2,4})?|(?:on\\s+)?(?:the\\s+)?${day}|(?:on\\s+)?(?:the\\s+)?${day}\\s+${month}|${month}\\s+${day})(?:\\s+please)?$`, "i").test(normalized)
+    || new RegExp(`^(?:اليوم|الليلة|غد(?:ا|اً)|بعد غد|${arabicWeekday}|(?:${arabicWeekday}\\s+)?[0-9٠-٩]{1,2}\\s+\\p{Script=Arabic}+|\\p{Script=Arabic}+\\s+[0-9٠-٩]{1,2})(?:\\s+من فضلك)?$`, "iu").test(normalized);
 }
 
 function guardMovieDisplayClaim(text, stage = {}, locale = "en") {
@@ -7139,8 +7136,8 @@ export default function App() {
       setInput("");
       if (stageRef.current.view !== "checkout") restoreActiveCheckout();
       say("agent", localeRef.current === "ar"
-        ? "اختر طريقة دفع اختبارية وتحقق منها في البوابة الظاهرة، ثم استخدم حفظ ملخص إتمام الحجز بعد التحقق. لم يتم خصم أي مبلغ أو إرسال أي حجز."
-        : "Choose and validate a test payment method in the on-screen gateway, then use Save validated checkout summary. Nothing has been charged or reserved.");
+        ? "تحقق من طريقة دفع في بوابة الاختبار قبل الحفظ. لم يتم خصم مبلغ أو حجز تذكرة."
+        : "Validate a method in the test gateway before saving. Nothing was charged or reserved.");
       return;
     }
     if (checkoutPaymentActiveRef.current) {

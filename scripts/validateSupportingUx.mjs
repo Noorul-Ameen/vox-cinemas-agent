@@ -81,7 +81,7 @@ const typedGatewayCompletion = appSource.slice(
   appSource.indexOf("if (checkoutPaymentActiveRef.current)", typedGatewayCompletionStart),
 );
 assert.match(typedGatewayCompletion, /restoreActiveCheckout\(\)/, "a typed summary request must restore the guest-controlled gateway");
-assert.match(typedGatewayCompletion, /Choose and validate a test payment method in the on-screen gateway/, "typed summary guidance must require on-screen validation");
+assert.match(typedGatewayCompletion, /Validate a method in the test gateway before saving/, "typed summary guidance must require on-screen validation");
 assert.doesNotMatch(typedGatewayCompletion, /handleCheckoutReviewComplete\(/, "typed chat must never bypass payment-method validation or complete checkout");
 const retryableLazySource = await readFile(new URL("../src/components/RetryableLazy.jsx", import.meta.url), "utf8");
 const mainSource = await readFile(new URL("../src/main.jsx", import.meta.url), "utf8");

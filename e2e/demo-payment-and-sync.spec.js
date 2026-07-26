@@ -98,7 +98,7 @@ test("typed journey reaches the test gateway and validates every published outco
 
   await sendText(page, "save booking summary");
   await expect(page.getByRole("heading", { name: "Test payment gateway" })).toBeVisible();
-  await expect(page.getByText(/Choose and validate a test payment method in the on-screen gateway/)).toBeVisible();
+  await expect(page.getByText(/Validate a method in the test gateway before saving/)).toBeVisible();
   await expect(page.getByRole("button", { name: /Save validated checkout summary/ })).toBeDisabled();
 
   await page.getByRole("button", { name: /Not eligible test card/ }).click();
