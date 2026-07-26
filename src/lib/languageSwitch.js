@@ -8,6 +8,8 @@ const tidy = (value) => String(value || "")
   .trim();
 
 const DIRECT_ARABIC = [
+  /^(?:please )?(?:switch|change)(?: the)? conversation and (?:the )?interface to arabic(?: please)?$/,
+  /^(?:please )?(?:switch|change)(?: the)? interface and (?:the )?conversation to arabic(?: please)?$/,
   /^(?:please )?(?:speak|continue|switch)(?: in| to)? arabic(?: please)?$/,
   /^(?:could|would|will|can) you (?:please )?(?:continue|switch)(?: in| to)? arabic(?: please)?$/,
   /^(?:please )?(?:use|talk to me in|talk with me in|speak with me in|reply in|respond in|answer in) arabic(?: please)?$/,
@@ -21,6 +23,8 @@ const DIRECT_ARABIC = [
 ];
 
 const DIRECT_ENGLISH = [
+  /^(?:please )?(?:switch|change)(?: the)? conversation and (?:the )?interface to english(?: please)?$/,
+  /^(?:please )?(?:switch|change)(?: the)? interface and (?:the )?conversation to english(?: please)?$/,
   /^(?:please )?(?:speak|continue|switch)(?: in| to)? english(?: please)?$/,
   /^(?:could|would|will|can) you (?:please )?(?:continue|switch)(?: in| to)? english(?: please)?$/,
   /^(?:please )?(?:use|talk to me in|talk with me in|speak with me in|reply in|respond in|answer in) english(?: please)?$/,

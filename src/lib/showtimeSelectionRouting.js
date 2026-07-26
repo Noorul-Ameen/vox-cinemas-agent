@@ -3,6 +3,17 @@ import { parseSpokenShowtimeHourChoice } from "./spokenShowtimeChoice.js";
 
 const INFORMATION_ONLY = /^\s*(?:(?:what|which|when|is there|are there|do you have|tell me)\b|(?:ماذا|متى|ما|هل يوجد|هل توجد)(?=\s|$))|[?؟]\s*$/iu;
 const HOUR_ONLY_CHOICE = /^\s*(?:(?:at|around|about|near|approximately|by|الساعة|حوالي)\s*)?(\d{1,2})\s*(a\s*m|p\s*m|صباحا|صباح|مساء|ليلا)?\s*(?:please|من فضلك)?[.!،]*$/iu;
+const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function explicitlyNamedVisibleExperience(value, sessions) {
+  const text = String(value || "");
+  return [...new Set((sessions || [])
+    .map((session) => String(session?.exp || session?.experience || "").trim())
+    .filter(Boolean))]
+    .sort((left, right) => right.length - left.length)
+    .find((experience) => new RegExp(`(?:^|\\s)${escapeRegex(experience)}(?=\\s|[.!?،؟]|$)`, "iu").test(text))
+    || null;
+}
 
 function visibleSessionTime(session) {
   const match = String(session?.time || "").match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
@@ -35,7 +46,7 @@ export function visibleShowtimeSelectionCandidates({ text, stage } = {}) {
   const signal = extractDiscoveryPreferencePatch(value, { expectingTime: true });
   const requestedTime = signal.patch.preferredTime;
 
-  const experience = signal.patch.experience?.toUpperCase();
+  const experience = (signal.patch.experience || explicitlyNamedVisibleExperience(value, stage.sessions))?.toUpperCase();
   const visibleSessions = experience
     ? stage.sessions.filter((session) => String(session.exp || session.experience).toUpperCase() === experience)
     : stage.sessions;

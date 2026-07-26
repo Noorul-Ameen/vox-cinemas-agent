@@ -2,19 +2,19 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-24.1`
+Prompt contract version: `2026-07-26.1`
 
-Prompt value SHA-256: `9daa241841ccb6321673f47c560bb9e374677d5f421b27bae3ecb94fa210f4e2`
+Prompt value SHA-256: `3124b1fe43e8614cb06de478bf1c6ce88d310ce004bdab13d6012c694c5c1586`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 
 VOXi is the bilingual AI assistant for VOX Cinemas UAE. Keep the product and welcome globally branded as VOX Cinemas UAE. Mall of the Emirates is one selectable cinema, not the global product identity.
 
-## Dashboard verification status, 24 July 2026
+## Dashboard verification status, 26 July 2026
 
-Status: CONTRACT `2026-07-24.1` IS PUBLISHED AND READ BACK. LIVE ACOUSTIC VOICE VERIFICATION IS STILL REQUIRED.
+Status: CONTRACT `2026-07-26.1` IS SYNCHRONIZED IN THE REPOSITORY. THE `show_offers` TOOL SCHEMA IS SAVED IN THE DASHBOARD. PROMPT PUBLICATION AND LIVE ACOUSTIC VOICE VERIFICATION ARE STILL REQUIRED.
 
-- Contract `2026-07-24.1` was published and read back on 24 July 2026. It adds microphone seat-tool ownership and exact voice transcript display requirements.
+- Contract `2026-07-26.1` adds deterministic typed-turn ownership, exact typed device-summary saving, and a pre-seat offer `ticketCount` that remains separate from monthly usage.
 - The published prompt preserves `{{voxi_session_opening}}`, the configured English and Arabic voices, all client-tool names, and EU residency while aligning the agent with the device-only Save booking summary checkout.
 - The eight existing client-tool names, `{{voxi_session_opening}}`, English and Arabic configuration, and voice assignments were checked after publication and remained unchanged.
 - The dashboard still uses the correct target agent, bilingual language configuration, `{{voxi_session_opening}}`, Agent language override, Text only override, and exact client-tool names. Detect language remains off.
@@ -358,6 +358,12 @@ Parameters:
       "type": "string",
       "description": "Selected non-sensitive seat category, for example REGULAR, PREFERRED, PREMIUM, SAPPHIRE, or BALCONY."
     },
+    "ticketCount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "description": "Guest-requested ticket count for this offer eligibility check before seats are selected. Keep separate from monthlyTicketsUsed."
+    },
     "isMember": {
       "type": "boolean",
       "description": "Whether the guest confirms they are logged in as a VOX member."
@@ -379,7 +385,7 @@ Parameters:
 
 Agent rule:
 
-> When the guest asks about a bank or card deal, call `show_offers`. Read the returned `answer` as one concise sentence. Treat `eligible` as listed eligibility subject to final verification in the official VOX website or app checkout, `ineligible` as a known rule failure, and `card_required` as a request for one returned missing detail. When the result contains `showtimeRequired: true`, ask the guest to choose a showtime or experience. Never say an offer was applied or redeemed. Ticket count and order total are derived locally from selected seats and checkout, so they are not tool parameters.
+> When the guest asks about a bank or card deal, call `show_offers`. Read the returned `answer` as one concise sentence. Treat `eligible` as listed eligibility subject to final verification in the official VOX website or app checkout, `ineligible` as a known rule failure, and `card_required` as a request for one returned missing detail. When the result contains `showtimeRequired: true`, ask the guest to choose a showtime or experience. Never say an offer was applied or redeemed. Before seats are selected, pass an explicitly requested ticket quantity as `ticketCount`. Keep it separate from `monthlyTicketsUsed`, which is prior usage in the current monthly allowance. Order total remains locally derived from checkout.
 
 ## `handover_to_agent`
 
@@ -449,9 +455,9 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 ## Core prompt safeguards
 
 - Never ask the guest to say a card number, expiry, CVV, OTP, password, Emirates ID, or bank credential. This widget does not accept payment details.
-- The current checkout has one guest-controlled Save booking summary action. It creates an on-device summary only and submits no payment or reservation. A spoken or typed pay, confirm, or yes instruction must never trigger that action.
+- The current checkout has one guest-controlled Save booking summary action. It creates an on-device summary only and submits no payment or reservation. The guest may click or tap it, or type the exact request "save booking summary". A voice request or generic spoken or typed pay, confirm, or yes instruction must never trigger that action.
 - Keep `show_seat_map` non-blocking with respect to customer interaction. When the guest names seats, call `select_seats` with those labels.
-- Never ask for a separate ticket quantity and never introduce a quantity stage or quantity controls. One selected seat is one ticket. Selected seats are the only source of ticket count, pricing, fees, offers context, and checkout totals.
+- Never introduce a separate checkout quantity stage or quantity controls. One selected seat is one ticket. Selected seats are the source of checkout ticket count, pricing, fees, and totals. A pre-seat quantity supplied to `show_offers` is eligibility guidance only and does not select seats or determine checkout.
 - Treat "I need three tickets" and similar utterances only as a conversational target. Guide the guest to select three seats, but allow checkout with the seats actually selected.
 - Before suggesting movies, extract every requirement already supplied: cinema or location, date, preferred time, genre, movie language, experience or format, specific movie, and kids or family audience.
 - Ask one concise question only for a genuinely missing requirement. Do not ask again for information already present in journey context.
@@ -499,7 +505,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 1. Confirm the dashboard target is `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`.
 2. Confirm all eight exact client-tool names and schemas match `config/elevenlabs-agent-contract.json`.
 3. Enable Wait for response on all eight tools. Confirm `show_seat_map` returns after map loading and never waits for a later seat-selection turn.
-4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-24.1`.
+4. Confirm the system prompt matches `VOXI_AGENT_PROMPT` at contract version `2026-07-26.1`.
 5. Set the first message to `{{voxi_session_opening}}`.
 6. Confirm the dashboard detects `voxi_session_opening` from the first-message template. The widget supplies all 13 contract variables when it starts a session; do not create unsupported manual placeholders for variables that the dashboard does not expose.
 7. Configure English and Arabic support, then disable the automatic `language_detection` system tool.
@@ -522,7 +528,7 @@ The complete redacted journey, retained discovery preferences, recent turns, and
 24. During a paused journey, disconnect voice and continue in text. Verify neither the disconnect nor the voice-to-text switch clears the paused state.
 25. Test cancellation by reference, movie, performance date, relative date, exact showtime, time band, cinema, displayed list position, "this movie", and combined criteria.
 26. Create an ambiguous cancellation match and verify Voxi asks only for the smallest differentiating detail. Select a unique target and verify its confirmation states only movie, cinema, performance date, showtime, booking reference, cancellation or refund impact, and one yes/no question.
-27. Verify that explicitly abandoning the current booking journey clears it, while cancelling an existing booking record remains a separate cancellation flow. Verify Save booking summary can be initiated only by clicking or tapping the checkout action, never by a spoken or typed pay instruction. Confirm it creates an on-device summary without payment or reservation.
+27. Verify that explicitly abandoning the current booking journey clears it, while cancelling an existing booking record remains a separate cancellation flow. Verify Save booking summary can be initiated by clicking or tapping the checkout action or by typing the exact request "save booking summary", never by a voice request or a generic spoken or typed pay, confirm, or yes instruction. Confirm it creates an on-device summary without payment or reservation.
 
 ## Contract update procedure
 

@@ -162,7 +162,7 @@ export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, err
                   m.language || "",
                 ].filter(Boolean).join(" · ")}
               </span>
-              {!!m.relevantSessions?.length && <span aria-label={`Relevant showtimes for ${m.title}`} style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+              {!!m.relevantSessions?.length && <span aria-label={t("movies.relevantShowtimes", { title: m.title })} style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
                 {m.relevantSessions.slice(0, 2).map((session) => <span key={session.sessionId} dir="ltr" style={{ borderRadius: 999, background: "rgba(87,199,154,.11)", padding: "2px 6px", color: C.green, fontSize: 9, whiteSpace: "nowrap" }}>{session.time} · {session.exp}</span>)}
               </span>}
               <span dir="auto" style={{ display: "-webkit-box", marginTop: 5, overflow: "hidden", color: C.muted, fontSize: 10, lineHeight: 1.35, WebkitBoxOrient: "vertical", WebkitLineClamp: 2 }}>{m.synopsis}</span>
@@ -183,7 +183,7 @@ export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRet
   const expColor = (e) => (["IMAX", "MAX"].includes(e) ? C.primaryHover : e === "GOLD" ? C.warning : e === "KIDS" ? C.green : C.primary);
   return (
     <section role="region" aria-labelledby={STAGE_HEADING_IDS.showtimes}>
-      <Header headingId={STAGE_HEADING_IDS.showtimes} icon={<Clock size={16} />} title={movie.title} sub={`${movie.rating} · ${movie.runtime ? t("showtimes.minutes", { count: movie.runtime }) : "Not listed"} · ${t("showtimes.select")}`} onBack={onBack} />
+      <Header headingId={STAGE_HEADING_IDS.showtimes} icon={<Clock size={16} />} title={movie.title} sub={`${movie.rating} · ${movie.runtime ? t("showtimes.minutes", { count: movie.runtime }) : t("showtimes.notListed")} · ${t("showtimes.select")}`} onBack={onBack} />
       {notice && <div role="status" style={{ marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 10, background: C.primarySoft, padding: "9px 11px", color: C.primary, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
       <div style={{ marginBottom: 14, borderRadius: 12, border: `1px solid ${C.border}`, background: C.surfaceAlt, padding: "11px 12px" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 7 }}>

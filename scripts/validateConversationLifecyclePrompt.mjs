@@ -98,12 +98,12 @@ assert.match(
 
 assert.match(
   VOXI_AGENT_PROMPT,
-  /guest must click or tap Save booking summary themselves/i,
-  "the on-device summary must remain a guest-controlled click or tap",
+  /guest may click or tap Save booking summary, or type the exact request "save booking summary"[\s\S]*device-local, unpaid summary/i,
+  "the on-device summary must remain an explicit guest-controlled click, tap, or exact typed request",
 );
 assert.match(
   VOXI_AGENT_PROMPT,
-  /Never treat a spoken or typed instruction[\s\S]*as payment authorization/i,
+  /Never treat a voice request or a generic spoken or typed instruction[\s\S]*as payment authorization/i,
   "voice and text must never authorize payment",
 );
 
@@ -111,4 +111,4 @@ for (const [label, source] of [["prompt", VOXI_AGENT_PROMPT], ["setup guide", se
   assert.doesNotMatch(source, /[\u2013\u2014]/u, `${label} must not contain Unicode en dash or em dash punctuation`);
 }
 
-console.log("Validated prompt rules for paused rich journeys, conversational restoration, explicit journey endings, natural cancellation targeting, concise confirmation, and click-or-tap payment.");
+console.log("Validated prompt rules for paused rich journeys, conversational restoration, explicit journey endings, natural cancellation targeting, concise confirmation, and explicit device-summary saving.");

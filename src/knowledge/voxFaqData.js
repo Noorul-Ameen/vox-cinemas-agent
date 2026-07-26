@@ -188,11 +188,11 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
     topic: "food_beverage",
     priority: 82,
     utterances: Object.freeze({
-      en: Object.freeze(["food and drinks", "outside food", "candy bar", "online food order", "prepare now", "food qr code", "collect my food"]),
+      en: Object.freeze(["food and drinks", "outside food", "candy bar", "online food order", "pre order food", "pre-order food", "can i pre order food", "can i pre order food and collect it at the cinema", "prepare now", "food qr code", "collect my food"]),
       ar: Object.freeze(["الطعام والمشروبات", "طعام من الخارج", "الكاندي بار", "طلب الطعام أونلاين", "جهز الآن", "رمز طلب الطعام", "استلام الطعام"]),
     }),
     answer: Object.freeze({
-      en: "Food and drinks bought outside the cinema are not permitted. VOX says its online and Candy Bar menus are the same, although in-cinema specials may differ. An online order is collected only from the selected cinema and starts being prepared after its QR code is activated at the kiosk.",
+      en: "Food and drinks bought outside the cinema are not permitted. Voxi cannot place a food order inside this conversation. VOX says its official online menu can be used to pre-order food for collection at the selected cinema; preparation starts after the order QR code is activated at the kiosk. The online and Candy Bar menus are the same, although in-cinema specials may differ.",
       ar: "لا يُسمح بإدخال أطعمة أو مشروبات تم شراؤها من خارج السينما. وتوضح ڤوكس أن قائمة الطلب الإلكتروني وقائمة Candy Bar متطابقتان، مع احتمال وجود عروض خاصة داخل السينما. يُستلم الطلب الإلكتروني من السينما المحددة فقط، ويبدأ تحضيره بعد تفعيل رمز QR في جهاز الخدمة.",
     }),
     delivery: STATIC,
@@ -233,9 +233,9 @@ export const VOX_FAQ_ENTRIES = Object.freeze([
   Object.freeze({
     id: "wheelchair-accessibility",
     topic: "accessibility",
-    priority: 91,
+    priority: 95,
     utterances: Object.freeze({
-      en: Object.freeze(["wheelchair access", "wheelchair spaces", "accessible seating", "people of determination", "pod accessibility"]),
+      en: Object.freeze(["wheelchair access", "wheelchair spaces", "accessible seating", "people of determination", "pod accessibility", "accessibility support", "what accessibility support is available", "accessible services"]),
       ar: Object.freeze(["دخول الكرسي المتحرك", "أماكن الكراسي المتحركة", "مقاعد مهيأة", "أصحاب الهمم", "سهولة الوصول"]),
     }),
     answer: Object.freeze({

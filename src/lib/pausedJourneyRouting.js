@@ -2,7 +2,7 @@ export const isResumeOnlyTurn = (value) => /^(?:continue|resume|go on|carry on|�
 
 export const isAffirmativeContinuationTurn = (value) => /^(?:yes(?:\s*[,]?\s*proceed)?|proceed|نعم(?:\s*[،]?\s*(?:تابع|استمر|تفضل))?|تابع|استمر|تفضل)(?:\s+(?:please|من فضلك))?[.!?؟،]*$/iu.test(String(value || "").trim());
 
-export const isResumeCheckoutTurn = (value) => /^(?:(?:return|go|take me|back)\s+(?:me\s+)?(?:back\s+)?to\s+(?:the\s+)?(?:checkout|payment)|(?:back|return|resume|continue|complete|finish)\s+(?:the\s+)?(?:checkout|payment)|(?:checkout|payment)\s+(?:again|please)|(?:العودة|ارجع|أرجع|عد)\s+(?:إلى|الى|ل)\s*(?:الدفع|صفحة الدفع)|(?:متابعة|استكمال|اكمال|إكمال)\s+(?:الدفع|عملية الدفع)|(?:الدفع|صفحة الدفع)\s+(?:مرة أخرى|من فضلك))[.!?،]*$/iu.test(String(value || "").trim());
+export const isResumeCheckoutTurn = (value) => /^(?:(?:return|go|take me|back)\s+(?:me\s+)?(?:back\s+)?to\s+(?:the\s+)?(?:checkout(?:\s+review)?|payment(?:\s+review)?)|(?:back|return|resume|continue|complete|finish)\s+(?:the\s+)?(?:checkout(?:\s+review)?|payment(?:\s+review)?)|(?:checkout(?:\s+review)?|payment(?:\s+review)?)\s+(?:again|please)|(?:العودة|ارجع|أرجع|عد)\s+(?:إلى|الى|ل)\s*(?:الدفع|صفحة الدفع)|(?:متابعة|استكمال|اكمال|إكمال)\s+(?:الدفع|عملية الدفع)|(?:الدفع|صفحة الدفع)\s+(?:مرة أخرى|من فضلك))[.!?،]*$/iu.test(String(value || "").trim());
 
 export function pausedResumeTarget(value, { affirmativeRecoveryPending = false } = {}) {
   const text = String(value || "").trim();

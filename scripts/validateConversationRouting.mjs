@@ -454,8 +454,8 @@ const cancellationContext = sliceBetween(app, "const cancellationResultContext",
 assert.match(cancellationContext, /result\.reason === ["']no_active_booking["'][\s\S]{0,360}Do not ask for a booking reference/, "an empty current-booking cancellation must not ask for a missing reference");
 assert.match(cancellationContext, /result\.reason === ["']not_current_booking["'][\s\S]{0,360}Do not ask for confirmation/, "a past booking must be explained without reopening confirmation");
 const historyCancelHandler = sliceBetween(app, "const cancelHistoryBooking", "const toggleSeat", "history cancellation handler");
-assert.ok(historyCancelHandler.indexOf("activeCancellationMutation()") < historyCancelHandler.indexOf("selectHistoryBooking(selected)"), "a different history booking must not replace an active provider cancellation mutation");
-assert.ok(historyCancelHandler.indexOf("existingFlow") < historyCancelHandler.indexOf("selectHistoryBooking(selected)"), "a repeated history cancel click must be ignored before it can invalidate the active lookup");
+assert.ok(historyCancelHandler.indexOf("activeCancellationMutation()") < historyCancelHandler.indexOf("selectHistoryBooking(selected"), "a different history booking must not replace an active provider cancellation mutation");
+assert.ok(historyCancelHandler.indexOf("existingFlow") < historyCancelHandler.indexOf("selectHistoryBooking(selected"), "a repeated history cancel click must be ignored before it can invalidate the active lookup");
 assert.match(historyCancelHandler, /\["checking", "route_confirmation", "final_confirmation", "processing"\]\.includes\(existingFlow\.phase\)/, "history cancellation must guard every active phase against repeated clicks");
 assert.match(historyCancelHandler, /showBookingForAuthorizedCancellation\([^\n]*["']ui_action["']\)/, "the visible history cancel action must grant explicit UI authorization");
 const bookingCancelHandler = sliceBetween(app, "const cancelBooking", "const changeLanguage", "booking cancel handler");

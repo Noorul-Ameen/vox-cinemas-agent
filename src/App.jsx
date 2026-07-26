@@ -42,6 +42,7 @@ import {
   selectRestorableRichStage,
 } from "./lib/pausedRichJourney.js";
 import { isAffirmativeContinuationTurn, isResumeCheckoutTurn, isResumeOnlyTurn, pausedResumeTarget } from "./lib/pausedJourneyRouting.js";
+import { isAmbiguousBareBookingTurn } from "./lib/bookingIntentRouting.js";
 import { contextualOpenChoicePreferenceClears, createDiscoveryPreferences, extractDiscoveryPreferencePatch, filterDiscoveryResults, formatDiscoveryTimePreference, getMissingDiscoveryCriteria, hasDiscoveryTimePreference, isOpenDiscoveryChoiceReply, mergeDiscoveryPreferences, parseAndMergeDiscoveryPreferences, resolveBilingualDiscoveryMovieCandidate, shouldTreatAsDiscoveryFilterTurn, unresolvedMovieTitleCandidate } from "./lib/discoveryPreferences.js";
 import { discoveryQuestionForLocale, localizedStageMessage, localizeDiscoveryStage } from "./lib/discoveryPromptLocalization.js";
 import { buildAuthoritativeDiscoveryContext, buildMovieSelectionGroundingContext } from "./lib/discoveryResultContext.js";
@@ -71,7 +72,7 @@ import { OFFER_META } from "./offers/offersData.js";
 import { answerForOfferTopic, buildOfferFacts } from "./offers/offerFacts.js";
 import { buildOfferEvaluationContext, shouldInvalidateOfferResult } from "./offers/offerContext.js";
 import { resolveOffer, resolveOfferForBankAndCard } from "./offers/offerResolver.js";
-import { resolveLocalOfferTextTurn } from "./offers/offerTextFallback.js";
+import { offerTicketCountAcknowledgement, resolveLocalOfferTextTurn } from "./offers/offerTextFallback.js";
 import { classifyFaqActionIntent, isGenuineFaqQuestion } from "./knowledge/faqRouting.js";
 import * as vista from "./vistaClient.js";
 
@@ -1834,7 +1835,9 @@ export default function App() {
       setSeatQuote(null);
       return null;
     }
-    const selectedSeatDetails = (planRef.current || [])
+    const effectivePlan = (planRef.current || []).length ? planRef.current : (current.plan || []);
+    if (!(planRef.current || []).length && effectivePlan.length) planRef.current = effectivePlan;
+    const selectedSeatDetails = effectivePlan
       .flatMap((row) => row.seats || [])
       .filter((seat) => normalizedSeats.includes(String(seat.id).toUpperCase()));
     setSeatQuote({ seatKey, loading: true, quote: null, error: null });
@@ -3273,7 +3276,8 @@ export default function App() {
     if (!filterCurrentSessions([{ ...current.session, date: current.session?.date || scheduleDateRef.current }]).available.length) {
       return { valid: [], total: 0, reason: "showtime_expired" };
     }
-    const plan = planRef.current || [];
+    const plan = (planRef.current || []).length ? planRef.current : (current.plan || []);
+    if (!(planRef.current || []).length && plan.length) planRef.current = plan;
     const all = plan.flatMap((row) => row.seats);
     const availableSeatIds = all.filter((seat) => seat.status === 0).map((seat) => seat.id);
     const requested = normalizeSeatIds(seatIds, availableSeatIds);
@@ -4972,21 +4976,26 @@ export default function App() {
       return JSON.stringify({ found: true, bookingRef: displayed.ref, eligible: true, simulationOnly: false, confirmationRequired: true, phase: "route_confirmation", refundRoute: "VOX Wallet", message });
     },
 
-    show_offers: async ({ bankName = "", cardName = "", experience = "", detailTopic = "", format = "", seatType = "", isMember, monthlyTicketsUsed, monthlySpend } = {}) => {
+    show_offers: async ({ bankName = "", cardName = "", experience = "", detailTopic = "", format = "", seatType = "", ticketCount, isMember, monthlyTicketsUsed, monthlySpend } = {}) => {
       if (checkoutPaymentActiveRef.current) return JSON.stringify({ shown: false, reason: "payment_in_progress", instruction: "A checkout review action is in progress. Keep checkout visible and ask the guest to wait for the on-screen result." });
       const current = stageRef.current;
+      const previousOffer = current.view === "offers" ? lastOfferRef.current : null;
       const preservedCheckout = activeCheckoutStage();
       const checkoutPreserved = Boolean(preservedCheckout);
       const origin = current.view === "offers" ? offersReturnRef.current || { view: "empty" } : current;
       const order = origin.view === "checkout" ? preservedCheckout?.order || pendingOrderRef.current : null;
       const activeBooking = origin.view === "booking" ? bookingRef.current : null;
       const preferences = discoveryPreferencesRef.current || {};
-      const retainedContext = current.view === "offers" ? lastOfferRef.current?.context || null : null;
+      const retainedContext = previousOffer?.context || null;
+      const suppliedTicketCount = ticketCount === "" || ticketCount === null || ticketCount === undefined ? null : Number(ticketCount);
       const suppliedMonthlyTickets = monthlyTicketsUsed === "" || monthlyTicketsUsed === null || monthlyTicketsUsed === undefined ? null : Number(monthlyTicketsUsed);
       const suppliedMonthlySpend = monthlySpend === "" || monthlySpend === null || monthlySpend === undefined ? null : Number(monthlySpend);
       const eligibilityInput = {
         format: format || retainedContext?.format || "",
         seatType: seatType || retainedContext?.seatType || "",
+        ticketCount: Number.isInteger(suppliedTicketCount) && suppliedTicketCount >= 1 && suppliedTicketCount <= MAX_TICKETS
+          ? suppliedTicketCount
+          : retainedContext?.ticketCount,
         isMember: typeof isMember === "boolean" ? isMember : retainedContext?.isMember,
         monthlyTicketsUsed: Number.isFinite(suppliedMonthlyTickets) ? suppliedMonthlyTickets : retainedContext?.monthlyTicketsUsed,
         monthlySpend: Number.isFinite(suppliedMonthlySpend) ? suppliedMonthlySpend : retainedContext?.monthlySpend,
@@ -5019,7 +5028,7 @@ export default function App() {
       });
 
       if (lastOfferRef.current && shouldInvalidateOfferResult(lastOfferRef.current, context)) lastOfferRef.current = null;
-      const retained = current.view === "offers" ? lastOfferRef.current : null;
+      const retained = previousOffer;
       const retainedBank = retained?.offer?.bank?.en || "";
       const retainedCard = retained?.cardProfile?.name?.en || "";
       const effectiveBankName = bankName || (cardName && retainedBank ? retainedBank : "") || (detailTopic && retainedBank ? retainedBank : "");
@@ -5042,6 +5051,7 @@ export default function App() {
         || experience
         || format
         || seatType
+        || Number.isInteger(suppliedTicketCount)
         || typeof isMember === "boolean"
         || Number.isFinite(suppliedMonthlyTickets)
         || Number.isFinite(suppliedMonthlySpend),
@@ -5074,6 +5084,7 @@ export default function App() {
         : result?.advisory || "";
       const facts = buildOfferFacts(result?.offer, toolLocale);
       const topicAnswer = answerForOfferTopic(result?.offer, result?.cardProfile, toolLocale, detailTopic || "summary");
+      const ticketCountAcknowledgement = offerTicketCountAcknowledgement(context.ticketCount, { locale: toolLocale });
       return JSON.stringify({
         shown: "offer card",
         checkoutPreserved,
@@ -5085,6 +5096,7 @@ export default function App() {
         headline: localizedHeadline,
         detailTopic: detailTopic || "summary",
         eligibility: result?.status || "ineligible",
+        ticketCount: context.ticketCount,
         showtimeRequired,
         selectedShowtime: context.selectedShowtime,
         missingFields: result?.missingFields || [],
@@ -5108,7 +5120,7 @@ export default function App() {
           termsUrl: facts.termsUrl,
           verifiedDate: facts.verifiedDate,
         } : null,
-        answer: `${topicAnswer}${effectiveCardName ? ` ${localizedReason}` : ""}${localizedAdvisory ? ` ${localizedAdvisory}` : ""}`,
+        answer: `${topicAnswer}${effectiveCardName ? ` ${localizedReason}` : ""}${localizedAdvisory ? ` ${localizedAdvisory}` : ""}${ticketCountAcknowledgement ? ` ${ticketCountAcknowledgement}` : ""}`,
         context,
         contextFingerprint: context.fingerprint,
         disclaimer,
@@ -5264,7 +5276,9 @@ export default function App() {
 
   const resolveVisibleSeatTurn = (text) => {
     if (stageRef.current.view !== "seatmap") return Object.freeze({ requested: false, seats: [] });
-    const availableSeatIds = (planRef.current || [])
+    const visiblePlan = (planRef.current || []).length ? planRef.current : (stageRef.current.plan || []);
+    if (!(planRef.current || []).length && visiblePlan.length) planRef.current = visiblePlan;
+    const availableSeatIds = visiblePlan
       .flatMap((row) => row.seats || [])
       .filter((seat) => seat.status === 0)
       .map((seat) => seat.id);
@@ -6061,14 +6075,15 @@ export default function App() {
           || (stageRef.current.view !== "checkout" && isResumeOnlyTurn(safeMessage)));
         if (checkoutResumeTurn) restoreActiveCheckout();
         const resumeOnlyTurn = !directSeatSelection && (isResumeOnlyTurn(safeMessage) || checkoutResumeTurn);
-        const preInformationMovieSelection = decision === null && !activeCheckout && !directCancellation
+        const preInformationDiscoveryFilterTurn = decision === null && !directCancellation && isDiscoveryFilterTurn(safeMessage);
+        const preInformationMovieSelection = decision === null && !activeCheckout && !directCancellation && !preInformationDiscoveryFilterTurn
           ? await resolveVisibleMovieSelectionTurnLazy(
               { text: safeMessage, stage: stageRef.current },
               { isCurrent: voiceTurnIsCurrent },
             )
           : null;
         if (!voiceTurnIsCurrent()) return;
-        const movieInformation = decision === null && !directCancellation && !preInformationMovieSelection
+        const movieInformation = decision === null && !directCancellation && !preInformationMovieSelection && !preInformationDiscoveryFilterTurn
           ? await resolveMovieInformation(safeMessage, { isCurrent: voiceTurnIsCurrent })
           : null;
         if (!voiceTurnIsCurrent()) return;
@@ -6125,6 +6140,23 @@ export default function App() {
             }
           }
         }
+        const ambiguousBareBooking = decision === null
+          && !activeCheckout
+          && !directMovieSelection
+          && !directShowtimeSelection
+          && !directSeatSelection
+          && isAmbiguousBareBookingTurn(safeMessage);
+        if (ambiguousBareBooking) {
+          const visibleTitles = Array.isArray(stageRef.current.movies)
+            ? stageRef.current.movies.slice(0, 5).map((movie) => movie.title).filter(Boolean)
+            : [];
+          const clarification = visibleTitles.length
+            ? `Ask the guest to name one visible movie: ${visibleTitles.join(", ")}.`
+            : "Ask the guest to name the movie, cinema, and date they want.";
+          conversation.sendContextualUpdate?.(`The guest used an ambiguous bare booking phrase. ${clarification} Do not treat this as a private or group booking enquiry and do not select anything by assumption.`);
+          updateIntentFromText(safeMessage);
+          return;
+        }
         const actionIntent = classifyFaqActionIntent(safeMessage);
         const localOfferTurn = decision === null
           && !cancellationFlowRef.current
@@ -6150,6 +6182,7 @@ export default function App() {
               bankName: localOfferTurn.bankName,
               cardName: localOfferTurn.cardName,
               detailTopic: localOfferTurn.detailTopic,
+              ticketCount: localOfferTurn.ticketCount,
             });
             const offerResult = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
             if (!voiceTurnIsCurrent()) return;
@@ -6163,7 +6196,9 @@ export default function App() {
         const checkoutFaq = activeCheckout && !localOfferTurn && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection && !ambiguousShowtimeSelection
           ? await prepareFaqContext(safeMessage)
           : { matches: [], context: "" };
-        const discoveryFilterTurn = movieInformation?.handled || checkoutFaq.matches.length || recordSelectorFaqBypass || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection ? false : isDiscoveryFilterTurn(safeMessage);
+        const discoveryFilterTurn = movieInformation?.handled || checkoutFaq.matches.length || recordSelectorFaqBypass || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection
+          ? false
+          : preInformationDiscoveryFilterTurn || isDiscoveryFilterTurn(safeMessage);
         const faq = localOfferTurn
           ? { matches: [], context: "" }
           : checkoutFaq.matches.length
@@ -7070,6 +7105,8 @@ export default function App() {
       pendingLocale: pendingLanguageSwitchRef.current,
     });
     const languageControlTurn = isLanguageControlTurn(value);
+    const explicitTypedLocale = explicitLanguageRequest(value);
+    const languageBusinessRemainder = stripLanguageControlCommand(value);
     pendingLanguageSwitchRef.current = languageSignal.pendingLocale;
     let languageRestartPromise = null;
     if (languageSignal.nextLocale && languageSignal.nextLocale !== localeRef.current) {
@@ -7082,6 +7119,22 @@ export default function App() {
     if (languageRestartPromise) {
       await languageRestartPromise;
       if (!typedTurnIsCurrent()) return;
+    }
+    if (languageControlTurn && explicitTypedLocale && languageBusinessRemainder === value) {
+      setInput("");
+      say("agent", explicitTypedLocale === "ar"
+        ? "تم تحويل المحادثة والواجهة إلى العربية."
+        : "The conversation and interface are now in English.");
+      return;
+    }
+    const checkoutForSummarySave = activeCheckoutStage();
+    const saveSummaryRequested = /\b(?:save|store|create)\s+(?:this\s+|my\s+|the\s+)?(?:booking\s+)?summary\b|(?:احفظ|حفظ)\s+(?:ملخص\s+)?(?:الحجز|حجزي)/iu.test(value);
+    if (saveSummaryRequested && checkoutForSummarySave) {
+      setInput("");
+      await handleCheckoutReviewComplete({
+        checkoutId: checkoutForSummarySave.order?.checkoutId || pendingOrderRef.current?.checkoutId,
+      });
+      return;
     }
     if (checkoutPaymentActiveRef.current) {
       setInput("");
@@ -7137,17 +7190,22 @@ export default function App() {
       setInput("");
       const restoreResult = await restorePausedJourney({ target: requestedResumeTarget, source: "text" });
       if (!typedTurnIsCurrent()) return;
-      queuePendingEcho(value);
-      const transition = sessionStartRef.current;
-      if (transition) await transition.promise;
-      const ready = sessionModeRef.current ? true : await startTextSession(localMessage.id);
-      if (ready && conversation.sendUserMessage && typedTurnIsCurrent()) {
-        conversation.sendContextualUpdate?.(pausedRestoreContext(restoreResult));
-        conversation.sendUserMessage(value);
+      if (restoreResult.restored) {
+        const restoredView = stageRef.current.view;
+        say("agent", localeRef.current === "ar"
+          ? `تمت استعادة ${restoredView === "checkout" ? "مراجعة الدفع" : "الخطوة السابقة"}.`
+          : `${restoredView === "checkout" ? "Checkout review" : "Your previous step"} is ready.`);
+        updateIntentFromText(value);
+        return;
       }
-      if (!typedTurnIsCurrent()) return;
-      updateIntentFromText(value);
-      return;
+      if (requestedResumeTarget !== "history") {
+        say("agent", localeRef.current === "ar"
+          ? "تعذر استعادة تلك الخطوة. تابع من اللوحة الظاهرة حالياً."
+          : "That step could not be restored. Continue from the panel currently shown.");
+        updateIntentFromText(value);
+        return;
+      }
+      restoredStageToolGuardRef.current = null;
     }
     const decision = turnCancellationDecision;
     if (decision !== null) {
@@ -7167,6 +7225,16 @@ export default function App() {
     const visibleHistory = historyRequest.requested
       ? openHistory({ notifyAgent: false, forceOpen: true, activeOnly: historyRequest.activeOnly, preserveReturn: bookingOpenedFromHistoryRef.current })
       : null;
+    if (historyRequest.requested) {
+      setInput("");
+      const count = Array.isArray(visibleHistory) ? visibleHistory.length : 0;
+      say("agent", visibleHistory?.storageUnavailable
+        ? (localeRef.current === "ar" ? "تعذر قراءة ملخصات الحجز المحفوظة على هذا الجهاز." : "Saved booking summaries could not be read on this device.")
+        : count
+          ? (localeRef.current === "ar" ? `تم عرض ${count} من ملخصات الحجز المحفوظة.` : `I found ${count} saved booking ${count === 1 ? "summary" : "summaries"} on this device.`)
+          : (localeRef.current === "ar" ? "لا توجد ملخصات حجز محفوظة على هذا الجهاز." : "There are no saved booking summaries on this device."));
+      return;
+    }
     const recordSelectorFaq = decision === null && !historyRequest.requested && stageRef.current.view === "history"
       ? await prepareFaqContext(value)
       : null;
@@ -7201,6 +7269,25 @@ export default function App() {
       || isActiveCancellationTargetRepeat(value)
       || isDirectCancellationRequest(value, { hasBookingContext })
     );
+    if (directCancellation) {
+      setInput("");
+      try {
+        const cancellationResult = await routeCancellationTurn(value, {
+          continuation: cancellationContinuation,
+          isCurrent: typedTurnIsCurrent,
+        });
+        if (!typedTurnIsCurrent()) return;
+        say("agent", cancellationResult?.message || (localeRef.current === "ar"
+          ? "تم عرض خطوة الإلغاء المتاحة. راجع التفاصيل الظاهرة قبل التأكيد."
+          : "The available cancellation step is shown. Review the visible details before confirming."));
+      } catch (error) {
+        if (!typedTurnIsCurrent()) return;
+        say("agent", localeRef.current === "ar"
+          ? "تعذر التحقق من الإلغاء. لم يتم تغيير الحجز."
+          : "The cancellation check could not be completed. The booking was not changed.");
+      }
+      return;
+    }
     let historyContinuation = { handled: false, bookingRef: null };
     if (decision === null && !directCancellation && !historyRequest.requested) {
       try {
@@ -7220,19 +7307,12 @@ export default function App() {
           ? selectHistoryBooking({ ref: historyContinuation.bookingRef }, { notifyAgent: false, beginUserTurn: false })
           : null;
         setInput("");
-        queuePendingEcho(value);
-        const transition = sessionStartRef.current;
-        if (transition) await transition.promise;
-        const ready = sessionModeRef.current ? true : await startTextSession(localMessage.id);
-        if (ready && conversation.sendUserMessage && typedTurnIsCurrent()) {
-          conversation.sendContextualUpdate?.(openedBooking
-            ? bookingDetailAgentContext(openedBooking)
-            : historyContinuation.reason === "booking_storage_unavailable"
-              ? bookingHistoryTurnContext(Object.assign([], { storageUnavailable: true }), { activeOnly: historyFilter === "active" })
-              : historyContinuationAgentContext(historyContinuation));
-          conversation.sendUserMessage(value);
-        }
-        if (typedTurnIsCurrent()) updateIntentFromText(value);
+        say("agent", openedBooking
+          ? (localeRef.current === "ar" ? `تم فتح ملخص الحجز ${openedBooking.ref}.` : `Booking summary ${openedBooking.ref} is open.`)
+          : historyContinuation.reason === "booking_storage_unavailable"
+            ? (localeRef.current === "ar" ? "تعذر قراءة ملخصات الحجز المحفوظة." : "Saved booking summaries could not be read.")
+            : (localeRef.current === "ar" ? "لم يتم العثور على ملخص حجز مطابق على هذا الجهاز." : "No matching saved booking summary was found on this device."));
+        updateIntentFromText(value);
         return;
       }
     }
@@ -7257,28 +7337,25 @@ export default function App() {
       const checkoutEditRoute = await routeCheckoutSeatEditTurn(value, { requestedTarget: checkoutSeatTarget, seatEdit: retainedEdit });
       if (!typedTurnIsCurrent()) return;
       setInput("");
-      queuePendingEcho(value);
-      const transition = sessionStartRef.current;
-      if (transition) await transition.promise;
-      const ready = sessionModeRef.current ? true : await startTextSession(localMessage.id);
-      if (ready && conversation.sendUserMessage && typedTurnIsCurrent()) {
-        conversation.sendContextualUpdate?.(checkoutEditRoute.result
-          ? seatSelectionResultContext(checkoutEditRoute.result)
-          : checkoutEditRoute.restored
-            ? `The guest returned to the seat map from checkout${checkoutSeatTarget ? ` with a target of ${checkoutSeatTarget} seats` : ""}. The visible seats are editable and the booking is not confirmed. Guide them to select the seats they want and confirm again.`
-            : "The checkout seat context could not be restored. Continue from the panel currently shown and do not claim any booking confirmation.");
-        conversation.sendUserMessage(value);
-      }
+      const editFailure = seatEditFailureMessage(checkoutEditRoute.result);
+      say("agent", editFailure || (checkoutEditRoute.restored
+        ? (localeRef.current === "ar"
+            ? `خريطة المقاعد جاهزة${checkoutSeatTarget ? ` لاختيار ${checkoutSeatTarget} مقاعد` : ""}.`
+            : `The seat map is ready${checkoutSeatTarget ? ` for ${checkoutSeatTarget} seats` : ""}.`)
+        : (localeRef.current === "ar"
+            ? "تعذر استعادة خريطة المقاعد. لم يتغير ملخص الحجز."
+            : "The seat map could not be restored. The checkout summary was not changed.")));
       return;
     }
-    const preInformationMovieSelection = turnCancellationDecision === null && !activeCheckout && !directCancellation
+    const preInformationDiscoveryFilterTurn = decision === null && !directCancellation && isDiscoveryFilterTurn(value);
+    const preInformationMovieSelection = turnCancellationDecision === null && !activeCheckout && !directCancellation && !preInformationDiscoveryFilterTurn
       ? await resolveVisibleMovieSelectionTurnLazy(
           { text: value, stage: stageRef.current },
           { isCurrent: typedTurnIsCurrent },
         )
       : null;
     if (!typedTurnIsCurrent()) return;
-    const movieInformation = turnCancellationDecision === null && !directCancellation && !preInformationMovieSelection
+    const movieInformation = turnCancellationDecision === null && !directCancellation && !preInformationMovieSelection && !preInformationDiscoveryFilterTurn
       ? await resolveMovieInformation(value, { isCurrent: typedTurnIsCurrent })
       : null;
     if (!typedTurnIsCurrent()) return;
@@ -7348,6 +7425,37 @@ export default function App() {
         }
       }
     }
+    const ambiguousMovieBooking = !activeCheckout
+      && !directMovieSelection
+      && !directShowtimeSelection
+      && !directSeatSelection
+      && isAmbiguousBareBookingTurn(value);
+    if (ambiguousMovieBooking) {
+      setInput("");
+      const titles = (Array.isArray(stageRef.current.movies) ? stageRef.current.movies : [])
+        .slice(0, 5)
+        .map((movie) => movie.title)
+        .filter(Boolean)
+        .join(", ");
+      const englishClarification = titles
+        ? `Please name the movie you want from the visible options: ${titles}.`
+        : "Please name the movie, cinema, and date you want to book.";
+      const arabicClarification = titles
+        ? `اذكر اسم الفيلم الذي تريده من الخيارات الظاهرة: ${titles}.`
+        : "اذكر اسم الفيلم والسينما والتاريخ الذي تريد حجزه.";
+      say("agent", localeRef.current === "ar" ? arabicClarification : englishClarification);
+      return;
+    }
+    if (ambiguousShowtimeSelection) {
+      setInput("");
+      const options = ambiguousShowtimeCandidates
+        .map((session) => `${session.time} ${session.exp || session.experience || "STANDARD"}`)
+        .join(", ");
+      say("agent", localeRef.current === "ar"
+        ? `يوجد أكثر من عرض مطابق. اذكر الوقت والتجربة بالضبط: ${options}.`
+        : `More than one visible showtime matches. Please name the exact time and experience: ${options}.`);
+      return;
+    }
     const actionIntent = classifyFaqActionIntent(value);
     const localOfferTurn = decision === null
       && !cancellationFlowRef.current
@@ -7362,15 +7470,29 @@ export default function App() {
       && !languageControlTurn
       ? recordSelectorOffer || resolveLocalOfferTextTurn(value, { locale: localeRef.current })
       : null;
-    if (localOfferTurn && (activeCheckout || recordSelectorOffer || !isConnected)) {
+    const retainedOfferTicketCount = stageRef.current.view === "offers" ? extractTicketQuantity(value) : null;
+    const retainedOfferResult = retainedOfferTicketCount ? lastOfferRef.current : null;
+    const retainedOfferTurn = retainedOfferResult?.offer ? {
+      bankName: retainedOfferResult.offer.bank?.en || "",
+      cardName: retainedOfferResult.cardProfile?.name?.en || "",
+      detailTopic: "summary",
+      ticketCount: retainedOfferTicketCount,
+      answer: "",
+    } : null;
+    const establishedLocalOfferOwnership = localOfferTurn && (activeCheckout || recordSelectorOffer || !isConnected);
+    const effectiveLocalOfferTurn = localOfferTurn || retainedOfferTurn;
+    if (effectiveLocalOfferTurn || establishedLocalOfferOwnership) {
       setInput("");
-      let localAnswer = localOfferTurn.answer;
+      let localAnswer = effectiveLocalOfferTurn.answer || (localeRef.current === "ar"
+        ? "تم تحديث عدد التذاكر للتحقق من أهلية العرض."
+        : "I updated the ticket count for the offer eligibility check.");
       let parsedResult = null;
       try {
         const rawResult = await clientTools.show_offers({
-          bankName: localOfferTurn.bankName,
-          cardName: localOfferTurn.cardName,
-          detailTopic: localOfferTurn.detailTopic,
+          bankName: effectiveLocalOfferTurn.bankName,
+          cardName: effectiveLocalOfferTurn.cardName,
+          detailTopic: effectiveLocalOfferTurn.detailTopic,
+          ticketCount: effectiveLocalOfferTurn.ticketCount,
         });
         parsedResult = typeof rawResult === "string" ? JSON.parse(rawResult) : rawResult;
         if (parsedResult?.answer) localAnswer = parsedResult.answer;
@@ -7381,7 +7503,7 @@ export default function App() {
       if (!typedTurnIsCurrent()) return;
       say("agent", localAnswer);
       if (activeCheckout && isConnected) {
-        conversation.sendContextualUpdate?.(`The guest asked about ${localOfferTurn.cardName || localOfferTurn.bankName}. The widget answered from published offer data and displayed the offer panel: ${localAnswer} Checkout ${parsedResult?.checkoutId || pendingOrderRef.current?.checkoutId || "current"} is preserved but hidden. Do not generate another reply for this turn and do not claim the offer was applied.`);
+        conversation.sendContextualUpdate?.(`The guest asked about ${effectiveLocalOfferTurn.cardName || effectiveLocalOfferTurn.bankName}. The widget answered from published offer data and displayed the offer panel: ${localAnswer} Checkout ${parsedResult?.checkoutId || pendingOrderRef.current?.checkoutId || "current"} is preserved but hidden. Do not generate another reply for this turn and do not claim the offer was applied.`);
       }
       return;
     }
@@ -7389,7 +7511,9 @@ export default function App() {
     const checkoutFaq = activeCheckout && actionIntent !== "booking" && !directCinemaSelection && !directCancellation && !directSeatSelection && !ambiguousShowtimeSelection
       ? await prepareFaqContext(value)
       : { matches: [], context: "" };
-    const discoveryFilterTurn = checkoutFaq.matches.length || recordSelectorFaqBypass || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection ? false : isDiscoveryFilterTurn(value);
+    const discoveryFilterTurn = checkoutFaq.matches.length || recordSelectorFaqBypass || directMovieSelection || directShowtimeSelection || ambiguousShowtimeSelection
+      ? false
+      : preInformationDiscoveryFilterTurn || isDiscoveryFilterTurn(value);
     const faq = localOfferTurn
       ? { matches: [], context: "" }
       : checkoutFaq.matches.length
@@ -7419,6 +7543,16 @@ export default function App() {
       actionIntent,
       faq,
     });
+    const staticFaqAnswer = faq.matches.find((match) => match?.needsLiveData === false && match?.answer)?.answer;
+    if (staticFaqAnswer) {
+      setInput("");
+      const returnHint = pausedJourneyRef.current.status === "paused"
+        ? (localeRef.current === "ar" ? " قل العودة للمتابعة من خطوتك السابقة." : " Say return when you want to continue from your previous step.")
+        : "";
+      say("agent", `${staticFaqAnswer}${returnHint}`);
+      conversation.sendContextualUpdate?.("The widget answered this typed FAQ from approved static VOX guidance. Do not add another answer or change the current panel for this turn.");
+      return;
+    }
     const bookingDetailsAllowed = explicitDiscoveryTurn || discoveryFilterTurn || directCinemaSelection || actionIntent === "booking";
     const details = (activeCheckout && !explicitDiscoveryTurn) || !bookingDetailsAllowed
       ? { cinema: null, requestedSeatTarget: null }
@@ -7482,6 +7616,63 @@ export default function App() {
         if (!typedTurnIsCurrent()) return;
         directShowtimeRouteResult = { session: directShowtimeSelection, result: { shown: false, reason: error?.message || "The seat map could not be loaded." } };
       }
+    }
+    if (directMovieRouteResult) {
+      const showtimes = Array.isArray(directMovieRouteResult.result?.showtimes) ? directMovieRouteResult.result.showtimes : [];
+      say("agent", showtimes.length
+        ? (localeRef.current === "ar"
+            ? `تم اختيار ${directMovieSelection.title}. تظهر الآن ${showtimes.length} مواعيد عرض متاحة.`
+            : `${directMovieSelection.title} is selected. ${showtimes.length} verified showtime ${showtimes.length === 1 ? "option is" : "options are"} now visible.`)
+        : (localeRef.current === "ar"
+            ? `تم اختيار ${directMovieSelection.title}، لكن لا يوجد موعد عرض قابل للحجز حالياً.`
+            : `${directMovieSelection.title} is selected, but no bookable showtime is currently available.`));
+      return;
+    }
+    if (directShowtimeRouteResult) {
+      say("agent", directShowtimeRouteResult.result?.shown === "seat map"
+        ? (localeRef.current === "ar"
+            ? `تم اختيار عرض ${directShowtimeSelection.time}. خريطة المقاعد جاهزة.`
+            : `The ${directShowtimeSelection.time} showtime is selected. The seat map is ready.`)
+        : (localeRef.current === "ar"
+            ? "تعذر تحميل خريطة المقاعد لهذا العرض."
+            : "The seat map could not be loaded for that showtime."));
+      return;
+    }
+    if (seatRoutePromise) {
+      try {
+        const seatResult = await seatRoutePromise;
+        if (!typedTurnIsCurrent()) return;
+        const failureMessage = seatEditFailureMessage(seatResult);
+        const chosenSeats = Array.isArray(seatResult?.valid) ? seatResult.valid : [];
+        say("agent", failureMessage || (stageRef.current.view === "checkout"
+          ? (localeRef.current === "ar"
+              ? `تم اختيار المقاعد ${chosenSeats.join("، ")}. مراجعة الدفع جاهزة.`
+              : `Seats ${chosenSeats.join(", ")} are selected. Checkout review is ready.`)
+          : (localeRef.current === "ar"
+              ? "تم تحديث اختيار المقاعد في الخريطة الظاهرة."
+              : "The seat selection has been updated on the visible map.")));
+      } catch {
+        if (!typedTurnIsCurrent()) return;
+        say("agent", localeRef.current === "ar"
+          ? "تعذر تأكيد اختيار المقاعد. بقيت خريطة المقاعد ظاهرة."
+          : "The seat selection could not be confirmed. The seat map remains visible.");
+      }
+      return;
+    }
+    if (discoveryRouteResult) {
+      const currentStage = stageRef.current;
+      const visibleMovies = Array.isArray(currentStage.movies) ? currentStage.movies : [];
+      const discoveryAnswer = currentStage.error
+        ? localizedStageMessage(currentStage, "error", localeRef.current)
+        : currentStage.view === "movies" && visibleMovies.length
+          ? (localeRef.current === "ar"
+              ? `وجدت ${visibleMovies.length} أفلام تطابق طلبك. اختر الفيلم بكتابة اسمه.`
+              : `I found ${visibleMovies.length} ${visibleMovies.length === 1 ? "movie" : "movies"} matching your request. Type the movie title to choose it.`)
+          : currentStage.question || (localeRef.current === "ar"
+              ? "تم تحديث نتائج البحث وفق طلبك."
+              : "The discovery results have been updated for your request.");
+      say("agent", discoveryAnswer);
+      return;
     }
     queuePendingEcho(agentFacingValue);
     const transition = sessionStartRef.current;
@@ -7949,7 +8140,7 @@ export default function App() {
         message: existingFlow.message || null,
       };
     }
-    const selectedBooking = selectHistoryBooking(selected);
+    const selectedBooking = selectHistoryBooking(selected, { notifyAgent: false });
     if (!selectedBooking) {
       return {
         found: false,

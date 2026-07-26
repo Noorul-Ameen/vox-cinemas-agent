@@ -46,6 +46,17 @@ export function classifyMovieInformationQuestion(input) {
   if (pluralDiscoveryCollection && /\b(?:language|genre)\b/iu.test(normalizedText)) return null;
   const rating = isMovieRatingQuestion(text) || /\b(?:ratings|certificates)\b|(?:التصنيفات|التقييمات)/iu.test(text);
   if (rating && DISCOVERY_COMMAND_PATTERN.test(normalizedText) && /\b(?:g|pg|pg13|pg15|15\+|18\+|21\+|18tc)\b/i.test(text)) return null;
+  const explicitFactCount = [
+    rating,
+    SUBTITLE_PATTERN.test(text),
+    LANGUAGE_PATTERN.test(text),
+    RUNTIME_PATTERN.test(text),
+    GENRE_PATTERN.test(text),
+    CAST_PATTERN.test(text),
+    TRAILER_PATTERN.test(text),
+    RELEASE_PATTERN.test(text),
+  ].filter(Boolean).length;
+  if (explicitFactCount > 1) return "details";
   if (rating) return "rating";
   if (SUBTITLE_PATTERN.test(text)) return "subtitles";
   if (LANGUAGE_PATTERN.test(text)) return "language";

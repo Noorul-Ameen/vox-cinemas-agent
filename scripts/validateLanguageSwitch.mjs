@@ -13,6 +13,8 @@ assert.equal(explicitLanguageRequest("Can you speak Arabic?"), null, "a language
 assert.equal(explicitLanguageRequest("Arabic"), null, "a bare movie-language answer must not switch the conversation language");
 assert.equal(explicitLanguageRequest("عربي"), null, "a bare Arabic movie-language answer must not switch the conversation language");
 assert.equal(explicitLanguageRequest("Switch to Arabic"), "ar");
+assert.equal(explicitLanguageRequest("Switch the conversation and interface to Arabic."), "ar");
+assert.equal(explicitLanguageRequest("Switch the interface and conversation to English."), "en");
 assert.equal(explicitLanguageRequest("Switch to Arabic and show me French movies"), "ar", "a combined command must still switch the interface language");
 assert.equal(stripLanguageControlCommand("Switch to Arabic and show me French movies"), "show me French movies", "the movie request must remain available for discovery routing");
 assert.equal(explicitLanguageRequest("Switch to English and show me Arabic movies"), "en", "the reverse combined command must still switch the interface language");
