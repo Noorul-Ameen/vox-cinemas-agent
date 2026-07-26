@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, ChevronLeft } from "lucide-react";
 import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
+import DemoPaymentGateway from "./DemoPaymentGateway.jsx";
 
 function resolveCheckoutMode(mode) {
   const explicitMode = String(mode || "").trim().toLowerCase();
@@ -131,20 +132,13 @@ export default function Checkout({ order, onComplete, onCancel, onRetry, onRevie
         <strong>{t("checkout.testOnly")}</strong> · {t("checkout.testNotice")}
       </div>
 
-      <button
-        type="button"
-        aria-describedby="checkout-safety-notice"
-        onClick={saveSummary}
-        style={saveSummaryButton}
-      >
-        <span style={{ minWidth: 0, flex: 1, textAlign: "start" }}>
-          <span style={{ display: "block", color: C.onPrimary, fontSize: 13, fontWeight: 800 }}>{t("checkout.saveSummary")}</span>
-          <span style={{ display: "block", marginTop: 2, color: C.onPrimary, fontSize: 10, opacity: 0.9 }}>{t("checkout.saveSummaryHint")}</span>
-        </span>
-        <span dir="ltr" style={{ display: "inline-flex", flexShrink: 0, alignItems: "center", gap: 5, color: C.onPrimary, fontSize: 11, fontWeight: 800 }}>
-          {formatCurrency(order?.total || 0, order?.currency || "AED")}
-        </span>
-      </button>
+      <DemoPaymentGateway
+        amount={order?.total || 0}
+        currency={order?.currency || "AED"}
+        dir={dir}
+        formatCurrency={formatCurrency}
+        onApprove={saveSummary}
+      />
 
       <div style={{ marginTop: 10, color: C.muted, fontSize: 10, textAlign: "center" }}>{t("checkout.demoDisclaimer")}</div>
     </section>
@@ -156,6 +150,5 @@ const summaryCard = { border: `1px solid ${C.border}`, borderRadius: 12, backgro
 const demoNotice = { border: `1px solid ${C.warning}`, borderRadius: 10, background: C.warningSoft, padding: "9px 11px", marginBottom: 12, color: C.text, fontSize: 10, lineHeight: 1.45 };
 const unavailableCard = { border: `1px solid ${C.warning}`, borderRadius: 14, background: C.warningSoft, padding: 20, textAlign: "center" };
 const spinner = { width: 26, height: 26, border: `3px solid ${C.border}`, borderTopColor: C.primary, borderRadius: "50%", animation: "spin 0.9s linear infinite" };
-const saveSummaryButton = { display: "flex", width: "100%", minHeight: 58, alignItems: "center", gap: 12, border: "none", borderRadius: 12, background: C.primary, padding: "11px 14px", cursor: "pointer" };
 const actionButton = { border: "none", borderRadius: 10, padding: 12, color: C.onPrimary, cursor: "pointer", fontSize: 14, fontWeight: 700 };
 const visuallyHidden = { position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", clipPath: "inset(50%)", whiteSpace: "nowrap" };

@@ -32,12 +32,12 @@ export default defineConfig({
     },
     {
       name: "firefox-text",
-      testMatch: /cross-browser-text\.spec\.js/,
+      testMatch: /(?:cross-browser-text|demo-payment-and-sync)\.spec\.js/,
       use: { ...devices["Desktop Firefox"], viewport: { width: 762, height: 698 } },
     },
     {
       name: "webkit-safari-engine-text",
-      testMatch: /cross-browser-text\.spec\.js/,
+      testMatch: /(?:cross-browser-text|demo-payment-and-sync)\.spec\.js/,
       use: { ...devices["Desktop Safari"], viewport: { width: 762, height: 698 } },
     },
   ],

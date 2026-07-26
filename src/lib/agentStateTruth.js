@@ -240,11 +240,13 @@ function wrongDiscoveryQuestion(value, stage) {
   return false;
 }
 
+const asksSatisfiedMovieCriterion = (value) => /\b(?:(?:which|what)\s+(?:cinema|location|date|day|genre|movie\s+genre|language|movie\s+language|experience)|where\s+(?:would|do)\s+you\s+(?:like|want)\s+to\s+watch|when\s+(?:would|do)\s+you\s+(?:like|want)\s+to\s+watch|what\s+(?:kind|type)\s+of\s+(?:movie|film)|what\s+are\s+you\s+in\s+the\s+mood\s+for)\b|(?:أي|اي|ما)\s+(?:سينما|موقع|تاريخ|يوم|نوع|تصنيف|لغة|تجربة)|(?:أين|وين|متى)\s+(?:تريد|تفضل)|ماذا\s+تفضل/iu.test(value);
+
 function staleProgressionQuestion(value, stage, pendingOrder, locale) {
   const asksMovie = /\b(?:what|which)\s+(?:movie|film)\b|\bwhat\b[\s\S]{0,35}\b(?:like|want)\s+to\s+(?:watch|see)\b|(?:أي|اي|ما)\s+(?:فيلم|الفيلم)|ماذا\s+(?:تريد|تفضل)[\s\S]{0,25}(?:تشاهد|مشاهدة)/iu.test(value);
   const asksShowtime = /\b(?:what|which)\s+(?:showtime|time|session)\b|\bwhen\b[\s\S]{0,30}\b(?:watch|see|go)\b|(?:أي|اي|ما)\s+(?:وقت|موعد|عرض)|متى[\s\S]{0,25}(?:العرض|تشاهد)/iu.test(value);
   const asksSeats = /\b(?:choose|select|pick|tap)\b[\s\S]{0,45}\bseats?\b|(?:اختر|حدد|اضغط)[\s\S]{0,45}(?:المقاعد|مقاعد)/iu.test(value);
-  if (stage?.view === "movies" && (asksShowtime || asksSeats)) return discoveryStepGuidance(stage, locale);
+  if (stage?.view === "movies" && (asksSatisfiedMovieCriterion(value) || asksShowtime || asksSeats)) return discoveryStepGuidance(stage, locale);
   if (stage?.view === "showtimes" && asksMovie) {
     const title = clean(stage.movie?.title);
     return locale === "ar"
