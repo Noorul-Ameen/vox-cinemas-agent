@@ -6,12 +6,14 @@ import {
   DEMO_CARD_NUMBERS,
   DEMO_SHARE_POINTS,
   DEMO_WALLET_BALANCE,
+  createDemoPaymentPlan,
   formatDemoCardNumber,
   maskDemoCardNumber,
   validateDemoCardOffer,
   validateDemoSharePoints,
   validateDemoWallet,
 } from "../src/lib/demoPaymentGateway.js";
+import { OFFERS } from "../src/offers/offersData.js";
 import {
   FALLBACK_EXPERIENCE_MEDIA,
   getExperienceMedia,
@@ -25,13 +27,11 @@ const checkoutSource = await readFile(new URL("../src/components/Checkout.jsx", 
 const demoGatewaySource = await readFile(new URL("../src/components/DemoPaymentGateway.jsx", import.meta.url), "utf8");
 assert.doesNotMatch(checkoutSource, /Noorul|DEFAULT_CARDS|["']vox_cards["']/, "checkout must not seed personal or legacy default cards");
 assert.doesNotMatch(checkoutSource, /VITE_VISTA_BASE/, "Vista read-data configuration must not change checkout behavior");
-assert.match(checkoutSource, /return "demo";/, "checkout must default explicitly to simulation mode");
-assert.match(checkoutSource, /checkoutMode !== "demo"/, "device-summary saving must be gated to the non-transactional review mode");
-assert.match(checkoutSource, /reviewStartedRef\.current/, "checkout must guard against duplicate summary saves");
-assert.match(checkoutSource, /clearTimers\(\)/, "checkout must clear pending summary timers");
-assert.match(checkoutSource, /onComplete\?\.\(\{ checkoutId \}\)/, "summary completion may expose only the checkout identity");
-assert.match(checkoutSource, /DemoPaymentGateway/, "checkout must render the test payment gateway");
-assert.match(checkoutSource, /onApprove=\{saveSummary\}/, "only a validated gateway method may reach the existing local-summary action");
+assert.match(checkoutSource, /status !== "ready"/, "checkout must guard against duplicate dummy processing");
+assert.match(checkoutSource, /onReviewStateChange\?\.\(false\)/, "checkout must release its navigation lock when processing ends or unmounts");
+assert.match(checkoutSource, /onComplete\?\.\(\{ checkoutId: checkoutId \|\| order\.checkoutId, payment: nextReceipt \}\)/, "completion must expose the checkout identity and dummy receipt");
+assert.match(checkoutSource, /DemoPaymentGateway/, "checkout must render the dummy payment gateway");
+assert.match(checkoutSource, /onProcess=\{processPayment\}/, "only a valid reviewed plan may reach dummy processing");
 assert.doesNotMatch(`${checkoutSource}\n${demoGatewaySource}`, /\bfetch\s*\(|axios|sendText|sendContextualUpdate|clientTools/, "test checkout data must never leave the non-transactional components");
 assert.doesNotMatch(demoGatewaySource, /\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b/, "test payment values must remain in memory and must not be persisted");
 assert.doesNotMatch(demoGatewaySource, /\b(?:cvv|cvc|cardName|expiryLabel|security code|one-time password|otp)\b/i, "the test gateway must not collect authentication or real cardholder details");
@@ -42,7 +42,10 @@ assert.match(demoGatewaySource, /DEMO_CARD_NUMBERS\.eligible/, "the eligible pub
 assert.match(demoGatewaySource, /DEMO_CARD_NUMBERS\.notEligible/, "the not-eligible published test card must be exposed");
 assert.match(demoGatewaySource, /VOX Wallet/, "the gateway must expose VOX Wallet validation");
 assert.match(demoGatewaySource, /SHARE points/, "the gateway must expose SHARE points validation");
-assert.match(demoGatewaySource, /disabled=\{!result\?\.eligible\}/, "an incomplete or failed validation must block checkout-summary completion");
+assert.match(demoGatewaySource, /disabled=\{!plan\.valid\}/, "an incomplete or failed plan must block final payment review");
+assert.match(demoGatewaySource, /Final payment summary/, "the guest must receive a separate final review before processing");
+assert.match(demoGatewaySource, /Process dummy payment/, "dummy processing must remain a guest-controlled on-screen action");
+assert.match(demoGatewaySource, /OFFERS\.map/, "all published offer groups must be selectable");
 assert.doesNotMatch(`${checkoutSource}\n${demoGatewaySource}`, /Apple Pay|Samsung Pay|walletButton|reviewCard/i, "non-integrated payment brands must not appear as checkout controls");
 
 assert.equal(formatDemoCardNumber(DEMO_CARD_NUMBERS.eligible), "4111 1111 1111 1111", "eligible test card formatting must be deterministic");
@@ -54,6 +57,41 @@ assert.equal(validateDemoWallet(84).eligible, true, "the published test wallet b
 assert.equal(validateDemoWallet(DEMO_WALLET_BALANCE + 1).status, "insufficient", "wallet validation must fail above the test balance");
 assert.equal(validateDemoSharePoints(84).eligible, true, "the published SHARE balance must validate a normal checkout amount");
 assert.equal(validateDemoSharePoints(DEMO_SHARE_POINTS).status, "insufficient", "SHARE validation must account for the points conversion");
+const fabShareOffer = OFFERS.find((offer) => offer.id === "fab-share");
+assert.ok(fabShareOffer, "the published FAB SHARE offer must remain available");
+const splitPlan = createDemoPaymentPlan({
+  amount: 84,
+  ticketCount: 2,
+  offer: fabShareOffer,
+  cardNumber: DEMO_CARD_NUMBERS.eligible,
+  shareAed: 10,
+  walletAed: 20,
+});
+assert.equal(splitPlan.valid, true, "eligible BOGO plus three-way funding must produce a valid plan");
+assert.deepEqual(splitPlan.amounts, {
+  originalTotal: 84,
+  offerDiscount: 42,
+  payableTotal: 42,
+  shareAed: 10,
+  walletAed: 20,
+  cardAed: 12,
+}, "BOGO, SHARE, wallet, and card amounts must reconcile exactly");
+assert.equal(createDemoPaymentPlan({
+  amount: 84,
+  ticketCount: 2,
+  offer: fabShareOffer,
+  cardNumber: DEMO_CARD_NUMBERS.notEligible,
+}).reason, "offer_card_not_eligible", "the second published card must fail every selected offer");
+assert.equal(createDemoPaymentPlan({
+  amount: 84,
+  ticketCount: 2,
+  walletAed: 84,
+}).amounts.cardAed, 0, "wallet funds may cover the full payable amount without a card");
+assert.equal(createDemoPaymentPlan({
+  amount: 84,
+  ticketCount: 2,
+  cardNumber: DEMO_CARD_NUMBERS.eligible,
+}).amounts.cardAed, 84, "declining SHARE and wallet redemption must leave the full amount on the test card");
 
 const visibleHorrorMovies = {
   view: "movies",
@@ -81,8 +119,8 @@ const typedGatewayCompletion = appSource.slice(
   appSource.indexOf("if (checkoutPaymentActiveRef.current)", typedGatewayCompletionStart),
 );
 assert.match(typedGatewayCompletion, /restoreActiveCheckout\(\)/, "a typed summary request must restore the guest-controlled gateway");
-assert.match(typedGatewayCompletion, /Validate a method in the test gateway before saving/, "typed summary guidance must require on-screen validation");
-assert.doesNotMatch(typedGatewayCompletion, /handleCheckoutReviewComplete\(/, "typed chat must never bypass payment-method validation or complete checkout");
+assert.match(typedGatewayCompletion, /review the final split and process the dummy payment on screen/i, "typed guidance must require on-screen review and processing");
+assert.doesNotMatch(typedGatewayCompletion, /handleCheckoutReviewComplete\(/, "typed chat must never bypass final review or trigger dummy processing");
 const retryableLazySource = await readFile(new URL("../src/components/RetryableLazy.jsx", import.meta.url), "utf8");
 const mainSource = await readFile(new URL("../src/main.jsx", import.meta.url), "utf8");
 const voxiPromptSource = await readFile(new URL("../src/lib/voxiPrompt.js", import.meta.url), "utf8");
@@ -158,8 +196,8 @@ for (const locale of ["en", "ar"]) {
   const visibleCopy = Object.values(STRINGS[locale]).join("\n");
   assert.doesNotMatch(
     visibleCopy,
-    /\bprototype\b|\bdemo only\b|\bprototype simulation\b|تجريبي|محاكاة|نموذج أولي/i,
-    `${locale}: leadership-facing UI must not repeat internal prototype terminology`,
+    /\bprototype\b|\bdemo only\b|\bprototype simulation\b|نموذج أولي/i,
+    `${locale}: leadership-facing UI may describe the bounded dummy payment but must not label the product a prototype`,
   );
 }
 assert.match(STRINGS.en["checkout.demoDisclaimer"], /does not charge a card or reserve cinema inventory/i, "checkout must keep its transaction-boundary disclosure");
@@ -180,8 +218,9 @@ assert.doesNotMatch(handoverSource, /agent queue|pick up this conversation|UserR
 assert.match(appSource, /connectingStep:\s*t\("handover\.preparingStep"\)/, "handover progress must say preparing rather than connecting");
 assert.doesNotMatch(appSource, /booking (?:was|is) removed from this device|Booking summary [^\n]+ removed only from this device/i, "persisted cancellations must not be described as removed records");
 assert.match(voxiPromptSource, /two published test card numbers[\s\S]*without transmitting or storing it/, "the voice prompt must describe the bounded test-card contract");
-assert.match(voxiPromptSource, /test VOX Wallet balance[\s\S]*test SHARE points[\s\S]*never apply an offer[\s\S]*charge a card/, "the voice prompt must keep all gateway validation non-transactional");
-assert.match(voxiPromptSource, /payment method[\s\S]*Save validated checkout summary action[\s\S]*guest-controlled on-screen selections/, "the voice prompt must leave every payment-step choice to the guest");
+assert.match(voxiPromptSource, /combine optional SHARE points and VOX Wallet value[\s\S]*never charges a real card/, "the voice prompt must keep split funding non-transactional");
+assert.match(voxiPromptSource, /final review[\s\S]*Process dummy payment[\s\S]*guest-controlled on-screen actions/, "the voice prompt must leave every payment-step choice to the guest");
+assert.match(voxiPromptSource, /dummy payment was processed only after authoritative widget context/, "processed receipt claims must synchronize with authoritative UI state");
 assert.match(voxiPromptSource, /Never ask in chat for a card number[\s\S]*Never ask the guest to enter a real card/, "the agent must never solicit card details in chat");
 assert.match(richMediaSource, /\["confirmed_demo", "summary_saved", "locally_stored"\]/, "booking cards must classify every device-summary status safely");
 assert.match(historySource, /\["confirmed_demo", "summary_saved", "locally_stored"\]/, "history must classify every device-summary status safely");

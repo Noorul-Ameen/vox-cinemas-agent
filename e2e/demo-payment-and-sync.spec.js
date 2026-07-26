@@ -92,29 +92,53 @@ test("Arabic typed date is consumed once and renders the retained horror results
   await expect(page.locator("main")).not.toContainText(STALE_ARABIC_DISCOVERY_QUESTION);
 });
 
-test("typed journey reaches the test gateway and validates every published outcome", async ({ page }) => {
+test("typed journey reaches final review and processes a three-way dummy payment", async ({ page }) => {
   await reachCheckoutByText(page);
-  await expect(page.getByRole("heading", { name: "Test payment gateway" })).toBeVisible();
+  await expect(page.getByTestId("dummy-payment-gateway")).toBeVisible();
 
-  await sendText(page, "save booking summary");
-  await expect(page.getByRole("heading", { name: "Test payment gateway" })).toBeVisible();
-  await expect(page.getByText(/Validate a method in the test gateway before saving/)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Save validated checkout summary/ })).toBeDisabled();
+  await sendText(page, "pay now");
+  await expect(page.getByTestId("dummy-payment-gateway")).toBeVisible();
+  await expect(page.getByTestId("process-dummy-payment")).toHaveCount(0);
+  await expect(page.getByTestId("review-dummy-payment")).toBeDisabled();
 
-  await page.getByRole("button", { name: /Not eligible test card/ }).click();
-  await expect(page.getByText("This test card is not eligible for the card offer.")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Save validated checkout summary/ })).toBeDisabled();
+  await page.getByTestId("dummy-payment-gateway").getByLabel("Card offer").selectOption("fab-share");
+  await page.getByTestId("ineligible-test-card").click();
+  await expect(page.getByText("This test card is not eligible for the selected offer.")).toBeVisible();
+  await expect(page.getByTestId("review-dummy-payment")).toBeDisabled();
 
-  await page.getByRole("button", { name: /Eligible test card/ }).click();
-  await expect(page.getByText(/Eligible for the 20% test card offer/)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Save validated checkout summary/ })).toBeEnabled();
+  await page.getByTestId("eligible-test-card").click();
+  await expect(page.getByText("Eligible for every selected offer").last()).toBeVisible();
 
-  await page.getByRole("button", { name: "VOX Wallet" }).click();
-  await page.getByRole("button", { name: "Validate wallet balance" }).click();
-  await expect(page.getByText(/VOX Wallet balance is sufficient/)).toBeVisible();
+  await page.getByLabel("Use SHARE points").check();
+  await page.getByLabel("SHARE value in AED").fill("10");
+  await page.getByLabel("Use VOX Wallet").check();
+  await page.getByLabel("Wallet value in AED").fill("20");
 
-  await page.getByRole("button", { name: "SHARE points" }).click();
-  await page.getByRole("button", { name: "Validate SHARE points" }).click();
-  await expect(page.getByText(/SHARE points balance is sufficient/)).toBeVisible();
-  await expect(page.getByRole("button", { name: /Save validated checkout summary/ })).toBeEnabled();
+  await expect(page.getByText(/Dummy offer discount/).locator("..")).toContainText(/AED\s*42\.00/);
+  await expect(page.getByText(/Card remainder/).locator("..")).toContainText(/AED\s*12\.00/);
+  await expect(page.getByTestId("review-dummy-payment")).toBeEnabled();
+  await page.getByTestId("review-dummy-payment").click();
+  await expect(page.getByText("Final payment summary")).toBeVisible();
+  await expect(page.getByText("SHARE points").locator("..")).toContainText(/AED\s*10\.00/);
+  await expect(page.getByText("VOX Wallet").locator("..")).toContainText(/AED\s*20\.00/);
+  await page.getByTestId("process-dummy-payment").click();
+  await expect(page.getByText("Processing dummy payment")).toBeVisible();
+  await expect(page.getByText("Dummy payment receipt")).toBeVisible();
+  await expect(page.getByText(/No real payment or seat reservation occurred/)).toBeVisible();
+});
+
+test("Arabic checkout can use wallet only and process a dummy receipt", async ({ page }) => {
+  await reachCheckoutByText(page);
+  await page.getByRole("button", { name: "العربية" }).click();
+  await expect(page.getByTestId("dummy-payment-gateway")).toBeVisible();
+
+  await page.getByLabel("استخدام محفظة VOX").check();
+  await page.getByLabel("قيمة المحفظة بالدرهم").fill("84");
+  await expect(page.getByTestId("review-dummy-payment")).toBeEnabled();
+  await page.getByTestId("review-dummy-payment").click();
+  await expect(page.getByText("ملخص الدفع النهائي")).toBeVisible();
+  await page.getByTestId("process-dummy-payment").click();
+  await expect(page.getByText("جار معالجة الدفع التجريبي")).toBeVisible();
+  await expect(page.getByText("إيصال الدفع التجريبي")).toBeVisible();
+  await expect(page.getByText(/لم يحدث دفع أو حجز مقعد حقيقي/)).toBeVisible();
 });

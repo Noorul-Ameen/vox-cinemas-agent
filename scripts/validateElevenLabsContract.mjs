@@ -184,8 +184,9 @@ assert.match(promptSource, /A request for new movies, different movies, another 
 assert.match(promptSource, /When a short hour such as "9" uniquely matches one visible showtime[\s\S]*Never restart movie discovery/, "the prompt must ground short-hour choices in visible showtimes and clarify ambiguity in place");
 assert.match(promptSource, /Never tell the guest that the booking process is paused[\s\S]*Do not apply that short reply as a global restore/, "the prompt must keep one-shot paused-journey recovery customer-safe and state-scoped");
 assert.match(promptSource, /two published test card numbers[\s\S]*without transmitting or storing it/, "the live-agent prompt must define the bounded test-card contract");
-assert.match(promptSource, /test VOX Wallet balance[\s\S]*test SHARE points[\s\S]*never apply an offer[\s\S]*charge a card/, "the live-agent prompt must describe every gateway method as non-transactional");
-assert.match(promptSource, /payment method[\s\S]*Save validated checkout summary action[\s\S]*guest-controlled on-screen selections/, "the live-agent prompt must reserve all payment-step choices for the guest");
+assert.match(promptSource, /combine optional SHARE points and VOX Wallet value[\s\S]*never charges a real card[\s\S]*redeems real points/, "the live-agent prompt must describe split funding as non-transactional");
+assert.match(promptSource, /final review[\s\S]*Process dummy payment[\s\S]*guest-controlled on-screen actions/, "the live-agent prompt must reserve all payment-step choices for the guest");
+assert.match(promptSource, /dummy payment was processed only after authoritative widget context explicitly confirms a processed dummy receipt/, "the live-agent prompt must synchronize dummy processing claims with the rendered receipt");
 assert.match(offerFacts, /use the official VOX website or app checkout/i, "offer redemption must direct guests to an official VOX checkout");
 const promptHash = createHash("sha256").update(normalizeSource(VOXI_AGENT_PROMPT), "utf8").digest("hex");
 assert.equal(promptHash, contract.prompt.sha256, "the exported ElevenLabs prompt value changed without a contract version update");

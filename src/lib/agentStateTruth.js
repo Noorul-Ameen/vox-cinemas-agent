@@ -43,9 +43,9 @@ function checkoutGuidance(stage, pendingOrder, locale) {
   const order = pendingOrder || stage?.order || {};
   const seats = Array.isArray(order.seats) ? order.seats.filter(Boolean) : [];
   if (locale === "ar") {
-    return `${seats.length ? `المقاعد المحددة ${seats.join("، ")} ظاهرة في شاشة مراجعة الحجز. ` : "المقاعد المحددة ظاهرة في شاشة مراجعة الحجز. "}استخدم حفظ ملخص الحجز، أو اختر تعديل المقاعد لتغييرها. لم يتم تأكيد الحجز بعد، ولن يتم إرسال دفعة أو حجز.`;
+    return `${seats.length ? `المقاعد المحددة ${seats.join("، ")} ظاهرة. ` : ""}راجع التقسيم النهائي واختر معالجة الدفع التجريبي على الشاشة، أو ارجع لتغيير المقاعد. لم يتم تأكيد الحجز بعد، ولن يحدث دفع أو حجز حقيقي.`;
   }
-  return `${seats.length ? `Your selected seats ${seats.join(", ")} are shown in checkout review. ` : "Your selected seats are shown in checkout review. "}Use Save booking summary, or choose Edit seats to change them. The booking is not confirmed yet, and no payment or reservation will be submitted.`;
+  return `${seats.length ? `Selected seats ${seats.join(", ")} are shown in checkout. ` : ""}Review the final split and select Process dummy payment on screen, or go back to change seats. The booking is not confirmed yet, and no real payment or reservation will occur.`;
 }
 
 function seatMapGuidance(locale) {
@@ -57,6 +57,12 @@ function seatMapGuidance(locale) {
 function savedSummaryGuidance(booking, locale) {
   const title = clean(booking?.movieTitle);
   const ref = clean(booking?.ref);
+  const hasDemoPayment = booking?.demoPayment?.status === "processed";
+  if (hasDemoPayment) {
+    return locale === "ar"
+      ? `تم حفظ إيصال الدفع التجريبي على هذا الجهاز${ref ? ` بالمرجع ${ref}` : ""}. لم يحدث دفع أو حجز حقيقي.`
+      : `Your dummy receipt is saved on this device${ref ? ` with reference ${ref}` : ""}. No real payment or reservation occurred.`;
+  }
   if (locale === "ar") {
     return `تم حفظ ملخص الحجز${title ? ` لفيلم ${title}` : ""} على هذا الجهاز${ref ? ` بالمرجع ${ref}` : ""}. لم يتم تحصيل أي دفعة أو إرسال حجز إلى السينما.`;
   }

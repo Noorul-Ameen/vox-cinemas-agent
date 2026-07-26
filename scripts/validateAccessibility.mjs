@@ -65,12 +65,12 @@ assert.doesNotMatch(
 
 assert.match(
   checkout,
-  /<h2 id="checkout-heading"[^>]*>\{t\("checkout\.title"\)\}<\/h2>/,
+  /<h2 id="checkout-heading"[^>]*>\{(?:t\("checkout\.title"\)|copy\.title)\}<\/h2>/,
   "Checkout must expose its visible title as a level-two heading.",
 );
 assert.match(
   checkout,
-  /<section aria-labelledby="checkout-heading">/,
+  /<section[^>]*aria-labelledby="checkout-heading"[^>]*>/,
   "Checkout must render inside a named section.",
 );
 assert.match(

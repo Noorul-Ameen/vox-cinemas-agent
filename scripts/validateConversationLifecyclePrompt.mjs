@@ -98,8 +98,8 @@ assert.match(
 
 assert.match(
   VOXI_AGENT_PROMPT,
-  /payment method and the final Save validated checkout summary action must remain guest-controlled on-screen selections/i,
-  "the on-device summary must require guest-controlled on-screen method validation and completion",
+  /Offer selection, test-card entry, SHARE and wallet amounts, final review, and Process dummy payment are guest-controlled on-screen actions/i,
+  "the dummy payment must require guest-controlled on-screen configuration, final review, and processing",
 );
 assert.match(
   VOXI_AGENT_PROMPT,

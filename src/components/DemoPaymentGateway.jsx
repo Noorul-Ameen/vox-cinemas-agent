@@ -1,281 +1,347 @@
-import React, { useState } from "react";
-import { BadgePercent, CheckCircle2, CreditCard, ShieldCheck, WalletCards, XCircle } from "lucide-react";
-import { C } from "../theme.js";
+import { useMemo, useState } from "react";
+import { OFFERS } from "../offers/offersData.js";
 import {
   DEMO_CARD_NUMBERS,
-  DEMO_CARD_OFFER_PERCENT,
   DEMO_SHARE_POINTS,
   DEMO_SHARE_POINTS_PER_AED,
   DEMO_WALLET_BALANCE,
+  createDemoPaymentPlan,
   formatDemoCardNumber,
-  normalizeDemoCardNumber,
-  validateDemoCardOffer,
-  validateDemoSharePoints,
-  validateDemoWallet,
 } from "../lib/demoPaymentGateway.js";
 
-const COPY = {
-  en: {
-    title: "Test payment gateway",
-    badge: "NO CHARGE",
-    intro: "Validate a test offer or balance before saving this checkout summary. No payment, points redemption, or cinema reservation will be submitted.",
-    methodsLabel: "Choose a test payment method",
-    card: "Card offer",
-    wallet: "VOX Wallet",
-    share: "SHARE points",
-    cardTitle: "Card offer validation",
-    cardHelp: "Use only one of the published test numbers. Real card details are not accepted, transmitted, or stored.",
-    eligibleCard: "Eligible test card",
-    ineligibleCard: "Not eligible test card",
-    cardInput: "Test card number",
-    cardPlaceholder: "Enter a published test number",
-    validateCard: "Validate card offer",
-    incompleteCard: "Enter all 16 digits from one of the two published test cards.",
-    unrecognizedCard: "This number is not a published test card. Real card details are ignored and are not stored.",
-    eligibleCardResult: `Eligible for the ${DEMO_CARD_OFFER_PERCENT}% test card offer. The discount is validated only and has not been applied.`,
-    ineligibleCardResult: "This test card is not eligible for the card offer.",
-    walletTitle: "VOX Wallet balance validation",
-    walletHelp: "The test wallet contains {balance}. Validation checks this checkout amount without deducting funds.",
-    validateWallet: "Validate wallet balance",
-    eligibleWallet: "The test VOX Wallet balance is sufficient. No funds have been deducted.",
-    insufficientWallet: "The test VOX Wallet balance is not sufficient for this amount.",
-    shareTitle: "SHARE points validation",
-    shareHelp: "The test account contains {points} points. For this test, {rate} points equal AED 1.",
-    shareRequired: "{points} points are required for this checkout amount.",
-    validateShare: "Validate SHARE points",
-    eligibleShare: "The test SHARE points balance is sufficient. No points have been redeemed.",
-    insufficientShare: "The test SHARE points balance is not sufficient for this amount.",
-    validationPassed: "Validation passed",
-    validationFailed: "Validation not passed",
-    continue: "Save validated checkout summary",
-    continueHint: "No charge or reservation",
-    chooseMethod: "Validate the selected method to continue.",
-  },
-  ar: {
-    title: "بوابة دفع اختبارية",
-    badge: "بدون خصم",
-    intro: "تحقق من عرض أو رصيد اختباري قبل حفظ ملخص إتمام الحجز. لن يتم إرسال دفعة أو استبدال نقاط أو حجز إلى السينما.",
-    methodsLabel: "اختر طريقة دفع اختبارية",
-    card: "عرض البطاقة",
-    wallet: "محفظة VOX",
-    share: "نقاط SHARE",
-    cardTitle: "التحقق من عرض البطاقة",
-    cardHelp: "استخدم أحد رقمي الاختبار المنشورين فقط. لا يتم قبول أو إرسال أو تخزين بيانات بطاقة حقيقية.",
-    eligibleCard: "بطاقة اختبار مؤهلة",
-    ineligibleCard: "بطاقة اختبار غير مؤهلة",
-    cardInput: "رقم بطاقة الاختبار",
-    cardPlaceholder: "أدخل رقم اختبار منشوراً",
-    validateCard: "تحقق من عرض البطاقة",
-    incompleteCard: "أدخل الأرقام الستة عشر كاملة من إحدى بطاقتي الاختبار.",
-    unrecognizedCard: "هذا الرقم ليس بطاقة اختبار منشورة. يتم تجاهل بيانات البطاقات الحقيقية ولا يتم تخزينها.",
-    eligibleCardResult: `البطاقة مؤهلة لعرض اختباري بنسبة ${DEMO_CARD_OFFER_PERCENT}%. تم التحقق فقط ولم يتم تطبيق الخصم.`,
-    ineligibleCardResult: "بطاقة الاختبار هذه غير مؤهلة لعرض البطاقة.",
-    walletTitle: "التحقق من رصيد محفظة VOX",
-    walletHelp: "تحتوي المحفظة الاختبارية على {balance}. يتحقق الاختبار من المبلغ دون خصم أي رصيد.",
-    validateWallet: "تحقق من رصيد المحفظة",
-    eligibleWallet: "رصيد محفظة VOX الاختبارية كافٍ. لم يتم خصم أي مبلغ.",
-    insufficientWallet: "رصيد محفظة VOX الاختبارية غير كافٍ لهذا المبلغ.",
-    shareTitle: "التحقق من نقاط SHARE",
-    shareHelp: "يحتوي الحساب الاختباري على {points} نقطة. في هذا الاختبار، كل {rate} نقاط تساوي درهماً واحداً.",
-    shareRequired: "يلزم {points} نقطة لمبلغ إتمام الحجز هذا.",
-    validateShare: "تحقق من نقاط SHARE",
-    eligibleShare: "رصيد نقاط SHARE الاختباري كافٍ. لم يتم استبدال أي نقاط.",
-    insufficientShare: "رصيد نقاط SHARE الاختباري غير كافٍ لهذا المبلغ.",
-    validationPassed: "نجح التحقق",
-    validationFailed: "لم ينجح التحقق",
-    continue: "حفظ ملخص إتمام الحجز بعد التحقق",
-    continueHint: "بدون دفع أو حجز",
-    chooseMethod: "تحقق من الطريقة المحددة للمتابعة.",
-  },
+const palette = {
+  ink: "#17151d",
+  muted: "#6f6876",
+  line: "#ded9e2",
+  paper: "#ffffff",
+  wash: "#f7f4f1",
+  accent: "#e11b22",
+  good: "#117a4b",
+  bad: "#b42318",
+  gold: "#9a6700",
 };
 
-const METHODS = [
-  { id: "card", icon: CreditCard },
-  { id: "wallet", icon: WalletCards },
-  { id: "share", icon: BadgePercent },
-];
+const styles = {
+  shell: { display: "grid", gap: 16, color: palette.ink },
+  notice: { border: "1px solid #f0c9ca", background: "#fff5f5", borderRadius: 14, padding: "12px 14px", fontSize: 13, lineHeight: 1.55 },
+  section: { display: "grid", gap: 10, border: `1px solid ${palette.line}`, background: palette.paper, borderRadius: 16, padding: 14 },
+  title: { margin: 0, fontSize: 16, fontWeight: 800 },
+  help: { margin: 0, color: palette.muted, fontSize: 12, lineHeight: 1.5 },
+  label: { display: "grid", gap: 7, fontSize: 13, fontWeight: 750 },
+  select: { width: "100%", minHeight: 44, border: `1px solid ${palette.line}`, borderRadius: 10, background: palette.paper, color: palette.ink, padding: "0 11px", font: "inherit" },
+  input: { width: "100%", minHeight: 44, boxSizing: "border-box", border: `1px solid ${palette.line}`, borderRadius: 10, background: palette.paper, color: palette.ink, padding: "0 12px", font: "inherit" },
+  cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 },
+  testCard: { display: "grid", gap: 5, textAlign: "start", border: `1px solid ${palette.line}`, borderRadius: 13, background: palette.wash, padding: 12, cursor: "pointer", color: palette.ink },
+  number: { fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace", fontSize: 13, letterSpacing: ".03em" },
+  badgeGood: { width: "fit-content", color: palette.good, fontSize: 11, fontWeight: 800 },
+  badgeBad: { width: "fit-content", color: palette.bad, fontSize: 11, fontWeight: 800 },
+  offer: { borderInlineStart: `4px solid ${palette.gold}`, background: "#fffaf0", borderRadius: 10, padding: "10px 12px", display: "grid", gap: 3 },
+  toggleRow: { display: "flex", alignItems: "center", gap: 9, fontSize: 13, fontWeight: 750 },
+  amountGrid: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 10, alignItems: "end" },
+  amountBadge: { minWidth: 105, borderRadius: 10, background: palette.wash, padding: "11px 12px", fontSize: 12, color: palette.muted },
+  error: { margin: 0, color: palette.bad, fontSize: 12, lineHeight: 1.45 },
+  success: { margin: 0, color: palette.good, fontSize: 12, lineHeight: 1.45 },
+  totals: { display: "grid", gap: 8, borderRadius: 14, background: palette.wash, padding: 14 },
+  row: { display: "flex", justifyContent: "space-between", gap: 16, fontSize: 13 },
+  strongRow: { display: "flex", justifyContent: "space-between", gap: 16, borderTop: `1px solid ${palette.line}`, paddingTop: 10, fontSize: 15, fontWeight: 850 },
+  actions: { display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "flex-end" },
+  primary: { minHeight: 44, border: 0, borderRadius: 999, background: palette.accent, color: "white", padding: "0 20px", font: "inherit", fontWeight: 850, cursor: "pointer" },
+  secondary: { minHeight: 44, border: `1px solid ${palette.line}`, borderRadius: 999, background: palette.paper, color: palette.ink, padding: "0 18px", font: "inherit", fontWeight: 800, cursor: "pointer" },
+};
 
-function interpolate(value, variables) {
-  return Object.entries(variables).reduce(
-    (result, [key, replacement]) => result.replace(`{${key}}`, String(replacement)),
-    value,
-  );
+function localValue(value, language) {
+  if (!value || typeof value !== "object") return String(value || "");
+  return value[language] || value.en || value.ar || "";
 }
 
 export default function DemoPaymentGateway({
   amount,
+  ticketCount = 1,
   currency = "AED",
   dir = "ltr",
   formatCurrency,
-  onApprove,
+  onProcess,
 }) {
-  const locale = dir === "rtl" ? "ar" : "en";
-  const copy = COPY[locale];
-  const [method, setMethod] = useState("card");
+  const language = dir === "rtl" ? "ar" : "en";
+  const ar = language === "ar";
+  const [phase, setPhase] = useState("configure");
+  const [offerId, setOfferId] = useState("");
   const [cardNumber, setCardNumber] = useState("");
-  const [result, setResult] = useState(null);
-  const money = (value) => formatCurrency?.(value, currency) || `${currency} ${Number(value || 0).toFixed(2)}`;
+  const [useShare, setUseShare] = useState(false);
+  const [shareAed, setShareAed] = useState("0");
+  const [useWallet, setUseWallet] = useState(false);
+  const [walletAed, setWalletAed] = useState("0");
 
-  const selectMethod = (nextMethod) => {
-    setMethod(nextMethod);
-    setResult(null);
+  const copy = ar ? {
+    notice: "هذه بوابة دفع تجريبية فقط. تحاكي العرض وتقسيم المبلغ والمعالجة، ولا تخصم أموالاً أو نقاطاً ولا تحجز مقاعد حقيقية.",
+    configure: "إعداد الدفع التجريبي",
+    offer: "عرض البطاقة",
+    noOffer: "بدون عرض بطاقة",
+    offerHelp: "اختر أي عرض منشور لاختبار الأهلية والخصم التجريبي.",
+    cards: "بطاقتا الاختبار المنشورتان",
+    eligibleCard: "مؤهلة لكل العروض المختارة",
+    ineligibleCard: "غير مؤهلة لأي عرض مختار",
+    useCard: "استخدام هذه البطاقة",
+    cardNumber: "رقم بطاقة الاختبار",
+    cardPlaceholder: "استخدم إحدى بطاقتي الاختبار فقط",
+    share: "استخدام نقاط SHARE",
+    shareAvailable: `${DEMO_SHARE_POINTS.toLocaleString("ar-AE")} نقطة متاحة، كل ${DEMO_SHARE_POINTS_PER_AED} نقاط = 1 د.إ`,
+    shareAmount: "قيمة SHARE بالدرهم",
+    wallet: "استخدام محفظة VOX",
+    walletAvailable: `الرصيد التجريبي ${DEMO_WALLET_BALANCE} د.إ`,
+    walletAmount: "قيمة المحفظة بالدرهم",
+    cardRemainder: "المتبقي على البطاقة",
+    review: "مراجعة الدفع التجريبي",
+    final: "ملخص الدفع النهائي",
+    original: "الإجمالي الأصلي",
+    discount: "خصم العرض التجريبي",
+    payable: "الإجمالي بعد العرض",
+    shareUsed: "SHARE",
+    walletUsed: "محفظة VOX",
+    cardUsed: "بطاقة الاختبار",
+    change: "تعديل الدفع",
+    process: "معالجة الدفع التجريبي",
+    ready: "خطة الدفع التجريبية جاهزة للمراجعة.",
+    invalidAmount: "تعذر إنشاء خطة لهذا المبلغ.",
+    twoTickets: "يتطلب عرض اشتر تذكرة واحصل على أخرى تذكرتين على الأقل.",
+    offerCardRequired: "اختر بطاقة الاختبار المؤهلة لتطبيق العرض المحدد.",
+    notEligible: "بطاقة الاختبار هذه غير مؤهلة للعرض المحدد.",
+    cardRequired: "اختر إحدى بطاقتي الاختبار لدفع المبلغ المتبقي.",
+    unsupported: "لا يمكن استخدام هذا العرض في المحاكاة.",
+    noReal: "سيؤدي الزر التالي إلى محاكاة المعالجة وإنشاء إيصال تجريبي على هذا الجهاز فقط.",
+  } : {
+    notice: "This is a dummy payment gateway. It simulates an offer, split funding, and processing, but never charges money, redeems points, or reserves real seats.",
+    configure: "Configure dummy payment",
+    offer: "Card offer",
+    noOffer: "No card offer",
+    offerHelp: "Choose any published offer to test its dummy eligibility and adjustment.",
+    cards: "Published test cards",
+    eligibleCard: "Eligible for every selected offer",
+    ineligibleCard: "Not eligible for any selected offer",
+    useCard: "Use this card",
+    cardNumber: "Test card number",
+    cardPlaceholder: "Use one of the two test cards only",
+    share: "Use SHARE points",
+    shareAvailable: `${DEMO_SHARE_POINTS.toLocaleString("en-AE")} points available, ${DEMO_SHARE_POINTS_PER_AED} points = AED 1`,
+    shareAmount: "SHARE value in AED",
+    wallet: "Use VOX Wallet",
+    walletAvailable: `Dummy balance AED ${DEMO_WALLET_BALANCE}`,
+    walletAmount: "Wallet value in AED",
+    cardRemainder: "Card remainder",
+    review: "Review dummy payment",
+    final: "Final payment summary",
+    original: "Original total",
+    discount: "Dummy offer discount",
+    payable: "Total after offer",
+    shareUsed: "SHARE points",
+    walletUsed: "VOX Wallet",
+    cardUsed: "Test card",
+    change: "Change payment",
+    process: "Process dummy payment",
+    ready: "The dummy payment plan is ready to review.",
+    invalidAmount: "A payment plan cannot be created for this amount.",
+    twoTickets: "This buy-one-get-one offer requires at least two tickets.",
+    offerCardRequired: "Choose the eligible test card to apply the selected offer.",
+    notEligible: "This test card is not eligible for the selected offer.",
+    cardRequired: "Choose either published test card for the remaining card balance.",
+    unsupported: "This offer cannot be used in the simulation.",
+    noReal: "The next action simulates processing and creates a dummy receipt on this device only.",
   };
 
-  const useTestCard = (number) => {
-    setCardNumber(number);
-    setResult(validateDemoCardOffer(number));
-  };
+  const selectedOffer = useMemo(
+    () => OFFERS.find((offer) => offer.id === offerId) || null,
+    [offerId],
+  );
+  const plan = useMemo(() => createDemoPaymentPlan({
+    amount,
+    ticketCount,
+    offer: selectedOffer,
+    cardNumber,
+    shareAed: useShare ? shareAed : 0,
+    walletAed: useWallet ? walletAed : 0,
+  }), [amount, ticketCount, selectedOffer, cardNumber, useShare, shareAed, useWallet, walletAed]);
 
-  const validateSelectedMethod = () => {
-    if (method === "card") setResult(validateDemoCardOffer(cardNumber));
-    if (method === "wallet") setResult(validateDemoWallet(amount));
-    if (method === "share") setResult(validateDemoSharePoints(amount));
+  const money = (value) => {
+    if (typeof formatCurrency === "function") return formatCurrency(value, currency);
+    return new Intl.NumberFormat(ar ? "ar-AE" : "en-AE", { style: "currency", currency }).format(Number(value) || 0);
   };
+  const reason = {
+    invalid_amount: copy.invalidAmount,
+    offer_requires_two_tickets: copy.twoTickets,
+    offer_card_required: copy.offerCardRequired,
+    offer_card_not_eligible: copy.notEligible,
+    card_required: copy.cardRequired,
+    unsupported_offer: copy.unsupported,
+    funding_mismatch: copy.unsupported,
+  }[plan.reason] || "";
+  const cardOfferErrorShown = Boolean(cardNumber && selectedOffer && !plan.cardValidation?.eligible);
+  const selectedOfferLabel = selectedOffer
+    ? `${localValue(selectedOffer.bank, language)} - ${localValue(selectedOffer.headline, language)}`
+    : copy.noOffer;
 
-  const resultMessage = (() => {
-    if (!result) return copy.chooseMethod;
-    if (result.method === "card") {
-      if (result.status === "eligible") return copy.eligibleCardResult;
-      if (result.status === "not_eligible") return copy.ineligibleCardResult;
-      if (result.status === "unrecognized") return copy.unrecognizedCard;
-      return copy.incompleteCard;
-    }
-    if (result.method === "wallet") return result.eligible ? copy.eligibleWallet : copy.insufficientWallet;
-    return result.eligible ? copy.eligibleShare : copy.insufficientShare;
-  })();
+  if (phase === "review") {
+    return (
+      <section style={styles.shell} dir={dir} data-testid="dummy-payment-review">
+        <div style={styles.notice}>{copy.notice}</div>
+        <div style={styles.section}>
+          <h3 style={styles.title}>{copy.final}</h3>
+          <div style={styles.offer}>
+            <strong>{selectedOfferLabel}</strong>
+            {selectedOffer ? <span style={styles.help}>{localValue(selectedOffer.summary, language)}</span> : null}
+          </div>
+          <div style={styles.totals}>
+            <div style={styles.row}><span>{copy.original}</span><strong>{money(plan.amounts.originalTotal)}</strong></div>
+            <div style={styles.row}><span>{copy.discount}</span><strong>-{money(plan.amounts.offerDiscount)}</strong></div>
+            <div style={styles.strongRow}><span>{copy.payable}</span><span>{money(plan.amounts.payableTotal)}</span></div>
+            <div style={styles.row}><span>{copy.shareUsed}</span><strong>{money(plan.amounts.shareAed)}</strong></div>
+            <div style={styles.row}><span>{copy.walletUsed}</span><strong>{money(plan.amounts.walletAed)}</strong></div>
+            <div style={styles.row}><span>{copy.cardUsed}{plan.cardLast4 ? ` •••• ${plan.cardLast4}` : ""}</span><strong>{money(plan.amounts.cardAed)}</strong></div>
+          </div>
+          <p style={styles.help}>{copy.noReal}</p>
+          <div style={styles.actions}>
+            <button type="button" style={styles.secondary} onClick={() => setPhase("configure")}>{copy.change}</button>
+            <button type="button" style={styles.primary} data-testid="process-dummy-payment" onClick={() => onProcess?.(plan)}>{copy.process}</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <div data-testid="demo-payment-gateway" style={gatewayCard}>
-      <div style={gatewayHeading}>
-        <span style={shieldIcon}><ShieldCheck size={18} aria-hidden="true" /></span>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <h3 style={{ margin: 0, color: C.text, fontSize: 14, fontWeight: 900 }}>{copy.title}</h3>
-          <div style={{ marginTop: 2, color: C.muted, fontSize: 10, lineHeight: 1.45 }}>{copy.intro}</div>
-        </div>
-        <span style={noChargeBadge}>{copy.badge}</span>
-      </div>
-
-      <div role="group" aria-label={copy.methodsLabel} style={methodGrid}>
-        {METHODS.map(({ id, icon: Icon }) => {
-          const active = method === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => selectMethod(id)}
-              style={{ ...methodButton, ...(active ? activeMethodButton : null) }}
-            >
-              <Icon size={16} aria-hidden="true" />
-              <span>{copy[id]}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {method === "card" && (
-        <div style={methodPanel}>
-          <div style={methodTitle}>{copy.cardTitle}</div>
-          <div style={methodHelp}>{copy.cardHelp}</div>
-          <div style={testCardGrid}>
-            <button type="button" onClick={() => useTestCard(DEMO_CARD_NUMBERS.eligible)} style={testCardButton}>
-              <span>{copy.eligibleCard}</span>
-              <strong dir="ltr">{formatDemoCardNumber(DEMO_CARD_NUMBERS.eligible)}</strong>
-            </button>
-            <button type="button" onClick={() => useTestCard(DEMO_CARD_NUMBERS.notEligible)} style={testCardButton}>
-              <span>{copy.ineligibleCard}</span>
-              <strong dir="ltr">{formatDemoCardNumber(DEMO_CARD_NUMBERS.notEligible)}</strong>
-            </button>
+    <section style={styles.shell} dir={dir} data-testid="dummy-payment-gateway">
+      <div style={styles.notice}>{copy.notice}</div>
+      <div style={styles.section}>
+        <h3 style={styles.title}>{copy.configure}</h3>
+        <label style={styles.label}>
+          <span>{copy.offer}</span>
+          <select
+            style={styles.select}
+            value={offerId}
+            aria-label={copy.offer}
+            onChange={(event) => setOfferId(event.target.value)}
+          >
+            <option value="">{copy.noOffer}</option>
+            {OFFERS.map((offer) => (
+              <option key={offer.id} value={offer.id}>
+                {localValue(offer.bank, language)} - {localValue(offer.headline, language)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p style={styles.help}>{copy.offerHelp}</p>
+        {selectedOffer ? (
+          <div style={styles.offer} data-testid="selected-offer-summary">
+            <strong>{selectedOfferLabel}</strong>
+            <span style={styles.help}>{localValue(selectedOffer.summary, language)}</span>
           </div>
-          <label style={inputLabel}>
-            <span>{copy.cardInput}</span>
+        ) : null}
+      </div>
+
+      <div style={styles.section}>
+        <h3 style={styles.title}>{copy.cards}</h3>
+        <div style={styles.cardGrid}>
+          <button type="button" style={styles.testCard} data-testid="eligible-test-card" onClick={() => setCardNumber(DEMO_CARD_NUMBERS.eligible)}>
+            <span style={styles.number}>{formatDemoCardNumber(DEMO_CARD_NUMBERS.eligible)}</span>
+            <span style={styles.badgeGood}>{copy.eligibleCard}</span>
+            <span style={styles.help}>{copy.useCard}</span>
+          </button>
+          <button type="button" style={styles.testCard} data-testid="ineligible-test-card" onClick={() => setCardNumber(DEMO_CARD_NUMBERS.notEligible)}>
+            <span style={styles.number}>{formatDemoCardNumber(DEMO_CARD_NUMBERS.notEligible)}</span>
+            <span style={styles.badgeBad}>{copy.ineligibleCard}</span>
+            <span style={styles.help}>{copy.useCard}</span>
+          </button>
+        </div>
+        <label style={styles.label}>
+          <span>{copy.cardNumber}</span>
+          <input
+            style={styles.input}
+            value={formatDemoCardNumber(cardNumber)}
+            aria-label={copy.cardNumber}
+            placeholder={copy.cardPlaceholder}
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={19}
+            onChange={(event) => setCardNumber(event.target.value)}
+          />
+        </label>
+        {cardNumber && selectedOffer ? (
+          plan.cardValidation?.eligible
+            ? <p style={styles.success}>{copy.eligibleCard}</p>
+            : <p style={styles.error}>{plan.cardValidation?.valid ? copy.notEligible : copy.offerCardRequired}</p>
+        ) : null}
+      </div>
+
+      <div style={styles.section}>
+        <label style={styles.toggleRow}>
+          <input type="checkbox" checked={useShare} onChange={(event) => setUseShare(event.target.checked)} />
+          <span>{copy.share}</span>
+        </label>
+        <p style={styles.help}>{copy.shareAvailable}</p>
+        {useShare ? (
+          <div style={styles.amountGrid}>
+            <label style={styles.label}>
+              <span>{copy.shareAmount}</span>
+              <input
+                style={styles.input}
+                type="number"
+                min="0"
+                max={DEMO_SHARE_POINTS / DEMO_SHARE_POINTS_PER_AED}
+                step="0.1"
+                value={shareAed}
+                aria-label={copy.shareAmount}
+                onChange={(event) => setShareAed(event.target.value)}
+              />
+            </label>
+            <span style={styles.amountBadge}>{plan.sharePointsUsed.toLocaleString(ar ? "ar-AE" : "en-AE")} pts</span>
+          </div>
+        ) : null}
+      </div>
+
+      <div style={styles.section}>
+        <label style={styles.toggleRow}>
+          <input type="checkbox" checked={useWallet} onChange={(event) => setUseWallet(event.target.checked)} />
+          <span>{copy.wallet}</span>
+        </label>
+        <p style={styles.help}>{copy.walletAvailable}</p>
+        {useWallet ? (
+          <label style={styles.label}>
+            <span>{copy.walletAmount}</span>
             <input
-              type="text"
-              inputMode="numeric"
-              autoComplete="off"
-              maxLength={19}
-              aria-label={copy.cardInput}
-              placeholder={copy.cardPlaceholder}
-              value={formatDemoCardNumber(cardNumber)}
-              onChange={(event) => {
-                setCardNumber(normalizeDemoCardNumber(event.target.value));
-                setResult(null);
-              }}
-              style={cardInput}
-              dir="ltr"
+              style={styles.input}
+              type="number"
+              min="0"
+              max={DEMO_WALLET_BALANCE}
+              step="0.01"
+              value={walletAed}
+              aria-label={copy.walletAmount}
+              onChange={(event) => setWalletAed(event.target.value)}
             />
           </label>
-          <button type="button" onClick={validateSelectedMethod} style={validateButton}>{copy.validateCard}</button>
-        </div>
-      )}
-
-      {method === "wallet" && (
-        <div style={methodPanel}>
-          <div style={methodTitle}>{copy.walletTitle}</div>
-          <div style={methodHelp}>{interpolate(copy.walletHelp, { balance: money(DEMO_WALLET_BALANCE) })}</div>
-          <div style={balanceRow}>
-            <span>{copy.wallet}</span>
-            <strong dir="ltr">{money(DEMO_WALLET_BALANCE)}</strong>
-          </div>
-          <button type="button" onClick={validateSelectedMethod} style={validateButton}>{copy.validateWallet}</button>
-        </div>
-      )}
-
-      {method === "share" && (
-        <div style={methodPanel}>
-          <div style={methodTitle}>{copy.shareTitle}</div>
-          <div style={methodHelp}>{interpolate(copy.shareHelp, { points: DEMO_SHARE_POINTS.toLocaleString(locale === "ar" ? "ar-AE" : "en-AE"), rate: DEMO_SHARE_POINTS_PER_AED })}</div>
-          <div style={balanceRow}>
-            <span>{interpolate(copy.shareRequired, { points: Math.ceil(Number(amount || 0) * DEMO_SHARE_POINTS_PER_AED).toLocaleString(locale === "ar" ? "ar-AE" : "en-AE") })}</span>
-            <strong>{DEMO_SHARE_POINTS.toLocaleString(locale === "ar" ? "ar-AE" : "en-AE")}</strong>
-          </div>
-          <button type="button" onClick={validateSelectedMethod} style={validateButton}>{copy.validateShare}</button>
-        </div>
-      )}
-
-      <div role="status" aria-live="polite" style={{ ...validationResult, ...(result?.eligible ? eligibleResult : result ? failedResult : null) }}>
-        {result?.eligible ? <CheckCircle2 size={18} aria-hidden="true" /> : result ? <XCircle size={18} aria-hidden="true" /> : <ShieldCheck size={18} aria-hidden="true" />}
-        <div>
-          <strong style={{ display: "block", fontSize: 11 }}>{result?.eligible ? copy.validationPassed : result ? copy.validationFailed : copy.title}</strong>
-          <span style={{ display: "block", marginTop: 2, fontSize: 10, lineHeight: 1.4 }}>{resultMessage}</span>
-        </div>
+        ) : null}
       </div>
 
-      <button
-        type="button"
-        disabled={!result?.eligible}
-        aria-disabled={!result?.eligible}
-        onClick={() => result?.eligible && onApprove?.()}
-        style={{ ...continueButton, ...(!result?.eligible ? disabledButton : null) }}
-      >
-        <span>
-          <strong style={{ display: "block" }}>{copy.continue}</strong>
-          <small style={{ display: "block", marginTop: 2, opacity: 0.88 }}>{copy.continueHint}</small>
-        </span>
-        <strong dir="ltr">{money(amount)}</strong>
-      </button>
-    </div>
+      <div style={styles.totals}>
+        <div style={styles.row}><span>{copy.discount}</span><strong>-{money(plan.amounts?.offerDiscount || 0)}</strong></div>
+        <div style={styles.row}><span>{copy.shareUsed}</span><strong>{money(plan.amounts?.shareAed || 0)}</strong></div>
+        <div style={styles.row}><span>{copy.walletUsed}</span><strong>{money(plan.amounts?.walletAed || 0)}</strong></div>
+        <div style={styles.strongRow}><span>{copy.cardRemainder}</span><span>{money(plan.amounts?.cardAed || 0)}</span></div>
+      </div>
+      {plan.valid
+        ? <p style={styles.success}>{copy.ready}</p>
+        : cardOfferErrorShown
+          ? null
+          : <p style={styles.error} role="alert">{reason}</p>}
+      <div style={styles.actions}>
+        <button
+          type="button"
+          style={{ ...styles.primary, opacity: plan.valid ? 1 : 0.5, cursor: plan.valid ? "pointer" : "not-allowed" }}
+          disabled={!plan.valid}
+          data-testid="review-dummy-payment"
+          onClick={() => setPhase("review")}
+        >
+          {copy.review}
+        </button>
+      </div>
+    </section>
   );
 }
-
-const gatewayCard = { border: `1px solid ${C.border}`, borderRadius: 14, background: C.surfaceAlt, padding: 12 };
-const gatewayHeading = { display: "flex", alignItems: "flex-start", gap: 9 };
-const shieldIcon = { display: "inline-flex", width: 32, height: 32, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 10, background: C.primarySoft, color: C.primary };
-const noChargeBadge = { flexShrink: 0, borderRadius: 999, background: C.warningSoft, padding: "4px 7px", color: C.warning, fontSize: 8, fontWeight: 900, letterSpacing: ".06em" };
-const methodGrid = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 6, marginTop: 12 };
-const methodButton = { display: "flex", minWidth: 0, minHeight: 48, flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, border: `1px solid ${C.border}`, borderRadius: 10, background: C.surface, padding: "6px 4px", color: C.muted, cursor: "pointer", fontSize: 9, fontWeight: 800 };
-const activeMethodButton = { borderColor: C.primary, background: C.primarySoft, color: C.primary };
-const methodPanel = { marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 11, background: C.surface, padding: 10 };
-const methodTitle = { color: C.text, fontSize: 12, fontWeight: 900 };
-const methodHelp = { marginTop: 3, color: C.muted, fontSize: 9, lineHeight: 1.45 };
-const testCardGrid = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 9 };
-const testCardButton = { display: "flex", minWidth: 0, minHeight: 58, flexDirection: "column", justifyContent: "space-between", gap: 5, border: `1px solid ${C.border}`, borderRadius: 9, background: C.surfaceAlt, padding: 8, color: C.text, cursor: "pointer", textAlign: "start", fontSize: 8 };
-const inputLabel = { display: "grid", gap: 4, marginTop: 9, color: C.text, fontSize: 9, fontWeight: 800 };
-const cardInput = { width: "100%", boxSizing: "border-box", border: `1px solid ${C.border}`, borderRadius: 9, background: C.surface, padding: "10px 11px", color: C.text, outlineColor: C.primary, fontSize: 13, letterSpacing: ".04em" };
-const validateButton = { width: "100%", minHeight: 42, marginTop: 8, border: `1px solid ${C.primary}`, borderRadius: 9, background: C.primarySoft, color: C.primary, cursor: "pointer", fontSize: 11, fontWeight: 900 };
-const balanceRow = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 9, borderRadius: 9, background: C.surfaceAlt, padding: "9px 10px", color: C.text, fontSize: 10 };
-const validationResult = { display: "flex", alignItems: "flex-start", gap: 8, marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 10, background: C.surface, padding: 9, color: C.muted };
-const eligibleResult = { borderColor: C.green, background: C.successSoft, color: C.green };
-const failedResult = { borderColor: C.warning, background: C.warningSoft, color: C.text };
-const continueButton = { display: "flex", width: "100%", minHeight: 54, alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10, border: "none", borderRadius: 11, background: C.primary, padding: "10px 12px", color: C.onPrimary, cursor: "pointer", textAlign: "start", fontSize: 11 };
-const disabledButton = { background: C.border, color: C.muted, cursor: "not-allowed" };
