@@ -113,6 +113,7 @@ test("a movie title supplied before cinema and date is selected without being re
   await page.getByRole("button", { name: "Start a new conversation" }).click();
 
   await sendText(page, movieTitle);
+  await expect(page.getByRole("heading", { name: "Choose your cinema" })).toBeVisible();
   await sendText(page, "Mall of the Emirates");
   const dateGroup = page.getByRole("group", { name: "Choose a date" });
   await expect(dateGroup).toBeVisible();
