@@ -12,6 +12,8 @@ import { isExplicitMovieTransactionTurn } from "./movieInformationPrefilter.js";
 
 const clean = (value) => normalizeCustomerFacingText(String(value ?? "").replace(/\s+/g, " ").trim());
 const localeText = (locale, en, ar) => locale === "ar" ? ar : en;
+import { localizeCatalogValue } from "./catalogLocalization.js";
+
 const normalize = (value) => String(value || "")
   .normalize("NFKC")
   .toLocaleLowerCase("en")
@@ -23,6 +25,7 @@ const normalize = (value) => String(value || "")
   .trim();
 
 const SYNOPSIS_PATTERN = /\b(?:what(?:'s| is) .{1,80} about|what happens|story|storyline|plot|synopsis|summary)\b|(?:عن ماذا|عن شو|ما قصة|ما قصه|قصة الفيلم|قصه الفيلم|ملخص|احداث الفيلم|أحداث الفيلم)/iu;
+const SYNOPSIS_DETAILS_PATTERN = /\b(?:(?:what(?:'s| is)|tell me)\s+(?:the\s+)?story|storyline|plot|synopsis|summary)\b|(?:قصة الفيلم|قصه الفيلم|ملخص|احداث الفيلم|أحداث الفيلم)/iu;
 const LANGUAGE_PATTERN = /\b(?:what|which|original|spoken|movie|film)?\s*(?:language|languages|dubbed|dubbing)\b|(?:ما لغة|ما لغه|لغة الفيلم|لغه الفيلم|مدبلج|اللغة الاصلية|اللغه الاصليه)/iu;
 const SUBTITLE_PATTERN = /\b(?:subtitle|subtitles|subtitled|captions?)\b|(?:ترجمة|ترجمه|مترجم|الترجمة|الترجمه)/iu;
 const RUNTIME_PATTERN = /\b(?:runtime|duration|how long|length of (?:the )?(?:movie|film)|minutes? long)\b|(?:(?:ما\s+)?(?:مدة|مده)(?:\s+فيلم)?|كم مدته|كم دقيقة|كم دقيقه)/iu;
@@ -194,7 +197,7 @@ function answerForTopic({ topic, movie, query, locale, sessions, viewerAge }) {
   if (topic === "language") {
     const language = languageFor(movie);
     return language
-      ? localeText(locale, `${title} is listed in ${language}.`, `اللغة المدرجة لفيلم ${title} هي ${language}.`)
+      ? localeText(locale, `${title} is listed in ${language}.`, `اللغة المدرجة لفيلم ${title} هي ${localizeCatalogValue(language, locale)}.`)
       : localeText(locale, `The current VOX listing does not specify the original language for ${title}.`, `لا تحدد قائمة ڤوكس الحالية اللغة الأصلية لفيلم ${title}.`);
   }
   if (topic === "subtitles") {
@@ -212,17 +215,19 @@ function answerForTopic({ topic, movie, query, locale, sessions, viewerAge }) {
   if (topic === "genre") {
     const genres = genresFor(movie);
     return genres.length
-      ? localeText(locale, `${title} is listed as ${genres.join(", ")}.`, `الأنواع المدرجة لفيلم ${title} هي ${genres.join("، ")}.`)
+      ? localeText(locale, `${title} is listed as ${genres.join(", ")}.`, `الأنواع المدرجة لفيلم ${title} هي ${genres.map((genre) => localizeCatalogValue(genre, locale)).join("، ")}.`)
       : localeText(locale, `The current VOX listing does not specify a genre for ${title}.`, `لا تحدد قائمة ڤوكس الحالية نوع فيلم ${title}.`);
   }
   if (topic === "details") {
+    const genres = genresFor(movie);
+    const language = languageFor(movie);
     const facts = [
       normalizeMovieRating(movie?.rating) ? localeText(locale, `rated ${normalizeMovieRating(movie.rating)}`, `التصنيف ${normalizeMovieRating(movie.rating)}`) : "",
-      genresFor(movie).join(", "),
-      languageFor(movie),
+      locale === "ar" ? genres.map((genre) => localizeCatalogValue(genre, locale)).join("، ") : genres.join(", "),
+      localizeCatalogValue(language, locale),
       runtimeFor(movie) ? localeText(locale, `${runtimeFor(movie)} minutes`, `${runtimeFor(movie)} دقيقة`) : "",
-    ].filter(Boolean).join(", ");
-    const synopsis = synopsisFor(movie);
+    ].filter(Boolean).join(locale === "ar" ? "، " : ", ");
+    const synopsis = SYNOPSIS_DETAILS_PATTERN.test(query) ? synopsisFor(movie) : "";
     return clean(localeText(
       locale,
       `${title}${facts ? ` is ${facts}.` : "."}${synopsis ? ` ${synopsis}` : ""}`,

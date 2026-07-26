@@ -4,6 +4,7 @@ import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 import { getExperienceMedia, getMoviePosterUrl, getSupportedImageUrl } from "../mediaData.js";
 import { isCurrentBooking } from "../lib/cancellationRouting.js";
+import { localizeCatalogValue, localizeCinemaName } from "../lib/catalogLocalization.js";
 import RetryableLazy from "./RetryableLazy.jsx";
 
 const loadBookingQRCode = () => import("./BookingQRCode.jsx");
@@ -104,11 +105,13 @@ function InlineState({ title, onRetry, error = false }) {
 }
 
 export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, onRetry, notice }) {
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   const [query, setQuery] = React.useState("");
   const [showAll, setShowAll] = React.useState(false);
   const key = query.trim().toLowerCase();
-  const matching = cinemas.filter((cinema) => !key || cinema.name.toLowerCase().includes(key));
+  const matching = cinemas.filter((cinema) => !key
+    || cinema.name.toLowerCase().includes(key)
+    || localizeCinemaName(cinema.name, locale).toLowerCase().includes(key));
   const visible = key || showAll ? matching : matching.slice(0, 6);
   return (
     <section role="region" aria-labelledby={STAGE_HEADING_IDS.cinemas}>
@@ -123,7 +126,7 @@ export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, 
           <button key={cinema.id} onClick={() => onSelect(cinema)} style={{ ...rowBtn, padding: "11px 13px", borderColor: selected?.id === cinema.id ? C.primary : C.border, background: selected?.id === cinema.id ? C.primarySoft : C.surface }}>
             <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
               <MapPin size={15} color={C.primary} />
-              <span dir="auto" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, color: C.text }}>{cinema.name.replace(/^VOX\s*[\u2014-]\s*/, "")}</span>
+              <span dir="auto" style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13, color: C.text }}>{localizeCinemaName(cinema.name.replace(/^VOX\s*[\u2014-]\s*/, ""), locale)}</span>
             </span>
             {selected?.id === cinema.id ? <Check size={15} color={C.green} /> : <ChevronRight size={16} color={C.muted} style={{ transform: dir === "rtl" ? "rotate(180deg)" : "none" }} />}
           </button>
@@ -138,14 +141,14 @@ export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, 
 }
 
 export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, error, onRetry, notice }) {
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   const [showAll, setShowAll] = React.useState(false);
   const movieKey = movies.map((movie) => movie.id).join("|");
   React.useEffect(() => setShowAll(false), [movieKey, cinemaName, scheduleDate]);
   const visibleMovies = showAll ? movies : movies.slice(0, 4);
   return (
     <section role="region" aria-labelledby={STAGE_HEADING_IDS.movies}>
-      <Header headingId={STAGE_HEADING_IDS.movies} icon={<Film size={16} />} title={t("movies.title")} sub={<span><bdi dir="auto">{cinemaName}</bdi> · <span dir="ltr">{scheduleDate}</span></span>} />
+      <Header headingId={STAGE_HEADING_IDS.movies} icon={<Film size={16} />} title={t("movies.title")} sub={<span><bdi dir="auto">{localizeCinemaName(cinemaName, locale)}</bdi> · <span dir="ltr">{scheduleDate}</span></span>} />
       {notice && <div role="status" style={{ marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 10, background: C.primarySoft, padding: "9px 11px", color: C.primary, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
       {error ? <InlineState title={typeof error === "string" ? error : t("movies.error")} onRetry={onRetry} error /> : !movies.length ? <InlineState title={t("movies.empty")} onRetry={onRetry} /> : <div style={{ display: "flex", maxWidth: "100%", flexDirection: "column", gap: 9 }}>
         {visibleMovies.map((m) => (
@@ -157,9 +160,9 @@ export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, err
                 <span style={{ background: C.primarySoft, color: C.primary, borderRadius: 3, padding: "1px 4px", marginInlineEnd: 5 }}>{m.rating}</span>
                 {" · "}
                 {[
-                  ...(m.genres || [m.genre]).filter(Boolean).slice(0, 2),
+                  ...(m.genres || [m.genre]).filter(Boolean).slice(0, 2).map((genre) => localizeCatalogValue(genre, locale)),
                   m.runtime ? t("showtimes.minutes", { count: m.runtime }) : "",
-                  m.language || "",
+                  localizeCatalogValue(m.language || "", locale),
                 ].filter(Boolean).join(" · ")}
               </span>
               {!!m.relevantSessions?.length && <span aria-label={t("movies.relevantShowtimes", { title: m.title })} style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
@@ -179,7 +182,7 @@ export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, err
 }
 
 export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRetry, notice }) {
-  const { t, dir } = useI18n();
+  const { t, dir, locale } = useI18n();
   const expColor = (e) => (["IMAX", "MAX"].includes(e) ? C.primaryHover : e === "GOLD" ? C.warning : e === "KIDS" ? C.green : C.primary);
   return (
     <section role="region" aria-labelledby={STAGE_HEADING_IDS.showtimes}>
@@ -187,8 +190,8 @@ export function Showtimes({ movie, sessions = [], onSelect, onBack, error, onRet
       {notice && <div role="status" style={{ marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 10, background: C.primarySoft, padding: "9px 11px", color: C.primary, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
       <div style={{ marginBottom: 14, borderRadius: 12, border: `1px solid ${C.border}`, background: C.surfaceAlt, padding: "11px 12px" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 7 }}>
-          {(movie.genres || [movie.genre]).filter(Boolean).map((genre) => <span key={genre} style={{ borderRadius: 999, background: C.primarySoft, color: C.primary, padding: "2px 7px", fontSize: 10 }}>{genre}</span>)}
-          {movie.language && <span style={{ borderRadius: 999, background: C.surface, color: C.muted, padding: "2px 7px", fontSize: 10 }}>{movie.language}</span>}
+          {(movie.genres || [movie.genre]).filter(Boolean).map((genre) => <span key={genre} style={{ borderRadius: 999, background: C.primarySoft, color: C.primary, padding: "2px 7px", fontSize: 10 }}>{localizeCatalogValue(genre, locale)}</span>)}
+          {movie.language && <span style={{ borderRadius: 999, background: C.surface, color: C.muted, padding: "2px 7px", fontSize: 10 }}>{localizeCatalogValue(movie.language, locale)}</span>}
         </div>
         <p dir="auto" style={{ margin: 0, fontSize: 11, lineHeight: 1.45, color: C.muted }}>{movie.synopsis}</p>
       </div>
@@ -322,7 +325,7 @@ export function BookingCard({
   onStaleVersion,
   cancelled,
 }) {
-  const { t, dir, formatCurrency, formatDate } = useI18n();
+  const { t, dir, locale, formatCurrency, formatDate } = useI18n();
   const isCancelled = cancelled ?? booking.cancelled;
   const isCurrent = isCurrentBooking({ ...booking, cancelled: isCancelled });
   const isDemo = booking.verified !== true
@@ -331,7 +334,7 @@ export function BookingCard({
     || ["confirmed_demo", "summary_saved", "locally_stored"].includes(booking.bookingStatus);
   const isDemoCancellation = isCancelled && (isDemo || booking.refundStatus === "not_processed_demo");
   const posterUrl = getMoviePosterUrl(booking);
-  const cinemaName = booking.cinemaName || t("booking.unknownCinema");
+  const cinemaName = localizeCinemaName(booking.cinemaName || t("booking.unknownCinema"), locale);
   const storedPerformanceDate = booking.performanceDate || booking.sourceDate || booking.date;
   const performanceDate = storedPerformanceDate ? formatDate(storedPerformanceDate) : t("booking.unknownDate");
   const sessionSummaryParts = [booking.experience, booking.screen, booking.showtime]

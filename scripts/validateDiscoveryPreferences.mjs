@@ -479,7 +479,7 @@ assert.equal(arabicDiscoveryPreferences.movieTitle, null);
 const arabicDiscoveryResults = filterDiscoveryResults({ movies, sessions, cinemas, preferences: arabicDiscoveryPreferences });
 assert.deepEqual(arabicDiscoveryResults.movies.map((movie) => movie.id), ["laugh"], "Arabic discovery must return only Arabic-language movies");
 assert.ok(arabicDiscoveryResults.sessions.every((session) => session.scheduledFilmId === "laugh" && session.cinemaId === "0002" && session.programmingDate === "2026-07-15"));
-for (const arabicLanguagePhrase of ["أفلام بالعربي", "أفلام بالعربية", "أفلام ناطقة بالعربية"]) {
+for (const arabicLanguagePhrase of ["أفلام بالعربي", "أفلام بالعربية", "أفلام ناطقة بالعربية", "أفلام باللغة العربية"]) {
   assert.equal(
     extractDiscoveryPreferencePatch(arabicLanguagePhrase, { movies }).patch.language,
     "Arabic",

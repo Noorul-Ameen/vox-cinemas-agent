@@ -3,9 +3,10 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight, History, RotateCcw, Tic
 import { C } from "../theme.js";
 import { useI18n } from "../i18n/I18nProvider.jsx";
 import { isCurrentBooking, sortBookingsForDisplay } from "../lib/cancellationRouting.js";
+import { localizeCinemaName } from "../lib/catalogLocalization.js";
 
 export default function BookingHistory({ bookings = [], error = "", onSelect, onBack, onCancel, onRequestCancel, filter = "all" }) {
-  const { t, dir, formatCurrency, formatDate } = useI18n();
+  const { t, dir, locale, formatCurrency, formatDate } = useI18n();
   const cancelBooking = onCancel || onRequestCancel;
   const activeOnly = filter === "active";
   const visibleBookings = activeOnly ? bookings.filter((booking) => isCurrentBooking(booking)) : bookings;
@@ -44,7 +45,7 @@ export default function BookingHistory({ bookings = [], error = "", onSelect, on
             const isDemoCancellation = cancelled && (isDemo || booking.refundStatus === "not_processed_demo");
             const storedPerformanceDate = booking.performanceDate || booking.sourceDate || booking.date;
             const performanceDate = storedPerformanceDate ? formatDate(storedPerformanceDate) : t("booking.unknownDate");
-            const cinemaName = booking.cinemaName || t("booking.unknownCinema");
+            const cinemaName = localizeCinemaName(booking.cinemaName || t("booking.unknownCinema"), locale);
             const statusLabel = isDemoCancellation
               ? t("history.cancelledLocal")
               : cancelled
