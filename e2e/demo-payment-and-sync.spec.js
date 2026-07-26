@@ -151,12 +151,12 @@ test("an unmatched typed showtime hour keeps the rendered showtime options visib
   await expect(page.locator("main")).toContainText("بقيت مواعيد العرض ظاهرة");
 });
 
-test("typed journey reaches final review and processes a three-way dummy payment", async ({ page }) => {
+test("typed journey reaches final review and processes a three-way payment", async ({ page }) => {
   await reachCheckoutByText(page);
   await expect(page.getByTestId("dummy-payment-gateway")).toBeVisible();
   await expect(page.getByTestId("combined-payment-options")).toBeVisible();
   await expect(page.getByTestId("combined-payment-options")).toContainText("10 points available");
-  await expect(page.getByTestId("combined-payment-options")).toContainText("Dummy balance AED 30");
+  await expect(page.getByTestId("combined-payment-options")).toContainText("Wallet balance AED 30");
 
   await sendText(page, "pay now");
   await expect(page.getByTestId("dummy-payment-gateway")).toBeVisible();
@@ -165,7 +165,7 @@ test("typed journey reaches final review and processes a three-way dummy payment
 
   await page.getByTestId("dummy-payment-gateway").getByLabel("Card offer").selectOption("fab-share");
   await page.getByTestId("ineligible-test-card").click();
-  await expect(page.getByText("This test card is not eligible for the selected offer.")).toBeVisible();
+  await expect(page.getByText("This card is not eligible for the selected offer.")).toBeVisible();
   await expect(page.getByTestId("review-dummy-payment")).toBeDisabled();
 
   await page.getByTestId("eligible-test-card").click();
@@ -176,7 +176,7 @@ test("typed journey reaches final review and processes a three-way dummy payment
   await page.getByLabel("Use VOX Wallet").check();
   await page.getByLabel("Wallet value in AED").fill("30");
 
-  await expect(page.getByText(/Dummy offer discount/).locator("..")).toContainText(/AED\s*42\.00/);
+  await expect(page.getByText(/Offer discount/).locator("..")).toContainText(/AED\s*42\.00/);
   await expect(page.getByText(/Card remainder/).locator("..")).toContainText(/AED\s*11\.00/);
   await expect(page.getByTestId("review-dummy-payment")).toBeEnabled();
   await page.getByTestId("review-dummy-payment").click();
@@ -184,9 +184,9 @@ test("typed journey reaches final review and processes a three-way dummy payment
   await expect(page.getByText("SHARE points").locator("..")).toContainText(/AED\s*1\.00/);
   await expect(page.getByText("VOX Wallet").locator("..")).toContainText(/AED\s*30\.00/);
   await page.getByTestId("process-dummy-payment").click();
-  await expect(page.getByText("Processing dummy payment")).toBeVisible();
-  await expect(page.getByText("Dummy payment receipt")).toBeVisible();
-  await expect(page.getByText(/No real payment or seat reservation occurred/)).toBeVisible();
+  await expect(page.getByText("Processing payment")).toBeVisible();
+  await expect(page.getByText("Payment receipt")).toBeVisible();
+  await expect(page.getByText(/Payment processed in the POC environment/)).toBeVisible();
   await expect(page.getByText(/^WL[A-HJ-NP-Z2-9]{5}$/).first()).toBeVisible();
 });
 
@@ -204,7 +204,7 @@ test("Arabic checkout processes a combined SHARE, wallet, and card payment", asy
   await page.getByTestId("review-dummy-payment").click();
   await expect(page.getByText("ملخص الدفع النهائي")).toBeVisible();
   await page.getByTestId("process-dummy-payment").click();
-  await expect(page.getByText("جار معالجة الدفع التجريبي")).toBeVisible();
-  await expect(page.getByText("إيصال الدفع التجريبي")).toBeVisible();
-  await expect(page.getByText(/لم يحدث دفع أو حجز مقعد حقيقي/)).toBeVisible();
+  await expect(page.getByText("جار معالجة الدفع")).toBeVisible();
+  await expect(page.getByText("إيصال الدفع")).toBeVisible();
+  await expect(page.getByText(/تمت معالجة الدفع في بيئة إثبات المفهوم/)).toBeVisible();
 });

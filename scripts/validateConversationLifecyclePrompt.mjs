@@ -98,8 +98,8 @@ assert.match(
 
 assert.match(
   VOXI_AGENT_PROMPT,
-  /Offer selection, test-card entry, SHARE and wallet amounts, final review, and Process dummy payment are guest-controlled on-screen actions/i,
-  "the dummy payment must require guest-controlled on-screen configuration, final review, and processing",
+  /Offer selection, card entry, SHARE and wallet amounts, final review, and Process payment are guest-controlled on-screen actions/i,
+  "the POC payment must require guest-controlled on-screen configuration, final review, and processing",
 );
 assert.match(
   VOXI_AGENT_PROMPT,

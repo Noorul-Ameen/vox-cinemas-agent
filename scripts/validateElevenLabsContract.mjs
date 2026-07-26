@@ -183,10 +183,10 @@ assert.match(promptSource, /Treat Afghan or Afghani movie wording as ambiguous[\
 assert.match(promptSource, /A request for new movies, different movies, another movie[\s\S]*Never continue with the old title or old showtime/, "the prompt must replace stale movie and time filters on an explicit alternative request");
 assert.match(promptSource, /When a short hour such as "9" uniquely matches one visible showtime[\s\S]*Never restart movie discovery/, "the prompt must ground short-hour choices in visible showtimes and clarify ambiguity in place");
 assert.match(promptSource, /Never tell the guest that the booking process is paused[\s\S]*Do not apply that short reply as a global restore/, "the prompt must keep one-shot paused-journey recovery customer-safe and state-scoped");
-assert.match(promptSource, /two published test card numbers[\s\S]*without transmitting or storing it/, "the live-agent prompt must define the bounded test-card contract");
-assert.match(promptSource, /combine optional SHARE points and VOX Wallet value[\s\S]*never charges a real card[\s\S]*redeems real points/, "the live-agent prompt must describe split funding as non-transactional");
-assert.match(promptSource, /final review[\s\S]*Process dummy payment[\s\S]*guest-controlled on-screen actions/, "the live-agent prompt must reserve all payment-step choices for the guest");
-assert.match(promptSource, /dummy payment was processed only after authoritative widget context explicitly confirms a processed dummy receipt/, "the live-agent prompt must synchronize dummy processing claims with the rendered receipt");
+assert.match(promptSource, /two published card profiles[\s\S]*without transmitting or storing it/, "the live-agent prompt must define the bounded card-profile contract");
+assert.match(promptSource, /combine optional SHARE points and VOX Wallet value[\s\S]*Do not claim external bank capture/, "the live-agent prompt must preserve the POC transaction boundary");
+assert.match(promptSource, /final review[\s\S]*Process payment[\s\S]*guest-controlled on-screen actions/, "the live-agent prompt must reserve all payment-step choices for the guest");
+assert.match(promptSource, /payment was processed only after authoritative widget context explicitly confirms a payment receipt/, "the live-agent prompt must synchronize payment claims with the rendered receipt");
 assert.match(offerFacts, /use the official VOX website or app checkout/i, "offer redemption must direct guests to an official VOX checkout");
 const promptHash = createHash("sha256").update(normalizeSource(VOXI_AGENT_PROMPT), "utf8").digest("hex");
 assert.equal(promptHash, contract.prompt.sha256, "the exported ElevenLabs prompt value changed without a contract version update");
