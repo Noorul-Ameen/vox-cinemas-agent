@@ -184,11 +184,14 @@ for (const informationTurn of ["ما الساعة 9", "ماذا يعرض الس�
 }
 
 const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+const clarification = await readFile(new URL("../src/lib/showtimeClarification.js", import.meta.url), "utf8");
 assert.match(app, /resolveVisibleShowtimeSelectionTurn\(\{ text: safeMessage, stage: stageRef\.current \}\)/, "voice transcripts must resolve a visible showtime choice");
 assert.match(app, /resolveVisibleShowtimeSelectionTurn\(\{ text: value, stage: stageRef\.current \}\)/, "typed turns must resolve a visible showtime choice");
 assert.ok((app.match(/routeVisibleShowtimeSelection\(directShowtimeSelection\)/g) || []).length >= 2, "text and voice must both open the seat map deterministically");
 assert.match(app, /const pauseRenderingForUnrelatedTurn[\s\S]*directShowtimeSelection[\s\S]*\|\| directShowtimeSelection/, "a visible showtime choice must remain transactional while the seat map loads");
-assert.ok((app.match(/ambiguousShowtimeCandidates\.length > 1/g) || []).length >= 2, "text and voice must identify an ambiguous visible hour without leaving the showtime view");
-assert.ok((app.match(/Ask only which exact time and experience they want/g) || []).length >= 2, "text and voice must ask a grounded clarification for ambiguous visible showtimes");
+assert.ok((app.match(/await showtimeClarificationLazy/g) || []).length >= 2, "text and voice must clarify a non-exact visible showtime without leaving the showtime view");
+assert.match(clarification, /candidates\.length > 1/, "the clarification must distinguish ambiguous visible times");
+assert.match(clarification, /exact displayed time/, "voice must ask for an exact displayed time");
+assert.match(clarification, /exact time and experience/, "text must ask for an exact time and experience when visible sessions are ambiguous");
 
 console.log("Validated deterministic English and Arabic visible-showtime selection for text and voice.");

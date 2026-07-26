@@ -53,9 +53,10 @@ assert.equal(maskDemoCardNumber(DEMO_CARD_NUMBERS.notEligible), "**** **** **** 
 assert.equal(validateDemoCardOffer(DEMO_CARD_NUMBERS.eligible).status, "eligible", "the eligible test card must pass offer validation");
 assert.equal(validateDemoCardOffer(DEMO_CARD_NUMBERS.notEligible).status, "not_eligible", "the second test card must return a not-eligible result");
 assert.equal(validateDemoCardOffer("4000000000000000").status, "unrecognized", "every unpublished card number must fail closed");
-assert.equal(validateDemoWallet(84).eligible, true, "the published test wallet balance must validate a normal checkout amount");
+assert.equal(validateDemoWallet(30).eligible, true, "the published test wallet balance must validate its full AED 30 balance");
 assert.equal(validateDemoWallet(DEMO_WALLET_BALANCE + 1).status, "insufficient", "wallet validation must fail above the test balance");
-assert.equal(validateDemoSharePoints(84).eligible, true, "the published SHARE balance must validate a normal checkout amount");
+assert.equal(validateDemoSharePoints(1).eligible, true, "the published 10 SHARE points must validate their AED 1 equivalent");
+assert.equal(validateDemoSharePoints(1.1).status, "insufficient", "SHARE validation must fail above the 10-point balance");
 assert.equal(validateDemoSharePoints(DEMO_SHARE_POINTS).status, "insufficient", "SHARE validation must account for the points conversion");
 const fabShareOffer = OFFERS.find((offer) => offer.id === "fab-share");
 assert.ok(fabShareOffer, "the published FAB SHARE offer must remain available");
@@ -64,17 +65,17 @@ const splitPlan = createDemoPaymentPlan({
   ticketCount: 2,
   offer: fabShareOffer,
   cardNumber: DEMO_CARD_NUMBERS.eligible,
-  shareAed: 10,
-  walletAed: 20,
+  shareAed: 1,
+  walletAed: 30,
 });
 assert.equal(splitPlan.valid, true, "eligible BOGO plus three-way funding must produce a valid plan");
 assert.deepEqual(splitPlan.amounts, {
   originalTotal: 84,
   offerDiscount: 42,
   payableTotal: 42,
-  shareAed: 10,
-  walletAed: 20,
-  cardAed: 12,
+  shareAed: 1,
+  walletAed: 30,
+  cardAed: 11,
 }, "BOGO, SHARE, wallet, and card amounts must reconcile exactly");
 assert.equal(createDemoPaymentPlan({
   amount: 84,
@@ -83,10 +84,11 @@ assert.equal(createDemoPaymentPlan({
   cardNumber: DEMO_CARD_NUMBERS.notEligible,
 }).reason, "offer_card_not_eligible", "the second published card must fail every selected offer");
 assert.equal(createDemoPaymentPlan({
-  amount: 84,
+  amount: 31,
   ticketCount: 2,
-  walletAed: 84,
-}).amounts.cardAed, 0, "wallet funds may cover the full payable amount without a card");
+  shareAed: 1,
+  walletAed: 30,
+}).amounts.cardAed, 0, "SHARE and wallet may fully fund a payable amount without a card");
 assert.equal(createDemoPaymentPlan({
   amount: 84,
   ticketCount: 2,

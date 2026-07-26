@@ -2,6 +2,22 @@ import { resolveBilingualDiscoveryMovieCandidate } from "./discoveryPreferences.
 import { isAmbiguousMovieSelectionUtterance } from "./discoveryResultContext.js";
 import { isPotentialMovieInformationTurn } from "./movieInformationPrefilter.js";
 
+export async function routePendingVisibleMovie({ result, text, route } = {}) {
+  if (!text || !Array.isArray(result?.movies) || !result.movies.length) return null;
+  const movie = await resolveBilingualDiscoveryMovieCandidate(result.movies, text);
+  if (!movie) return null;
+  const selection = await route(movie);
+  const showtimes = Array.isArray(selection?.result?.showtimes) ? selection.result.showtimes : [];
+  return {
+    ...result,
+    shown: showtimes.length ? "showtimes" : "movie",
+    movies: [],
+    selectedMovie: { id: movie.id, title: movie.title },
+    showtimes,
+    reason: selection?.result?.reason || result.reason,
+  };
+}
+
 const clean = (value) => String(value || "")
   .normalize("NFKC")
   .replace(/[.!?,;:،؟]+$/gu, "")

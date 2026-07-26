@@ -319,7 +319,8 @@ assert.match(
 const discoveryRoute = app.slice(app.indexOf("const routeDiscoveryTurn"), app.indexOf("useEffect(() =>", app.indexOf("const routeDiscoveryTurn")));
 assert.match(discoveryRoute, /const directCinemaReply = Boolean\(cinemaOverride && isDirectCinemaSelectionUtterance/, "a direct cinema-only reply must be identified before unresolved movie-title handling");
 assert.match(discoveryRoute, /rawTurn && !locationIntent && !directCinemaReply && !dateOnlyReply/, "location, cinema, and date-only replies must never be retained as unresolved movie titles");
-assert.match(discoveryRoute, /directCinemaReply \|\| rawPreferencePatch\.patch\.movieId/, "a direct cinema-only reply must clear any stale pending movie title");
+assert.doesNotMatch(discoveryRoute, /directCinemaReply \|\| rawPreferencePatch\.patch\.movieId/, "a cinema reply must not clear a movie title supplied on the previous turn");
+assert.match(discoveryRoute, /likelyUnresolvedTitle \|\| explicitMovieSelectionTurn[\s\S]*pendingDiscoveryTurnRef\.current = rawTurn/, "both unresolved and catalog-matched movie titles must remain pending until availability is verified");
 assert.match(
   discoveryRoute,
   /const shouldVerifyCinemaList = Boolean\(preferences\.date && \([\s\S]{0,260}hasDiscoveryTimePreference\(preferences\)[\s\S]{0,260}preferences\.openChoice/,

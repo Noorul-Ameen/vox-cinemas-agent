@@ -67,10 +67,10 @@ export default function DemoPaymentGateway({
   const [phase, setPhase] = useState("configure");
   const [offerId, setOfferId] = useState("");
   const [cardNumber, setCardNumber] = useState("");
-  const [useShare, setUseShare] = useState(false);
-  const [shareAed, setShareAed] = useState("0");
-  const [useWallet, setUseWallet] = useState(false);
-  const [walletAed, setWalletAed] = useState("0");
+  const [useShare, setUseShare] = useState(true);
+  const [shareAed, setShareAed] = useState(String(DEMO_SHARE_POINTS / DEMO_SHARE_POINTS_PER_AED));
+  const [useWallet, setUseWallet] = useState(true);
+  const [walletAed, setWalletAed] = useState(String(DEMO_WALLET_BALANCE));
 
   const copy = ar ? {
     notice: "هذه بوابة دفع تجريبية فقط. تحاكي العرض وتقسيم المبلغ والمعالجة، ولا تخصم أموالاً أو نقاطاً ولا تحجز مقاعد حقيقية.",
@@ -84,6 +84,8 @@ export default function DemoPaymentGateway({
     useCard: "استخدام هذه البطاقة",
     cardNumber: "رقم بطاقة الاختبار",
     cardPlaceholder: "استخدم إحدى بطاقتي الاختبار فقط",
+    combined: "الدفع المدمج",
+    combinedHelp: "استخدم نقاط SHARE ومحفظة VOX معاً، وادفع أي مبلغ متبقٍ ببطاقة الاختبار. يمكنك إلغاء أي مصدر دفع قبل المراجعة.",
     share: "استخدام نقاط SHARE",
     shareAvailable: `${DEMO_SHARE_POINTS.toLocaleString("ar-AE")} نقطة متاحة، كل ${DEMO_SHARE_POINTS_PER_AED} نقاط = 1 د.إ`,
     shareAmount: "قيمة SHARE بالدرهم",
@@ -121,6 +123,8 @@ export default function DemoPaymentGateway({
     useCard: "Use this card",
     cardNumber: "Test card number",
     cardPlaceholder: "Use one of the two test cards only",
+    combined: "Combined payment",
+    combinedHelp: "Use SHARE points and VOX Wallet together, then pay any remaining amount with the selected test card. Either balance can be declined before review.",
     share: "Use SHARE points",
     shareAvailable: `${DEMO_SHARE_POINTS.toLocaleString("en-AE")} points available, ${DEMO_SHARE_POINTS_PER_AED} points = AED 1`,
     shareAmount: "SHARE value in AED",
@@ -237,6 +241,57 @@ export default function DemoPaymentGateway({
         ) : null}
       </div>
 
+      <div
+        style={{ ...styles.section, borderColor: palette.accent, background: "#fff8f6" }}
+        data-testid="combined-payment-options"
+      >
+        <h3 style={styles.title}>{copy.combined}</h3>
+        <p style={styles.help}>{copy.combinedHelp}</p>
+        <label style={styles.toggleRow}>
+          <input type="checkbox" checked={useShare} onChange={(event) => setUseShare(event.target.checked)} />
+          <span>{copy.share}</span>
+        </label>
+        <p style={styles.help}>{copy.shareAvailable}</p>
+        {useShare ? (
+          <div style={styles.amountGrid}>
+            <label style={styles.label}>
+              <span>{copy.shareAmount}</span>
+              <input
+                style={styles.input}
+                type="number"
+                min="0"
+                max={DEMO_SHARE_POINTS / DEMO_SHARE_POINTS_PER_AED}
+                step="0.1"
+                value={shareAed}
+                aria-label={copy.shareAmount}
+                onChange={(event) => setShareAed(event.target.value)}
+              />
+            </label>
+            <span style={styles.amountBadge}>{plan.sharePointsUsed.toLocaleString(ar ? "ar-AE" : "en-AE")} pts</span>
+          </div>
+        ) : null}
+        <label style={styles.toggleRow}>
+          <input type="checkbox" checked={useWallet} onChange={(event) => setUseWallet(event.target.checked)} />
+          <span>{copy.wallet}</span>
+        </label>
+        <p style={styles.help}>{copy.walletAvailable}</p>
+        {useWallet ? (
+          <label style={styles.label}>
+            <span>{copy.walletAmount}</span>
+            <input
+              style={styles.input}
+              type="number"
+              min="0"
+              max={DEMO_WALLET_BALANCE}
+              step="0.01"
+              value={walletAed}
+              aria-label={copy.walletAmount}
+              onChange={(event) => setWalletAed(event.target.value)}
+            />
+          </label>
+        ) : null}
+      </div>
+
       <div style={styles.section}>
         <h3 style={styles.title}>{copy.cards}</h3>
         <div style={styles.cardGrid}>
@@ -268,55 +323,6 @@ export default function DemoPaymentGateway({
           plan.cardValidation?.eligible
             ? <p style={styles.success}>{copy.eligibleCard}</p>
             : <p style={styles.error}>{plan.cardValidation?.valid ? copy.notEligible : copy.offerCardRequired}</p>
-        ) : null}
-      </div>
-
-      <div style={styles.section}>
-        <label style={styles.toggleRow}>
-          <input type="checkbox" checked={useShare} onChange={(event) => setUseShare(event.target.checked)} />
-          <span>{copy.share}</span>
-        </label>
-        <p style={styles.help}>{copy.shareAvailable}</p>
-        {useShare ? (
-          <div style={styles.amountGrid}>
-            <label style={styles.label}>
-              <span>{copy.shareAmount}</span>
-              <input
-                style={styles.input}
-                type="number"
-                min="0"
-                max={DEMO_SHARE_POINTS / DEMO_SHARE_POINTS_PER_AED}
-                step="0.1"
-                value={shareAed}
-                aria-label={copy.shareAmount}
-                onChange={(event) => setShareAed(event.target.value)}
-              />
-            </label>
-            <span style={styles.amountBadge}>{plan.sharePointsUsed.toLocaleString(ar ? "ar-AE" : "en-AE")} pts</span>
-          </div>
-        ) : null}
-      </div>
-
-      <div style={styles.section}>
-        <label style={styles.toggleRow}>
-          <input type="checkbox" checked={useWallet} onChange={(event) => setUseWallet(event.target.checked)} />
-          <span>{copy.wallet}</span>
-        </label>
-        <p style={styles.help}>{copy.walletAvailable}</p>
-        {useWallet ? (
-          <label style={styles.label}>
-            <span>{copy.walletAmount}</span>
-            <input
-              style={styles.input}
-              type="number"
-              min="0"
-              max={DEMO_WALLET_BALANCE}
-              step="0.01"
-              value={walletAed}
-              aria-label={copy.walletAmount}
-              onChange={(event) => setWalletAed(event.target.value)}
-            />
-          </label>
         ) : null}
       </div>
 
