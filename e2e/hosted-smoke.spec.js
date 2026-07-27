@@ -45,10 +45,11 @@ test.describe("hosted Cloudflare release smoke", () => {
     await expect(page.getByRole("region", { name: "Choose your cinema" })).toBeVisible();
     await page.getByRole("searchbox", { name: "Search cinemas" }).fill("Mall of the Emirates");
     await page.getByRole("button", { name: /Mall of the Emirates/ }).click();
-    const dateGroup = page.getByRole("group", { name: "Choose a date" });
-    const dateButtons = dateGroup.getByRole("button");
-    const dateCount = await dateButtons.count();
-    expect(dateCount).toBeGreaterThan(0);
+  const dateGroup = page.getByRole("group", { name: "Choose a date" });
+  const dateButtons = dateGroup.getByRole("button");
+  await expect(dateButtons.first()).toBeVisible();
+  const dateCount = await dateButtons.count();
+  expect(dateCount).toBeGreaterThan(0);
     await dateButtons.nth(dateCount > 1 ? 1 : 0).click();
 
     const input = page.locator("input[aria-label]").last();
