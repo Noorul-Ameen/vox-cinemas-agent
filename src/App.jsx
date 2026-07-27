@@ -4701,8 +4701,8 @@ export default function App() {
         if (!message && authoritativeResult?.confirmed) {
           message = authoritativeResult.simulationOnly
             ? (localeRef.current === "ar"
-              ? "تم تسجيل الحجز كملغى على هذا الجهاز فقط. لم تتم معالجة أي استرداد مالي."
-              : "The booking is marked cancelled on this device only. No refund was processed.")
+              ? "تم تحديث حالة الحجز إلى ملغى في بيئة إثبات المفهوم."
+              : "The booking status was updated to cancelled in the POC environment.")
             : (localeRef.current === "ar"
               ? `تم إلغاء الحجز ${bookingRef}. تمت معالجة الاسترداد إلى محفظة VOX${authoritativeResult.refundReference ? ` بالمرجع ${authoritativeResult.refundReference}` : ""}.`
               : `Booking ${bookingRef} was cancelled. The refund was processed to VOX Wallet${authoritativeResult.refundReference ? ` with reference ${authoritativeResult.refundReference}` : ""}.`);
@@ -5655,7 +5655,7 @@ export default function App() {
     if (!result) return "The widget could not determine the cancellation state. Do not claim that the booking was cancelled.";
     if (result.confirmed) {
       return result.simulationOnly
-        ? `The widget marked booking ${result.bookingRef} cancelled on this device. No refund was processed. Confirm this boundary once.`
+        ? `The widget updated booking ${result.bookingRef} to cancelled in the POC environment. State that status once.`
         : `The verified refund adapter confirmed booking ${result.bookingRef} cancelled. Refund reference: ${result.refundReference || "not returned"}.`;
     }
     if (result.phase === "processing") return `The widget is processing cancellation for ${result.bookingRef}. Do not claim success until a completed result is supplied.`;
@@ -8510,12 +8510,10 @@ export default function App() {
       window.clearTimeout(cancelTimerRef.current);
       cancelTimerRef.current = null;
       const reason = storageError?.message || "The on-device cancellation could not be saved.";
-      const message = localeRef.current === "ar" ? "تعذر حفظ حالة الإلغاء على هذا الجهاز. بقي الحجز نشطاً." : "The cancellation could not be saved on this device. The booking remains active.";
+      const message = localeRef.current === "ar" ? "تعذر تحديث حالة الإلغاء في بيئة إثبات المفهوم. بقي الحجز نشطاً." : "The cancellation status could not be updated in the POC environment. The booking remains active.";
       if (mountedRef.current) {
         setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: true, refundRoute: null, error: reason, message });
-        announceCancellationSystem(source, localeRef.current === "ar"
-          ? "تعذر تسجيل الإلغاء على هذا الجهاز. بقي سجل الحجز نشطاً، ولم تتم معالجة أي استرداد."
-          : "The cancellation could not be saved on this device. The booking summary remains active and no refund was processed.");
+        announceCancellationSystem(source, message);
       }
       return { confirmed: false, simulationOnly: true, bookingRef: current.ref, reason, message };
     }

@@ -422,8 +422,8 @@ assert.match(
     stage: { ...savedBooking, booking: { ...savedBooking.booking, cancelled: true, bookingStatus: "cancelled_demo" } },
     locale: "en",
   }),
-  /marked cancelled on this device.*no refund was processed/i,
-  "a cancelled device summary must retain its cancellation and no-refund boundary",
+  /cancelled in the POC environment/i,
+  "a cancelled POC booking must retain its approved cancellation boundary",
 );
 const verifiedClaim = "Your booking is confirmed.";
 assert.equal(

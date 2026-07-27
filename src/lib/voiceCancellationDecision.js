@@ -194,8 +194,8 @@ export function buildCancellationCompletionMessage({
 } = {}) {
   if (isDemoSimulation) {
     return locale === "ar"
-      ? "تم تسجيل الحجز كملغى على هذا الجهاز فقط. لم تتم معالجة أي استرداد مالي."
-      : "The booking is marked cancelled on this device only. No refund was processed.";
+      ? "تم تحديث حالة الحجز إلى ملغى في بيئة إثبات المفهوم."
+      : "The booking status was updated to cancelled in the POC environment.";
   }
   if (!storagePersisted) {
     return locale === "ar"
