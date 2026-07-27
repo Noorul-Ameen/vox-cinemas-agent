@@ -8240,7 +8240,7 @@ export default function App() {
       say("system", message);
       return;
     }
-    sendUiTurn(`Confirm seats ${result.valid.join(", ")}`, {
+    sendUiTurn(`${localeRef.current === "ar" ? "تأكيد المقاعد" : "Confirm seats"} ${result.valid.join(", ")}`, {
       context: `The guest selected seats ${result.valid.join(", ")} through the UI and checkout review is already displayed. This confirms only the seat choice, not a booking, payment, reservation, reference, or QR. Do not call select_seats again. Tell the guest to use Save booking summary or Edit seats, and never ask for payment details by voice or text.`,
     });
   };

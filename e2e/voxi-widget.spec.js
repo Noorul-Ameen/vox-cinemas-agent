@@ -82,7 +82,11 @@ async function reachCheckout(page, seatCount = 2) {
   for (let index = 0; index < seatCount; index += 1) await availableSeats.nth(index).click();
   await expect(page.getByText(new RegExp(`${seatCount} seats?:`))).toBeVisible();
 
-  await page.getByRole("button", { name: "Confirm seats" }).click();
+  await page.getByRole("button", { name: "العربية", exact: true }).click();
+  await page.getByRole("button", { name: "تأكيد المقاعد", exact: true }).click();
+  await expect(page.getByRole("log")).toContainText("تأكيد المقاعد");
+  await expect(page.getByRole("log")).not.toContainText("Confirm seats");
+  await page.getByRole("button", { name: "English", exact: true }).click();
   await expect(page.getByText("Checkout review", { exact: true }).last()).toBeVisible();
   await expect(page.getByText(new RegExp(`${seatCount} seats?`)).first()).toBeVisible();
   return { input };
