@@ -233,7 +233,8 @@ test("checkout gateway processes a payment receipt with reference QR guidance", 
 
   const reviewPayment = page.getByTestId("review-dummy-payment");
   await expect(reviewPayment).toBeDisabled();
-  await page.getByTestId("eligible-test-card").click();
+  await page.getByTestId("payment-card-select").selectOption({ label: "**** **** **** 1111" });
+  await page.getByLabel("Card CVV").fill("123");
   await expect(reviewPayment).toBeEnabled();
   await reviewPayment.click();
   await expect(page.getByText("Final payment summary")).toBeVisible();

@@ -68,6 +68,7 @@ function readNamedFunction(source, name) {
 }
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
+const discoveryPrompt = fs.readFileSync(new URL("../src/components/DiscoveryPrompt.jsx", import.meta.url), "utf8");
 const helperSource = readNamedFunction(app, "resolveDatePromptReply");
 const resolveDatePromptReply = Function(`${helperSource}; return resolveDatePromptReply;`)();
 
@@ -335,10 +336,8 @@ assert.match(missingCriteriaSource, /preferences\.openChoice/, "an explicit open
 assert.match(missingCriteriaSource, /hasDiscoveryTimePreference\(preferences\)/, "a complete time range must satisfy the discovery preference requirement without another question");
 assert.match(discoveryRoute, /const hasNarrowingCriteria = Boolean\([\s\S]{0,220}hasDiscoveryTimePreference\(preferences\)/, "nearby cinema verification must apply a retained time range");
 assert.ok((app.match(/preferred time:\s*\$\{formatDiscoveryTimePreference\(retained\)/g) || []).length >= 2, "typed and spoken agent grounding must report the retained time range");
-const discoveryPromptStart = app.indexOf("function DiscoveryPrompt");
-const discoveryPromptEnd = app.indexOf("function LanguageSelector", discoveryPromptStart);
-assert.ok(discoveryPromptStart >= 0 && discoveryPromptEnd > discoveryPromptStart, "the discovery prompt must remain inspectable");
-assert.match(app.slice(discoveryPromptStart, discoveryPromptEnd), /formatDiscoveryTimePreference\(preferences, \{ locale \}\)/, "the visible discovery chips must display a retained time range in the active language");
+assert.match(discoveryPrompt, /export default function DiscoveryPrompt/, "the discovery prompt must remain inspectable");
+assert.match(discoveryPrompt, /formatDiscoveryTimePreference\(preferences, \{ locale \}\)/, "the visible discovery chips must display a retained time range in the active language");
 assert.match(
   missingCriteriaSource,
   /preferences\.recommendationIntent\s*===\s*["']unsupported_language_afghan["'][\s\S]*missing\.push\(["']unsupported_language_afghan["']\)/,

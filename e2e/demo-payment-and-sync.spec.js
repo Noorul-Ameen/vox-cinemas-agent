@@ -164,14 +164,15 @@ test("typed journey reaches final review and processes a three-way payment", asy
   await expect(page.getByTestId("review-dummy-payment")).toBeDisabled();
 
   await page.getByTestId("dummy-payment-gateway").getByLabel("Card offer").selectOption("fab-share");
-  await page.getByTestId("ineligible-test-card").click();
+  await page.getByTestId("payment-card-select").selectOption({ label: "**** **** **** 4444" });
   await expect(page.getByText("This card is not eligible for the selected offer.")).toBeVisible();
   await expect(page.getByTestId("review-dummy-payment")).toBeDisabled();
 
-  await page.getByTestId("eligible-test-card").click();
-  await expect(page.getByText("Eligible for every selected offer").last()).toBeVisible();
-  await expect(page.getByTestId("eligible-test-card")).toContainText("**** **** **** 1111");
-  await expect(page.getByTestId("eligible-test-card")).not.toContainText("4111 1111 1111 1111");
+  await page.getByTestId("payment-card-select").selectOption({ label: "**** **** **** 1111" });
+  await expect(page.getByText("Eligible for the selected offer").last()).toBeVisible();
+  await expect(page.getByTestId("payment-card-select")).toContainText("**** **** **** 1111");
+  await expect(page.getByTestId("dummy-payment-gateway")).not.toContainText("4111 1111 1111 1111");
+  await page.getByLabel("Card CVV").fill("123");
 
   await page.getByLabel("Use SHARE points").check();
   await page.getByLabel("SHARE points to redeem").fill("11");
@@ -179,15 +180,19 @@ test("typed journey reaches final review and processes a three-way payment", asy
   await expect(page.getByTestId("review-dummy-payment")).toBeDisabled();
   await page.getByLabel("SHARE points to redeem").fill("10");
   await page.getByLabel("Use VOX Wallet").check();
-  await page.getByLabel("Wallet value in AED").fill("30");
+  await page.getByLabel("Wallet value in AED").fill("10");
 
   await expect(page.getByText(/Offer discount/).locator("..")).toContainText(/AED\s*42\.00/);
-  await expect(page.getByText(/Card remainder/).locator("..")).toContainText(/AED\s*11\.00/);
+  await expect(page.getByText(/Equivalent AED discount/).locator("..")).toContainText(/AED\s*20\.00/);
+  await expect(page.getByText(/Remaining amount to be paid/).locator("..")).toContainText(/AED\s*22\.00/);
+  await expect(page.getByText(/Card remainder/).locator("..")).toContainText(/AED\s*12\.00/);
   await expect(page.getByTestId("review-dummy-payment")).toBeEnabled();
   await page.getByTestId("review-dummy-payment").click();
   await expect(page.getByText("Final payment summary")).toBeVisible();
-  await expect(page.getByText("SHARE points").locator("..")).toContainText(/10 points/);
-  await expect(page.getByText("VOX Wallet").locator("..")).toContainText(/AED\s*30\.00/);
+  await expect(page.getByText("Points redeemed").locator("..")).toContainText(/10 points/);
+  await expect(page.getByText("Equivalent AED discount").locator("..")).toContainText(/AED\s*20\.00/);
+  await expect(page.getByText("Remaining amount to be paid").locator("..")).toContainText(/AED\s*22\.00/);
+  await expect(page.getByText("VOX Wallet").locator("..")).toContainText(/AED\s*10\.00/);
   await page.getByTestId("process-dummy-payment").click();
   await expect(page.getByText("Processing payment")).toBeVisible();
   await expect(page.getByText("Payment receipt")).toBeVisible();
@@ -200,7 +205,8 @@ test("Arabic checkout processes a combined SHARE, wallet, and card payment", asy
   await page.getByRole("button", { name: "العربية" }).click();
   await expect(page.getByTestId("dummy-payment-gateway")).toBeVisible();
 
-  await page.getByTestId("eligible-test-card").click();
+  await page.getByTestId("payment-card-select").selectOption({ label: "**** **** **** 1111" });
+  await page.getByLabel("رمز CVV").fill("123");
   await page.getByLabel("استخدام نقاط SHARE").check();
   await page.getByLabel("نقاط SHARE المراد استخدامها").fill("11");
   await expect(page.getByText(/رصيدك المتاح .* نقاط SHARE/)).toBeVisible();

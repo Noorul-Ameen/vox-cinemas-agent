@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { OFFERS } from "../offers/offersData.js";
 import {
   DEMO_CARD_NUMBERS,
+  DEMO_SHARE_AED_VALUE,
   DEMO_SHARE_POINTS,
   DEMO_SHARE_POINTS_PER_AED,
   DEMO_WALLET_BALANCE,
@@ -68,6 +69,7 @@ export default function DemoPaymentGateway({
   const [phase, setPhase] = useState("configure");
   const [offerId, setOfferId] = useState("");
   const [cardNumber, setCardNumber] = useState("");
+  const [cvv, setCvv] = useState("");
   const [useShare, setUseShare] = useState(true);
   const [sharePoints, setSharePoints] = useState(String(DEMO_SHARE_POINTS));
   const [useWallet, setUseWallet] = useState(true);
@@ -79,15 +81,21 @@ export default function DemoPaymentGateway({
     offer: "عرض البطاقة",
     noOffer: "بدون عرض بطاقة",
     offerHelp: "اختر أي عرض منشور للتحقق من الأهلية وقيمة الخصم.",
-    cards: "بطاقات الدفع المتاحة",
-    eligibleCard: "مؤهلة لكل العروض المختارة",
-    ineligibleCard: "غير مؤهلة لأي عرض مختار",
+    cards: "بطاقة الدفع",
+    cardPlaceholder: "اختر بطاقة",
+    eligibleCard: "مؤهلة للعرض المحدد",
+    ineligibleCard: "غير مؤهلة للعرض المحدد",
+    cardAvailable: "متاحة للدفع",
     useCard: "استخدام هذه البطاقة",
     selectedCard: "البطاقة المحددة",
+    cvv: "رمز CVV",
+    cvvHelp: "أدخل رمز CVV المكوّن من 3 أرقام للبطاقة المحددة.",
+    cvvRequired: "أدخل رمز CVV للبطاقة المحددة.",
+    cvvInvalid: "يجب أن يتكون رمز CVV من 3 أرقام.",
     combined: "الدفع المدمج",
     combinedHelp: "استخدم نقاط SHARE ومحفظة VOX معاً، وادفع أي مبلغ متبقٍ بالبطاقة المحددة. يمكنك إلغاء أي مصدر دفع قبل المراجعة.",
     share: "استخدام نقاط SHARE",
-    shareAvailable: `رصيد SHARE المتاح: ${DEMO_SHARE_POINTS.toLocaleString("ar-AE")} نقاط`,
+    shareAvailable: `رصيد SHARE المتاح: ${DEMO_SHARE_POINTS.toLocaleString("ar-AE")} نقاط بقيمة ${DEMO_SHARE_AED_VALUE.toLocaleString("ar-AE")} د.إ`,
     shareAmount: "نقاط SHARE المراد استخدامها",
     sharePointUnit: "نقطة",
     shareBalanceExceeded: `رصيدك المتاح ${DEMO_SHARE_POINTS.toLocaleString("ar-AE")} نقاط SHARE. أدخل ${DEMO_SHARE_POINTS.toLocaleString("ar-AE")} نقاط أو أقل.`,
@@ -95,13 +103,16 @@ export default function DemoPaymentGateway({
     wallet: "استخدام محفظة VOX",
     walletAvailable: `رصيد المحفظة ${DEMO_WALLET_BALANCE} د.إ`,
     walletAmount: "قيمة المحفظة بالدرهم",
+    pointsRedeemed: "النقاط المستخدمة",
+    pointsEquivalent: "قيمة النقاط بالدرهم",
+    remainingPayment: "المبلغ المتبقي للدفع",
     cardRemainder: "المتبقي على البطاقة",
     review: "مراجعة الدفع",
     final: "ملخص الدفع النهائي",
     original: "الإجمالي الأصلي",
     discount: "خصم العرض",
     payable: "الإجمالي بعد العرض",
-    shareUsed: "SHARE",
+    shareUsed: "نقاط SHARE",
     walletUsed: "محفظة VOX",
     cardUsed: "البطاقة",
     change: "تعديل الدفع",
@@ -120,15 +131,21 @@ export default function DemoPaymentGateway({
     offer: "Card offer",
     noOffer: "No card offer",
     offerHelp: "Choose any published offer to validate eligibility and adjustment.",
-    cards: "Available payment cards",
-    eligibleCard: "Eligible for every selected offer",
-    ineligibleCard: "Not eligible for any selected offer",
+    cards: "Payment card",
+    cardPlaceholder: "Select a card",
+    eligibleCard: "Eligible for the selected offer",
+    ineligibleCard: "Not eligible for the selected offer",
+    cardAvailable: "Available for payment",
     useCard: "Use this card",
     selectedCard: "Selected card",
+    cvv: "Card CVV",
+    cvvHelp: "Enter the 3-digit CVV for the selected card.",
+    cvvRequired: "Enter the CVV for the selected card.",
+    cvvInvalid: "CVV must contain 3 digits.",
     combined: "Combined payment",
     combinedHelp: "Use SHARE points and VOX Wallet together, then pay any remaining amount with the selected card. Either balance can be declined before review.",
     share: "Use SHARE points",
-    shareAvailable: `Available SHARE balance: ${DEMO_SHARE_POINTS.toLocaleString("en-AE")} points`,
+    shareAvailable: `Available SHARE balance: ${DEMO_SHARE_POINTS.toLocaleString("en-AE")} points worth AED ${DEMO_SHARE_AED_VALUE.toLocaleString("en-AE")}`,
     shareAmount: "SHARE points to redeem",
     sharePointUnit: "points",
     shareBalanceExceeded: `You have ${DEMO_SHARE_POINTS.toLocaleString("en-AE")} SHARE points available. Enter ${DEMO_SHARE_POINTS.toLocaleString("en-AE")} points or fewer.`,
@@ -136,6 +153,9 @@ export default function DemoPaymentGateway({
     wallet: "Use VOX Wallet",
     walletAvailable: `Wallet balance AED ${DEMO_WALLET_BALANCE}`,
     walletAmount: "Wallet value in AED",
+    pointsRedeemed: "Points redeemed",
+    pointsEquivalent: "Equivalent AED discount",
+    remainingPayment: "Remaining amount to be paid",
     cardRemainder: "Card remainder",
     review: "Review payment",
     final: "Final payment summary",
@@ -166,9 +186,10 @@ export default function DemoPaymentGateway({
     ticketCount,
     offer: selectedOffer,
     cardNumber,
+    cvv,
     sharePoints: useShare ? sharePoints : 0,
     walletAed: useWallet ? walletAed : 0,
-  }), [amount, ticketCount, selectedOffer, cardNumber, useShare, sharePoints, useWallet, walletAed]);
+  }), [amount, ticketCount, selectedOffer, cardNumber, cvv, useShare, sharePoints, useWallet, walletAed]);
 
   const money = (value) => {
     if (typeof formatCurrency === "function") return formatCurrency(value, currency);
@@ -180,6 +201,8 @@ export default function DemoPaymentGateway({
     offer_card_required: copy.offerCardRequired,
     offer_card_not_eligible: copy.notEligible,
     card_required: copy.cardRequired,
+    cvv_required: copy.cvvRequired,
+    cvv_invalid: copy.cvvInvalid,
     share_points_exceed_balance: copy.shareBalanceExceeded,
     share_points_invalid: copy.shareWholePoints,
     unsupported_offer: copy.unsupported,
@@ -187,6 +210,8 @@ export default function DemoPaymentGateway({
   }[plan.reason] || "";
   const cardOfferErrorShown = Boolean(cardNumber && selectedOffer && !plan.cardValidation?.eligible);
   const shareValidationErrorShown = Boolean(useShare && plan.shareValidation && !plan.shareValidation.valid);
+  const cardSelectionNeedsCvv = Boolean(cardNumber && (selectedOffer ? plan.cardValidation?.eligible : plan.amounts?.cardAed > 0));
+  const cvvErrorShown = Boolean(cardSelectionNeedsCvv && cvv && !plan.cvvValidation?.valid);
   const selectedOfferLabel = selectedOffer
     ? `${localValue(selectedOffer.bank, language)} - ${localValue(selectedOffer.headline, language)}`
     : copy.noOffer;
@@ -206,7 +231,9 @@ export default function DemoPaymentGateway({
             <div style={styles.row}><span>{copy.original}</span><strong>{money(plan.amounts.originalTotal)}</strong></div>
             <div style={styles.row}><span>{copy.discount}</span><strong>-{money(plan.amounts.offerDiscount)}</strong></div>
             <div style={styles.strongRow}><span>{copy.payable}</span><span>{money(plan.amounts.payableTotal)}</span></div>
-            <div style={styles.row}><span>{copy.shareUsed}</span><strong>{points(plan.sharePointsUsed)}</strong></div>
+            <div style={styles.row}><span>{copy.pointsRedeemed}</span><strong>{points(plan.sharePointsUsed)}</strong></div>
+            <div style={styles.row}><span>{copy.pointsEquivalent}</span><strong>-{money(plan.amounts.shareAed)}</strong></div>
+            <div style={styles.strongRow}><span>{copy.remainingPayment}</span><span>{money(plan.amounts.remainingAfterPointsAed)}</span></div>
             <div style={styles.row}><span>{copy.walletUsed}</span><strong>{money(plan.amounts.walletAed)}</strong></div>
             <div style={styles.row}><span>{copy.cardUsed}{plan.cardLast4 ? ` •••• ${plan.cardLast4}` : ""}</span><strong>{money(plan.amounts.cardAed)}</strong></div>
           </div>
@@ -277,7 +304,7 @@ export default function DemoPaymentGateway({
                 onChange={(event) => setSharePoints(event.target.value)}
               />
             </label>
-            <span style={styles.amountBadge}>{copy.shareAvailable}</span>
+            <span style={styles.amountBadge}>{points(plan.sharePointsUsed)} = {money(plan.amounts?.shareAed || 0)}</span>
           </div>
         ) : null}
         {shareValidationErrorShown ? <p style={styles.error} role="alert">{reason}</p> : null}
@@ -305,52 +332,55 @@ export default function DemoPaymentGateway({
 
       <div style={styles.section}>
         <h3 style={styles.title}>{copy.cards}</h3>
-        <div style={styles.cardGrid}>
-          <button
-            type="button"
-            style={{
-              ...styles.testCard,
-              ...(cardNumber === DEMO_CARD_NUMBERS.eligible
-                ? { borderColor: palette.accent, background: palette.accentSoft, boxShadow: "0 0 0 2px rgba(0, 118, 111, 0.12)" }
-                : {}),
+        <label style={styles.label}>
+          <span>{copy.cards}</span>
+          <select
+            style={styles.select}
+            value={cardNumber}
+            aria-label={copy.cards}
+            data-testid="payment-card-select"
+            onChange={(event) => {
+              setCardNumber(event.target.value);
+              setCvv("");
             }}
-            data-testid="eligible-test-card"
-            aria-pressed={cardNumber === DEMO_CARD_NUMBERS.eligible}
-            onClick={() => setCardNumber(DEMO_CARD_NUMBERS.eligible)}
           >
-            <span style={styles.number}>{maskDemoCardNumber(DEMO_CARD_NUMBERS.eligible)}</span>
-            <span style={styles.badgeGood}>{copy.eligibleCard}</span>
-            <span style={styles.help}>{cardNumber === DEMO_CARD_NUMBERS.eligible ? copy.selectedCard : copy.useCard}</span>
-          </button>
-          <button
-            type="button"
-            style={{
-              ...styles.testCard,
-              ...(cardNumber === DEMO_CARD_NUMBERS.notEligible
-                ? { borderColor: palette.accent, background: palette.accentSoft, boxShadow: "0 0 0 2px rgba(0, 118, 111, 0.12)" }
-                : {}),
-            }}
-            data-testid="ineligible-test-card"
-            aria-pressed={cardNumber === DEMO_CARD_NUMBERS.notEligible}
-            onClick={() => setCardNumber(DEMO_CARD_NUMBERS.notEligible)}
-          >
-            <span style={styles.number}>{maskDemoCardNumber(DEMO_CARD_NUMBERS.notEligible)}</span>
-            <span style={styles.badgeBad}>{copy.ineligibleCard}</span>
-            <span style={styles.help}>{cardNumber === DEMO_CARD_NUMBERS.notEligible ? copy.selectedCard : copy.useCard}</span>
-          </button>
-        </div>
+            <option value="">{copy.cardPlaceholder}</option>
+            <option value={DEMO_CARD_NUMBERS.eligible}>{maskDemoCardNumber(DEMO_CARD_NUMBERS.eligible)}</option>
+            <option value={DEMO_CARD_NUMBERS.notEligible}>{maskDemoCardNumber(DEMO_CARD_NUMBERS.notEligible)}</option>
+          </select>
+        </label>
         {cardNumber && selectedOffer ? (
           plan.cardValidation?.eligible
             ? <p style={styles.success}>{copy.eligibleCard}</p>
             : <p style={styles.error}>{plan.cardValidation?.valid ? copy.notEligible : copy.offerCardRequired}</p>
+        ) : cardNumber ? <p style={styles.success}>{copy.cardAvailable}</p> : null}
+        {cardSelectionNeedsCvv ? (
+          <label style={styles.label}>
+            <span>{copy.cvv}</span>
+            <input
+              style={styles.input}
+              type="password"
+              inputMode="numeric"
+              autoComplete="cc-csc"
+              maxLength={3}
+              value={cvv}
+              aria-label={copy.cvv}
+              aria-invalid={cvvErrorShown}
+              onChange={(event) => setCvv(event.target.value.replace(/\D/g, "").slice(0, 3))}
+            />
+            <span style={styles.help}>{copy.cvvHelp}</span>
+          </label>
         ) : null}
+        {cvvErrorShown ? <p style={styles.error} role="alert">{copy.cvvInvalid}</p> : null}
       </div>
 
       <div style={styles.totals}>
         <div style={styles.row}><span>{copy.discount}</span><strong>-{money(plan.amounts?.offerDiscount || 0)}</strong></div>
-        <div style={styles.row}><span>{copy.shareUsed}</span><strong>{points(plan.sharePointsUsed)}</strong></div>
+        <div style={styles.row}><span>{copy.pointsRedeemed}</span><strong>{points(plan.sharePointsUsed)}</strong></div>
+        <div style={styles.row}><span>{copy.pointsEquivalent}</span><strong>-{money(plan.amounts?.shareAed || 0)}</strong></div>
         <div style={styles.row}><span>{copy.walletUsed}</span><strong>{money(plan.amounts?.walletAed || 0)}</strong></div>
-        <div style={styles.strongRow}><span>{copy.cardRemainder}</span><span>{money(plan.amounts?.cardAed || 0)}</span></div>
+        <div style={styles.strongRow}><span>{copy.remainingPayment}</span><span>{money(plan.amounts?.remainingAfterPointsAed || 0)}</span></div>
+        <div style={styles.row}><span>{copy.cardRemainder}</span><strong>{money(plan.amounts?.cardAed || 0)}</strong></div>
       </div>
       {plan.valid
         ? <p style={styles.success}>{copy.ready}</p>

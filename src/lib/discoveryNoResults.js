@@ -31,6 +31,8 @@ function preferenceLabels(preferences = {}, locale = "en") {
     preferences.genre ? (locale === "ar" ? `نوع ${localizeCatalogValue(preferences.genre, locale)}` : `${preferences.genre} genre`) : null,
     preferences.experience ? (locale === "ar" ? `تجربة ${localizeCatalogValue(preferences.experience, locale)}` : `${preferences.experience} experience`) : null,
     preferences.audience === "kids_family" ? (locale === "ar" ? "أطفال وعائلات" : "kids and family") : null,
+    preferences.audience === "teen" ? (locale === "ar" ? "مناسب للمراهقين" : "suitable for teenagers") : null,
+    preferences.viewerAge != null ? (locale === "ar" ? `مناسب لعمر ${preferences.viewerAge}` : `suitable for age ${preferences.viewerAge}`) : null,
     timePreference,
   ].map(clean).filter(Boolean);
 }
@@ -56,6 +58,24 @@ export function buildDiscoveryNoResultsMessage({
     : "";
   let statement;
   let action;
+  if (singleContent && preferences.viewerAge != null) {
+    statement = locale === "ar"
+      ? `لا توجد أفلام بتصنيف عمري مناسب لعمر ${preferences.viewerAge}`
+      : `No movies with a suitable published rating for age ${preferences.viewerAge} are available`;
+    action = locale === "ar"
+      ? "يمكنك تغيير التاريخ أو السينما."
+      : "You can change the date or cinema.";
+    return `${statement}${scope ? ` ${scope}` : ""}. ${action}`;
+  }
+  if (singleContent && preferences.audience === "teen") {
+    statement = locale === "ar"
+      ? "لا توجد أفلام بتصنيف عمري مناسب للمراهقين"
+      : "No movies with a suitable published rating for teenagers are available";
+    action = locale === "ar"
+      ? "يمكنك تغيير التاريخ أو السينما."
+      : "You can change the date or cinema.";
+    return `${statement}${scope ? ` ${scope}` : ""}. ${action}`;
+  }
   if (locale === "ar") {
     if (singleContent && preferences.movieTitle) [statement, action] = [`لا توجد عروض متاحة لفيلم ${preferences.movieTitle}`, "يمكنك تغيير التاريخ أو السينما."];
     else if (singleContent && preferences.language) [statement, action] = [`لا توجد أفلام باللغة ${localizeCatalogValue(preferences.language, locale)}`, "يمكنك تغيير التاريخ أو السينما أو لغة الفيلم."];

@@ -31,8 +31,8 @@ const cinemas = [
   { id: "0012", name: "Yas Mall", city: "Abu Dhabi" },
 ];
 const movies = [
-  { id: "toy", title: "Toy Story 5", genres: ["Animation", "Adventure", "Family"], languageName: "English", experiences: ["IMAX", "STANDARD"] },
-  { id: "laugh", title: "The Big Laugh", genres: ["Comedy"], languageName: "Arabic", experiences: ["STANDARD"] },
+  { id: "toy", title: "Toy Story 5", rating: "PG", genres: ["Animation", "Adventure", "Family"], languageName: "English", experiences: ["IMAX", "STANDARD"] },
+  { id: "laugh", title: "The Big Laugh", rating: "15+", genres: ["Comedy"], languageName: "Arabic", experiences: ["STANDARD"] },
   { id: "race", title: "Desert Race", genres: ["Action", "Sports"], languageName: "English", experiences: ["4DX", "STANDARD"] },
 ];
 const minionsMovie = { id: "minions", title: "Minions & Monsters", genres: ["Animation", "Comedy", "Family"], languageName: "English", experiences: ["STANDARD"] };
@@ -55,6 +55,40 @@ const reportedFrenchJourneySessions = [
   { sessionId: "fr-23", scheduledFilmId: "french-film", cinemaId: "0002", programmingDate: "2026-07-23", time: "18:00", exp: "STANDARD" },
   { sessionId: "en-23", scheduledFilmId: "english-film", cinemaId: "0002", programmingDate: "2026-07-23", time: "18:30", exp: "STANDARD" },
 ];
+
+const structuredDiscoveryCases = [
+  ["I'd like to book a movie suitable for a 15-year-old", { viewerAge: 15 }],
+  ["Suggest a movie for my 15-year-old", { viewerAge: 15 }],
+  ["Show me a movie suitable for children", { audience: "kids_family" }],
+  ["Recommend a good movie for teenagers", { audience: "teen" }],
+  ["Book a comedy movie", { genre: "Comedy" }],
+  ["Show me an Arabic movie", { language: "Arabic" }],
+  ["What movie can I watch with my 10-year-old?", { viewerAge: 10 }],
+];
+for (const [input, expected] of structuredDiscoveryCases) {
+  const result = extractDiscoveryPreferencePatch(input, { cinemas, movies, now: NOW });
+  for (const [key, value] of Object.entries(expected)) {
+    assert.equal(result.patch[key], value, `${input}: ${key} must be extracted as a discovery filter`);
+  }
+  assert.equal(result.patch.movieTitle, undefined, `${input}: a generic discovery phrase must not become a movie title`);
+  assert.equal(unresolvedMovieTitleCandidate(input, result), null, `${input}: a structured discovery request must not be queued as an unresolved title`);
+}
+const explicitTitleRequest = extractDiscoveryPreferencePatch("I want to book Toy Story 5", { cinemas, movies, now: NOW });
+assert.equal(explicitTitleRequest.patch.movieTitle, "Toy Story 5", "a clearly named published title must still resolve normally");
+const ageFilteredResults = filterDiscoveryResults({
+  movies,
+  sessions,
+  cinemas,
+  preferences: { cinemaId: "0002", date: "2026-07-15", viewerAge: 15 },
+});
+assert.deepEqual(ageFilteredResults.movies.map((movie) => movie.id), ["toy", "laugh"], "age 15 discovery must exclude only movies blocked by the published rating policy");
+const childAgeFilteredResults = filterDiscoveryResults({
+  movies,
+  sessions,
+  cinemas,
+  preferences: { cinemaId: "0002", date: "2026-07-15", viewerAge: 10 },
+});
+assert.deepEqual(childAgeFilteredResults.movies.map((movie) => movie.id), ["toy"], "age 10 discovery must exclude restricted 15+ and 18+ movies");
 
 const frenchTurn = parseAndMergeDiscoveryPreferences({}, "French", { cinemas, movies, now: NOW });
 assert.equal(frenchTurn.preferences.language, "French", "a bare supported movie language must be retained even when the current catalog has no matching title");

@@ -92,9 +92,9 @@ function uniqueDisplayParts(...values) {
   });
 }
 
-function InlineState({ title, onRetry, error = false }) {
+function InlineState({ title, onRetry, error = false, loading = false }) {
   const { t } = useI18n();
-  const Icon = error ? AlertTriangle : Film;
+  const Icon = loading ? RefreshCw : error ? AlertTriangle : Film;
   return (
     <div role={error ? "alert" : "status"} style={{ display: "flex", minHeight: 150, flexDirection: "column", alignItems: "center", justifyContent: "center", border: `1px dashed ${error ? C.warning : C.border}`, borderRadius: 13, background: error ? C.warningSoft : C.surfaceAlt, padding: 20, color: C.muted, textAlign: "center" }}>
       <Icon size={25} color={error ? C.warning : C.primary} aria-hidden="true" />
@@ -140,17 +140,17 @@ export function CinemaPicker({ cinemas = [], selected, onSelect, onBack, error, 
   );
 }
 
-export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, error, onRetry, notice }) {
+export function MovieGrid({ movies = [], cinemaName, scheduleDate, onSelect, error, onRetry, notice, loading = false, loadingLabel = "" }) {
   const { t, dir, locale } = useI18n();
   const [showAll, setShowAll] = React.useState(false);
   const movieKey = movies.map((movie) => movie.id).join("|");
   React.useEffect(() => setShowAll(false), [movieKey, cinemaName, scheduleDate]);
   const visibleMovies = showAll ? movies : movies.slice(0, 4);
   return (
-    <section role="region" aria-labelledby={STAGE_HEADING_IDS.movies}>
+    <section role="region" aria-labelledby={STAGE_HEADING_IDS.movies} aria-busy={loading}>
       <Header headingId={STAGE_HEADING_IDS.movies} icon={<Film size={16} />} title={t("movies.title")} sub={<span><bdi dir="auto">{localizeCinemaName(cinemaName, locale)}</bdi> · <span dir="ltr">{scheduleDate}</span></span>} />
       {notice && <div role="status" style={{ marginBottom: 12, border: `1px solid ${C.border}`, borderRadius: 10, background: C.primarySoft, padding: "9px 11px", color: C.primary, fontSize: 10, lineHeight: 1.45 }}>{notice}</div>}
-      {error ? <InlineState title={typeof error === "string" ? error : t("movies.error")} onRetry={onRetry} error /> : !movies.length ? <InlineState title={t("movies.empty")} onRetry={onRetry} /> : <div style={{ display: "flex", maxWidth: "100%", flexDirection: "column", gap: 9 }}>
+      {loading ? <InlineState loading title={loadingLabel} /> : error ? <InlineState title={typeof error === "string" ? error : t("movies.error")} onRetry={onRetry} error /> : !movies.length ? <InlineState title={t("movies.empty")} onRetry={onRetry} /> : <div style={{ display: "flex", maxWidth: "100%", flexDirection: "column", gap: 9 }}>
         {visibleMovies.map((m) => (
           <button key={m.id} onClick={() => onSelect(m)} style={{ ...btnReset, display: "flex", width: "100%", minWidth: 0, gap: 11, border: `1px solid ${C.border}`, borderRadius: 13, background: C.surface, padding: 9, textAlign: "start" }}>
             <Poster small tint={m.tint} title={m.title} posterUrl={m.posterUrl} />
