@@ -60,22 +60,22 @@ function savedSummaryGuidance(booking, locale) {
   const hasDemoPayment = booking?.demoPayment?.status === "processed";
   if (hasDemoPayment) {
     return locale === "ar"
-      ? `إيصال الدفع متاح${ref ? ` بمرجع الحجز ${ref}` : ""} ضمن بيئة إثبات المفهوم.`
-      : `Your payment receipt is available${ref ? ` with booking reference ${ref}` : ""} in the POC environment.`;
+      ? `إيصال الدفع متاح${ref ? ` بمرجع الحجز ${ref}` : ""}.`
+      : `Your payment receipt is available${ref ? ` with booking reference ${ref}` : ""}.`;
   }
   if (locale === "ar") {
-    return `الحجز${title ? ` لفيلم ${title}` : ""} ظاهر${ref ? ` بمرجع الحجز ${ref}` : ""} ضمن بيئة إثبات المفهوم.`;
+    return `الحجز${title ? ` لفيلم ${title}` : ""} ظاهر${ref ? ` بمرجع الحجز ${ref}` : ""}.`;
   }
-  return `Your booking${title ? ` for ${title}` : ""} is available${ref ? ` with booking reference ${ref}` : ""} in the POC environment.`;
+  return `Your booking${title ? ` for ${title}` : ""} is available${ref ? ` with booking reference ${ref}` : ""}.`;
 }
 
 function cancelledSummaryGuidance(booking, locale) {
   const title = clean(booking?.movieTitle);
   const ref = clean(booking?.ref);
   if (locale === "ar") {
-    return `تم تحديث حالة الحجز${title ? ` لفيلم ${title}` : ""}${ref ? ` بالمرجع ${ref}` : ""} إلى ملغى في بيئة إثبات المفهوم.`;
+    return `تم تحديث حالة الحجز${title ? ` لفيلم ${title}` : ""}${ref ? ` بالمرجع ${ref}` : ""} إلى ملغى.`;
   }
-  return `The booking${title ? ` for ${title}` : ""}${ref ? ` with reference ${ref}` : ""} is cancelled in the POC environment.`;
+  return `The booking${title ? ` for ${title}` : ""}${ref ? ` with reference ${ref}` : ""} is cancelled.`;
 }
 
 function preservedCheckoutGuidance(pendingOrder, locale) {

@@ -35,13 +35,15 @@ assert.match(checkoutSource, /onProcess=\{processPayment\}/, "only a valid revie
 assert.doesNotMatch(`${checkoutSource}\n${demoGatewaySource}`, /\bfetch\s*\(|axios|sendText|sendContextualUpdate|clientTools/, "test checkout data must never leave the non-transactional components");
 assert.doesNotMatch(demoGatewaySource, /\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b/, "test payment values must remain in memory and must not be persisted");
 assert.doesNotMatch(demoGatewaySource, /\b(?:cvv|cvc|cardName|expiryLabel|security code|one-time password|otp)\b/i, "the test gateway must not collect authentication or real cardholder details");
-assert.match(demoGatewaySource, /inputMode="numeric"/, "the published test-card field must use a numeric mobile keyboard");
-assert.match(demoGatewaySource, /autoComplete="off"/, "the published test-card field must not invite browser payment autofill");
-assert.match(demoGatewaySource, /maxLength=\{19\}/, "the test-card field must remain bounded to a formatted 16-digit number");
+assert.match(demoGatewaySource, /maskDemoCardNumber\(DEMO_CARD_NUMBERS\.eligible\)/, "the eligible card must render only a masked account number");
+assert.match(demoGatewaySource, /maskDemoCardNumber\(DEMO_CARD_NUMBERS\.notEligible\)/, "the ineligible card must render only a masked account number");
+assert.doesNotMatch(demoGatewaySource, /formatDemoCardNumber\(cardNumber\)/, "the checkout must never render a full selected card number");
 assert.match(demoGatewaySource, /DEMO_CARD_NUMBERS\.eligible/, "the eligible published test card must be exposed");
 assert.match(demoGatewaySource, /DEMO_CARD_NUMBERS\.notEligible/, "the not-eligible published test card must be exposed");
 assert.match(demoGatewaySource, /VOX Wallet/, "the gateway must expose VOX Wallet validation");
 assert.match(demoGatewaySource, /SHARE points/, "the gateway must expose SHARE points validation");
+assert.match(demoGatewaySource, /SHARE points to redeem/, "SHARE redemption must be entered directly in points");
+assert.match(demoGatewaySource, /shareBalanceExceeded[\s\S]*role="alert"/, "an over-balance SHARE request must show an accessible error");
 assert.match(demoGatewaySource, /disabled=\{!plan\.valid\}/, "an incomplete or failed plan must block final payment review");
 assert.match(demoGatewaySource, /Final payment summary/, "the guest must receive a separate final review before processing");
 assert.match(demoGatewaySource, /Process payment/, "payment processing must remain a guest-controlled on-screen action");
@@ -55,9 +57,9 @@ assert.equal(validateDemoCardOffer(DEMO_CARD_NUMBERS.notEligible).status, "not_e
 assert.equal(validateDemoCardOffer("4000000000000000").status, "unrecognized", "every unpublished card number must fail closed");
 assert.equal(validateDemoWallet(30).eligible, true, "the published test wallet balance must validate its full AED 30 balance");
 assert.equal(validateDemoWallet(DEMO_WALLET_BALANCE + 1).status, "insufficient", "wallet validation must fail above the test balance");
-assert.equal(validateDemoSharePoints(1).eligible, true, "the published 10 SHARE points must validate their AED 1 equivalent");
-assert.equal(validateDemoSharePoints(1.1).status, "insufficient", "SHARE validation must fail above the 10-point balance");
-assert.equal(validateDemoSharePoints(DEMO_SHARE_POINTS).status, "insufficient", "SHARE validation must account for the points conversion");
+assert.equal(validateDemoSharePoints(10).eligible, true, "the full published SHARE points balance must validate");
+assert.equal(validateDemoSharePoints(11).status, "insufficient", "SHARE validation must fail above the 10-point balance");
+assert.equal(validateDemoSharePoints(10.5).status, "invalid", "SHARE redemption must use whole points");
 const fabShareOffer = OFFERS.find((offer) => offer.id === "fab-share");
 assert.ok(fabShareOffer, "the published FAB SHARE offer must remain available");
 const splitPlan = createDemoPaymentPlan({
@@ -65,7 +67,7 @@ const splitPlan = createDemoPaymentPlan({
   ticketCount: 2,
   offer: fabShareOffer,
   cardNumber: DEMO_CARD_NUMBERS.eligible,
-  shareAed: 1,
+  sharePoints: 10,
   walletAed: 30,
 });
 assert.equal(splitPlan.valid, true, "eligible BOGO plus three-way funding must produce a valid plan");
@@ -84,9 +86,15 @@ assert.equal(createDemoPaymentPlan({
   cardNumber: DEMO_CARD_NUMBERS.notEligible,
 }).reason, "offer_card_not_eligible", "the second published card must fail every selected offer");
 assert.equal(createDemoPaymentPlan({
+  amount: 84,
+  ticketCount: 2,
+  cardNumber: DEMO_CARD_NUMBERS.eligible,
+  sharePoints: 11,
+}).reason, "share_points_exceed_balance", "payment review must fail when requested SHARE points exceed the available balance");
+assert.equal(createDemoPaymentPlan({
   amount: 31,
   ticketCount: 2,
-  shareAed: 1,
+  sharePoints: 10,
   walletAed: 30,
 }).amounts.cardAed, 0, "SHARE and wallet may fully fund a payable amount without a card");
 assert.equal(createDemoPaymentPlan({
@@ -198,20 +206,21 @@ for (const locale of ["en", "ar"]) {
   const visibleCopy = Object.values(STRINGS[locale]).join("\n");
   assert.doesNotMatch(
     visibleCopy,
-    /\bprototype\b|\bdemo only\b|\bprototype simulation\b|نموذج أولي/i,
-    `${locale}: leadership-facing UI may describe the bounded dummy payment but must not label the product a prototype`,
+    /\bPOC\b|\bproof[- ]of[- ]concept\b|\bprototype\b|\bdemo only\b|\bprototype simulation\b|إثبات المفهوم|نموذج أولي/i,
+    `${locale}: customer-facing UI must not expose implementation or environment labels`,
   );
 }
-assert.match(STRINGS.en["checkout.demoDisclaimer"], /POC environment/i, "checkout must keep a concise POC boundary disclosure");
-assert.match(STRINGS.en["checkout.testNotice"], /estimated amount/i, "checkout must disclose that its amount is not an authoritative VOX quote");
-assert.match(STRINGS.en["seats.demoNotice"], /official VOX booking channel/i, "seat guidance must distinguish the official booking channel from this review checkout");
+assert.match(STRINGS.en["checkout.demoDisclaimer"], /Review your payment details/i, "checkout must provide clear review guidance");
+assert.match(STRINGS.en["checkout.testNotice"], /amount and payment split/i, "checkout must explain the final review");
+assert.match(STRINGS.en["seats.demoNotice"], /Select your seats to continue/i, "seat guidance must keep the customer moving through checkout");
 assert.match(STRINGS.en["offers.disclaimer"], /official VOX website or app checkout/i, "offer eligibility must point to the official VOX website or app checkout");
 assert.match(i18nProviderSource, /safeCurrency[\s\S]*catch[\s\S]*currency: "AED"/, "currency formatting must fail safely even if an untrusted currency reaches the renderer");
-assert.match(STRINGS.en["booking.cancelDemoQuestion"], /Cancel booking .* in the POC environment/, "POC cancellation must identify the booking and transaction boundary");
-assert.equal(STRINGS.en["booking.cancelledLocal"], "Cancelled", "POC cancellation must use concise customer-facing status");
+assert.match(STRINGS.en["booking.cancelDemoQuestion"], /Cancel booking .*\?/, "cancellation must identify the booking in a concise confirmation");
+assert.doesNotMatch(STRINGS.en["booking.cancelDemoQuestion"], /POC|environment/i, "cancellation copy must not expose implementation labels");
+assert.equal(STRINGS.en["booking.cancelledLocal"], "Cancelled", "cancellation must use concise customer-facing status");
 assert.equal(STRINGS.en["history.cancelledLocal"], "Cancelled", "history must use the same cancelled status");
 assert.equal(STRINGS.en["history.cancelLocal"], "Cancel booking", "history must expose a clear cancellation action");
-assert.match(STRINGS.en["booking.qrDemoHint"], /official VOX ticket/, "reference QR must direct guests to an official admission ticket");
+assert.match(STRINGS.en["booking.qrDemoHint"], /booking reference/i, "reference QR guidance must use customer-facing booking language");
 assert.match(handoverSource, /showDebug\s*=\s*false/, "leadership view must hide handover diagnostics by default");
 assert.match(STRINGS.en["handover.readyBody"], /No external support connection has been started/, "handover must state that it only prepares a summary");
 assert.doesNotMatch(handoverSource, /agent queue|pick up this conversation|UserRound|Headphones/i, "handover presentation must not imply a live agent or queue");

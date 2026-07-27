@@ -6,32 +6,33 @@ import {
   DEMO_SHARE_POINTS_PER_AED,
   DEMO_WALLET_BALANCE,
   createDemoPaymentPlan,
-  formatDemoCardNumber,
+  maskDemoCardNumber,
 } from "../lib/demoPaymentGateway.js";
 
 const palette = {
-  ink: "#17151d",
-  muted: "#6f6876",
-  line: "#ded9e2",
+  ink: "#102a3a",
+  muted: "#536873",
+  line: "#c9d9dc",
   paper: "#ffffff",
-  wash: "#f7f4f1",
-  accent: "#e11b22",
-  good: "#117a4b",
+  wash: "#f1f7f7",
+  accent: "#00766f",
+  accentSoft: "#eaf8f6",
+  good: "#147a55",
   bad: "#b42318",
-  gold: "#9a6700",
+  gold: "#8a6500",
 };
 
 const styles = {
   shell: { display: "grid", gap: 16, color: palette.ink },
-  notice: { border: "1px solid #f0c9ca", background: "#fff5f5", borderRadius: 14, padding: "12px 14px", fontSize: 13, lineHeight: 1.55 },
-  section: { display: "grid", gap: 10, border: `1px solid ${palette.line}`, background: palette.paper, borderRadius: 16, padding: 14 },
+  notice: { border: "1px solid #b8dcd8", background: palette.accentSoft, borderRadius: 14, padding: "12px 14px", color: "#174d50", fontSize: 13, lineHeight: 1.55 },
+  section: { display: "grid", gap: 10, border: `1px solid ${palette.line}`, background: palette.paper, borderRadius: 16, padding: 14, boxShadow: "0 8px 24px rgba(16, 42, 58, 0.05)" },
   title: { margin: 0, fontSize: 16, fontWeight: 800 },
   help: { margin: 0, color: palette.muted, fontSize: 12, lineHeight: 1.5 },
   label: { display: "grid", gap: 7, fontSize: 13, fontWeight: 750 },
   select: { width: "100%", minHeight: 44, border: `1px solid ${palette.line}`, borderRadius: 10, background: palette.paper, color: palette.ink, padding: "0 11px", font: "inherit" },
   input: { width: "100%", minHeight: 44, boxSizing: "border-box", border: `1px solid ${palette.line}`, borderRadius: 10, background: palette.paper, color: palette.ink, padding: "0 12px", font: "inherit" },
   cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 },
-  testCard: { display: "grid", gap: 5, textAlign: "start", border: `1px solid ${palette.line}`, borderRadius: 13, background: palette.wash, padding: 12, cursor: "pointer", color: palette.ink },
+  testCard: { display: "grid", gap: 5, textAlign: "start", border: `1px solid ${palette.line}`, borderRadius: 13, background: palette.wash, padding: 12, cursor: "pointer", color: palette.ink, transition: "border-color 160ms ease, background 160ms ease, box-shadow 160ms ease" },
   number: { fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace", fontSize: 13, letterSpacing: ".03em" },
   badgeGood: { width: "fit-content", color: palette.good, fontSize: 11, fontWeight: 800 },
   badgeBad: { width: "fit-content", color: palette.bad, fontSize: 11, fontWeight: 800 },
@@ -45,7 +46,7 @@ const styles = {
   row: { display: "flex", justifyContent: "space-between", gap: 16, fontSize: 13 },
   strongRow: { display: "flex", justifyContent: "space-between", gap: 16, borderTop: `1px solid ${palette.line}`, paddingTop: 10, fontSize: 15, fontWeight: 850 },
   actions: { display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "flex-end" },
-  primary: { minHeight: 44, border: 0, borderRadius: 999, background: palette.accent, color: "white", padding: "0 20px", font: "inherit", fontWeight: 850, cursor: "pointer" },
+  primary: { minHeight: 44, border: 0, borderRadius: 999, background: palette.accent, color: "white", padding: "0 20px", font: "inherit", fontWeight: 850, cursor: "pointer", boxShadow: "0 8px 18px rgba(0, 118, 111, 0.2)" },
   secondary: { minHeight: 44, border: `1px solid ${palette.line}`, borderRadius: 999, background: palette.paper, color: palette.ink, padding: "0 18px", font: "inherit", fontWeight: 800, cursor: "pointer" },
 };
 
@@ -68,12 +69,12 @@ export default function DemoPaymentGateway({
   const [offerId, setOfferId] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [useShare, setUseShare] = useState(true);
-  const [shareAed, setShareAed] = useState(String(DEMO_SHARE_POINTS / DEMO_SHARE_POINTS_PER_AED));
+  const [sharePoints, setSharePoints] = useState(String(DEMO_SHARE_POINTS));
   const [useWallet, setUseWallet] = useState(true);
   const [walletAed, setWalletAed] = useState(String(DEMO_WALLET_BALANCE));
 
   const copy = ar ? {
-    notice: "بيئة الدفع الخاصة بإثبات المفهوم. اختر العرض وطريقة تقسيم المبلغ ثم راجع التفاصيل قبل المعالجة.",
+    notice: "دفع آمن. اختر العرض وطريقة تقسيم المبلغ ثم راجع التفاصيل قبل المعالجة.",
     configure: "إعداد الدفع",
     offer: "عرض البطاقة",
     noOffer: "بدون عرض بطاقة",
@@ -82,13 +83,15 @@ export default function DemoPaymentGateway({
     eligibleCard: "مؤهلة لكل العروض المختارة",
     ineligibleCard: "غير مؤهلة لأي عرض مختار",
     useCard: "استخدام هذه البطاقة",
-    cardNumber: "رقم البطاقة",
-    cardPlaceholder: "استخدم إحدى البطاقتين المتاحتين",
+    selectedCard: "البطاقة المحددة",
     combined: "الدفع المدمج",
     combinedHelp: "استخدم نقاط SHARE ومحفظة VOX معاً، وادفع أي مبلغ متبقٍ بالبطاقة المحددة. يمكنك إلغاء أي مصدر دفع قبل المراجعة.",
     share: "استخدام نقاط SHARE",
-    shareAvailable: `${DEMO_SHARE_POINTS.toLocaleString("ar-AE")} نقطة متاحة، كل ${DEMO_SHARE_POINTS_PER_AED} نقاط = 1 د.إ`,
-    shareAmount: "قيمة SHARE بالدرهم",
+    shareAvailable: `رصيد SHARE المتاح: ${DEMO_SHARE_POINTS.toLocaleString("ar-AE")} نقاط`,
+    shareAmount: "نقاط SHARE المراد استخدامها",
+    sharePointUnit: "نقطة",
+    shareBalanceExceeded: `رصيدك المتاح ${DEMO_SHARE_POINTS.toLocaleString("ar-AE")} نقاط SHARE. أدخل ${DEMO_SHARE_POINTS.toLocaleString("ar-AE")} نقاط أو أقل.`,
+    shareWholePoints: "أدخل عدداً صحيحاً من نقاط SHARE.",
     wallet: "استخدام محفظة VOX",
     walletAvailable: `رصيد المحفظة ${DEMO_WALLET_BALANCE} د.إ`,
     walletAmount: "قيمة المحفظة بالدرهم",
@@ -110,9 +113,9 @@ export default function DemoPaymentGateway({
     notEligible: "هذه البطاقة غير مؤهلة للعرض المحدد.",
     cardRequired: "اختر إحدى البطاقتين لدفع المبلغ المتبقي.",
     unsupported: "لا يمكن تطبيق هذا العرض.",
-    noReal: "سيؤدي الزر التالي إلى معالجة الدفع وإنشاء إيصال في بيئة إثبات المفهوم.",
+    reviewHelp: "راجع جميع التفاصيل قبل معالجة الدفع.",
   } : {
-    notice: "POC payment environment. Choose an offer and funding split, then review the details before processing.",
+    notice: "Secure checkout. Choose an offer and funding split, then review the details before processing.",
     configure: "Configure payment",
     offer: "Card offer",
     noOffer: "No card offer",
@@ -121,13 +124,15 @@ export default function DemoPaymentGateway({
     eligibleCard: "Eligible for every selected offer",
     ineligibleCard: "Not eligible for any selected offer",
     useCard: "Use this card",
-    cardNumber: "Card number",
-    cardPlaceholder: "Use one of the two available cards",
+    selectedCard: "Selected card",
     combined: "Combined payment",
     combinedHelp: "Use SHARE points and VOX Wallet together, then pay any remaining amount with the selected card. Either balance can be declined before review.",
     share: "Use SHARE points",
-    shareAvailable: `${DEMO_SHARE_POINTS.toLocaleString("en-AE")} points available, ${DEMO_SHARE_POINTS_PER_AED} points = AED 1`,
-    shareAmount: "SHARE value in AED",
+    shareAvailable: `Available SHARE balance: ${DEMO_SHARE_POINTS.toLocaleString("en-AE")} points`,
+    shareAmount: "SHARE points to redeem",
+    sharePointUnit: "points",
+    shareBalanceExceeded: `You have ${DEMO_SHARE_POINTS.toLocaleString("en-AE")} SHARE points available. Enter ${DEMO_SHARE_POINTS.toLocaleString("en-AE")} points or fewer.`,
+    shareWholePoints: "Enter a whole number of SHARE points.",
     wallet: "Use VOX Wallet",
     walletAvailable: `Wallet balance AED ${DEMO_WALLET_BALANCE}`,
     walletAmount: "Wallet value in AED",
@@ -149,7 +154,7 @@ export default function DemoPaymentGateway({
     notEligible: "This card is not eligible for the selected offer.",
     cardRequired: "Choose either available card for the remaining card balance.",
     unsupported: "This offer cannot be applied.",
-    noReal: "The next action processes the payment and creates a receipt in the POC environment.",
+    reviewHelp: "Review all details before processing the payment.",
   };
 
   const selectedOffer = useMemo(
@@ -161,9 +166,9 @@ export default function DemoPaymentGateway({
     ticketCount,
     offer: selectedOffer,
     cardNumber,
-    shareAed: useShare ? shareAed : 0,
+    sharePoints: useShare ? sharePoints : 0,
     walletAed: useWallet ? walletAed : 0,
-  }), [amount, ticketCount, selectedOffer, cardNumber, useShare, shareAed, useWallet, walletAed]);
+  }), [amount, ticketCount, selectedOffer, cardNumber, useShare, sharePoints, useWallet, walletAed]);
 
   const money = (value) => {
     if (typeof formatCurrency === "function") return formatCurrency(value, currency);
@@ -175,13 +180,17 @@ export default function DemoPaymentGateway({
     offer_card_required: copy.offerCardRequired,
     offer_card_not_eligible: copy.notEligible,
     card_required: copy.cardRequired,
+    share_points_exceed_balance: copy.shareBalanceExceeded,
+    share_points_invalid: copy.shareWholePoints,
     unsupported_offer: copy.unsupported,
     funding_mismatch: copy.unsupported,
   }[plan.reason] || "";
   const cardOfferErrorShown = Boolean(cardNumber && selectedOffer && !plan.cardValidation?.eligible);
+  const shareValidationErrorShown = Boolean(useShare && plan.shareValidation && !plan.shareValidation.valid);
   const selectedOfferLabel = selectedOffer
     ? `${localValue(selectedOffer.bank, language)} - ${localValue(selectedOffer.headline, language)}`
     : copy.noOffer;
+  const points = (value) => `${Math.max(0, Number(value) || 0).toLocaleString(ar ? "ar-AE" : "en-AE")} ${copy.sharePointUnit}`;
 
   if (phase === "review") {
     return (
@@ -197,11 +206,11 @@ export default function DemoPaymentGateway({
             <div style={styles.row}><span>{copy.original}</span><strong>{money(plan.amounts.originalTotal)}</strong></div>
             <div style={styles.row}><span>{copy.discount}</span><strong>-{money(plan.amounts.offerDiscount)}</strong></div>
             <div style={styles.strongRow}><span>{copy.payable}</span><span>{money(plan.amounts.payableTotal)}</span></div>
-            <div style={styles.row}><span>{copy.shareUsed}</span><strong>{money(plan.amounts.shareAed)}</strong></div>
+            <div style={styles.row}><span>{copy.shareUsed}</span><strong>{points(plan.sharePointsUsed)}</strong></div>
             <div style={styles.row}><span>{copy.walletUsed}</span><strong>{money(plan.amounts.walletAed)}</strong></div>
             <div style={styles.row}><span>{copy.cardUsed}{plan.cardLast4 ? ` •••• ${plan.cardLast4}` : ""}</span><strong>{money(plan.amounts.cardAed)}</strong></div>
           </div>
-          <p style={styles.help}>{copy.noReal}</p>
+          <p style={styles.help}>{copy.reviewHelp}</p>
           <div style={styles.actions}>
             <button type="button" style={styles.secondary} onClick={() => setPhase("configure")}>{copy.change}</button>
             <button type="button" style={styles.primary} data-testid="process-dummy-payment" onClick={() => onProcess?.(plan)}>{copy.process}</button>
@@ -242,7 +251,7 @@ export default function DemoPaymentGateway({
       </div>
 
       <div
-        style={{ ...styles.section, borderColor: palette.accent, background: "#fff8f6" }}
+        style={{ ...styles.section, borderColor: "#9bcfc9", background: palette.accentSoft }}
         data-testid="combined-payment-options"
       >
         <h3 style={styles.title}>{copy.combined}</h3>
@@ -260,16 +269,18 @@ export default function DemoPaymentGateway({
                 style={styles.input}
                 type="number"
                 min="0"
-                max={DEMO_SHARE_POINTS / DEMO_SHARE_POINTS_PER_AED}
-                step="0.1"
-                value={shareAed}
+                max={DEMO_SHARE_POINTS}
+                step="1"
+                value={sharePoints}
                 aria-label={copy.shareAmount}
-                onChange={(event) => setShareAed(event.target.value)}
+                aria-invalid={shareValidationErrorShown}
+                onChange={(event) => setSharePoints(event.target.value)}
               />
             </label>
-            <span style={styles.amountBadge}>{plan.sharePointsUsed.toLocaleString(ar ? "ar-AE" : "en-AE")} pts</span>
+            <span style={styles.amountBadge}>{copy.shareAvailable}</span>
           </div>
         ) : null}
+        {shareValidationErrorShown ? <p style={styles.error} role="alert">{reason}</p> : null}
         <label style={styles.toggleRow}>
           <input type="checkbox" checked={useWallet} onChange={(event) => setUseWallet(event.target.checked)} />
           <span>{copy.wallet}</span>
@@ -295,30 +306,39 @@ export default function DemoPaymentGateway({
       <div style={styles.section}>
         <h3 style={styles.title}>{copy.cards}</h3>
         <div style={styles.cardGrid}>
-          <button type="button" style={styles.testCard} data-testid="eligible-test-card" onClick={() => setCardNumber(DEMO_CARD_NUMBERS.eligible)}>
-            <span style={styles.number}>{formatDemoCardNumber(DEMO_CARD_NUMBERS.eligible)}</span>
+          <button
+            type="button"
+            style={{
+              ...styles.testCard,
+              ...(cardNumber === DEMO_CARD_NUMBERS.eligible
+                ? { borderColor: palette.accent, background: palette.accentSoft, boxShadow: "0 0 0 2px rgba(0, 118, 111, 0.12)" }
+                : {}),
+            }}
+            data-testid="eligible-test-card"
+            aria-pressed={cardNumber === DEMO_CARD_NUMBERS.eligible}
+            onClick={() => setCardNumber(DEMO_CARD_NUMBERS.eligible)}
+          >
+            <span style={styles.number}>{maskDemoCardNumber(DEMO_CARD_NUMBERS.eligible)}</span>
             <span style={styles.badgeGood}>{copy.eligibleCard}</span>
-            <span style={styles.help}>{copy.useCard}</span>
+            <span style={styles.help}>{cardNumber === DEMO_CARD_NUMBERS.eligible ? copy.selectedCard : copy.useCard}</span>
           </button>
-          <button type="button" style={styles.testCard} data-testid="ineligible-test-card" onClick={() => setCardNumber(DEMO_CARD_NUMBERS.notEligible)}>
-            <span style={styles.number}>{formatDemoCardNumber(DEMO_CARD_NUMBERS.notEligible)}</span>
+          <button
+            type="button"
+            style={{
+              ...styles.testCard,
+              ...(cardNumber === DEMO_CARD_NUMBERS.notEligible
+                ? { borderColor: palette.accent, background: palette.accentSoft, boxShadow: "0 0 0 2px rgba(0, 118, 111, 0.12)" }
+                : {}),
+            }}
+            data-testid="ineligible-test-card"
+            aria-pressed={cardNumber === DEMO_CARD_NUMBERS.notEligible}
+            onClick={() => setCardNumber(DEMO_CARD_NUMBERS.notEligible)}
+          >
+            <span style={styles.number}>{maskDemoCardNumber(DEMO_CARD_NUMBERS.notEligible)}</span>
             <span style={styles.badgeBad}>{copy.ineligibleCard}</span>
-            <span style={styles.help}>{copy.useCard}</span>
+            <span style={styles.help}>{cardNumber === DEMO_CARD_NUMBERS.notEligible ? copy.selectedCard : copy.useCard}</span>
           </button>
         </div>
-        <label style={styles.label}>
-          <span>{copy.cardNumber}</span>
-          <input
-            style={styles.input}
-            value={formatDemoCardNumber(cardNumber)}
-            aria-label={copy.cardNumber}
-            placeholder={copy.cardPlaceholder}
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={19}
-            onChange={(event) => setCardNumber(event.target.value)}
-          />
-        </label>
         {cardNumber && selectedOffer ? (
           plan.cardValidation?.eligible
             ? <p style={styles.success}>{copy.eligibleCard}</p>
@@ -328,7 +348,7 @@ export default function DemoPaymentGateway({
 
       <div style={styles.totals}>
         <div style={styles.row}><span>{copy.discount}</span><strong>-{money(plan.amounts?.offerDiscount || 0)}</strong></div>
-        <div style={styles.row}><span>{copy.shareUsed}</span><strong>{money(plan.amounts?.shareAed || 0)}</strong></div>
+        <div style={styles.row}><span>{copy.shareUsed}</span><strong>{points(plan.sharePointsUsed)}</strong></div>
         <div style={styles.row}><span>{copy.walletUsed}</span><strong>{money(plan.amounts?.walletAed || 0)}</strong></div>
         <div style={styles.strongRow}><span>{copy.cardRemainder}</span><span>{money(plan.amounts?.cardAed || 0)}</span></div>
       </div>
@@ -336,6 +356,8 @@ export default function DemoPaymentGateway({
         ? <p style={styles.success}>{copy.ready}</p>
         : cardOfferErrorShown
           ? null
+          : shareValidationErrorShown
+            ? null
           : <p style={styles.error} role="alert">{reason}</p>}
       <div style={styles.actions}>
         <button

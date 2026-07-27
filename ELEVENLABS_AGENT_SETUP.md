@@ -2,9 +2,9 @@
 
 Target agent: `agent_0001kx3xc0b4f6s8dqy9qnejm4qr`
 
-Prompt contract version: `2026-07-26.5`
+Prompt contract version: `2026-07-27.1`
 
-Prompt value SHA-256: `e7e9d6352a48ed8fa08ab589c7879bc387a28602cb468d5a7081089d6c05c160`
+Prompt value SHA-256: `9cb3fc1387fa72b7db5f20f2d8803c5e202949b7be0e6ce990ab57a18fd948c6`
 
 The versioned source of truth is `config/elevenlabs-agent-contract.json`. The repository validator compares that contract with the runtime handlers, dynamic variables, prompt source, public agent ID, protected transport, and this setup guide.
 

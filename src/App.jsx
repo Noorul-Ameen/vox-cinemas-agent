@@ -4165,7 +4165,7 @@ export default function App() {
     clearPausedJourneyForLifecycle("completed", "booking_completed");
     say("system", t("app.paymentSimulated", { ref }));
     resetClarificationFailures();
-    conversation.sendContextualUpdate?.(`POC payment receipt ${ref}, ${order.currency || "AED"} ${payableTotal}. The widget has completed its payment flow. Do not generate another reply for this turn.`);
+    conversation.sendContextualUpdate?.(`Payment receipt ${ref}, ${order.currency || "AED"} ${payableTotal}. The widget has completed its payment flow. Do not generate another reply for this turn.`);
     return true;
   };
 
@@ -4702,8 +4702,8 @@ export default function App() {
         if (!message && authoritativeResult?.confirmed) {
           message = authoritativeResult.simulationOnly
             ? (localeRef.current === "ar"
-              ? "تم تحديث حالة الحجز إلى ملغى في بيئة إثبات المفهوم."
-              : "The booking status was updated to cancelled in the POC environment.")
+              ? "تم تحديث حالة الحجز إلى ملغى."
+              : "The booking status was updated to cancelled.")
             : (localeRef.current === "ar"
               ? `تم إلغاء الحجز ${bookingRef}. تمت معالجة الاسترداد إلى محفظة VOX${authoritativeResult.refundReference ? ` بالمرجع ${authoritativeResult.refundReference}` : ""}.`
               : `Booking ${bookingRef} was cancelled. The refund was processed to VOX Wallet${authoritativeResult.refundReference ? ` with reference ${authoritativeResult.refundReference}` : ""}.`);
@@ -4910,8 +4910,8 @@ export default function App() {
       resetClarificationFailures();
       if (displayed.cancelled) {
         const message = localeRef.current === "ar"
-          ? (displayed.refundStatus === "not_processed_demo" ? "تم تسجيل إلغاء هذا الحجز ضمن بيئة إثبات المفهوم." : "هذا الحجز ملغى بالفعل.")
-          : (displayed.refundStatus === "not_processed_demo" ? "This booking cancellation is recorded in the POC environment." : "This booking is already cancelled.");
+          ? (displayed.refundStatus === "not_processed_demo" ? "تم إلغاء هذا الحجز." : "هذا الحجز ملغى بالفعل.")
+          : (displayed.refundStatus === "not_processed_demo" ? "This booking is cancelled." : "This booking is already cancelled.");
         dismissPendingCancellation("already_cancelled");
         return JSON.stringify({
           confirmed: false,
@@ -4950,8 +4950,8 @@ export default function App() {
       if (demoOnly) {
         const summary = cancellationBookingSummary(displayed, localeRef.current);
         const message = localeRef.current === "ar"
-          ? `${summary} الأثر: سيتم تحديث حالة الحجز إلى ملغى في بيئة إثبات المفهوم. هل تريد مني إلغاء هذا الحجز؟`
-          : `${summary} Impact: the booking status will be updated to cancelled in the POC environment. Would you like me to cancel this booking?`;
+          ? `${summary} الأثر: سيتم تحديث حالة الحجز إلى ملغى. هل تريد مني إلغاء هذا الحجز؟`
+          : `${summary} Impact: the booking status will be updated to cancelled. Would you like me to cancel this booking?`;
         setCancellationFlow({
           bookingRef: displayed.ref,
           phase: "final_confirmation",
@@ -5656,7 +5656,7 @@ export default function App() {
     if (!result) return "The widget could not determine the cancellation state. Do not claim that the booking was cancelled.";
     if (result.confirmed) {
       return result.simulationOnly
-        ? `The widget updated booking ${result.bookingRef} to cancelled in the POC environment. State that status once.`
+        ? `The widget updated booking ${result.bookingRef} to cancelled. State that status once.`
         : `The verified refund adapter confirmed booking ${result.bookingRef} cancelled. Refund reference: ${result.refundReference || "not returned"}.`;
     }
     if (result.phase === "processing") return `The widget is processing cancellation for ${result.bookingRef}. Do not claim success until a completed result is supplied.`;
@@ -8511,7 +8511,7 @@ export default function App() {
       window.clearTimeout(cancelTimerRef.current);
       cancelTimerRef.current = null;
       const reason = storageError?.message || "The on-device cancellation could not be saved.";
-      const message = localeRef.current === "ar" ? "تعذر تحديث حالة الإلغاء في بيئة إثبات المفهوم. بقي الحجز نشطاً." : "The cancellation status could not be updated in the POC environment. The booking remains active.";
+      const message = localeRef.current === "ar" ? "تعذر تحديث حالة الإلغاء. بقي الحجز نشطاً." : "The cancellation status could not be updated. The booking remains active.";
       if (mountedRef.current) {
         setCancellationFlow({ phase: "error", bookingRef: current.ref, demoOnly: true, refundRoute: null, error: reason, message });
         announceCancellationSystem(source, message);
