@@ -64,20 +64,22 @@ export function validateDemoWallet(amount) {
   };
 }
 
-export function validateDemoSharePoints(amount) {
-  const requestedAed = roundDemoMoney(Math.max(0, finiteAmount(amount)));
-  const pointsRequired = Math.round(requestedAed * DEMO_SHARE_POINTS_PER_AED);
-  const appliedPoints = Math.min(pointsRequired, DEMO_SHARE_POINTS);
+export function validateDemoSharePoints(points) {
+  const requestedPoints = Math.max(0, finiteAmount(points));
+  const wholePoints = Number.isInteger(requestedPoints);
+  const appliedPoints = Math.min(Math.floor(requestedPoints), DEMO_SHARE_POINTS);
+  const withinBalance = requestedPoints <= DEMO_SHARE_POINTS;
   return {
-    valid: pointsRequired <= DEMO_SHARE_POINTS,
-    eligible: pointsRequired <= DEMO_SHARE_POINTS,
-    status: pointsRequired <= DEMO_SHARE_POINTS ? "eligible" : "insufficient",
+    valid: wholePoints && withinBalance,
+    eligible: wholePoints && withinBalance,
+    status: !wholePoints ? "invalid" : withinBalance ? "eligible" : "insufficient",
     points: DEMO_SHARE_POINTS,
-    pointsRequired,
+    pointsRequired: requestedPoints,
+    pointsRequested: requestedPoints,
     appliedPoints,
     appliedAed: roundDemoMoney(appliedPoints / DEMO_SHARE_POINTS_PER_AED),
     remainingPoints: DEMO_SHARE_POINTS - appliedPoints,
-    shortfallPoints: Math.max(0, pointsRequired - DEMO_SHARE_POINTS),
+    shortfallPoints: Math.max(0, requestedPoints - DEMO_SHARE_POINTS),
   };
 }
 
@@ -132,6 +134,7 @@ export function createDemoPaymentPlan({
   ticketCount = 1,
   offer = null,
   cardNumber = "",
+  sharePoints = null,
   shareAed = 0,
   walletAed = 0,
 } = {}) {
@@ -142,8 +145,15 @@ export function createDemoPaymentPlan({
 
   const offerAdjustment = calculateDemoOfferAdjustment({ offer, amount: originalTotal, ticketCount });
   const payableTotal = offerAdjustment.payableTotal;
-  const requestedShareAed = Math.floor(Math.max(0, finiteAmount(shareAed)) * DEMO_SHARE_POINTS_PER_AED) / DEMO_SHARE_POINTS_PER_AED;
-  const appliedShareAed = clampMoney(requestedShareAed, 0, Math.min(payableTotal, DEMO_SHARE_POINTS / DEMO_SHARE_POINTS_PER_AED));
+  const requestedSharePoints = sharePoints == null
+    ? Math.floor(Math.max(0, finiteAmount(shareAed)) * DEMO_SHARE_POINTS_PER_AED)
+    : Math.max(0, finiteAmount(sharePoints));
+  const shareValidation = validateDemoSharePoints(requestedSharePoints);
+  const appliedShareAed = clampMoney(
+    shareValidation.appliedAed,
+    0,
+    Math.min(payableTotal, DEMO_SHARE_POINTS / DEMO_SHARE_POINTS_PER_AED),
+  );
   const afterShare = roundDemoMoney(payableTotal - appliedShareAed);
   const appliedWalletAed = clampMoney(walletAed, 0, Math.min(afterShare, DEMO_WALLET_BALANCE));
   const cardAed = roundDemoMoney(Math.max(0, payableTotal - appliedShareAed - appliedWalletAed));
@@ -151,7 +161,12 @@ export function createDemoPaymentPlan({
 
   let valid = offerAdjustment.valid;
   let reason = offerAdjustment.valid ? "ready" : offerAdjustment.reason;
-  if (valid && offer && !cardValidation.eligible) {
+  if (valid && !shareValidation.valid) {
+    valid = false;
+    reason = shareValidation.status === "insufficient"
+      ? "share_points_exceed_balance"
+      : "share_points_invalid";
+  } else if (valid && offer && !cardValidation.eligible) {
     valid = false;
     reason = cardValidation.valid ? "offer_card_not_eligible" : "offer_card_required";
   } else if (valid && cardAed > 0 && !cardValidation.valid) {
@@ -181,6 +196,7 @@ export function createDemoPaymentPlan({
     offerResult: offerAdjustment.reason,
     cardValidation,
     cardLast4: cardValidation.last4,
+    shareValidation,
     amounts: {
       originalTotal,
       offerDiscount: offerAdjustment.discount,

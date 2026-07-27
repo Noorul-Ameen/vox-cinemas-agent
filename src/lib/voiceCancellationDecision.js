@@ -194,8 +194,8 @@ export function buildCancellationCompletionMessage({
 } = {}) {
   if (isDemoSimulation) {
     return locale === "ar"
-      ? "تم تحديث حالة الحجز إلى ملغى في بيئة إثبات المفهوم."
-      : "The booking status was updated to cancelled in the POC environment.";
+      ? "تم تحديث حالة الحجز إلى ملغى."
+      : "The booking status was updated to cancelled.";
   }
   if (!storagePersisted) {
     return locale === "ar"

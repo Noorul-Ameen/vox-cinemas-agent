@@ -220,7 +220,7 @@ test("direct UI journey reaches checkout with seat-derived ticket count", async 
   await expectNoForbiddenCustomerFacingDashes(page);
 });
 
-test("checkout gateway processes a POC payment receipt with reference QR disclosure", async ({ page }) => {
+test("checkout gateway processes a payment receipt with reference QR guidance", async ({ page }) => {
   const { input } = await reachCheckout(page, 2);
   await input.fill("Can I pre order food and collect it at the cinema?");
   await input.press("Enter");
@@ -240,8 +240,8 @@ test("checkout gateway processes a POC payment receipt with reference QR disclos
   await page.getByTestId("process-dummy-payment").click();
 
   await expect(page.getByText("Payment receipt", { exact: true }).last()).toBeVisible({ timeout: 8_000 });
-  await expect(page.getByText(/Payment processed in the POC environment/)).toBeVisible();
-  await expect(page.getByText(/use the official VOX ticket for cinema admission/i)).toBeVisible();
+  await expect(page.getByText(/Payment processed successfully/)).toBeVisible();
+  await expect(page.getByText(/Keep this booking reference available for entry/i)).toBeVisible();
   await expect(page.getByText("Booking reference", { exact: true })).toBeVisible();
   await expect(page.getByText("Booking ref", { exact: true })).toHaveCount(0);
 
@@ -489,7 +489,7 @@ test("typed cancellation stays in the booking flow when a movie title is selecte
   await page.getByRole("button", { name: /Yes, (?:cancel booking|mark cancelled)/ }).click();
   const cancellationSuccess = page.getByText("Cancelled", { exact: true }).first();
   await expect(cancellationSuccess).toBeVisible();
-  await expect(page.getByText(/Cancellation recorded in the POC environment/i).first()).toBeVisible();
+  await expect(page.getByText("Booking cancelled", { exact: true }).first()).toBeVisible();
 
   const storedAfterCancellation = await page.evaluate(() => JSON.parse(localStorage.getItem("vox_bookings") || "null"));
   const familyBooking = storedAfterCancellation.bookings.find((booking) => booking.ref === "E2ECAN1");

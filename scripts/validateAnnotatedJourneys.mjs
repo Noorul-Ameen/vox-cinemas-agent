@@ -384,8 +384,8 @@ for (const claim of [
   "Use the QR code on screen for admission.",
 ]) {
   const guarded = guardAgentStateClaim(claim, { stage: savedBooking, locale: "en" });
-  assert.match(guarded, /booking.*booking reference WLTEST1.*POC environment/i, "POC bookings must use booking-reference language");
-  assert.doesNotMatch(guarded, /provider-confirmed|bank|reservation is confirmed/i, "POC bookings must not invent provider confirmation");
+  assert.match(guarded, /booking.*booking reference WLTEST1/i, "saved bookings must use booking-reference language");
+  assert.doesNotMatch(guarded, /POC|proof-of-concept|provider-confirmed|bank|reservation is confirmed/i, "saved bookings must not expose implementation labels or invent provider confirmation");
 }
 assert.match(
   guardAgentStateClaim("Checkout is displayed. Complete payment.", {
@@ -422,8 +422,8 @@ assert.match(
     stage: { ...savedBooking, booking: { ...savedBooking.booking, cancelled: true, bookingStatus: "cancelled_demo" } },
     locale: "en",
   }),
-  /cancelled in the POC environment/i,
-  "a cancelled POC booking must retain its approved cancellation boundary",
+  /cancelled/i,
+  "a cancelled saved booking must retain its customer-facing status",
 );
 const verifiedClaim = "Your booking is confirmed.";
 assert.equal(
@@ -502,6 +502,7 @@ for (const locale of ["en", "ar"]) {
 
 assert.doesNotMatch(STRINGS.en["app.paymentSimulated"], /environment|prototype|demo|simulation/i, "the saved-summary notice must remain leadership-ready");
 assert.match(STRINGS.en["app.paymentSimulated"], /Payment processed[\s\S]*Booking reference/, "the completed checkout notice must state the processed result and reference");
-assert.match(STRINGS.en["checkout.demoDisclaimer"], /POC environment/i, "checkout must identify the POC boundary without repetitive simulation language");
+assert.match(STRINGS.en["checkout.demoDisclaimer"], /Review your payment details/i, "checkout must use customer-facing review guidance");
+assert.doesNotMatch(STRINGS.en["checkout.demoDisclaimer"], /POC|proof-of-concept|environment/i, "checkout copy must not expose implementation labels");
 
 console.log("Validated annotated DCC discovery, transcript truth, checkout seat editing, saved-summary wording, and full-history access for text and voice.");

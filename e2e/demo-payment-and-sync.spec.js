@@ -155,7 +155,7 @@ test("typed journey reaches final review and processes a three-way payment", asy
   await reachCheckoutByText(page);
   await expect(page.getByTestId("dummy-payment-gateway")).toBeVisible();
   await expect(page.getByTestId("combined-payment-options")).toBeVisible();
-  await expect(page.getByTestId("combined-payment-options")).toContainText("10 points available");
+  await expect(page.getByTestId("combined-payment-options")).toContainText("Available SHARE balance: 10 points");
   await expect(page.getByTestId("combined-payment-options")).toContainText("Wallet balance AED 30");
 
   await sendText(page, "pay now");
@@ -170,9 +170,14 @@ test("typed journey reaches final review and processes a three-way payment", asy
 
   await page.getByTestId("eligible-test-card").click();
   await expect(page.getByText("Eligible for every selected offer").last()).toBeVisible();
+  await expect(page.getByTestId("eligible-test-card")).toContainText("**** **** **** 1111");
+  await expect(page.getByTestId("eligible-test-card")).not.toContainText("4111 1111 1111 1111");
 
   await page.getByLabel("Use SHARE points").check();
-  await page.getByLabel("SHARE value in AED").fill("1");
+  await page.getByLabel("SHARE points to redeem").fill("11");
+  await expect(page.getByText("You have 10 SHARE points available. Enter 10 points or fewer.")).toBeVisible();
+  await expect(page.getByTestId("review-dummy-payment")).toBeDisabled();
+  await page.getByLabel("SHARE points to redeem").fill("10");
   await page.getByLabel("Use VOX Wallet").check();
   await page.getByLabel("Wallet value in AED").fill("30");
 
@@ -181,12 +186,12 @@ test("typed journey reaches final review and processes a three-way payment", asy
   await expect(page.getByTestId("review-dummy-payment")).toBeEnabled();
   await page.getByTestId("review-dummy-payment").click();
   await expect(page.getByText("Final payment summary")).toBeVisible();
-  await expect(page.getByText("SHARE points").locator("..")).toContainText(/AED\s*1\.00/);
+  await expect(page.getByText("SHARE points").locator("..")).toContainText(/10 points/);
   await expect(page.getByText("VOX Wallet").locator("..")).toContainText(/AED\s*30\.00/);
   await page.getByTestId("process-dummy-payment").click();
   await expect(page.getByText("Processing payment")).toBeVisible();
   await expect(page.getByText("Payment receipt")).toBeVisible();
-  await expect(page.getByText(/Payment processed in the POC environment/)).toBeVisible();
+  await expect(page.getByText(/Payment processed successfully/)).toBeVisible();
   await expect(page.getByText(/^WL[A-HJ-NP-Z2-9]{5}$/).first()).toBeVisible();
 });
 
@@ -197,7 +202,10 @@ test("Arabic checkout processes a combined SHARE, wallet, and card payment", asy
 
   await page.getByTestId("eligible-test-card").click();
   await page.getByLabel("استخدام نقاط SHARE").check();
-  await page.getByLabel("قيمة SHARE بالدرهم").fill("1");
+  await page.getByLabel("نقاط SHARE المراد استخدامها").fill("11");
+  await expect(page.getByText(/رصيدك المتاح .* نقاط SHARE/)).toBeVisible();
+  await expect(page.getByTestId("review-dummy-payment")).toBeDisabled();
+  await page.getByLabel("نقاط SHARE المراد استخدامها").fill("10");
   await page.getByLabel("استخدام محفظة VOX").check();
   await page.getByLabel("قيمة المحفظة بالدرهم").fill("30");
   await expect(page.getByTestId("review-dummy-payment")).toBeEnabled();
@@ -206,5 +214,5 @@ test("Arabic checkout processes a combined SHARE, wallet, and card payment", asy
   await page.getByTestId("process-dummy-payment").click();
   await expect(page.getByText("جار معالجة الدفع")).toBeVisible();
   await expect(page.getByText("إيصال الدفع")).toBeVisible();
-  await expect(page.getByText(/تمت معالجة الدفع في بيئة إثبات المفهوم/)).toBeVisible();
+  await expect(page.getByText(/تمت معالجة الدفع بنجاح/)).toBeVisible();
 });

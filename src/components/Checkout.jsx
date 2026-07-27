@@ -101,8 +101,8 @@ export default function Checkout({
     return (
       <section className="checkout" dir={dir} aria-labelledby="checkout-heading" data-testid="dummy-payment-processing" style={{ display: "grid", placeItems: "center", minHeight: 420, padding: 24, textAlign: "center" }}>
         <div style={{ display: "grid", gap: 12, justifyItems: "center", maxWidth: 470 }}>
-          <div aria-hidden="true" style={{ width: 54, height: 54, borderRadius: "50%", border: "5px solid #f2d6d7", borderTopColor: "#e11b22", animation: status === "processing" ? "spin 900ms linear infinite" : "none" }} />
-          <p style={{ margin: 0, color: "#e11b22", fontSize: 12, fontWeight: 850, letterSpacing: ".08em", textTransform: "uppercase" }}>{copy.eyebrow}</p>
+          <div aria-hidden="true" style={{ width: 54, height: 54, borderRadius: "50%", border: "5px solid #c7e4e1", borderTopColor: "#00766f", animation: status === "processing" ? "spin 900ms linear infinite" : "none" }} />
+          <p style={{ margin: 0, color: "#00766f", fontSize: 12, fontWeight: 850, letterSpacing: ".08em", textTransform: "uppercase" }}>{copy.eyebrow}</p>
           <h2 id="checkout-heading" style={{ margin: 0 }}>{status === "processing" ? copy.processing : copy.approved}</h2>
           <p style={{ margin: 0, color: "#6f6876", lineHeight: 1.55 }}>{status === "processing" ? copy.processingHelp : copy.approvedHelp}</p>
           {receipt?.amounts ? <strong>{money(receipt.amounts.payableTotal)}</strong> : null}
@@ -115,12 +115,12 @@ export default function Checkout({
   return (
     <section className="checkout" dir={dir} aria-labelledby="checkout-heading" data-testid="checkout" style={{ display: "grid", gap: 18 }}>
       <header style={{ display: "grid", gap: 7 }}>
-        <p style={{ margin: 0, color: "#e11b22", fontSize: 12, fontWeight: 850, letterSpacing: ".08em", textTransform: "uppercase" }}>{copy.eyebrow}</p>
+        <p style={{ margin: 0, color: "#00766f", fontSize: 12, fontWeight: 850, letterSpacing: ".08em", textTransform: "uppercase" }}>{copy.eyebrow}</p>
         <h2 id="checkout-heading" style={{ margin: 0 }}>{copy.title}</h2>
         <p style={{ margin: 0, color: "#6f6876", lineHeight: 1.55 }}>{copy.subtitle}</p>
       </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, padding: 14, borderRadius: 16, background: "#f7f4f1" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, padding: 14, border: "1px solid #c9d9dc", borderRadius: 16, background: "#eef7f7" }}>
         <div><small>{copy.tickets}</small><strong style={{ display: "block" }}>{ar ? `${seatCount} مقاعد` : `${seatCount} seats`}</strong></div>
         <div><small>{copy.seats}</small><strong style={{ display: "block" }}>{Array.isArray(order.seats) ? order.seats.join(", ") : order.seats || "-"}</strong></div>
         <div><small>{copy.total}</small><strong style={{ display: "block" }}>{money(order.total)}</strong></div>

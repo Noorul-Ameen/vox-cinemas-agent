@@ -31,8 +31,8 @@ assert.match(media, /getMoviePosterUrl\(booking\)/, "booking confirmation must r
 const cancellationTool = app.slice(app.indexOf("show_booking_for_cancellation: async"), app.indexOf("show_offers: async"));
 assert.match(cancellationTool, /const demoOnly =/, "cancellation must distinguish device-only records before discussing a refund route");
 assert.match(cancellationTool, /phase:\s*"final_confirmation"[\s\S]*refundRoute:\s*null[\s\S]*demoOnly:\s*true/, "device-only removal must bypass VOX Wallet selection");
-assert.match(cancellationTool, /booking status will be updated to cancelled in the POC environment/, "POC cancellation confirmation must use the approved boundary language");
-assert.doesNotMatch(cancellationTool, /VOX will not be contacted and no refund will be issued/, "POC cancellation confirmation must not use the retired technical disclaimer");
+assert.match(cancellationTool, /booking status will be updated to cancelled/, "saved-booking cancellation confirmation must state the resulting status");
+assert.doesNotMatch(cancellationTool, /POC environment|proof-of-concept|VOX will not be contacted and no refund will be issued/, "cancellation confirmation must not expose implementation labels or retired technical disclaimers");
 assert.match(cancellationTool, /Cancellation eligibility could not be verified/, "unverified live cancellation eligibility must fail closed");
 assert.match(app, /refundRoute:\s*isDemoSimulation\s*\?\s*null\s*:\s*"VOX Wallet"/, "device-only cancellation records must not claim a VOX Wallet refund route");
 assert.doesNotMatch(app, /Ø§Ø®ØªØ±Øª/, "Arabic cinema selection transcript must not contain mojibake");
