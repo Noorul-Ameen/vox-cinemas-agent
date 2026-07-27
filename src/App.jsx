@@ -8971,7 +8971,7 @@ export default function App() {
             question={discoveryQuestion(stage.missing, locale)}
             preferences={stage.preferences}
             dateLabel={t("dates.label")}
-            dateStrip={stage.missing?.[0] === "date" ? <DateStrip dates={displayedProgrammingDates} selected={null} locale={locale} label={t("dates.label")} onSelect={chooseDate} compact /> : null}
+            dateStrip={stage.missing?.[0] === "date" && displayedProgrammingDates.length ? <DateStrip dates={displayedProgrammingDates} selected={null} locale={locale} label={t("dates.label")} onSelect={chooseDate} compact /> : null}
           />}
           {visibleStageView === "cinemas" && <CinemaPicker cinemas={stage.cinemas || CINEMAS} selected={cinema} notice={localizedStageMessage(stage, "notice", locale)} error={localizedStageMessage(stage, "error", locale)} onRetry={stage.retryAvailable ? () => { beginDirectUiUserTurn(); return routeDiscoveryTurn("", { preferencesAlreadyApplied: true }); } : undefined} onSelect={chooseCinema} onBack={() => { beginDirectUiUserTurn(); void restoreCinemaReturn(); }} />}
           {cinema && (visibleStageView === "movies" || (visibleStageView === "loading" && stage.kind === "movies")) && <MovieGrid
