@@ -47,6 +47,7 @@ test.describe("hosted Cloudflare release smoke", () => {
     await page.getByRole("button", { name: /Mall of the Emirates/ }).click();
     const dateGroup = page.getByRole("group", { name: "Choose a date" });
     const dateButtons = dateGroup.getByRole("button");
+    await expect(dateButtons.first()).toBeVisible();
     const dateCount = await dateButtons.count();
     expect(dateCount).toBeGreaterThan(0);
     await dateButtons.nth(dateCount > 1 ? 1 : 0).click();
