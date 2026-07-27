@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { createLocalDeterministicToolAuthorization, shouldBlockConcurrentDeterministicToolCall } from "../src/lib/deterministicToolRouting.js";
-import { resolveVisibleMovieSelectionTurn } from "../src/lib/movieSelectionRouting.js";
+import { resolveVisibleMovieSelectionTurn, routePendingVisibleMovie } from "../src/lib/movieSelectionRouting.js";
 import { resolveVisibleShowtimeSelectionTurn } from "../src/lib/showtimeSelectionRouting.js";
 
 const movies = [
@@ -52,6 +52,17 @@ assert.equal((await resolveVisibleMovieSelectionTurn({ text: "I choose Minions a
 assert.equal((await resolveVisibleMovieSelectionTurn({ text: "I'd like Minions and Monsters", stage: ampersandStage }))?.id, "minions");
 assert.equal((await resolveVisibleMovieSelectionTurn({ text: "توي ستوري 5", stage: bilingualStage }))?.id, "toy", "an Arabic title reply must select its visible English catalog movie");
 
+const titleFirstResult = await routePendingVisibleMovie({
+  result: { shown: "filtered movie list", movies: ampersandStage.movies },
+  text: "Minions & Monsters",
+  route: async (movie) => ({
+    movie,
+    result: { showtimes: [{ sessionId: "minions-premier-1020", time: "10:20", exp: "PREMIER" }] },
+  }),
+});
+assert.equal(titleFirstResult?.selectedMovie?.id, "minions", "a resolved title-first request must advance directly from its filtered movie result");
+assert.equal(titleFirstResult?.shown, "showtimes", "a resolved title-first request must render its verified showtimes without asking for the title again");
+
 const rapidMovie = {
   ...ampersandStage.movies[0],
   relevantSessions: [
@@ -101,6 +112,7 @@ assert.doesNotMatch(app, /^import .*movieSelectionRouting/m, "the initial App mo
 assert.match(app, /await import\("\.\/lib\/movieSelectionRouting\.js"\)/, "visible movie selection routing must load only when a user turn needs it");
 assert.match(app, /await resolveVisibleMovieSelectionTurnLazy\(\s*\{ text: safeMessage, stage: stageRef\.current \},\s*\{ isCurrent: voiceTurnIsCurrent \}/, "voice transcripts must resolve explicit visible movie selection through the guarded lazy route");
 assert.match(app, /await resolveVisibleMovieSelectionTurnLazy\(\s*\{ text: value, stage: stageRef\.current \},\s*\{ isCurrent: typedTurnIsCurrent \}/, "typed turns must resolve explicit visible movie selection through the guarded lazy route");
+assert.match(app, /const explicitMovieSelectionTurn = discoveryPreferencesRef\.current\.movieTitle \|\| pendingMovieSelectionTurn;[\s\S]*routePendingVisibleMovieLazy\(\{[\s\S]*text: explicitMovieSelectionTurn/, "a resolved title-first discovery request must advance directly to verified showtimes");
 assert.ok((app.match(/routeVisibleMovieSelection\(directMovieSelection\)/g) || []).length >= 2, "text and voice must both open verified showtimes deterministically");
 assert.match(app, /const pauseRenderingForUnrelatedTurn[\s\S]*directMovieSelection[\s\S]*\|\| directMovieSelection/, "an exact visible-movie choice must stay transactional instead of pausing its movie panel before showtimes load");
 assert.ok((app.match(/directMovieSelection,\s*\n\s*directShowtimeSelection,/g) || []).length >= 2, "text and voice must preserve the visible movie stage while their deterministic selection route runs");
