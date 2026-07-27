@@ -19,6 +19,7 @@ export const DISCOVERY_PREFERENCE_KEYS = Object.freeze([
   "movieId",
   "movieTitle",
   "audience",
+  "viewerAge",
   "openChoice",
   "recommendationIntent",
 ]);
@@ -271,6 +272,23 @@ const normalizeText = (value) => String(value ?? "")
   .replace(/\s+/g, " ")
   .trim();
 
+function extractDiscoveryViewerAge(input) {
+  const text = normalizeText(input);
+  const age = Number(text.match(/\b\d{1,2}\b/u)?.[0]);
+  return age <= 120 && (/\b(?:age|years?\s+old)\b|عمر|سنة|سنوات|عام/iu.test(text)) ? age : null;
+}
+
+function discoveryRatingAllowsAge(value, viewerAge) {
+  const code = String(value ?? "")
+    .toUpperCase()
+    .replace(/\bPLUS\b/g, "+")
+    .replace(/[\s._/-]+/g, "");
+  if (/^(?:G|PG(?:13|15)?)$/.test(code)) return true;
+  return code === "15+" ? viewerAge >= 15
+    : /^(?:18\+|18TC)$/.test(code) ? viewerAge >= 18
+      : code === "21+" && viewerAge >= 21;
+}
+
 const normalizeKey = (value) => normalizeText(value).replace(/\s+/g, " ");
 const phraseInText = (text, phrase) => ` ${text} `.includes(` ${normalizeText(phrase)} `);
 const pad2 = (value) => String(value).padStart(2, "0");
@@ -519,6 +537,9 @@ const TITLE_PARTIAL_BLOCKLIST = new Set([
   "showtime", "showtimes", "standard", "tamil", "telugu", "theatre", "thriller", "tonight",
   "tomorrow", "urdu", "western",
 ]);
+const KIDS_FAMILY_AUDIENCE_PATTERN = /\b(?:kids?|children|childrens|family|families|family friendly)\b|أطفال|اطفال|عائلي|عائلية|العائلي|العائلية|العائلة/iu;
+const TEEN_AUDIENCE_PATTERN = /\b(?:teen|teens|teenager|teenagers|adolescent|adolescents|young adults?)\b|مراهق|مراهقة|مراهقين|المراهقين|يافع|يافعين/iu;
+const GENERIC_RATING_DISCOVERY_PATTERN = /\b(?:age appropriate|age based|age rating|rated\s+(?:g|pg|pg13|pg15|15\+|18\+|21\+)|suitable for|appropriate for)\b|مناسب\s+لعمر|تصنيف\s+عمري/iu;
 
 function distinctiveTitleTokens(value) {
   return normalizeText(value).split(" ").filter((token) => (
@@ -526,6 +547,15 @@ function distinctiveTitleTokens(value) {
     && !TITLE_CONNECTOR_TOKENS.has(token)
     && !TITLE_PARTIAL_BLOCKLIST.has(token)
   ));
+}
+
+function hasStructuredDiscoveryFacet(text) {
+  return extractDiscoveryViewerAge(text) != null
+    || KIDS_FAMILY_AUDIENCE_PATTERN.test(text)
+    || TEEN_AUDIENCE_PATTERN.test(text)
+    || GENERIC_RATING_DISCOVERY_PATTERN.test(text)
+    || Boolean(findAliasValue(text, GENRE_ALIASES))
+    || Boolean(findAliasValue(text, LANGUAGE_ALIASES));
 }
 
 function hasNaturalTitleReference(text) {
@@ -544,6 +574,7 @@ function findMovieInText(text, movies) {
     .filter(({ title }) => phraseInText(titleSearchText, title))
     .sort((left, right) => right.title.length - left.title.length || movieTitle(left.movie).localeCompare(movieTitle(right.movie)));
   if (exact.length) return exact[0].movie;
+  if (hasStructuredDiscoveryFacet(titleSearchText)) return null;
   if (!hasNaturalTitleReference(titleSearchText)) return null;
 
   // A guest often says only the distinctive portion of a published title,
@@ -612,7 +643,7 @@ function explicitClears(text) {
   if (isExplicitContentReplacement(text)) {
     // A content change retains the guest's established place, date, and time,
     // but cannot safely intersect with an earlier movie or content facet.
-    ["movieId", "movieTitle", "genre", "language", "experience", "audience", "openChoice", "recommendationIntent"]
+    ["movieId", "movieTitle", "genre", "language", "experience", "audience", "viewerAge", "openChoice", "recommendationIntent"]
       .forEach((key) => clear.add(key));
   }
   if (/\b(?:any movie|another movie|other movies|something else)\b|فيلم آخر|فيلم اخر/.test(text) || isReplacementMovieDiscovery(text)) {
@@ -623,7 +654,7 @@ function explicitClears(text) {
   }
   const filterClearRequest = /\b(?:remove|clear|drop|reset)\b.*\b(?:filters?|preferences?)\b|(?:امسح|احذف|الغ|ألغي|أزل|ازل).*(?:الفلاتر|المرشحات|التفضيلات|عوامل\s+التصفية)/u.test(text);
   if (filterClearRequest) {
-    const optionalKeys = ["preferredTime", "timeRangeStart", "timeRangeEnd", "timeRangeStrict", "timeBand", "genre", "audience", "language", "experience", "openChoice", "recommendationIntent"];
+    const optionalKeys = ["preferredTime", "timeRangeStart", "timeRangeEnd", "timeRangeStrict", "timeBand", "genre", "audience", "viewerAge", "language", "experience", "openChoice", "recommendationIntent"];
     const clearEverythingOptional = /\b(?:all|every)\b|(?:كل|جميع)/u.test(text);
     let namedFilter = false;
     if (/\b(?:time|showtime)\b|(?:وقت|موعد)/u.test(text)) {
@@ -632,6 +663,10 @@ function explicitClears(text) {
     }
     if (/\bgenre\b|(?:نوع|تصنيف)/u.test(text)) {
       ["genre", "audience"].forEach((key) => clear.add(key));
+      namedFilter = true;
+    }
+    if (/\bage\b|(?:عمر|العمر)/u.test(text)) {
+      clear.add("viewerAge");
       namedFilter = true;
     }
     if (/\blanguage\b|(?:لغة|اللغه|اللغة)/u.test(text)) {
@@ -645,6 +680,7 @@ function explicitClears(text) {
     if (clearEverythingOptional || !namedFilter) optionalKeys.forEach((key) => clear.add(key));
   }
   if (/\b(?:not for kids|no kids)\b|ليس للاطفال|مش للاطفال/.test(text)) clear.add("audience");
+  if (/\b(?:any age|no age preference|remove age filter)\b|أي عمر|بدون تفضيل للعمر/u.test(text)) clear.add("viewerAge");
   if (/\b(?:not educational|no educational (?:filter|preference)|without (?:an )?educational (?:filter|preference)|show (?:the )?(?:family|other) options instead)\b|بدون تفضيل تعليمي|ليس تعليميا/.test(text)) clear.add("recommendationIntent");
   return clear;
 }
@@ -669,6 +705,7 @@ const OPEN_CHOICE_NO_RESULT_CLEARS = Object.freeze({
   no_genre_match: ["genre"],
   no_experience_match: ["experience"],
   no_audience_match: ["audience"],
+  no_age_match: ["viewerAge"],
   no_suitable_time: ["preferredTime", "timeRangeStart", "timeRangeEnd", "timeRangeStrict", "timeBand"],
   movie_unavailable_for_criteria: ["movieId", "movieTitle"],
 });
@@ -763,6 +800,9 @@ export function extractDiscoveryPreferencePatch(input, {
     clear.add("timeRangeStrict");
   }
 
+  const viewerAge = extractDiscoveryViewerAge(discoveryInput);
+  if (viewerAge != null) patch.viewerAge = viewerAge;
+
   // A cinema name can share distinctive words with a film title. Once the
   // cinema has been grounded, do not let that same phrase create a second,
   // unrelated movie constraint when cinema-specific results are reparsed.
@@ -801,7 +841,8 @@ export function extractDiscoveryPreferencePatch(input, {
     patch.recommendationIntent = "unsupported_language_afghan";
   }
 
-  const kidsFamilyRequest = /\b(?:kids?|children|childrens|family|families|family friendly)\b|أطفال|اطفال|عائلي|عائلية|العائلي|العائلية|العائلة/.test(facetText);
+  const kidsFamilyRequest = KIDS_FAMILY_AUDIENCE_PATTERN.test(facetText);
+  const teenRequest = TEEN_AUDIENCE_PATTERN.test(facetText);
   const explicitKidsExperience = /\b(?:kids?\s+(?:cinema|experience|format)|in\s+kids|kids?\s+(?:at|showtime))\b|(?:سينما|تجربة|صيغة)\s+(?:الأطفال|الاطفال)/.test(facetText);
   const catalogExperiences = (movies || []).flatMap((item) => item?.experiences || item?.Experiences || []).filter(Boolean);
   const experience = findAliasValue(facetText, [
@@ -818,6 +859,8 @@ export function extractDiscoveryPreferencePatch(input, {
     // "Family movies" is an audience request, not a demand that the source
     // catalog use the literal Family genre (many suitable titles use Animation).
     if (patch.genre === "Family") delete patch.genre;
+  } else if (teenRequest) {
+    patch.audience = "teen";
   }
 
   const educationalRequest = /\b(?:educational|educative|learning focused|informative for (?:kids?|children|families))\b|تعليمي|تثقيفي/.test(facetText);
@@ -830,18 +873,20 @@ export function extractDiscoveryPreferencePatch(input, {
   // together ("family action movies"), both remain explicit constraints.
   if (patch.genre && !patch.audience) clear.add("audience");
   if (patch.audience && !patch.genre) clear.add("genre");
+  if (patch.viewerAge != null && !kidsFamilyRequest && !teenRequest) clear.add("audience");
+  if (patch.audience && patch.viewerAge == null) clear.add("viewerAge");
 
-  if ((patch.genre || patch.audience) && !patch.movieId && !patch.movieTitle) {
+  if ((patch.genre || patch.language || patch.experience || patch.audience || patch.viewerAge != null) && !patch.movieId && !patch.movieTitle) {
     clear.add("movieId");
     clear.add("movieTitle");
   }
 
   const suppliedNarrowingPreference = Boolean(
     patch.movieId || patch.movieTitle || patch.preferredTime || patch.timeRangeStart || patch.timeRangeEnd || patch.timeBand
-    || patch.genre || patch.language || patch.experience || patch.audience
+    || patch.genre || patch.language || patch.experience || patch.audience || patch.viewerAge != null
   );
   if (suppliedNarrowingPreference && !openChoice) clear.add("openChoice");
-  if (patch.genre || patch.language) clear.add("recommendationIntent");
+  if (patch.genre || patch.language || patch.audience || patch.viewerAge != null) clear.add("recommendationIntent");
 
   for (const key of Object.keys(patch)) clear.delete(key);
   const provided = [...new Set([...Object.keys(patch), ...clear])].sort();
@@ -887,7 +932,7 @@ export function shouldTreatAsDiscoveryFilterTurn(input, {
   const patch = parsed.patch || {};
   const satisfiesMissing = (fields.has("cinema") && (patch.cinemaId || patch.cinemaName || patch.city))
     || (fields.has("date") && patch.date)
-    || (fields.has("preference") && (patch.movieTitle || patch.genre || patch.language || patch.experience || patch.audience || patch.preferredTime || patch.timeRangeStart || patch.timeRangeEnd || patch.timeBand))
+    || (fields.has("preference") && (patch.movieTitle || patch.genre || patch.language || patch.experience || patch.audience || patch.viewerAge != null || patch.preferredTime || patch.timeRangeStart || patch.timeRangeEnd || patch.timeBand))
     || (fields.has("time") && (patch.preferredTime || (patch.timeRangeStart && patch.timeRangeEnd) || patch.timeBand));
   return Boolean(parsed.hasDiscoverySignal || satisfiesMissing);
 }
@@ -901,7 +946,11 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
   const value = stripLanguageControlCommand(input);
   const patch = signal.patch || {};
   const clear = new Set(signal.clear || []);
-  if (!value || patch.movieTitle || patch.movieId || patch.openChoice === true || patch.recommendationIntent || clear.has("movieTitle") || clear.has("movieId")) return null;
+  if (!value || patch.movieTitle || patch.movieId || patch.openChoice === true || patch.recommendationIntent) return null;
+  const structuredFilter = patch.viewerAge != null || patch.genre || patch.language || patch.experience || patch.audience;
+  const explicitTitleCue = /\b(?:movie|film)\s+(?:called|named)\b|["“”'][^"“”']{2,}["“”']|فيلم\s+(?:اسمه|يدعى)/iu.test(value)
+    || /\b(?:watch|see|book(?:\s+me)?|show\s+me|tickets?\s+for|i\s+(?:want|need))\s+(?!(?:(?:a|an|the)\s+)?(?:movie|film)\b).+?\s+(?:in|with)\s+\S/iu.test(value);
+  if (structuredFilter && !explicitTitleCue) return null;
   if (/^\s*(?:ما|ماذا|أي|اي)\s+(?:(?:هي|هو)\s+)?(?:الأفلام|الافلام|أفلام|افلام)(?:\s|$)/iu.test(value)) return null;
   if (/^(?:أريد|اريد)\s+فيلم(?:ا[\u064b-\u065f]*)?\s+(?:في|حوالي)(?:\s|$)/iu.test(value)) return null;
 
@@ -1035,7 +1084,7 @@ export function mergeDiscoveryPreferences(current, update = {}) {
   const changedKeys = DISCOVERY_PREFERENCE_KEYS.filter((key) => previous[key] !== next[key]);
   const clearedKeys = changedKeys.filter((key) => previous[key] != null && next[key] == null);
   const resultKeys = new Set(changedKeys.filter((key) => key !== "dateSignal"));
-  const movieSelectionKeys = new Set(["cinemaId", "cinemaName", "city", "date", "genre", "language", "experience", "movieId", "movieTitle", "audience", "openChoice", "recommendationIntent"]);
+  const movieSelectionKeys = new Set(["cinemaId", "cinemaName", "city", "date", "genre", "language", "experience", "movieId", "movieTitle", "audience", "viewerAge", "openChoice", "recommendationIntent"]);
   const sessionSelectionKeys = new Set([...movieSelectionKeys, "preferredTime", "timeRangeStart", "timeRangeEnd", "timeRangeStrict", "timeBand"]);
   const intersects = (keys) => [...resultKeys].some((key) => keys.has(key));
 
@@ -1065,7 +1114,7 @@ function fieldIsPresent(preferences, field) {
   if (field === "time") return Boolean(preferences.preferredTime || (preferences.timeRangeStart && preferences.timeRangeEnd) || preferences.timeBand);
   if (field === "movie") return Boolean(preferences.movieId || preferences.movieTitle);
   if (field === "movieOrPreference") {
-    return Boolean(preferences.movieId || preferences.movieTitle || preferences.genre || preferences.language || preferences.experience || preferences.audience || preferences.openChoice || preferences.recommendationIntent);
+    return Boolean(preferences.movieId || preferences.movieTitle || preferences.genre || preferences.language || preferences.experience || preferences.audience || preferences.viewerAge != null || preferences.openChoice || preferences.recommendationIntent);
   }
   return Boolean(preferences[field]);
 }
@@ -1182,6 +1231,12 @@ function movieMatchesMetadata(movie, preferences, kidsSessionMovieIds, cinemas, 
   if (preferences.date && directDate && directDate !== preferences.date) return false;
   if (preferences.genre && !valuesMatch(movieGenres(movie), preferences.genre)) return false;
   if (preferences.language && !valuesMatch(movieLanguages(movie), preferences.language)) return false;
+  const requestedViewerAge = preferences.viewerAge != null
+    ? Number(preferences.viewerAge)
+    : preferences.audience === "teen" ? 15 : null;
+  if (Number.isFinite(requestedViewerAge)) {
+    if (!discoveryRatingAllowsAge(movie?.rating ?? movie?.Rating ?? movie?.movieRating, requestedViewerAge)) return false;
+  }
   if (preferences.audience === "kids_family") {
     const rating = String(movie?.rating ?? movie?.Rating ?? movie?.movieRating ?? "")
       .toUpperCase()
@@ -1280,7 +1335,7 @@ export function filterDiscoveryResults({
     const filmId = sessionMovieId(session);
     const associatedMovie = moviesById.get(filmId);
     if (associatedMovie && !allowedMovieIds.has(filmId)) return false;
-    if (!associatedMovie && (criteria.movieId || criteria.movieTitle || criteria.genre || criteria.language || criteria.audience)) {
+    if (!associatedMovie && (criteria.movieId || criteria.movieTitle || criteria.genre || criteria.language || criteria.audience || criteria.viewerAge != null)) {
       if (!movieMatchesMetadata(session, criteria, kidsSessionMovieIds, cinemas)) return false;
     }
     return true;
@@ -1406,13 +1461,14 @@ export function filterDiscoveryResults({
 
   let noResultsReason = null;
   if (!filteredMovies.length && !filteredSessions.length) {
-    const suppliedContentCriteria = [criteria.experience, criteria.language, criteria.genre, criteria.audience, criteria.movieId || criteria.movieTitle].filter(Boolean);
+    const suppliedContentCriteria = [criteria.experience, criteria.language, criteria.genre, criteria.audience, criteria.viewerAge != null ? criteria.viewerAge : null, criteria.movieId || criteria.movieTitle].filter((value) => value !== null && value !== undefined && value !== "");
     if ((criteria.preferredTime || hasTimeRange) && baseSessions.length) noResultsReason = "no_suitable_time";
     else if (criteria.timeBand && sessionsBeforeTimeBand > 0 && baseSessions.length === 0) noResultsReason = "no_suitable_time";
     else if (suppliedContentCriteria.length > 1) noResultsReason = "no_results_for_criteria";
     else if (criteria.experience) noResultsReason = "no_experience_match";
     else if (criteria.language) noResultsReason = "no_language_match";
     else if (criteria.genre) noResultsReason = "no_genre_match";
+    else if (criteria.viewerAge != null) noResultsReason = "no_age_match";
     else if (criteria.audience) noResultsReason = "no_audience_match";
     else if (criteria.movieId || criteria.movieTitle) noResultsReason = "movie_unavailable_for_criteria";
     else noResultsReason = "no_results_for_criteria";

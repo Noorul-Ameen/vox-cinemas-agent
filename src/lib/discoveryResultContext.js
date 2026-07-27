@@ -66,6 +66,8 @@ export function buildAuthoritativeDiscoveryContext(result, { maxMovies = 8, maxS
       preferences.language,
       preferences.experience,
       preferences.audience === "kids_family" ? "kids/family" : null,
+      preferences.audience === "teen" ? "teenagers" : null,
+      preferences.viewerAge != null ? `viewer age ${preferences.viewerAge}` : null,
       preferences.timeRangeStart && preferences.timeRangeEnd
         ? `${preferences.timeRangeStart} to ${preferences.timeRangeEnd}`
         : preferences.preferredTime || preferences.timeBand,

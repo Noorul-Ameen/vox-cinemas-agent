@@ -18,7 +18,8 @@ export default function DemoPaymentReceiptDetails({ booking, locale, formatCurre
     ready: "تمت معالجة الدفع بنجاح.",
     original: "الإجمالي الأصلي",
     offer: "عرض البطاقة",
-    share: "نقاط SHARE المستخدمة",
+    share: "النقاط المستخدمة",
+    shareValue: "قيمة النقاط بالدرهم",
     wallet: "محفظة VOX المستخدمة",
     card: "البطاقة المستخدمة",
     transaction: "مرجع المعاملة",
@@ -27,7 +28,8 @@ export default function DemoPaymentReceiptDetails({ booking, locale, formatCurre
     ready: "Payment processed successfully.",
     original: "Original total",
     offer: "Card offer",
-    share: "SHARE points used",
+    share: "Points redeemed",
+    shareValue: "Equivalent AED discount",
     wallet: "VOX Wallet used",
     card: "Card used",
     transaction: "Transaction reference",
@@ -48,6 +50,7 @@ export default function DemoPaymentReceiptDetails({ booking, locale, formatCurre
       <ReceiptRow label={copy.original}><span dir="ltr">{money(booking.originalTotal ?? payment.amounts?.originalTotal)}</span></ReceiptRow>
       {offerLabel ? <ReceiptRow label={copy.offer}><bdi dir="auto">{offerLabel}</bdi></ReceiptRow> : null}
       <ReceiptRow label={copy.share}><span dir="ltr">{points(payment.sharePointsUsed)}</span></ReceiptRow>
+      <ReceiptRow label={copy.shareValue}><span dir="ltr">-{money(payment.amounts?.shareAed)}</span></ReceiptRow>
       <ReceiptRow label={copy.wallet}><span dir="ltr">{money(payment.amounts?.walletAed)}</span></ReceiptRow>
       <ReceiptRow label={copy.card}><span dir="ltr">{money(payment.amounts?.cardAed)}{payment.cardLast4 ? ` (**** ${payment.cardLast4})` : ""}</span></ReceiptRow>
       <ReceiptRow label={copy.transaction}><span dir="ltr" style={{ fontFamily: "monospace", color: "#00766f" }}>{payment.transactionRef}</span></ReceiptRow>

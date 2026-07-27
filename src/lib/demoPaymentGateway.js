@@ -6,7 +6,8 @@ export const DEMO_CARD_NUMBERS = Object.freeze({
 export const DEMO_CARD_OFFER_PERCENT = 20;
 export const DEMO_WALLET_BALANCE = 30;
 export const DEMO_SHARE_POINTS = 10;
-export const DEMO_SHARE_POINTS_PER_AED = 10;
+export const DEMO_SHARE_AED_VALUE = 20;
+export const DEMO_SHARE_POINTS_PER_AED = DEMO_SHARE_POINTS / DEMO_SHARE_AED_VALUE;
 
 const EPSILON = 0.011;
 
@@ -46,6 +47,14 @@ export function validateDemoCardOffer(value) {
     status: !known ? "unrecognized" : eligible ? "eligible" : "not_eligible",
     last4: known ? normalized.slice(-4) : "",
     discountPercent: eligible ? DEMO_CARD_OFFER_PERCENT : 0,
+  };
+}
+
+export function validateDemoCvv(value) {
+  const normalized = String(value || "").replace(/\D/g, "").slice(0, 3);
+  return {
+    valid: /^\d{3}$/.test(normalized),
+    status: !normalized ? "required" : normalized.length === 3 ? "valid" : "invalid",
   };
 }
 
@@ -134,6 +143,7 @@ export function createDemoPaymentPlan({
   ticketCount = 1,
   offer = null,
   cardNumber = "",
+  cvv = "",
   sharePoints = null,
   shareAed = 0,
   walletAed = 0,
@@ -158,6 +168,8 @@ export function createDemoPaymentPlan({
   const appliedWalletAed = clampMoney(walletAed, 0, Math.min(afterShare, DEMO_WALLET_BALANCE));
   const cardAed = roundDemoMoney(Math.max(0, payableTotal - appliedShareAed - appliedWalletAed));
   const cardValidation = validateDemoCardOffer(cardNumber);
+  const cvvValidation = validateDemoCvv(cvv);
+  const cvvRequired = Boolean(cardValidation.valid && (offer || cardAed > 0));
 
   let valid = offerAdjustment.valid;
   let reason = offerAdjustment.valid ? "ready" : offerAdjustment.reason;
@@ -172,6 +184,9 @@ export function createDemoPaymentPlan({
   } else if (valid && cardAed > 0 && !cardValidation.valid) {
     valid = false;
     reason = "card_required";
+  } else if (valid && cvvRequired && !cvvValidation.valid) {
+    valid = false;
+    reason = cvvValidation.status === "required" ? "cvv_required" : "cvv_invalid";
   }
 
   const fundingTotal = roundDemoMoney(appliedShareAed + appliedWalletAed + cardAed);
@@ -195,6 +210,7 @@ export function createDemoPaymentPlan({
       : null,
     offerResult: offerAdjustment.reason,
     cardValidation,
+    cvvValidation,
     cardLast4: cardValidation.last4,
     shareValidation,
     amounts: {
@@ -202,6 +218,7 @@ export function createDemoPaymentPlan({
       offerDiscount: offerAdjustment.discount,
       payableTotal,
       shareAed: appliedShareAed,
+      remainingAfterPointsAed: afterShare,
       walletAed: appliedWalletAed,
       cardAed,
     },

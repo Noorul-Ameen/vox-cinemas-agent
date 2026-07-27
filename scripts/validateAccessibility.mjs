@@ -21,7 +21,7 @@ assert.match(
 for (const stage of ["cinemas", "movies", "showtimes", "seats", "booking"]) {
   assert.match(
     richMedia,
-    new RegExp(`<section role="region" aria-labelledby=\\{STAGE_HEADING_IDS\\.${stage}\\}>`),
+    new RegExp(`<section role="region" aria-labelledby=\\{STAGE_HEADING_IDS\\.${stage}\\}(?:\\s[^>]*)?>`),
     `${stage} must render as a named region.`,
   );
   assert.match(
@@ -30,6 +30,12 @@ for (const stage of ["cinemas", "movies", "showtimes", "seats", "booking"]) {
     `${stage} must connect its region name to its visible heading.`,
   );
 }
+
+assert.match(
+  richMedia,
+  /<section role="region" aria-labelledby=\{STAGE_HEADING_IDS\.movies\} aria-busy=\{loading\}>/,
+  "Movie loading must expose its busy state on the named results region.",
+);
 
 assert.match(
   richMedia,

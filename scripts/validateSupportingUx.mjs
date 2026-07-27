@@ -4,12 +4,14 @@ import { DEMO_CARD_STORAGE_KEY } from "../src/checkoutSafety.js";
 import { guardAgentStateClaim } from "../src/lib/agentStateTruth.js";
 import {
   DEMO_CARD_NUMBERS,
+  DEMO_SHARE_AED_VALUE,
   DEMO_SHARE_POINTS,
   DEMO_WALLET_BALANCE,
   createDemoPaymentPlan,
   formatDemoCardNumber,
   maskDemoCardNumber,
   validateDemoCardOffer,
+  validateDemoCvv,
   validateDemoSharePoints,
   validateDemoWallet,
 } from "../src/lib/demoPaymentGateway.js";
@@ -34,7 +36,8 @@ assert.match(checkoutSource, /DemoPaymentGateway/, "checkout must render the POC
 assert.match(checkoutSource, /onProcess=\{processPayment\}/, "only a valid reviewed plan may reach dummy processing");
 assert.doesNotMatch(`${checkoutSource}\n${demoGatewaySource}`, /\bfetch\s*\(|axios|sendText|sendContextualUpdate|clientTools/, "test checkout data must never leave the non-transactional components");
 assert.doesNotMatch(demoGatewaySource, /\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b/, "test payment values must remain in memory and must not be persisted");
-assert.doesNotMatch(demoGatewaySource, /\b(?:cvv|cvc|cardName|expiryLabel|security code|one-time password|otp)\b/i, "the test gateway must not collect authentication or real cardholder details");
+assert.match(demoGatewaySource, /type="password"[\s\S]*autoComplete="cc-csc"[\s\S]*maxLength=\{3\}/, "CVV must use a protected three-digit on-screen control");
+assert.match(demoGatewaySource, /data-testid="payment-card-select"/, "available payment cards must be presented in a dropdown");
 assert.match(demoGatewaySource, /maskDemoCardNumber\(DEMO_CARD_NUMBERS\.eligible\)/, "the eligible card must render only a masked account number");
 assert.match(demoGatewaySource, /maskDemoCardNumber\(DEMO_CARD_NUMBERS\.notEligible\)/, "the ineligible card must render only a masked account number");
 assert.doesNotMatch(demoGatewaySource, /formatDemoCardNumber\(cardNumber\)/, "the checkout must never render a full selected card number");
@@ -58,8 +61,11 @@ assert.equal(validateDemoCardOffer("4000000000000000").status, "unrecognized", "
 assert.equal(validateDemoWallet(30).eligible, true, "the published test wallet balance must validate its full AED 30 balance");
 assert.equal(validateDemoWallet(DEMO_WALLET_BALANCE + 1).status, "insufficient", "wallet validation must fail above the test balance");
 assert.equal(validateDemoSharePoints(10).eligible, true, "the full published SHARE points balance must validate");
+assert.equal(validateDemoSharePoints(10).appliedAed, DEMO_SHARE_AED_VALUE, "the 10-point balance must remain equivalent to AED 20");
 assert.equal(validateDemoSharePoints(11).status, "insufficient", "SHARE validation must fail above the 10-point balance");
 assert.equal(validateDemoSharePoints(10.5).status, "invalid", "SHARE redemption must use whole points");
+assert.equal(validateDemoCvv("123").valid, true, "a three-digit CVV must validate");
+assert.equal(validateDemoCvv("12").status, "invalid", "an incomplete CVV must block review");
 const fabShareOffer = OFFERS.find((offer) => offer.id === "fab-share");
 assert.ok(fabShareOffer, "the published FAB SHARE offer must remain available");
 const splitPlan = createDemoPaymentPlan({
@@ -67,28 +73,32 @@ const splitPlan = createDemoPaymentPlan({
   ticketCount: 2,
   offer: fabShareOffer,
   cardNumber: DEMO_CARD_NUMBERS.eligible,
+  cvv: "123",
   sharePoints: 10,
-  walletAed: 30,
+  walletAed: 10,
 });
 assert.equal(splitPlan.valid, true, "eligible BOGO plus three-way funding must produce a valid plan");
 assert.deepEqual(splitPlan.amounts, {
   originalTotal: 84,
   offerDiscount: 42,
   payableTotal: 42,
-  shareAed: 1,
-  walletAed: 30,
-  cardAed: 11,
+  shareAed: 20,
+  remainingAfterPointsAed: 22,
+  walletAed: 10,
+  cardAed: 12,
 }, "BOGO, SHARE, wallet, and card amounts must reconcile exactly");
 assert.equal(createDemoPaymentPlan({
   amount: 84,
   ticketCount: 2,
   offer: fabShareOffer,
   cardNumber: DEMO_CARD_NUMBERS.notEligible,
+  cvv: "123",
 }).reason, "offer_card_not_eligible", "the second published card must fail every selected offer");
 assert.equal(createDemoPaymentPlan({
   amount: 84,
   ticketCount: 2,
   cardNumber: DEMO_CARD_NUMBERS.eligible,
+  cvv: "123",
   sharePoints: 11,
 }).reason, "share_points_exceed_balance", "payment review must fail when requested SHARE points exceed the available balance");
 assert.equal(createDemoPaymentPlan({
@@ -101,6 +111,7 @@ assert.equal(createDemoPaymentPlan({
   amount: 84,
   ticketCount: 2,
   cardNumber: DEMO_CARD_NUMBERS.eligible,
+  cvv: "123",
 }).amounts.cardAed, 84, "declining SHARE and wallet redemption must leave the full amount on the test card");
 
 const visibleHorrorMovies = {

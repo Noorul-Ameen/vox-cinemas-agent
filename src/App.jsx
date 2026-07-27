@@ -82,6 +82,7 @@ const loadBookingHistory = () => import("./components/BookingHistory.jsx");
 const loadHandoverPanel = () => import("./components/HandoverPanel.jsx");
 const loadOffersPanel = () => import("./components/OffersPanel.jsx");
 const loadCheckout = () => import("./components/Checkout.jsx");
+const loadDiscoveryPrompt = () => import("./components/DiscoveryPrompt.jsx");
 let faqKnowledgePromise;
 const loadFaqKnowledge = () => {
   faqKnowledgePromise ||= import("./knowledge/index.js");
@@ -2282,7 +2283,7 @@ export default function App() {
     const missing = getMissingDiscoveryCriteria(preferences, ["cinema", "date"]);
     const hasNarrowingPreference = Boolean(
       preferences.movieId || preferences.movieTitle || hasDiscoveryTimePreference(preferences)
-      || preferences.genre || preferences.language || preferences.experience || preferences.audience || preferences.openChoice
+      || preferences.genre || preferences.language || preferences.experience || preferences.audience || preferences.viewerAge != null || preferences.openChoice
     );
     if (preferences.recommendationIntent === "unsupported_language_afghan") missing.push("unsupported_language_afghan");
     else if (preferences.recommendationIntent === "educational") missing.push("educational");
@@ -2313,7 +2314,7 @@ export default function App() {
 
   const loadDiscoveryForCinema = async (target, requestedDate, initialPreferences = discoveryPreferencesRef.current, rawTurn = "") => {
     const epoch = beginAsyncRequest();
-    showStage({ view: "loading", label: t("app.loadingMovies") });
+    showStage({ view: "loading", kind: "movies", label: t("app.loadingMovies") });
     const revision = stageRevisionRef.current;
     let movies;
     try {
@@ -2543,7 +2544,7 @@ export default function App() {
     if (visibleNoResultsReason === "no_results_for_criteria" && contextualOpenChoiceOnly) {
       const retained = discoveryPreferencesRef.current;
       const hasOptionalCriteria = Boolean(retained.movieId || retained.movieTitle || retained.genre || retained.language
-        || retained.experience || retained.audience || hasDiscoveryTimePreference(retained));
+        || retained.experience || retained.audience || retained.viewerAge != null || hasDiscoveryTimePreference(retained));
       const errorByLocale = localePair(
         hasOptionalCriteria
           ? "Those preferences do not have a matching showtime together. Tell me which one to change, such as movie, genre, language, experience, audience, or time. I will keep your cinema and date."
@@ -2665,7 +2666,7 @@ export default function App() {
         };
       }
       const hasNarrowingCriteria = Boolean(preferences.movieId || preferences.movieTitle || hasDiscoveryTimePreference(preferences)
-        || preferences.genre || preferences.language || preferences.experience || preferences.audience || preferences.openChoice);
+        || preferences.genre || preferences.language || preferences.experience || preferences.audience || preferences.viewerAge != null || preferences.openChoice);
       let visibleCinemas = suggested;
       let verified = false;
       let failedCinemaCount = 0;
@@ -2713,7 +2714,7 @@ export default function App() {
       let cinemas = filterDiscoveryResults({ cinemas: CINEMAS, preferences }).cinemas;
       const shouldVerifyCinemaList = Boolean(preferences.date && (
         preferences.movieId || preferences.movieTitle || hasDiscoveryTimePreference(preferences)
-        || preferences.genre || preferences.language || preferences.experience || preferences.audience || preferences.openChoice
+        || preferences.genre || preferences.language || preferences.experience || preferences.audience || preferences.viewerAge != null || preferences.openChoice
       ));
       if (shouldVerifyCinemaList) {
         const scanEpoch = beginAsyncRequest();
@@ -6319,7 +6320,7 @@ export default function App() {
             pendingVoiceDiscoveryTurnRef.current = { ...pendingVoiceDiscoveryTurnRef.current, completedResult: voiceDiscoveryResult };
           }
           const movieCount = Array.isArray(voiceDiscoveryResult?.movies) ? voiceDiscoveryResult.movies.length : 0;
-          conversation.sendContextualUpdate?.(`The widget already applied every supplied spoken discovery criterion and rendered the authoritative result. Visible result: ${voiceDiscoveryResult?.shown || "none"}; movie count: ${movieCount}; missing: ${(voiceDiscoveryResult?.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${formatDiscoveryTimePreference(retained) || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; movie: ${retained.movieTitle || "not supplied"}; open choice accepted: ${retained.openChoice === true ? "yes" : "no"}; recommendation clarification: ${retained.recommendationIntent || "none"}. ${buildAuthoritativeDiscoveryContext(voiceDiscoveryResult)} Do not call show_movie_selection for this turn. Describe only the widget result, ask only the first missing item, and do not list unfiltered movies.${voiceDiscoveryResult?.time?.usedNearestFallback ? ` No exact ${voiceDiscoveryResult.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}${normalizedCinemaTurn !== safeMessage ? ` Authoritative speech-recognition correction: “${safeMessage}” means “${normalizedCinemaTurn}”.` : ""}`);
+          conversation.sendContextualUpdate?.(`The widget already applied every supplied spoken discovery criterion and rendered the authoritative result. Visible result: ${voiceDiscoveryResult?.shown || "none"}; movie count: ${movieCount}; missing: ${(voiceDiscoveryResult?.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${formatDiscoveryTimePreference(retained) || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; viewer age: ${retained.viewerAge ?? "not supplied"}; movie: ${retained.movieTitle || "not supplied"}; open choice accepted: ${retained.openChoice === true ? "yes" : "no"}; recommendation clarification: ${retained.recommendationIntent || "none"}. ${buildAuthoritativeDiscoveryContext(voiceDiscoveryResult)} Do not call show_movie_selection for this turn. Describe only the widget result, ask only the first missing item, and do not list unfiltered movies.${voiceDiscoveryResult?.time?.usedNearestFallback ? ` No exact ${voiceDiscoveryResult.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}${normalizedCinemaTurn !== safeMessage ? ` Authoritative speech-recognition correction: “${safeMessage}” means “${normalizedCinemaTurn}”.` : ""}`);
         }
         if (directMovieSelection) {
           conversation.sendContextualUpdate?.(`The guest explicitly selected ${directMovieSelection.title} from the visible movie cards. The widget is loading that movie's verified showtimes now. Do not restart discovery or substitute another movie.`);
@@ -7734,7 +7735,7 @@ export default function App() {
       if (discoveryRouteResult) {
         const retained = discoveryPreferencesRef.current;
         const movieCount = Array.isArray(discoveryRouteResult.movies) ? discoveryRouteResult.movies.length : 0;
-        conversation.sendContextualUpdate?.(`The widget applied every supplied discovery criterion. Visible result: ${discoveryRouteResult.shown || "none"}; movie count: ${movieCount}; missing: ${(discoveryRouteResult.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${formatDiscoveryTimePreference(retained) || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; movie: ${retained.movieTitle || "not supplied"}; open choice accepted: ${retained.openChoice === true ? "yes" : "no"}; recommendation clarification: ${retained.recommendationIntent || "none"}. ${buildAuthoritativeDiscoveryContext(discoveryRouteResult)} Ask only the first missing item and do not list unfiltered movies.${discoveryRouteResult.time?.usedNearestFallback ? ` No exact ${discoveryRouteResult.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}`);
+        conversation.sendContextualUpdate?.(`The widget applied every supplied discovery criterion. Visible result: ${discoveryRouteResult.shown || "none"}; movie count: ${movieCount}; missing: ${(discoveryRouteResult.missing || []).join(", ") || "none"}; cinema: ${retained.cinemaName || "not supplied"}; date: ${retained.date || "not supplied"}; preferred time: ${formatDiscoveryTimePreference(retained) || "not supplied"}; genre: ${retained.genre || "not supplied"}; language: ${retained.language || "not supplied"}; experience: ${retained.experience || "not supplied"}; audience: ${retained.audience || "not supplied"}; viewer age: ${retained.viewerAge ?? "not supplied"}; movie: ${retained.movieTitle || "not supplied"}; open choice accepted: ${retained.openChoice === true ? "yes" : "no"}; recommendation clarification: ${retained.recommendationIntent || "none"}. ${buildAuthoritativeDiscoveryContext(discoveryRouteResult)} Ask only the first missing item and do not list unfiltered movies.${discoveryRouteResult.time?.usedNearestFallback ? ` No exact ${discoveryRouteResult.time.requestedTime} showtime exists; explicitly say the displayed times are the closest suitable options.` : ""}`);
       }
       if (directMovieRouteResult) {
         const showtimes = Array.isArray(directMovieRouteResult.result?.showtimes) ? directMovieRouteResult.result.showtimes : [];
@@ -8958,17 +8959,32 @@ export default function App() {
             </div>
           )}
           {visibleStageView !== "empty" && <div ref={stageAnchorRef} aria-hidden="true" />}
-          {cinema && ["movies", "showtimes"].includes(visibleStageView) && <DateStrip dates={displayedProgrammingDates} selected={stage.errorCode === "date_unavailable" || !discoveryPreferences.date ? null : scheduleDate} locale={locale} label={t("dates.label")} onSelect={chooseDate} />}
-          {visibleStageView === "loading" && <LoadingPanel label={stage.label} />}
-          {visibleStageView === "discovery" && <DiscoveryPrompt
+          {cinema && (["movies", "showtimes"].includes(visibleStageView) || (visibleStageView === "loading" && stage.kind === "movies")) && <DateStrip dates={displayedProgrammingDates} selected={stage.errorCode === "date_unavailable" || !discoveryPreferences.date ? null : scheduleDate} locale={locale} label={t("dates.label")} onSelect={chooseDate} />}
+          {visibleStageView === "loading" && !(stage.kind === "movies" && cinema) && <LoadingPanel label={stage.label} />}
+          {visibleStageView === "discovery" && <RetryableLazy
+            loader={loadDiscoveryPrompt}
+            manifestKey="src/components/DiscoveryPrompt.jsx"
+            loadingFallback={<LoadingPanel label={discoveryQuestion(stage.missing, locale)} />}
+            errorTitle={t("error.title")}
+            retryLabel={t("error.retry")}
+            onStaleVersion={preserveJourneyForReleaseReload}
             question={discoveryQuestion(stage.missing, locale)}
             preferences={stage.preferences}
-            dateOptions={stage.missing?.[0] === "date" ? displayedProgrammingDates : []}
             dateLabel={t("dates.label")}
-            onDateSelect={chooseDate}
+            dateStrip={stage.missing?.[0] === "date" ? <DateStrip dates={displayedProgrammingDates} selected={null} locale={locale} label={t("dates.label")} onSelect={chooseDate} compact /> : null}
           />}
           {visibleStageView === "cinemas" && <CinemaPicker cinemas={stage.cinemas || CINEMAS} selected={cinema} notice={localizedStageMessage(stage, "notice", locale)} error={localizedStageMessage(stage, "error", locale)} onRetry={stage.retryAvailable ? () => { beginDirectUiUserTurn(); return routeDiscoveryTurn("", { preferencesAlreadyApplied: true }); } : undefined} onSelect={chooseCinema} onBack={() => { beginDirectUiUserTurn(); void restoreCinemaReturn(); }} />}
-          {visibleStageView === "movies" && cinema && <MovieGrid movies={stage.movies} cinemaName={stripVox(cinema.name)} scheduleDate={stage.errorCode === "date_unavailable" ? userRequestedDateRef.current : scheduleDate} notice={localizedStageMessage(stage, "notice", locale)} onSelect={pickMovie} error={localizedStageMessage(stage, "error", locale)} onRetry={stage.errorCode === "date_unavailable" ? undefined : () => { beginDirectUiUserTurn(); return routeDiscoveryTurn("", { cinemaOverride: cinema, dateOverride: scheduleDate, preferencesAlreadyApplied: true }); }} />}
+          {cinema && (visibleStageView === "movies" || (visibleStageView === "loading" && stage.kind === "movies")) && <MovieGrid
+            movies={stage.movies || []}
+            cinemaName={stripVox(cinema.name)}
+            scheduleDate={stage.errorCode === "date_unavailable" ? userRequestedDateRef.current : scheduleDate}
+            notice={localizedStageMessage(stage, "notice", locale)}
+            onSelect={pickMovie}
+            error={localizedStageMessage(stage, "error", locale)}
+            onRetry={stage.errorCode === "date_unavailable" ? undefined : () => { beginDirectUiUserTurn(); return routeDiscoveryTurn("", { cinemaOverride: cinema, dateOverride: scheduleDate, preferencesAlreadyApplied: true }); }}
+            loading={visibleStageView === "loading"}
+            loadingLabel={stage.label}
+          />}
           {visibleStageView === "showtimes" && <Showtimes movie={stage.movie} sessions={stage.sessions} notice={localizedStageMessage(stage, "notice", locale)} error={localizedStageMessage(stage, "error", locale)} onRetry={stage.retryAvailable ? () => pickMovie(stage.movie) : undefined} onSelect={pickSession} onBack={backFromShowtimes} />}
           {visibleStageView === "seatmap" && <SeatMap movie={stage.movie} session={stage.session} plan={stage.plan} selected={selectedSeats} requestedTarget={requestedSeatTarget} pricing={SEAT_PRICING_PREVIEW} quoteState={seatQuote} notice={stage.planMeta?.verified === false ? true : stage.planMeta?.warning || false} onToggle={toggleSeat} onConfirm={confirmSeats} onBack={backFromSeatMap} />}
           {visibleStageView === "checkout" && stage.order && pendingOrder?.checkoutId === stage.order.checkoutId && (
@@ -9083,50 +9099,6 @@ function LoadingPanel({ label }) {
       <style>{`@keyframes voxi-spin{to{transform:rotate(360deg)}}`}</style>
       <span style={{ fontSize: 12 }}>{label}</span>
     </div>
-  );
-}
-
-function DiscoveryPrompt({ question, preferences = {}, dateOptions = [], dateLabel = "", onDateSelect }) {
-  const { locale } = useI18n();
-  const formattedDate = (() => {
-    if (!preferences.date) return null;
-    const date = new Date(`${preferences.date}T12:00:00+04:00`);
-    if (Number.isNaN(date.getTime())) return null;
-    try {
-      return new Intl.DateTimeFormat(locale === "ar" ? "ar-AE" : "en-AE", {
-        timeZone: "Asia/Dubai",
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      }).format(date);
-    } catch {
-      return null;
-    }
-  })();
-  const visibleValues = [
-    preferences.cinemaName,
-    preferences.city && !preferences.cinemaName ? preferences.city : null,
-    formattedDate,
-    formatDiscoveryTimePreference(preferences, { locale }),
-    preferences.movieTitle,
-    preferences.genre,
-    preferences.language,
-    preferences.experience,
-    preferences.audience === "kids_family" ? (locale === "ar" ? "أطفال وعائلات" : "Kids & family") : null,
-    preferences.openChoice === true ? (locale === "ar" ? "أي فيلم مناسب" : "Any suitable movie") : null,
-    preferences.recommendationIntent === "educational" ? (locale === "ar" ? "طلب تعليمي يحتاج توضيحاً" : "Educational preference needs clarification") : null,
-  ].filter(Boolean);
-  return (
-    <section role="status" aria-live="polite" style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface, boxShadow: `0 8px 22px ${C.shadow}`, padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.brand }}><Sparkles size={16} /><strong dir="auto" style={{ color: C.text, fontSize: 14 }}>{question}</strong></div>
-      {!!visibleValues.length && <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
-        {visibleValues.map((value, index) => <span key={`${value}-${index}`} dir="auto" style={{ borderRadius: 999, background: C.primarySoft, padding: "4px 8px", color: C.primary, fontSize: 10 }}>{value}</span>)}
-      </div>}
-      {!!dateOptions.length && <div style={{ marginTop: 13 }}>
-        <div dir="auto" style={{ marginBottom: 7, color: C.muted, fontSize: 10, fontWeight: 700 }}>{dateLabel}</div>
-        <DateStrip dates={dateOptions} selected={null} locale={locale} label={dateLabel} onSelect={onDateSelect} compact />
-      </div>}
-    </section>
   );
 }
 
