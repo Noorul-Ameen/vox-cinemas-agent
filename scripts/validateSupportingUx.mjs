@@ -6,6 +6,7 @@ import {
   DEMO_CARD_NUMBERS,
   DEMO_SHARE_AED_VALUE,
   DEMO_SHARE_POINTS,
+  DEMO_SHARE_POINTS_PER_AED,
   DEMO_WALLET_BALANCE,
   createDemoPaymentPlan,
   formatDemoCardNumber,
@@ -60,10 +61,12 @@ assert.equal(validateDemoCardOffer(DEMO_CARD_NUMBERS.notEligible).status, "not_e
 assert.equal(validateDemoCardOffer("4000000000000000").status, "unrecognized", "every unpublished card number must fail closed");
 assert.equal(validateDemoWallet(30).eligible, true, "the published test wallet balance must validate its full AED 30 balance");
 assert.equal(validateDemoWallet(DEMO_WALLET_BALANCE + 1).status, "insufficient", "wallet validation must fail above the test balance");
-assert.equal(validateDemoSharePoints(10).eligible, true, "the full published SHARE points balance must validate");
-assert.equal(validateDemoSharePoints(10).appliedAed, DEMO_SHARE_AED_VALUE, "the 10-point balance must remain equivalent to AED 20");
-assert.equal(validateDemoSharePoints(11).status, "insufficient", "SHARE validation must fail above the 10-point balance");
-assert.equal(validateDemoSharePoints(10.5).status, "invalid", "SHARE redemption must use whole points");
+assert.equal(DEMO_SHARE_POINTS_PER_AED, 10, "ten SHARE points must equal AED 1");
+assert.equal(validateDemoSharePoints(10).appliedAed, 1, "10 SHARE points must convert to AED 1");
+assert.equal(validateDemoSharePoints(200).eligible, true, "the full published SHARE points balance must validate");
+assert.equal(validateDemoSharePoints(200).appliedAed, DEMO_SHARE_AED_VALUE, "the 200-point balance must remain equivalent to AED 20");
+assert.equal(validateDemoSharePoints(201).status, "insufficient", "SHARE validation must fail above the 200-point balance");
+assert.equal(validateDemoSharePoints(200.5).status, "invalid", "SHARE redemption must use whole points");
 assert.equal(validateDemoCvv("123").valid, true, "a three-digit CVV must validate");
 assert.equal(validateDemoCvv("12").status, "invalid", "an incomplete CVV must block review");
 const fabShareOffer = OFFERS.find((offer) => offer.id === "fab-share");
@@ -74,7 +77,7 @@ const splitPlan = createDemoPaymentPlan({
   offer: fabShareOffer,
   cardNumber: DEMO_CARD_NUMBERS.eligible,
   cvv: "123",
-  sharePoints: 10,
+  sharePoints: 150,
   walletAed: 10,
 });
 assert.equal(splitPlan.valid, true, "eligible BOGO plus three-way funding must produce a valid plan");
@@ -82,10 +85,10 @@ assert.deepEqual(splitPlan.amounts, {
   originalTotal: 84,
   offerDiscount: 42,
   payableTotal: 42,
-  shareAed: 20,
-  remainingAfterPointsAed: 22,
+  shareAed: 15,
+  remainingAfterPointsAed: 27,
   walletAed: 10,
-  cardAed: 12,
+  cardAed: 17,
 }, "BOGO, SHARE, wallet, and card amounts must reconcile exactly");
 assert.equal(createDemoPaymentPlan({
   amount: 84,
@@ -99,14 +102,19 @@ assert.equal(createDemoPaymentPlan({
   ticketCount: 2,
   cardNumber: DEMO_CARD_NUMBERS.eligible,
   cvv: "123",
-  sharePoints: 11,
+  sharePoints: 201,
 }).reason, "share_points_exceed_balance", "payment review must fail when requested SHARE points exceed the available balance");
-assert.equal(createDemoPaymentPlan({
+const cardlessPlan = createDemoPaymentPlan({
   amount: 31,
   ticketCount: 2,
-  sharePoints: 10,
+  sharePoints: 200,
   walletAed: 30,
-}).amounts.cardAed, 0, "SHARE and wallet may fully fund a payable amount without a card");
+});
+assert.equal(cardlessPlan.valid, true, "SHARE and wallet may fully fund a payable amount without a card");
+assert.equal(cardlessPlan.amounts.cardAed, 0, "fully funded payment must leave no card remainder");
+assert.equal(cardlessPlan.requirements.card, false, "a fully funded payment must not require card selection");
+assert.equal(cardlessPlan.requirements.cvv, false, "a fully funded payment must not require CVV");
+assert.equal(cardlessPlan.cardLast4, "", "a fully funded payment must not retain card display details");
 assert.equal(createDemoPaymentPlan({
   amount: 84,
   ticketCount: 2,
