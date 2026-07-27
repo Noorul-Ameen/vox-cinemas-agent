@@ -123,6 +123,7 @@ export default function DemoPaymentGateway({
     offerCardRequired: "اختر البطاقة المؤهلة لتطبيق العرض المحدد.",
     notEligible: "هذه البطاقة غير مؤهلة للعرض المحدد.",
     cardRequired: "اختر إحدى البطاقتين لدفع المبلغ المتبقي.",
+    noCardRequired: "لا يلزم اختيار بطاقة أو إدخال رمز CVV لأن نقاط SHARE ومحفظة VOX تغطيان المبلغ بالكامل.",
     unsupported: "لا يمكن تطبيق هذا العرض.",
     reviewHelp: "راجع جميع التفاصيل قبل معالجة الدفع.",
   } : {
@@ -173,6 +174,7 @@ export default function DemoPaymentGateway({
     offerCardRequired: "Choose the eligible card to apply the selected offer.",
     notEligible: "This card is not eligible for the selected offer.",
     cardRequired: "Choose either available card for the remaining card balance.",
+    noCardRequired: "No card or CVV is required because SHARE points and VOX Wallet cover the full amount.",
     unsupported: "This offer cannot be applied.",
     reviewHelp: "Review all details before processing the payment.",
   };
@@ -210,7 +212,8 @@ export default function DemoPaymentGateway({
   }[plan.reason] || "";
   const cardOfferErrorShown = Boolean(cardNumber && selectedOffer && !plan.cardValidation?.eligible);
   const shareValidationErrorShown = Boolean(useShare && plan.shareValidation && !plan.shareValidation.valid);
-  const cardSelectionNeedsCvv = Boolean(cardNumber && (selectedOffer ? plan.cardValidation?.eligible : plan.amounts?.cardAed > 0));
+  const cardControlsRequired = Boolean(plan.requirements?.card);
+  const cardSelectionNeedsCvv = Boolean(cardNumber && plan.requirements?.cvv);
   const cvvErrorShown = Boolean(cardSelectionNeedsCvv && cvv && !plan.cvvValidation?.valid);
   const selectedOfferLabel = selectedOffer
     ? `${localValue(selectedOffer.bank, language)} - ${localValue(selectedOffer.headline, language)}`
@@ -235,7 +238,9 @@ export default function DemoPaymentGateway({
             <div style={styles.row}><span>{copy.pointsEquivalent}</span><strong>-{money(plan.amounts.shareAed)}</strong></div>
             <div style={styles.strongRow}><span>{copy.remainingPayment}</span><span>{money(plan.amounts.remainingAfterPointsAed)}</span></div>
             <div style={styles.row}><span>{copy.walletUsed}</span><strong>{money(plan.amounts.walletAed)}</strong></div>
-            <div style={styles.row}><span>{copy.cardUsed}{plan.cardLast4 ? ` •••• ${plan.cardLast4}` : ""}</span><strong>{money(plan.amounts.cardAed)}</strong></div>
+            {plan.amounts.cardAed > 0 ? (
+              <div style={styles.row}><span>{copy.cardUsed}{plan.cardLast4 ? ` •••• ${plan.cardLast4}` : ""}</span><strong>{money(plan.amounts.cardAed)}</strong></div>
+            ) : null}
           </div>
           <p style={styles.help}>{copy.reviewHelp}</p>
           <div style={styles.actions}>
@@ -332,46 +337,52 @@ export default function DemoPaymentGateway({
 
       <div style={styles.section}>
         <h3 style={styles.title}>{copy.cards}</h3>
-        <label style={styles.label}>
-          <span>{copy.cards}</span>
-          <select
-            style={styles.select}
-            value={cardNumber}
-            aria-label={copy.cards}
-            data-testid="payment-card-select"
-            onChange={(event) => {
-              setCardNumber(event.target.value);
-              setCvv("");
-            }}
-          >
-            <option value="">{copy.cardPlaceholder}</option>
-            <option value={DEMO_CARD_NUMBERS.eligible}>{maskDemoCardNumber(DEMO_CARD_NUMBERS.eligible)}</option>
-            <option value={DEMO_CARD_NUMBERS.notEligible}>{maskDemoCardNumber(DEMO_CARD_NUMBERS.notEligible)}</option>
-          </select>
-        </label>
-        {cardNumber && selectedOffer ? (
-          plan.cardValidation?.eligible
-            ? <p style={styles.success}>{copy.eligibleCard}</p>
-            : <p style={styles.error}>{plan.cardValidation?.valid ? copy.notEligible : copy.offerCardRequired}</p>
-        ) : cardNumber ? <p style={styles.success}>{copy.cardAvailable}</p> : null}
-        {cardSelectionNeedsCvv ? (
-          <label style={styles.label}>
-            <span>{copy.cvv}</span>
-            <input
-              style={styles.input}
-              type="password"
-              inputMode="numeric"
-              autoComplete="cc-csc"
-              maxLength={3}
-              value={cvv}
-              aria-label={copy.cvv}
-              aria-invalid={cvvErrorShown}
-              onChange={(event) => setCvv(event.target.value.replace(/\D/g, "").slice(0, 3))}
-            />
-            <span style={styles.help}>{copy.cvvHelp}</span>
-          </label>
-        ) : null}
-        {cvvErrorShown ? <p style={styles.error} role="alert">{copy.cvvInvalid}</p> : null}
+        {cardControlsRequired ? (
+          <>
+            <label style={styles.label}>
+              <span>{copy.cards}</span>
+              <select
+                style={styles.select}
+                value={cardNumber}
+                aria-label={copy.cards}
+                data-testid="payment-card-select"
+                onChange={(event) => {
+                  setCardNumber(event.target.value);
+                  setCvv("");
+                }}
+              >
+                <option value="">{copy.cardPlaceholder}</option>
+                <option value={DEMO_CARD_NUMBERS.eligible}>{maskDemoCardNumber(DEMO_CARD_NUMBERS.eligible)}</option>
+                <option value={DEMO_CARD_NUMBERS.notEligible}>{maskDemoCardNumber(DEMO_CARD_NUMBERS.notEligible)}</option>
+              </select>
+            </label>
+            {cardNumber && selectedOffer ? (
+              plan.cardValidation?.eligible
+                ? <p style={styles.success}>{copy.eligibleCard}</p>
+                : <p style={styles.error}>{plan.cardValidation?.valid ? copy.notEligible : copy.offerCardRequired}</p>
+            ) : cardNumber ? <p style={styles.success}>{copy.cardAvailable}</p> : null}
+            {cardSelectionNeedsCvv ? (
+              <label style={styles.label}>
+                <span>{copy.cvv}</span>
+                <input
+                  style={styles.input}
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="cc-csc"
+                  maxLength={3}
+                  value={cvv}
+                  aria-label={copy.cvv}
+                  aria-invalid={cvvErrorShown}
+                  onChange={(event) => setCvv(event.target.value.replace(/\D/g, "").slice(0, 3))}
+                />
+                <span style={styles.help}>{copy.cvvHelp}</span>
+              </label>
+            ) : null}
+            {cvvErrorShown ? <p style={styles.error} role="alert">{copy.cvvInvalid}</p> : null}
+          </>
+        ) : (
+          <p style={styles.success} role="status">{copy.noCardRequired}</p>
+        )}
       </div>
 
       <div style={styles.totals}>

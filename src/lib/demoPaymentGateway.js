@@ -5,7 +5,7 @@ export const DEMO_CARD_NUMBERS = Object.freeze({
 
 export const DEMO_CARD_OFFER_PERCENT = 20;
 export const DEMO_WALLET_BALANCE = 30;
-export const DEMO_SHARE_POINTS = 10;
+export const DEMO_SHARE_POINTS = 200;
 export const DEMO_SHARE_AED_VALUE = 20;
 export const DEMO_SHARE_POINTS_PER_AED = DEMO_SHARE_POINTS / DEMO_SHARE_AED_VALUE;
 
@@ -159,17 +159,16 @@ export function createDemoPaymentPlan({
     ? Math.floor(Math.max(0, finiteAmount(shareAed)) * DEMO_SHARE_POINTS_PER_AED)
     : Math.max(0, finiteAmount(sharePoints));
   const shareValidation = validateDemoSharePoints(requestedSharePoints);
-  const appliedShareAed = clampMoney(
-    shareValidation.appliedAed,
-    0,
-    Math.min(payableTotal, DEMO_SHARE_POINTS / DEMO_SHARE_POINTS_PER_AED),
-  );
+  const maximumSharePointsForPayable = Math.floor((payableTotal * DEMO_SHARE_POINTS_PER_AED) + EPSILON);
+  const appliedSharePoints = Math.min(shareValidation.appliedPoints, maximumSharePointsForPayable);
+  const appliedShareAed = roundDemoMoney(appliedSharePoints / DEMO_SHARE_POINTS_PER_AED);
   const afterShare = roundDemoMoney(payableTotal - appliedShareAed);
   const appliedWalletAed = clampMoney(walletAed, 0, Math.min(afterShare, DEMO_WALLET_BALANCE));
   const cardAed = roundDemoMoney(Math.max(0, payableTotal - appliedShareAed - appliedWalletAed));
   const cardValidation = validateDemoCardOffer(cardNumber);
   const cvvValidation = validateDemoCvv(cvv);
-  const cvvRequired = Boolean(cardValidation.valid && (offer || cardAed > 0));
+  const cardRequired = Boolean(offer || cardAed > 0);
+  const cvvRequired = Boolean(cardRequired && cardValidation.valid);
 
   let valid = offerAdjustment.valid;
   let reason = offerAdjustment.valid ? "ready" : offerAdjustment.reason;
@@ -195,7 +194,7 @@ export function createDemoPaymentPlan({
     reason = "funding_mismatch";
   }
 
-  const sharePointsUsed = Math.round(appliedShareAed * DEMO_SHARE_POINTS_PER_AED);
+  const sharePointsUsed = appliedSharePoints;
   return {
     valid,
     reason,
@@ -211,7 +210,11 @@ export function createDemoPaymentPlan({
     offerResult: offerAdjustment.reason,
     cardValidation,
     cvvValidation,
-    cardLast4: cardValidation.last4,
+    cardLast4: cardRequired ? cardValidation.last4 : "",
+    requirements: {
+      card: cardRequired,
+      cvv: cvvRequired,
+    },
     shareValidation,
     amounts: {
       originalTotal,

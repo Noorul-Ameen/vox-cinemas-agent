@@ -52,7 +52,9 @@ export default function DemoPaymentReceiptDetails({ booking, locale, formatCurre
       <ReceiptRow label={copy.share}><span dir="ltr">{points(payment.sharePointsUsed)}</span></ReceiptRow>
       <ReceiptRow label={copy.shareValue}><span dir="ltr">-{money(payment.amounts?.shareAed)}</span></ReceiptRow>
       <ReceiptRow label={copy.wallet}><span dir="ltr">{money(payment.amounts?.walletAed)}</span></ReceiptRow>
-      <ReceiptRow label={copy.card}><span dir="ltr">{money(payment.amounts?.cardAed)}{payment.cardLast4 ? ` (**** ${payment.cardLast4})` : ""}</span></ReceiptRow>
+      {Number(payment.amounts?.cardAed) > 0 ? (
+        <ReceiptRow label={copy.card}><span dir="ltr">{money(payment.amounts.cardAed)}{payment.cardLast4 ? ` (**** ${payment.cardLast4})` : ""}</span></ReceiptRow>
+      ) : null}
       <ReceiptRow label={copy.transaction}><span dir="ltr" style={{ fontFamily: "monospace", color: "#00766f" }}>{payment.transactionRef}</span></ReceiptRow>
     </React.Fragment>
   );
