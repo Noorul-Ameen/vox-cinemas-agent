@@ -2766,10 +2766,10 @@ export default function App() {
     if (missing.includes("preference") && !pendingDiscoveryTurnRef.current) return showDiscoveryPrompt(missing.filter((item) => item === "preference"), preferences);
     const pendingMovieSelectionTurn = pendingDiscoveryTurnRef.current;
     const result = await loadDiscoveryForCinema(target, preferences.date, preferences, combinedRawTurn);
-    const explicitMovieSelectionTurn = discoveryPreferencesRef.current.movieTitle || pendingMovieSelectionTurn;
-    const pendingResult = explicitMovieSelectionTurn && await routePendingVisibleMovieLazy({
+    const resolvedMovieSelectionTurn = discoveryPreferencesRef.current.movieTitle || pendingMovieSelectionTurn;
+    const pendingResult = resolvedMovieSelectionTurn && await routePendingVisibleMovieLazy({
       result,
-      text: explicitMovieSelectionTurn,
+      text: resolvedMovieSelectionTurn,
       route: routeVisibleMovieSelection,
     });
     if (pendingResult) {
