@@ -573,7 +573,10 @@ function extractTicketQuantity(text) {
 
 const cancellationBookingSummary = (booking, locale = "en") => {
   const movie = booking?.movieTitle || booking?.movie || (locale === "ar" ? "فيلم غير محدد" : "Unknown movie");
-  const cinemaName = booking?.cinemaName || booking?.cinema || (locale === "ar" ? "سينما غير محددة" : "Unknown cinema");
+  const rawCinemaName = booking?.cinemaName || booking?.cinema;
+  const cinemaName = rawCinemaName
+    ? (locale === "ar" ? `VOX - ${localizeCinemaName(stripVox(rawCinemaName), locale)}` : rawCinemaName)
+    : (locale === "ar" ? "سينما غير محددة" : "Unknown cinema");
   const performanceDate = booking?.performanceDate || booking?.sourceDate || booking?.date || (locale === "ar" ? "تاريخ غير محدد" : "Unknown date");
   const showtime = booking?.showtime || booking?.time || (locale === "ar" ? "وقت غير محدد" : "Unknown time");
   const reference = booking?.ref || (locale === "ar" ? "غير متوفر" : "Unavailable");
@@ -4946,8 +4949,8 @@ export default function App() {
       if (demoOnly) {
         const summary = cancellationBookingSummary(displayed, localeRef.current);
         const message = localeRef.current === "ar"
-          ? `${summary} الأثر: سيُسجل هذا الملخص كملغى على هذا الجهاز فقط. لن يتم التواصل مع VOX ولن يصدر أي استرداد. هل تريد مني إلغاء هذا الحجز؟`
-          : `${summary} Impact: this summary will be marked cancelled on this device only. VOX will not be contacted and no refund will be issued. Would you like me to cancel this booking?`;
+          ? `${summary} الأثر: سيتم تحديث حالة الحجز إلى ملغى في بيئة إثبات المفهوم. هل تريد مني إلغاء هذا الحجز؟`
+          : `${summary} Impact: the booking status will be updated to cancelled in the POC environment. Would you like me to cancel this booking?`;
         setCancellationFlow({
           bookingRef: displayed.ref,
           phase: "final_confirmation",

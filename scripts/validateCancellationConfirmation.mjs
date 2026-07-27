@@ -11,6 +11,8 @@ for (const phrase of [
   "Do it now",
   "نعم",
   "نعم، ألغي الحجز",
+  "نعم، ألغِ الحجز",
+  "نعم، ألغِ الحجز من فضلك",
   "أكيد، تابع الإلغاء",
 ]) {
   assert.equal(resolveCancellationDecision(phrase), true, `${phrase}: must confirm the pending cancellation`);
@@ -25,6 +27,7 @@ for (const phrase of [
   "Not now",
   "لا",
   "لا تلغي الحجز",
+  "لا، تلغِ الحجز",
   "احتفظ بالحجز",
 ]) {
   assert.equal(resolveCancellationDecision(phrase), false, `${phrase}: must decline the pending cancellation`);
