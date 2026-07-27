@@ -73,9 +73,9 @@ function cancelledSummaryGuidance(booking, locale) {
   const title = clean(booking?.movieTitle);
   const ref = clean(booking?.ref);
   if (locale === "ar") {
-    return `تم وضع علامة ملغي على ملخص الحجز${title ? ` لفيلم ${title}` : ""} على هذا الجهاز${ref ? ` بالمرجع ${ref}` : ""}. لم تتم معالجة استرداد أي مبلغ أو إرسال إلغاء إلى السينما.`;
+    return `تم تحديث حالة الحجز${title ? ` لفيلم ${title}` : ""}${ref ? ` بالمرجع ${ref}` : ""} إلى ملغى في بيئة إثبات المفهوم.`;
   }
-  return `The booking summary${title ? ` for ${title}` : ""}${ref ? ` with reference ${ref}` : ""} is marked cancelled on this device. No refund was processed and no cancellation was sent to the cinema.`;
+  return `The booking${title ? ` for ${title}` : ""}${ref ? ` with reference ${ref}` : ""} is cancelled in the POC environment.`;
 }
 
 function preservedCheckoutGuidance(pendingOrder, locale) {
