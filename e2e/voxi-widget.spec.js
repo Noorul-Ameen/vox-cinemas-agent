@@ -208,8 +208,8 @@ test("direct UI journey reaches checkout with seat-derived ticket count", async 
 
   await input.fill("What does PG mean?");
   await input.press("Enter");
-  await expect(page.getByRole("button", { name: /Return to checkout/ })).toBeVisible();
-  await page.getByRole("button", { name: /Return to checkout/ }).click();
+  await expect(page.locator("main")).toContainText("PG means parental guidance is advised");
+  await expect(page.getByRole("button", { name: /Return to checkout/ })).toHaveCount(0);
   await expect(page.getByText("Checkout review", { exact: true }).last()).toBeVisible();
   await expect(page.getByText(/2 seats/).first()).toBeVisible();
 

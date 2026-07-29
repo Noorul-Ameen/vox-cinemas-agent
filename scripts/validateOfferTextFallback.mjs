@@ -35,13 +35,18 @@ assert.equal(classifyOfferDetailTopic("How do I redeem the HSBC offer?"), "redem
 assert.equal(classifyOfferDetailTopic("What is excluded from the Citi offer?"), "exclusions");
 assert.equal(classifyOfferDetailTopic("Show the terms for the Mashreq offer"), "terms");
 
-assert.equal(resolveLocalOfferTextTurn("How do bank offers work?"), null, "Generic offer FAQs must stay on the approved FAQ path");
-assert.equal(resolveLocalOfferTextTurn("Which cards qualify?"), null, "A bank or uniquely resolved card is required");
+expectTurn("How do bank offers work?", { offerId: null, detailTopic: "summary" });
+expectTurn("What card offers are available?", { offerId: null, detailTopic: "cards" });
+expectTurn("ما عروض البطاقات المتاحة؟", { offerId: null, detailTopic: "cards" }, { locale: "ar" });
+expectTurn("Which cards qualify?", { offerId: null, detailTopic: "cards" });
 assert.equal(resolveLocalOfferTextTurn("Cancel my FAB booking"), null, "Cancellation must retain routing priority");
 assert.equal(resolveLocalOfferTextTurn("Can I get a refund for my ENBD booking?"), null, "Refund requests must retain routing priority");
 assert.equal(resolveLocalOfferTextTurn("Can I use Apple Pay?"), null, "A payment method must not be misrouted to a bank offer");
-assert.equal(resolveLocalOfferTextTurn("Can I use this card?"), null, "A card use question requires a uniquely named published offer");
-assert.equal(resolveLocalOfferTextTurn("Can I use Visa Infinite for this booking?"), null, "A generic card tier requires its issuing bank");
+assert.equal(resolveLocalOfferTextTurn("اعرض أفلاماً أخرى", { locale: "ar" }), null, "An Arabic request to show other movies must not be misrouted to bank offers");
+expectTurn("Can I use this card?", { offerId: null, detailTopic: "cards" });
+const genericTierTurn = expectTurn("Can I use Visa Infinite for this booking?", { offerId: null, detailTopic: "summary" });
+assert.match(genericTierTurn.cardName, /Visa Infinite/i, "A generic card tier must be carried into the published-offer panel filter");
+expectTurn("Can I use Emirates NBD Visa Infinite for this booking?", { offerId: "emirates-nbd", detailTopic: "summary" });
 assert.equal(resolveLocalOfferTextTurn("Can I use FAB SHARE to cancel my booking?"), null, "Cancellation must outrank a named offer use question");
 
 const unpublished = expectTurn("Tell me the SIB offer", { offerId: "sharjah-islamic-bank", detailTopic: "summary" });
@@ -95,7 +100,7 @@ const voiceMessageStart = app.indexOf("onMessage:", callbacksStart);
 const voiceMessageEnd = app.indexOf("const startTextSession", voiceMessageStart);
 assert.ok(callbacksStart >= 0 && voiceMessageStart >= 0 && voiceMessageEnd > voiceMessageStart, "Voice transcript route was not found");
 const voiceMessages = app.slice(voiceMessageStart, voiceMessageEnd);
-assert.match(voiceMessages, /resolveLocalOfferTextTurn\(safeMessage/, "Voice transcripts must use the same named-offer resolver as typed text");
+assert.match(voiceMessages, /resolveLocalOfferTextTurnLazy\(safeMessage/, "Voice transcripts must use the same lazy named-offer resolver as typed text");
 assert.match(voiceMessages, /Approved published offer result for the guest's spoken question/, "Voice must receive the grounded checkout offer result before responding");
 assert.match(voiceMessages, /checkoutOfferEvaluation[\s\S]*checkout review is preserved but will be hidden[\s\S]*Do not claim the offer was applied/, "Voice offer guidance must hide but preserve checkout and avoid false application claims");
 

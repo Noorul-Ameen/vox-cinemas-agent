@@ -3,7 +3,27 @@ import { parseSpokenShowtimeHourChoice } from "./spokenShowtimeChoice.js";
 
 const INFORMATION_ONLY = /^\s*(?:(?:what|which|when|is there|are there|do you have|tell me)\b|(?:ماذا|متى|ما|هل يوجد|هل توجد)(?=\s|$))|[?؟]\s*$/iu;
 const HOUR_ONLY_CHOICE = /^\s*(?:(?:at|around|about|near|approximately|by|الساعة|حوالي)\s*)?(\d{1,2})\s*(a\s*m|p\s*m|صباحا|صباح|مساء|ليلا)?\s*(?:please|من فضلك)?[.!،]*$/iu;
+const CLOCK_SHAPED_CHOICE = /^\s*(?:(?:at|around|about|near|approximately|by|choose|select|اختر|اختار|الساعة|حوالي)\s*)?([0-9٠-٩۰-۹]{1,2})\s*:\s*([0-9٠-٩۰-۹]{1,2})\s*(a\s*m|p\s*m|صباحا|صباح|مساء|ليلا)?\s*(?:please|من فضلك)?[.!؟،]*$/iu;
+const CLOCK_DIGITS = Object.freeze({
+  "٠": "0", "١": "1", "٢": "2", "٣": "3", "٤": "4",
+  "٥": "5", "٦": "6", "٧": "7", "٨": "8", "٩": "9",
+  "۰": "0", "۱": "1", "۲": "2", "۳": "3", "۴": "4",
+  "۵": "5", "۶": "6", "۷": "7", "۸": "8", "۹": "9",
+});
 const escapeRegex = (value) => String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function asciiClockDigits(value) {
+  return String(value || "").replace(/[٠-٩۰-۹]/gu, (digit) => CLOCK_DIGITS[digit] || digit);
+}
+
+export function isMalformedVisibleShowtimeSelectionAttempt({ text, stage } = {}) {
+  if (stage?.view !== "showtimes" || !Array.isArray(stage.sessions) || !stage.sessions.length) return false;
+  const match = asciiClockDigits(text).match(CLOCK_SHAPED_CHOICE);
+  if (!match) return false;
+  const hour = Number(asciiClockDigits(match[1]));
+  const minute = Number(asciiClockDigits(match[2]));
+  return !Number.isInteger(hour) || !Number.isInteger(minute) || hour > 23 || minute > 59 || match[2].length !== 2;
+}
 
 function explicitlyNamedVisibleExperience(value, sessions) {
   const text = String(value || "");
@@ -37,6 +57,7 @@ export function isVisibleShowtimeSelectionAttempt({ text, stage } = {}) {
   if (stage?.view !== "showtimes" || !Array.isArray(stage.sessions) || !stage.sessions.length) return false;
   const value = String(text || "").trim();
   if (!value || INFORMATION_ONLY.test(value)) return false;
+  if (isMalformedVisibleShowtimeSelectionAttempt({ text: value, stage })) return true;
   if (HOUR_ONLY_CHOICE.test(value) || parseSpokenShowtimeHourChoice(value)) return true;
   return Boolean(extractDiscoveryPreferencePatch(value, { expectingTime: true }).patch.preferredTime);
 }
@@ -50,6 +71,7 @@ export function visibleShowtimeSelectionCandidates({ text, stage } = {}) {
   if (stage?.view !== "showtimes" || !Array.isArray(stage.sessions) || !stage.sessions.length) return [];
   const value = String(text || "").trim();
   if (!value || INFORMATION_ONLY.test(value)) return [];
+  if (isMalformedVisibleShowtimeSelectionAttempt({ text: value, stage })) return [];
 
   const signal = extractDiscoveryPreferencePatch(value, { expectingTime: true });
   const requestedTime = signal.patch.preferredTime;

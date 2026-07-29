@@ -610,7 +610,7 @@ function withoutResolvedCinemaPhrase(text, cinema) {
   return remaining.replace(/\s+/g, " ").trim();
 }
 
-const REPLACEMENT_MOVIE_DISCOVERY = /\b(?:any\s+(?:new|different)\s+(?:movie|film)|(?:new|different)\s+(?:movies?|films?))\b|(?:اي|أي)\s+فيلم\s+(?:جديد|مختلف)|فيلم\s+(?:جديد|مختلف)|(?:افلام|أفلام)\s+(?:جديدة|مختلفة|اخرى|أخرى)/iu;
+const REPLACEMENT_MOVIE_DISCOVERY = /\b(?:any\s+(?:new|different|other)\s+(?:movie|film)|(?:new|different|other)\s+(?:movies?|films?)|another\s+(?:movie|film)|something\s+else)\b|(?:اي|أي)\s+فيلم\s+(?:جديد|مختلف|اخر|آخر)|فيلم\s+(?:جديد|مختلف|اخر|آخر)|(?:افلام|أفلام)(?:ا)?\s+(?:جديدة|مختلفة|اخرى|أخرى)/iu;
 const SUGGESTED_MOVIE_LIST = /\b(?:suggest|recommend)\b[\s\S]{0,48}\b(?:movies|films)\b|(?:اقترح|رشح)[\s\S]{0,48}(?:افلام|أفلام)/iu;
 const EXPLICIT_CONTENT_REPLACEMENT = /\b(?:i\s+ve\s+|i\s+have\s+|i\s+)?changed?\s+my\s+mind\b|(?:غيرت|غيّرت)\s+رأيي/iu;
 
@@ -630,7 +630,7 @@ function explicitClears(text) {
     DISCOVERY_PREFERENCE_KEYS.forEach((key) => clear.add(key));
     return clear;
   }
-  if (/\b(?:any|another)\s+(?:cinema|location|venue)\b|\bwherever\b|اي سينما|أي سينما/.test(text)) {
+  if (/\b(?:any|another|different)\s+(?:cinema|location|venue)\b|\bwherever\b|\b(?:change|switch|choose|select|pick)\s+(?:(?:my|the)\s+)?(?:cinema|location|venue)\b|اي سينما|أي سينما|(?:غير|غيّر|بدل|بدّل|اختر|اختار)\s+(?:السينما|سينما|الموقع|المكان)/u.test(text)) {
     ["cinemaId", "cinemaName", "city"].forEach((key) => clear.add(key));
   }
   if (/\b(?:any|another)\s+(?:date|day)\b|اي يوم|أي يوم/.test(text)) ["date", "dateSignal"].forEach((key) => clear.add(key));
@@ -646,7 +646,7 @@ function explicitClears(text) {
     ["movieId", "movieTitle", "genre", "language", "experience", "audience", "viewerAge", "openChoice", "recommendationIntent"]
       .forEach((key) => clear.add(key));
   }
-  if (/\b(?:any movie|another movie|other movies|something else)\b|فيلم آخر|فيلم اخر/.test(text) || isReplacementMovieDiscovery(text)) {
+  if (/\b(?:any movie|another movie|other movies|another film|other films|something else)\b|فيلم آخر|فيلم اخر|(?:افلام|أفلام)(?:ا)?\s+(?:اخرى|أخرى)/u.test(text) || isReplacementMovieDiscovery(text)) {
     ["movieId", "movieTitle"].forEach((key) => clear.add(key));
   }
   if (isReplacementMovieDiscovery(text)) {
@@ -810,6 +810,14 @@ export function extractDiscoveryPreferencePatch(input, {
   if (movie) {
     patch.movieId = movieIdentity(movie) || null;
     patch.movieTitle = movieTitle(movie) || null;
+    // An exact catalog title is an explicit content replacement. Keep place
+    // and date, but do not let facets or a session preference from the
+    // previous movie make the newly named title disappear. Any facet or time
+    // restated in this same turn is applied again below and therefore wins.
+    [
+      "preferredTime", "timeRangeStart", "timeRangeEnd", "timeRangeStrict", "timeBand",
+      "genre", "language", "experience", "audience", "viewerAge", "openChoice", "recommendationIntent",
+    ].forEach((key) => clear.add(key));
   }
   const matchedTitle = movie ? normalizeText(movieTitle(movie)) : "";
   const facetText = matchedTitle
@@ -947,6 +955,7 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
   const patch = signal.patch || {};
   const clear = new Set(signal.clear || []);
   if (!value || patch.movieTitle || patch.movieId || patch.openChoice === true || patch.recommendationIntent) return null;
+  if ((clear.has("movieId") || clear.has("movieTitle")) && isReplacementMovieDiscovery(normalizeText(value))) return null;
   const structuredFilter = patch.viewerAge != null || patch.genre || patch.language || patch.experience || patch.audience;
   const explicitTitleCue = /\b(?:movie|film)\s+(?:called|named)\b|["“”'][^"“”']{2,}["“”']|فيلم\s+(?:اسمه|يدعى)/iu.test(value)
     || /\b(?:watch|see|book(?:\s+me)?|show\s+me|tickets?\s+for|i\s+(?:want|need))\s+(?!(?:(?:a|an|the)\s+)?(?:movie|film)\b).+?\s+(?:in|with)\s+\S/iu.test(value);
@@ -1009,7 +1018,7 @@ export function unresolvedMovieTitleCandidate(input, signal = {}) {
   if (!candidate) return null;
   const normalized = normalizeText(candidate);
   if (GENERIC_DISCOVERY_TITLE_RESIDUAL.test(normalized)) return null;
-  if (!normalized || /^(?:a|an|the|this|that|movies?|films?|showtimes?|options?|choices?|something|anything|one|tickets?|seats?|instead|only|أفلام|افلام|فيلم|خيارات|شيء|أي شيء|تذاكر|مقاعد|بدلا|بدلاً|فقط)$/iu.test(normalized)) return null;
+  if (!normalized || /^(?:a|an|the|this|that|movies?|films?|showtimes?|options?|choices?|something|anything|one|other|another|different|tickets?|seats?|instead|only|أفلام|افلام|فيلم|اخرى|أخرى|اخر|آخر|خيارات|شيء|أي شيء|تذاكر|مقاعد|بدلا|بدلاً|فقط)$/iu.test(normalized)) return null;
   if (/\b(?:tickets?|seats?)\b|(?:تذاكر|مقاعد)/iu.test(normalized)) return null;
   return candidate;
 }

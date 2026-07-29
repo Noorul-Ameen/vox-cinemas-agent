@@ -1,16 +1,16 @@
 {
   "schemaVersion": "voxi.elevenlabs-agent-contract.v1",
-  "contractVersion": "2026-07-27.1",
+  "contractVersion": "2026-07-29.1",
   "publicAgentId": "agent_0001kx3xc0b4f6s8dqy9qnejm4qr",
   "firstMessageTemplate": "{{voxi_session_opening}}",
   "prompt": {
     "source": "src/lib/voxiPrompt.js",
     "exportName": "VOXI_AGENT_PROMPT",
-    "version": "2026-07-27.1",
+    "version": "2026-07-29.1",
     "hashAlgorithm": "sha256",
     "hashNormalization": "utf8_lf",
     "hashScope": "export_value",
-    "sha256": "9cb3fc1387fa72b7db5f20f2d8803c5e202949b7be0e6ce990ab57a18fd948c6"
+    "sha256": "cb6f7efab7f3363468f6dfce325e6ba6ff8d5bf833965db00c7d0a49fddecdcb"
   },
   "transport": {
     "voiceConnectionType": "webrtc",
@@ -274,7 +274,7 @@
       "name": "show_offers",
       "type": "client",
       "waitForResponse": true,
-      "description": "Show published VOX Cinemas UAE bank-offer guidance using the guest's non-sensitive eligibility details and locally derived booking totals.",
+      "description": "Show published VOX Cinemas UAE bank and card offers for every offer question, including general questions with no bank or card named. Leave bankName and cardName blank to display all published offers, wait for the result, and never route an offer question to refund or cancellation guidance. Use only non-sensitive eligibility details and locally derived booking totals.",
       "parameters": {
         "type": "object",
         "additionalProperties": false,

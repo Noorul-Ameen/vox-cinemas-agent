@@ -4,6 +4,7 @@ import { resolveOffer, searchOffers } from "./offerResolver.js";
 const CANCELLATION_OR_REFUND = /\b(?:cancel|cancellation|refund|refundable|void)\b|(?:إلغاء|الغاء|ألغي|الغي|استرداد|استرجاع)/iu;
 const ENGLISH_OFFER_INTENT = /\b(?:offer|offers|deal|deals|discount|discounts|promotion|promotions|eligible|eligibility|qualify|qualifies|qualified|redeem|redemption|card|cards)\b/i;
 const ARABIC_OFFER_INTENT = /(?:عرض|عروض|خصم|خصومات|تخفيض|ترويج|مؤهل|مؤهلة|الأهلية|اهلية|أهلية|بطاق|استفادة|استخدام)/u;
+const ARABIC_MOVIE_DISPLAY_INTENT = /(?:^|\s)[اأإآ]عرض\s+(?:لي\s+)?(?:ال)?(?:فيلم|أفلام)/u;
 const NAMED_OFFER_USE_INTENT = /\b(?:(?:can|could|may|would|do)\s+i\s+(?:use|apply)|pay\s+with)\b/i;
 const GENERIC_CARD_TIER = /\b(?:visa|mastercard)\s+(?:infinite|signature|platinum|gold|classic|titanium|world|world elite|black|premier|rewards)\b/i;
 const TICKET_WORDS = Object.freeze({
@@ -56,20 +57,33 @@ export function offerTicketCountAcknowledgement(ticketCount, { locale = "en" } =
 export function resolveLocalOfferTextTurn(query, { locale = "en" } = {}) {
   const text = String(query || "").trim();
   if (!text || CANCELLATION_OR_REFUND.test(text)) return null;
-  const explicitOfferIntent = ENGLISH_OFFER_INTENT.test(text) || ARABIC_OFFER_INTENT.test(text);
+  const explicitOfferIntent = ENGLISH_OFFER_INTENT.test(text)
+    || (ARABIC_OFFER_INTENT.test(text) && !ARABIC_MOVIE_DISPLAY_INTENT.test(text));
   const namedUseIntent = NAMED_OFFER_USE_INTENT.test(text);
   if (!explicitOfferIntent && !namedUseIntent) return null;
-  if (namedUseIntent && GENERIC_CARD_TIER.test(text)) return null;
+  const genericCardTier = text.match(GENERIC_CARD_TIER)?.[0] || "";
   const namedMatches = namedUseIntent ? searchOffers(text) : [];
-  if (!explicitOfferIntent && namedMatches.length !== 1) return null;
+  if (!explicitOfferIntent && namedMatches.length !== 1 && !genericCardTier) return null;
 
-  const result = resolveOffer(text, {});
-  if (!result?.offer) return null;
-  const selectedProfile = result.cardProfile
-    || (namedUseIntent && result.offer.profiles.length === 1 ? result.offer.profiles[0] : null);
-
+  const explicitIssuerMatches = genericCardTier ? searchOffers(text.replace(GENERIC_CARD_TIER, " ")) : [];
+  const result = genericCardTier && explicitIssuerMatches.length !== 1 ? null : resolveOffer(text, {});
   const responseLocale = locale === "ar" || /\p{Script=Arabic}/u.test(text) ? "ar" : "en";
   const detailTopic = classifyOfferDetailTopic(text);
+  if (!result?.offer) {
+    return {
+      offerId: null,
+      profileId: null,
+      bankName: "",
+      cardName: genericCardTier,
+      detailTopic,
+      ticketCount: ticketCountFromText(text),
+      answer: responseLocale === "ar"
+        ? "هذه عروض البنوك المنشورة حالياً. اختر عرضاً لمراجعة البطاقات المؤهلة والشروط."
+        : "Here are the currently published bank offers. Choose an offer to review its eligible cards and conditions.",
+    };
+  }
+  const selectedProfile = result.cardProfile
+    || (namedUseIntent && result.offer.profiles.length === 1 ? result.offer.profiles[0] : null);
 
   return {
     offerId: result.offer.id,
