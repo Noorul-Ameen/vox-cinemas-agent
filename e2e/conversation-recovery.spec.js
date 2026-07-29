@@ -39,7 +39,9 @@ async function reachShowtimes(page) {
 }
 
 async function visibleMovieTitles(page) {
-  return page.locator('main [aria-label^="Relevant showtimes for "]').evaluateAll((nodes) => nodes
+  const labels = page.locator('main [aria-label^="Relevant showtimes for "]');
+  await expect(labels.first()).toBeVisible();
+  return labels.evaluateAll((nodes) => nodes
     .map((node) => String(node.getAttribute("aria-label") || "").replace(/^Relevant showtimes for\s+/i, "").trim())
     .filter(Boolean));
 }
