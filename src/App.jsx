@@ -73,7 +73,6 @@ import { OFFER_META } from "./offers/offersData.js";
 import { answerForOfferTopic, buildOfferFacts } from "./offers/offerFacts.js";
 import { buildOfferEvaluationContext, shouldInvalidateOfferResult } from "./offers/offerContext.js";
 import { resolveOffer, resolveOfferForBankAndCard } from "./offers/offerResolver.js";
-import { offerTicketCountAcknowledgement, resolveLocalOfferTextTurn } from "./offers/offerTextFallback.js";
 import { classifyFaqActionIntent, isGenuineFaqQuestion } from "./knowledge/faqRouting.js";
 import * as vista from "./vistaClient.js";
 
@@ -83,6 +82,22 @@ const loadHandoverPanel = () => import("./components/HandoverPanel.jsx");
 const loadOffersPanel = () => import("./components/OffersPanel.jsx");
 const loadCheckout = () => import("./components/Checkout.jsx");
 const loadDiscoveryPrompt = () => import("./components/DiscoveryPrompt.jsx");
+let offerTextFallbackPromise;
+const loadOfferTextFallback = () => {
+  offerTextFallbackPromise ||= import("./offers/offerTextFallback.js");
+  return offerTextFallbackPromise;
+};
+const resolveLocalOfferTextTurnLazy = async (...args) => {
+  const { resolveLocalOfferTextTurn } = await loadOfferTextFallback();
+  return resolveLocalOfferTextTurn(...args);
+};
+const offerTicketCountAcknowledgement = (ticketCount, { locale = "en" } = {}) => {
+  const count = Number(ticketCount);
+  if (!Number.isInteger(count) || count < 1 || count > 10) return "";
+  return locale === "ar"
+    ? `عدد التذاكر المستخدم في هذا التحقق هو ${count}، وهو منفصل عن الاستخدام الشهري للعرض.`
+    : `Ticket count for this eligibility check: ${count}. This is separate from monthly offer usage.`;
+};
 let faqKnowledgePromise;
 const loadFaqKnowledge = () => {
   faqKnowledgePromise ||= import("./knowledge/index.js");
@@ -3161,10 +3176,12 @@ export default function App() {
     discoveryFilterTurn,
     actionIntent,
     faq,
-  } = {}) => {
-    if (!stageVisibleRef.current || !richJourneyViewFromStage(stageRef.current)) return false;
-    const transactional = decision !== null
-      || historyRequested
+    } = {}) => {
+      if (!stageVisibleRef.current || !richJourneyViewFromStage(stageRef.current)) return false;
+      const journeySafeFaq = faq?.matches?.some((match) => match?.id === "movie-age-ratings");
+      if (journeySafeFaq) return false;
+      const transactional = decision !== null
+        || historyRequested
       || directCancellation
       || directSeatSelection
       || directCinemaSelection
@@ -6015,7 +6032,7 @@ export default function App() {
           ? await prepareFaqContext(safeMessage)
           : null;
         const recordSelectorOffer = decision === null && !historyRequest.requested && stageRef.current.view === "history"
-          ? resolveLocalOfferTextTurn(safeMessage, { locale: localeRef.current })
+          ? await resolveLocalOfferTextTurnLazy(safeMessage, { locale: localeRef.current })
           : null;
         const recordSelectorFaqBypass = Boolean(recordSelectorOffer) || isGenuineFaqQuestion(safeMessage, {
           matches: recordSelectorFaq?.matches,
@@ -6201,7 +6218,7 @@ export default function App() {
           && !directShowtimeSelection
           && !ambiguousShowtimeSelection
           && !checkoutResumeTurn
-          ? recordSelectorOffer || resolveLocalOfferTextTurn(safeMessage, { locale: localeRef.current })
+          ? recordSelectorOffer || await resolveLocalOfferTextTurnLazy(safeMessage, { locale: localeRef.current })
           : null;
         const checkoutOfferEvaluation = activeCheckout && localOfferTurn
           ? evaluateCheckoutOfferTurn(localOfferTurn)
@@ -7276,7 +7293,7 @@ export default function App() {
       ? await prepareFaqContext(value)
       : null;
     const recordSelectorOffer = decision === null && !historyRequest.requested && stageRef.current.view === "history"
-      ? resolveLocalOfferTextTurn(value, { locale: localeRef.current })
+      ? await resolveLocalOfferTextTurnLazy(value, { locale: localeRef.current })
       : null;
     const recordSelectorFaqBypass = Boolean(recordSelectorOffer) || isGenuineFaqQuestion(value, {
       matches: recordSelectorFaq?.matches,
@@ -7510,7 +7527,7 @@ export default function App() {
       && !ambiguousShowtimeSelection
       && !checkoutResumeTurn
       && !languageControlTurn
-      ? recordSelectorOffer || resolveLocalOfferTextTurn(value, { locale: localeRef.current })
+      ? recordSelectorOffer || await resolveLocalOfferTextTurnLazy(value, { locale: localeRef.current })
       : null;
     const retainedOfferTicketCount = stageRef.current.view === "offers" ? extractTicketQuantity(value) : null;
     const retainedOfferResult = retainedOfferTicketCount ? lastOfferRef.current : null;

@@ -36,6 +36,42 @@ const RELEASE_PATTERN = /\b(?:release date|released|premiere date|when did .* co
 const DETAILS_PATTERN = /\b(?:tell me about|movie details|film details|more (?:about|information)|information about|details about)\b|(?:اخبرني عن|أخبرني عن|معلومات عن|تفاصيل الفيلم|تفاصيل عن)/iu;
 const PLURAL_REFERENCE_PATTERN = /\b(?:their|these|those|all (?:the )?(?:movies|films)|movies'?|films'?)\s+(?:ratings?|certificates?)\b|(?:تصنيف هذه الافلام|تصنيفات الافلام|تصنيفهم|تقييم هذه الافلام)/iu;
 const DISCOVERY_COMMAND_PATTERN = /^(?:show|find|list|suggest|recommend|book|i want|i need|looking for)\b|^(?:اعرض|ابحث|اقترح|رشح|اريد|أريد|احتاج|أحتاج|احجز)\b/iu;
+const RATING_CODE_PATTERN = /(?:PG[\s-]?(?:13|15)?|(?:15|18|21)\s*(?:\+|plus)|18\s*TC|\bG\b)/iu;
+const RATING_DEFINITION_PATTERN = /\b(?:what\s+(?:does|is)|meaning\s+of|mean|explain)\b|(?:ما\s+معنى|ماذا\s+يعني|وش\s+يعني|اش\s+يعني|ما\s+هو|ما\s+هي|اشرح)/iu;
+const RATING_MEANINGS = Object.freeze({
+  G: {
+    en: "G is a VOX age certificate open to all ages.",
+    ar: "تصنيف G هو تصنيف عمري لدى VOX ومتاح لجميع الأعمار.",
+  },
+  PG: {
+    en: "PG is a VOX age certificate open to all ages, with parental guidance advised because some content may not be suitable for children.",
+    ar: "تصنيف PG هو تصنيف عمري لدى VOX ومتاح لجميع الأعمار، مع توصية بإرشاد الوالدين لأن بعض المحتوى قد لا يناسب الأطفال.",
+  },
+  PG13: {
+    en: "PG13 is a VOX age certificate. Guests aged 13 and under must attend with someone aged 13 or older, and some content may not be suitable for them.",
+    ar: "تصنيف PG13 هو تصنيف عمري لدى VOX. يجب أن يحضر الضيوف بعمر 13 سنة أو أقل مع شخص عمره 13 سنة أو أكثر، وقد لا يناسبهم بعض المحتوى.",
+  },
+  PG15: {
+    en: "PG15 is a VOX age certificate. Guests aged 15 and under must attend with someone aged 15 or older, and some content may not be suitable for them.",
+    ar: "تصنيف PG15 هو تصنيف عمري لدى VOX. يجب أن يحضر الضيوف بعمر 15 سنة أو أقل مع شخص عمره 15 سنة أو أكثر، وقد لا يناسبهم بعض المحتوى.",
+  },
+  "15+": {
+    en: "15+ is a restricted VOX age certificate. Guests under 15 are not admitted, even with a parent or guardian.",
+    ar: "تصنيف 15+ هو تصنيف عمري مقيّد لدى VOX. لا يُسمح بدخول من هم دون 15 سنة حتى مع أحد الوالدين أو ولي الأمر.",
+  },
+  "18+": {
+    en: "18+ is a restricted VOX age certificate. Guests under 18 are not admitted, and identification may be required.",
+    ar: "تصنيف 18+ هو تصنيف عمري مقيّد لدى VOX. لا يُسمح بدخول من هم دون 18 سنة، وقد يُطلب إثبات الهوية.",
+  },
+  "21+": {
+    en: "21+ is a restricted VOX age certificate. Guests under 21 are not admitted, and identification may be required.",
+    ar: "تصنيف 21+ هو تصنيف عمري مقيّد لدى VOX. لا يُسمح بدخول من هم دون 21 سنة، وقد يُطلب إثبات الهوية.",
+  },
+  "18TC": {
+    en: "18TC is a provisional VOX age certificate and is treated as 18+ until the final certificate is published.",
+    ar: "تصنيف 18TC هو تصنيف عمري مؤقت لدى VOX ويُعامل كتصنيف 18+ حتى نشر التصنيف النهائي.",
+  },
+});
 
 export function classifyMovieInformationQuestion(input) {
   const text = clean(typeof input === "object" && input !== null ? input.text ?? input.query : input);
@@ -249,6 +285,26 @@ export function resolveMovieInformationTurn(options = {}) {
   const topic = forcedTopic || classifyMovieInformationQuestion(query);
   if (!topic) return { handled: false, topic: null, movie: null, answer: "", context: "" };
   const viewerAge = options.viewerAge ?? extractViewerAge(query);
+  const requestedRating = normalizeMovieRating(query.match(RATING_CODE_PATTERN)?.[0]);
+  if (topic === "rating" && requestedRating && RATING_DEFINITION_PATTERN.test(query)) {
+    const answer = clean(RATING_MEANINGS[requestedRating]?.[locale] || localeText(
+      locale,
+      `${requestedRating} is a VOX age certificate.`,
+      `تصنيف ${requestedRating} هو تصنيف عمري لدى VOX.`,
+    ));
+    return {
+      handled: true,
+      topic,
+      movie: null,
+      viewerAge,
+      answer,
+      context: [
+        `AUTHORITATIVE VOX RATING DEFINITION: ${JSON.stringify({ rating: requestedRating, answer })}`,
+        `Authoritative customer answer: ${answer}`,
+        "Speak the authoritative customer answer exactly once. This is a generic certificate definition, so do not ask for a movie title, select a movie, change filters, or call a display tool.",
+      ].join("\n"),
+    };
+  }
 
   const variantCandidates = namedTitleVariants([
     ...(Array.isArray(options.visibleMovies) ? options.visibleMovies : []),

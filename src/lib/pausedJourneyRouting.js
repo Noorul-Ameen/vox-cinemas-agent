@@ -1,4 +1,4 @@
-export const isResumeOnlyTurn = (value) => /^(?:continue|resume|go on|carry on|متابعة|تابع|اكمل|أكمل|العودة)(?:\s+(?:please|من فضلك))?[.!?،]*$/iu.test(String(value || "").trim());
+export const isResumeOnlyTurn = (value) => /^(?:continue|resume|return|go on|carry on|متابعة|تابع|اكمل|أكمل|العودة)(?:\s+(?:please|من فضلك))?[.!?،]*$/iu.test(String(value || "").trim());
 
 export const isAffirmativeContinuationTurn = (value) => /^(?:yes(?:\s*[,]?\s*proceed)?|proceed|نعم(?:\s*[،]?\s*(?:تابع|استمر|تفضل))?|تابع|استمر|تفضل)(?:\s+(?:please|من فضلك))?[.!?؟،]*$/iu.test(String(value || "").trim());
 
@@ -9,9 +9,9 @@ export function pausedResumeTarget(value, { affirmativeRecoveryPending = false }
   if (!text) return null;
   if (isResumeCheckoutTurn(text)) return "checkout";
   if (/^(?:go|come|take me|return|back)\s+(?:me\s+)?(?:back\s+)?to\s+(?:my|the)?\s*(?:seats?|seat map)\s*(?:again|please)?[.!?،]*$|^(?:show|open)\s+(?:my|the)?\s*seats?\s*(?:again|please)?[.!?،]*$|^(?:ارجع|أرجع|عد|العودة)\s+(?:إلى|الى|ل)?\s*(?:مقاعدي|المقاعد|خريطة المقاعد)[.!?؟،]*$/iu.test(text)) return "seatmap";
-  if (/^(?:show|open|return|go|back)\s+(?:me\s+)?(?:back\s+)?(?:to\s+)?(?:(?:my|the)\s+)?showtimes?\s*(?:again|please)?[.!?،]*$|^(?:اعرض|أعرض|اظهر|أظهر|ارجع|أرجع|عد)\s+(?:إلى|الى|ل)?\s*(?:مواعيد العرض|العروض)[.!?؟،]*$/iu.test(text)) return "showtimes";
+  if (/^(?:show|open|return|go|back)\s+(?:me\s+)?(?:back\s+)?(?:to\s+)?(?:(?:my|the)\s+)?showtimes?\s*(?:again|please)?[.!?،]*$|^(?:اعرض|أعرض|اظهر|أظهر|ارجع|أرجع|عد|العودة)\s+(?:إلى|الى|ل)?\s*(?:مواعيد العرض|العروض)[.!?؟،]*$/iu.test(text)) return "showtimes";
   if (/\b(?:continue|resume|return to)\s+(?:my|the|this)?\s*cancell?ation|(?:متابعة|استكمال|اكمال|إكمال)\s+(?:طلب\s+)?(?:الإلغاء|الالغاء)/iu.test(text)) return "cancellation";
-  if (/^(?:show|open|return to)\s+(?:my|the)?\s*(?:booking history|bookings?)\s*(?:again|please)?[.!?،]*$|^(?:اعرض|أعرض|افتح|أظهر)\s+(?:سجل\s+)?حجوزي\s*(?:مرة أخرى)?[.!?؟،]*$/iu.test(text)) return "history";
+  if (/^(?:show|open|return to)\s+(?:my|the)?\s*(?:booking history|bookings?)\s*(?:again|please)?[.!?،]*$|^(?:اعرض|أعرض|افتح|أظهر|العودة\s+إلى|العودة\s+الى)\s+(?:سجل\s+)?حجوزي\s*(?:مرة أخرى)?[.!?؟،]*$/iu.test(text)) return "history";
   if (/\b(?:continue|resume|go back|take me back|return)\s+(?:to\s+)?where\s+i\s+(?:was|stopped|left off)|\b(?:go|take me|return)\s+back\s+to\s+(?:my\s+)?(?:previous|last)\s+(?:step|screen)|(?:تابع|أكمل|ارجع|أرجع|عد)\s+(?:إلى|الى)?\s*(?:من\s+)?حيث\s+توقفت/iu.test(text)) return "last";
   if (/\b(?:continue|resume)\s+(?:my|the|this)?\s*(?:booking|journey)|(?:متابعة|استكمال|اكمال|إكمال)\s+(?:حجزي|الحجز)/iu.test(text)) return "journey";
   if (isResumeOnlyTurn(text)) return "last";
