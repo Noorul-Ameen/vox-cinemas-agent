@@ -1,11 +1,11 @@
 {
   "format": "vox-official-movie-information-v1",
-  "extractedAt": "2026-07-29T09:55:06.838Z",
+  "extractedAt": "2026-07-30T05:22:04.375Z",
   "region": "UAE",
   "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
   "sourcePageUrl": "https://uae.voxcinemas.com/movies/whatson",
-  "sourceRecordCount": 99,
-  "acceptedRecordCount": 99,
+  "sourceRecordCount": 82,
+  "acceptedRecordCount": 82,
   "rejectedRecordCount": 0,
   "movies": [
     {
@@ -26,31 +26,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/aks-sir-arabic",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016187",
-      "title": "Alpha",
-      "rating": "15+",
-      "language": "Hindi",
-      "languageName": "Hindi",
-      "runtime": 155,
-      "genres": [
-        "Action",
-        "Thriller"
-      ],
-      "synopsis": "Welcome to the newest chapter of the YRF Spy Universe that presents an edgy origin story of a girl raised and built to kill. Alpha is a female-led action film that will take you on a fun, edge of the seat, thrilling ride that is designed as an out and out entertainer.",
-      "subtitles": [
-        "Arabic",
-        "English"
-      ],
-      "released": "2026-07-03T00:00:00Z",
-      "movieUrl": "alpha-hindi",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/alpha-hindi",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/alpha-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016400",
@@ -73,7 +49,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/avengers-doomsday",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016404",
@@ -97,7 +73,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/awarapan-2-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016349",
@@ -120,7 +96,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/batwara-1947-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016401",
@@ -144,7 +120,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/bethlahem-kudumba-unit-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016377",
@@ -190,7 +166,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/blue-lock-japanese",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015799",
@@ -212,29 +188,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/buttery-effect-azzam-arabic",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016382",
-      "title": "Buyu 3",
-      "rating": "15+",
-      "language": "Turkish",
-      "languageName": "Turkish",
-      "runtime": 90,
-      "genres": [
-        "Horror"
-      ],
-      "synopsis": "A man is trapped by a suffocating, dark spell that isolates him from every woman, including his wife. The curse causes malevolent spirits to haunt and possess his family's grand, decaying mansion.",
-      "subtitles": [
-        "Arabic"
-      ],
-      "released": "2026-07-23T00:00:00Z",
-      "movieUrl": "buyu-3-turkish",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/buyu-3-turkish",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/buyu-3-turkish",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016355",
@@ -257,7 +211,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/by-any-means",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016397",
@@ -280,7 +234,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/cats-at-the-museum-2",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016221",
@@ -304,7 +258,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/chennai-love-story-telugu",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016018",
@@ -327,7 +281,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/cocktail-2-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015950",
@@ -349,7 +303,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/coyote-vs-acme",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016360",
@@ -372,7 +326,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/detective-conan-29-japanese",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016191",
@@ -396,7 +350,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/dhamaal-4-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016193",
@@ -420,7 +374,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/digger",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015945",
@@ -444,7 +398,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/dune-part-three",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016029",
@@ -464,7 +418,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/eben-meen-fehom-arabic",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015765",
@@ -482,9 +436,9 @@
       "movieUrl": "el-gawahergy-arabic",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/el-gawahergy-arabic",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "retained_official_detail_page",
+      "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/el-gawahergy-arabic",
-      "runtimeVerifiedAt": "2026-07-27T06:03:07.017Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016379",
@@ -507,7 +461,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/el-set-lamma-arabic",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015967",
@@ -529,7 +483,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/evil-dead-burn",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016197",
@@ -553,7 +507,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/fall-2-deadpoint",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015906",
@@ -575,31 +529,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/focker-in-law",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016203",
-      "title": "Gatta Kusthi 2",
-      "rating": "PG13",
-      "language": "Tamil",
-      "languageName": "Tamil",
-      "runtime": 165,
-      "genres": [
-        "Comedy",
-        "Drama"
-      ],
-      "synopsis": "Veera is a devoted husband and father who proudly takes care of his home while supporting his wife Keerthy's successful wrestling career. But when misunderstandings, societal judgment, and an unexpected incident threaten to tear their family apart, Veera finds himself fighting the toughest battle of his life - not in an arena, but for the love and trust of his wife and daughter.",
-      "subtitles": [
-        "Arabic",
-        "English"
-      ],
-      "released": "2026-07-03T00:00:00Z",
-      "movieUrl": "gatta-kusthi-2-tamil",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/gatta-kusthi-2-tamil",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/gatta-kusthi-2-tamil",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016194",
@@ -621,9 +551,9 @@
       "movieUrl": "gatto",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/gatto",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "retained_official_detail_page",
+      "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/gatto",
-      "runtimeVerifiedAt": "2026-07-27T06:03:07.017Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016374",
@@ -646,7 +576,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/gauthali-nepali",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016195",
@@ -654,7 +584,7 @@
       "rating": "18TC",
       "language": "Tamil",
       "languageName": "Tamil",
-      "runtime": 175,
+      "runtime": 155,
       "genres": [
         "Biographical",
         "Drama"
@@ -670,7 +600,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/gdn-tamil",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016189",
@@ -693,29 +623,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/heart-of-the-beast",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016219",
-      "title": "Her Private Hell",
-      "rating": "18TC",
-      "language": "English",
-      "languageName": "English",
-      "runtime": 100,
-      "genres": [
-        "Horror"
-      ],
-      "synopsis": "A troubled young woman searches for her father as a mysterious mist engulfs a futuristic metropolis, unleashing a deadly and elusive entity. Her quest collides with an American G.I. who's on a harrowing odyssey to rescue his daughter from hell.",
-      "subtitles": [
-        "Arabic"
-      ],
-      "released": "2026-07-30T00:00:00Z",
-      "movieUrl": "her-private-hell",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/her-private-hell",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/her-private-hell",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016173",
@@ -737,7 +645,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/hexed",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016012",
@@ -757,30 +665,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/how-to-rob-a-bank",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016223",
-      "title": "I, Nobody",
-      "rating": "PG13",
-      "language": "Malayalam",
-      "languageName": "Malayalam",
-      "runtime": 175,
-      "genres": [
-        "Action"
-      ],
-      "synopsis": "An ordinary government employee and family man accidentally witnesses a crime that turns his quiet life upside down. As he becomes the prime target of a corrupt system determined to silence him, he must fight to protect his family and prove the truth before it's too late.",
-      "subtitles": [
-        "Arabic",
-        "English"
-      ],
-      "released": "2026-07-09T00:00:00Z",
-      "movieUrl": "i-nobody-malayalam",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/i-nobody-malayalam",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/i-nobody-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016199",
@@ -801,9 +686,9 @@
       "movieUrl": "i-object",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/i-object",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "retained_official_detail_page",
+      "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/i-object",
-      "runtimeVerifiedAt": "2026-07-27T06:03:07.017Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016196",
@@ -827,7 +712,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/im-game-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016180",
@@ -850,31 +735,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/ice-cream-man",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016182",
-      "title": "Idhayam Murali",
-      "rating": "PG13",
-      "language": "Tamil",
-      "languageName": "Tamil",
-      "runtime": 175,
-      "genres": [
-        "Romance",
-        "Drama"
-      ],
-      "synopsis": "A heartwarming tale of friendship, love, and destiny as Idhayaa journeys through different stages of life.",
-      "subtitles": [
-        "Arabic",
-        "English"
-      ],
-      "released": "2026-07-10T00:00:00Z",
-      "movieUrl": "idhayam-murali-tamil",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/idhayam-murali-tamil",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/idhayam-murali-tamil",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015969",
@@ -896,29 +757,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/insidious-out-of-the-further",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016198",
-      "title": "Ipman Kungfu Legend",
-      "rating": "PG15",
-      "language": "English",
-      "languageName": "English",
-      "runtime": 95,
-      "genres": [
-        "Action"
-      ],
-      "synopsis": "Ip Man leaves the police force to start his martial arts school. When a Western boxing gym acquires all local martial arts properties, he must protect the tradition from being wiped out.",
-      "subtitles": [
-        "Arabic"
-      ],
-      "released": "2026-07-23T00:00:00Z",
-      "movieUrl": "ipman-kungfu-legend",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/ipman-kungfu-legend",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/ipman-kungfu-legend",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016396",
@@ -941,7 +780,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/iron-maiden-burning-ambition",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016352",
@@ -963,33 +802,9 @@
       "movieUrl": "irumudi-telugu",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/irumudi-telugu",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "retained_official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/irumudi-telugu",
-      "runtimeVerifiedAt": "2026-07-27T06:03:07.017Z"
-    },
-    {
-      "code": "HO00016384",
-      "title": "Ishqnama",
-      "rating": "PG15",
-      "language": "Punjabi",
-      "languageName": "Punjabi",
-      "runtime": 185,
-      "genres": [
-        "Romance",
-        "Action"
-      ],
-      "synopsis": "Based on true emotions and inspired by real-life experiences of Nirmal Nimma, Ishqnama narrates a timeless tale of two souls brought together by destiny but divided by circumstances beyond their control. Set against the backdrop of the India-Pakistan border, the film explores the power of love that survives despite distance, politics, and societal barriers.",
-      "subtitles": [
-        "Arabic",
-        "English"
-      ],
-      "released": "2026-07-24T00:00:00Z",
-      "movieUrl": "ishqnama-punjabi",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/ishqnama-punjabi",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/ishqnama-punjabi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/irumudi-telugu",
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015542",
@@ -1013,7 +828,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/jana-nayagan-tamil",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015544",
@@ -1037,12 +852,12 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/jana-nayagan-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016414",
       "title": "Karavali",
-      "rating": "18TC",
+      "rating": "PG15",
       "language": "Kannada",
       "languageName": "Kannada",
       "runtime": 135,
@@ -1061,7 +876,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/karavali-kannada",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016337",
@@ -1081,7 +896,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/khali-balak-min-nafsik-arabic",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015975",
@@ -1104,7 +919,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/khalifa-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016403",
@@ -1127,7 +942,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/korean-kanararaju-tamil",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016347",
@@ -1150,30 +965,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/les-miserables",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016185",
-      "title": "Love, Ngo",
-      "rating": "PG13",
-      "language": "Tagalog",
-      "languageName": "Tagalog",
-      "runtime": 85,
-      "genres": [
-        "Comedy"
-      ],
-      "synopsis": "When Ngongo (Jerald Napoles), a young man with a cleft lip, meets Scarlet (Louise delos Reyes), the first woman he truly loves, he dares to dream of a life beyond his insecurities. But Scarlet’s family sees only\r\nhis condition and wants him out of her life. Now he must overcome his insecurities and self-hatred to realize that\r\ntrue acceptance begins with loving himself.",
-      "subtitles": [
-        "Arabic",
-        "English"
-      ],
-      "released": "2026-07-02T00:00:00Z",
-      "movieUrl": "love-ngo-tagalog",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/love-ngo-tagalog",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/love-ngo-tagalog",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016183",
@@ -1193,7 +985,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/lumivia-the-five-magical-wishes",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016402",
@@ -1216,30 +1008,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/lurk-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016376",
-      "title": "Maharaja Hostel",
-      "rating": "PG13",
-      "language": "Malayalam",
-      "languageName": "Malayalam",
-      "runtime": 140,
-      "genres": [
-        "Comedy"
-      ],
-      "synopsis": "Aravindan, Varkey & Mithun- Three mischievous youngsters from Pallikal Village - trick their parents into sending them to a city college, hoping for a carefree life away from home. Short on money they move to a rundown haunted hostel, caring a little for Ghosts long as they can drink, smoke & party. But the life in that hostel turns up to a journey to tests their courage, friendship & sense of redemption.",
-      "subtitles": [
-        "Arabic",
-        "English"
-      ],
-      "released": "2026-07-24T00:00:00Z",
-      "movieUrl": "maharaja-hostel-malayalam",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/maharaja-hostel-malayalam",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/maharaja-hostel-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016025",
@@ -1264,7 +1033,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/main-vaapas-aaunga-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015724",
@@ -1286,7 +1055,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/minions--monsters",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015858",
@@ -1310,29 +1079,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/moana",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016354",
-      "title": "Motor City",
-      "rating": "15+",
-      "language": "English",
-      "languageName": "English",
-      "runtime": 105,
-      "genres": [
-        "Action"
-      ],
-      "synopsis": "In 1970s Detroit, a working-class romantic is framed by a ruthless gangster after falling for his girlfriend. After years in prison, he returns with only one mission: revenge.",
-      "subtitles": [
-        "Arabic"
-      ],
-      "released": "2026-07-23T00:00:00Z",
-      "movieUrl": "motor-city",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/motor-city",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/motor-city",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016398",
@@ -1356,7 +1103,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/mr-bhaarath-tamil",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015894",
@@ -1379,7 +1126,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/mutiny",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015886",
@@ -1401,7 +1148,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/obsession",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016381",
@@ -1424,7 +1171,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/panda-plan-the-magical-tribe",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015856",
@@ -1446,7 +1193,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/paw-patrol-the-dino-movie",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016405",
@@ -1466,30 +1213,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/paw-patrol-the-dino-movie-arabic",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016181",
-      "title": "Pinocchio: Unstrung",
-      "rating": "18+",
-      "language": "English",
-      "languageName": "English",
-      "runtime": 85,
-      "genres": [
-        "Horror",
-        "Thriller"
-      ],
-      "synopsis": "James is introduced by his grandfather, Geppetto, to a seemingly magical wooden doll named Pinocchio. As the two become friends, James unknowingly exposes the naïve puppet to the darker aspects of the world. Unable to understand human morality, Pinocchio begins a violent crusade to eliminate everything he perceives as \"bad.\" Influenced by a sinister Cricket and driven by a desire to become a real boy, Pinocchio's quest turns increasingly murderous and grotesque.",
-      "subtitles": [
-        "Arabic"
-      ],
-      "released": "2026-07-23T00:00:00Z",
-      "movieUrl": "pinocchio-unstrung",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/pinocchio-unstrung",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/pinocchio-unstrung",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016378",
@@ -1513,7 +1237,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/pluto-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016192",
@@ -1535,7 +1259,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/practical-magic-2",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016359",
@@ -1556,7 +1280,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/psycho-arabic",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016399",
@@ -1579,7 +1303,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/runner",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015994",
@@ -1602,7 +1326,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/sakr-w-canaria-arabic",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016335",
@@ -1625,7 +1349,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/shamshoun-w-dalila-arabic",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015860",
@@ -1648,7 +1372,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/spider-man-brand-new-day",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016407",
@@ -1672,31 +1396,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/spider-man-brand-new-day-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016413",
-      "title": "Spider-Man: Brand New Day",
-      "rating": "18TC",
-      "language": "Hindi",
-      "languageName": "Hindi",
-      "runtime": 140,
-      "genres": [
-        "Action",
-        "Adventure"
-      ],
-      "synopsis": "It's a BRAND NEW DAY for Peter Parker. Fighting crime full-time as Spider-Man in a world that doesn’t remember him -- and the pressure of seeing his old friends move on without him -- sparks a change in Peter he may not have the power to control. But that transformation might also be the only thing that can stop a shocking new threat to the city and those he loves - a powerful villain no one can even see.",
-      "subtitles": [
-        "Arabic",
-        "English"
-      ],
-      "released": "2026-07-30T00:00:00Z",
-      "movieUrl": "spider-man-brand-new-day-hindi",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/spider-man-brand-new-day-hindi",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/spider-man-brand-new-day-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015914",
@@ -1718,7 +1418,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/street-fighter",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016341",
@@ -1740,7 +1440,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/sunray-fallen-soldier",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015784",
@@ -1763,7 +1463,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/supergirl",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016224",
@@ -1785,32 +1485,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/tad-and-the-magic-lamp",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016353",
-      "title": "Tera Yaar Hoon Main",
-      "rating": "PG13",
-      "language": "Hindi",
-      "languageName": "Hindi",
-      "runtime": 160,
-      "genres": [
-        "Action",
-        "Comedy",
-        "Drama"
-      ],
-      "synopsis": "Sanju, a cheerful young man from Nagpur, moves to Mumbai to build a career in IT. During his journey, he meets Anu, the daughter of his mother's close friend, Vishwanath. Although their first meeting is filled with misunderstandings, their bond gradually grows into love. After realizing his true feelings, Sanju seeks Vishwanath's approval. Torn between friendship and fatherly responsibility, Vishwanath eventually accepts their relationship, leading to a heartwarming ending where love and family triumph together.",
-      "subtitles": [
-        "Arabic",
-        "English"
-      ],
-      "released": "2026-07-24T00:00:00Z",
-      "movieUrl": "tera-yaar-hoon-main-hindi",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/tera-yaar-hoon-main-hindi",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/tera-yaar-hoon-main-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00014995",
@@ -1832,7 +1507,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-cat-in-the-hat",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015923",
@@ -1855,7 +1530,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-dog-stars",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015973",
@@ -1878,7 +1553,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-end-of-oak-street",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016200",
@@ -1901,30 +1576,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-get-out",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016380",
-      "title": "The India Story",
-      "rating": "PG15",
-      "language": "Hindi",
-      "languageName": "Hindi",
-      "runtime": 160,
-      "genres": [
-        "Drama",
-        "Thriller"
-      ],
-      "synopsis": "A community confronts the devastating impact of pesticide contamination as industrial negligence threatens public health. The fight for accountability exposes systemic failures in regulatory oversight and corporate responsibility.",
-      "subtitles": [
-        "English"
-      ],
-      "released": "2026-07-24T00:00:00Z",
-      "movieUrl": "the-india-story-hindi",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/the-india-story-hindi",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-india-story-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016339",
@@ -1946,7 +1598,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-odyssey",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016358",
@@ -1969,7 +1621,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-weight",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016375",
@@ -1993,7 +1645,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/thudakkam-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015725",
@@ -2016,7 +1668,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/toxic-kannada",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015727",
@@ -2039,7 +1691,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/toxic-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015731",
@@ -2062,7 +1714,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/toxic-tamil",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015757",
@@ -2085,7 +1737,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/toxic-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015756",
@@ -2110,7 +1762,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/toy-story-5",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016406",
@@ -2133,31 +1785,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/unmadham-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00015970",
-      "title": "Varavu",
-      "rating": "PG15",
-      "language": "Malayalam",
-      "languageName": "Malayalam",
-      "runtime": 155,
-      "genres": [
-        "Action",
-        "Thriller"
-      ],
-      "synopsis": "A family falls victim to the powerful elite in a small town. Time passes; wounds fester. One man's return force a confrontation that will expose decades of lies and corruption.",
-      "subtitles": [
-        "Arabic",
-        "English"
-      ],
-      "released": "2026-07-16T00:00:00Z",
-      "movieUrl": "varavu-malayalam",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/varavu-malayalam",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/varavu-malayalam",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00015964",
@@ -2179,7 +1807,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/verity",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016389",
@@ -2202,7 +1830,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/vishwanath--sons-tamil",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016395",
@@ -2225,7 +1853,7 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/vishwanath--sons-telugu",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     },
     {
       "code": "HO00016342",
@@ -2247,38 +1875,15 @@
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
       "runtimeStatus": "official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/wake",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
-    },
-    {
-      "code": "HO00016017",
-      "title": "Welcome to the Jungle",
-      "rating": "15+",
-      "language": "Hindi",
-      "languageName": "Hindi",
-      "runtime": 175,
-      "genres": [
-        "Action",
-        "Adventure"
-      ],
-      "synopsis": "Welcome to the Jungle is a comedy-action adventure where a group of quirky characters gets stuck in a dangerous jungle during a chaotic mission. \r\nFilled with confusion, criminals, and hilarious situations, they must work together to survive and find their way out",
-      "subtitles": [
-        "Arabic and English"
-      ],
-      "released": "2026-06-25T00:00:00Z",
-      "movieUrl": "welcome-to-the-jungle-hindi",
-      "sourcePageUrl": "https://uae.voxcinemas.com/movies/welcome-to-the-jungle-hindi",
-      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
-      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/welcome-to-the-jungle-hindi",
-      "runtimeVerifiedAt": "2026-07-29T09:55:06.838Z"
+      "runtimeVerifiedAt": "2026-07-30T05:22:04.375Z"
     }
   ],
   "detailPageRuntimeEnrichment": {
-    "requestedCount": 99,
-    "enrichedCount": 94,
+    "requestedCount": 82,
+    "enrichedCount": 81,
     "failedCount": 0,
     "timedOutCount": 0,
-    "retainedCount": 5,
+    "retainedCount": 1,
     "workers": 4,
     "retries": 2,
     "totalTimeoutMs": 120000,
