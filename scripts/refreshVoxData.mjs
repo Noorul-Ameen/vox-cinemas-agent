@@ -140,7 +140,7 @@ try {
     "--output", nextJson,
     "--movie-information-output", nextMovieInformation,
     "--previous-movie-information", currentMovieInformation,
-    "--max-days", process.env.VOX_REFRESH_MAX_DAYS || "31",
+    "--max-days", process.env.VOX_REFRESH_MAX_DAYS || "45",
     "--workers", process.env.VOX_REFRESH_WORKERS || "2",
   ];
   await run(process.execPath, extractorArgs, "extract official VOX UAE schedule");

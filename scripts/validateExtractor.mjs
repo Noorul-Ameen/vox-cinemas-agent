@@ -19,6 +19,8 @@ assert.equal(addDays("2026-07-14", 1), "2026-07-15");
 assert.equal(isIsoDate("2026-02-29"), false, "impossible calendar dates must be rejected");
 assert.equal(isIsoDate("2028-02-29"), true);
 assert.match(fs.readFileSync(new URL("./extractVoxShowtimes.mjs", import.meta.url), "utf8"), /authenticate\(\{ rediscoverKey: authAttempt === 1 \}\)/, "a repeated 401 must rediscover the rotating public browser key");
+assert.equal(parseArgs([]).maxDays, 45, "the default crawl window must cover the currently published VOX schedule");
+assert.match(fs.readFileSync(new URL("./refreshVoxData.mjs", import.meta.url), "utf8"), /VOX_REFRESH_MAX_DAYS \|\| "45"/, "the automated refresh must use the extended crawl window");
 assert.deepEqual(parseArgs(["--start-date", "2026-07-14", "--max-days", "45", "--workers", "2", "--output", "fresh.json", "--movie-information-output", "movie-information.json", "--previous-movie-information", "previous-information.json"]), {
   startDate: "2026-07-14",
   output: "fresh.json",

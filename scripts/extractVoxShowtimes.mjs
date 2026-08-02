@@ -83,7 +83,7 @@ export function parseArgs(argv) {
     output: "data/vox_showtimes_full.json",
     movieInformationOutput: "data/vox_movie_information_catalog.json",
     previousMovieInformation: null,
-    maxDays: 31,
+    maxDays: 45,
     workers: DEFAULT_WORKERS,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -99,7 +99,7 @@ export function parseArgs(argv) {
       if (flag === "--workers") args.workers = Number(value);
       index += 1;
     } else if (flag === "--help") {
-      console.log("node scripts/extractVoxShowtimes.mjs [--start-date YYYY-MM-DD] [--max-days 31] [--workers 2] [--output FILE] [--movie-information-output FILE] [--previous-movie-information FILE]");
+      console.log("node scripts/extractVoxShowtimes.mjs [--start-date YYYY-MM-DD] [--max-days 45] [--workers 2] [--output FILE] [--movie-information-output FILE] [--previous-movie-information FILE]");
       process.exit(0);
     } else throw new Error(`Unknown argument: ${flag}`);
   }
