@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="color-scheme" content="light" />
+    <title>Voxi Conversation Monitor</title>
+    <link rel="stylesheet" href="./dashboard.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="/backend-monitoring/" aria-label="Voxi Operations home">
+          <span class="brand-mark">V</span>
+          <span><strong>Voxi Operations</strong><small>Backend monitoring</small></span>
+        </a>
+        <div class="topbar-actions">
+          <span id="liveState" class="live-state"><i></i> Connecting</span>
+          <span id="freshness" class="freshness">Waiting for activity</span>
+          <button id="syncButton" class="primary-button" type="button">Sync now</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="pageTitle">
+          <div>
+            <p class="eyebrow">CONVERSATION CONTROL ROOM</p>
+            <h1 id="pageTitle">Live journey health, without the transcript.</h1>
+            <p>Trace every tool call, missing trigger, error, and state transition across testing sessions.</p>
+          </div>
+          <div class="hero-status" aria-label="Monitoring status">
+            <span>REGION</span><strong id="regionValue">EU</strong>
+            <span>HISTORY</span><strong id="historyValue">Loading</strong>
+          </div>
+        </section>
+
+        <div id="globalNotice" class="notice" hidden></div>
+
+        <section class="metric-grid" aria-label="Monitoring summary">
+          <article class="metric metric-total"><span>All sessions</span><strong id="metricTotal">0</strong><small id="metricDay">0 in 24 hours</small></article>
+          <article class="metric metric-live"><span>Active now</span><strong id="metricActive">0</strong><small>In progress or processing</small></article>
+          <article class="metric metric-error"><span>Sessions with errors</span><strong id="metricErrors">0</strong><small id="metricToolErrors">0 failed calls</small></article>
+          <article class="metric metric-missing"><span>Missing triggers</span><strong id="metricMissing">0</strong><small>Expected calls not observed</small></article>
+          <article class="metric metric-rate"><span>Tool success rate</span><strong id="metricRate">0%</strong><small id="metricCalls">0 calls recorded</small></article>
+        </section>
+
+        <section class="tool-strip" aria-labelledby="toolHealthTitle">
+          <div class="section-heading compact">
+            <div><p class="eyebrow">API MATRIX</p><h2 id="toolHealthTitle">Tool health</h2></div>
+            <span class="legend"><i class="success-dot"></i> Success <i class="error-dot"></i> Error <i class="missing-dot"></i> Not triggered</span>
+          </div>
+          <div id="toolHealth" class="tool-health"></div>
+        </section>
+
+        <section class="workspace">
+          <div class="conversation-panel">
+            <div class="section-heading">
+              <div><p class="eyebrow">SESSIONS</p><h2>Conversation activity</h2></div>
+              <span id="resultCount" class="result-count">0 results</span>
+            </div>
+            <form id="filterForm" class="filters" role="search">
+              <label class="search-field"><span>Search conversation ID</span><input id="searchInput" type="search" placeholder="Search conversation ID" autocomplete="off" /></label>
+              <label><span>Status</span><select id="statusFilter"><option value="">All statuses</option><option value="in_progress">In progress</option><option value="done">Done</option><option value="completed">Completed</option><option value="failed">Failed</option></select></label>
+              <label><span>Language</span><select id="languageFilter"><option value="">All languages</option><option value="en">English</option><option value="ar">Arabic</option></select></label>
+              <label><span>Journey</span><select id="intentFilter"><option value="">All journeys</option><option value="booking">Booking</option><option value="offers">Offers</option><option value="cancellation">Cancellation</option><option value="booking_summary">Booking summary</option><option value="handover">Handover</option><option value="faq">FAQ</option></select></label>
+              <label class="issue-toggle"><input id="issueFilter" type="checkbox" /><span>Issues only</span></label>
+            </form>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Started</th><th>Conversation</th><th>Journey</th><th>Calls</th><th>Health</th></tr></thead>
+                <tbody id="conversationRows"><tr><td colspan="5" class="empty-row">Loading sessions...</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+
+          <aside id="detailPanel" class="detail-panel" aria-live="polite">
+            <div class="detail-placeholder">
+              <span class="radar-icon"></span>
+              <h2>Select a session</h2>
+              <p>Inspect its API sequence, missing calls, errors, and operational logs.</p>
+            </div>
+          </aside>
+        </section>
+
+        <section class="lower-grid">
+          <article class="error-board">
+            <div class="section-heading compact"><div><p class="eyebrow">TRIAGE</p><h2>Recent errors</h2></div></div>
+            <div id="recentErrors" class="error-list"><p class="empty-copy">No errors recorded.</p></div>
+          </article>
+          <article class="sync-board">
+            <div class="section-heading compact"><div><p class="eyebrow">INGESTION</p><h2>Synchronization runs</h2></div></div>
+            <div id="syncRuns" class="sync-list"><p class="empty-copy">No synchronization runs recorded.</p></div>
+          </article>
+        </section>
+      </main>
+    </div>
+    <script src="./dashboard.js" defer></script>
+  </body>
+</html>
