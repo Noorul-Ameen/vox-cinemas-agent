@@ -9,6 +9,18 @@ export const DEMO_SHARE_POINTS = 200;
 export const DEMO_SHARE_AED_VALUE = 20;
 export const DEMO_SHARE_POINTS_PER_AED = DEMO_SHARE_POINTS / DEMO_SHARE_AED_VALUE;
 
+export const PAYMENT_METHODS = Object.freeze({
+  samsungPay: "samsung_pay",
+  applePay: "apple_pay",
+  card: "card",
+  balances: "balances",
+});
+
+export function normalizeDemoPaymentMethod(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return Object.values(PAYMENT_METHODS).includes(normalized) ? normalized : "";
+}
+
 const EPSILON = 0.011;
 
 function finiteAmount(value) {
@@ -144,6 +156,7 @@ export function createDemoPaymentPlan({
   offer = null,
   cardNumber = "",
   cvv = "",
+  paymentMethod = "",
   sharePoints = null,
   shareAed = 0,
   walletAed = 0,
@@ -153,6 +166,8 @@ export function createDemoPaymentPlan({
     return { valid: false, reason: "invalid_amount", simulated: true };
   }
 
+  const normalizedPaymentMethod = normalizeDemoPaymentMethod(paymentMethod)
+    || (normalizeDemoCardNumber(cardNumber) ? PAYMENT_METHODS.card : "");
   const offerAdjustment = calculateDemoOfferAdjustment({ offer, amount: originalTotal, ticketCount });
   const payableTotal = offerAdjustment.payableTotal;
   const requestedSharePoints = sharePoints == null
@@ -164,10 +179,11 @@ export function createDemoPaymentPlan({
   const appliedShareAed = roundDemoMoney(appliedSharePoints / DEMO_SHARE_POINTS_PER_AED);
   const afterShare = roundDemoMoney(payableTotal - appliedShareAed);
   const appliedWalletAed = clampMoney(walletAed, 0, Math.min(afterShare, DEMO_WALLET_BALANCE));
-  const cardAed = roundDemoMoney(Math.max(0, payableTotal - appliedShareAed - appliedWalletAed));
+  const externalAed = roundDemoMoney(Math.max(0, payableTotal - appliedShareAed - appliedWalletAed));
   const cardValidation = validateDemoCardOffer(cardNumber);
   const cvvValidation = validateDemoCvv(cvv);
-  const cardRequired = Boolean(offer || cardAed > 0);
+  const paymentMethodRequired = Boolean(offer || externalAed > 0);
+  const cardRequired = paymentMethodRequired && normalizedPaymentMethod === PAYMENT_METHODS.card;
   const cvvRequired = Boolean(cardRequired && cardValidation.valid);
 
   let valid = offerAdjustment.valid;
@@ -177,10 +193,16 @@ export function createDemoPaymentPlan({
     reason = shareValidation.status === "insufficient"
       ? "share_points_exceed_balance"
       : "share_points_invalid";
+  } else if (valid && paymentMethodRequired && !normalizedPaymentMethod) {
+    valid = false;
+    reason = "payment_method_required";
+  } else if (valid && offer && normalizedPaymentMethod !== PAYMENT_METHODS.card) {
+    valid = false;
+    reason = "offer_requires_card_payment";
   } else if (valid && offer && !cardValidation.eligible) {
     valid = false;
     reason = cardValidation.valid ? "offer_card_not_eligible" : "offer_card_required";
-  } else if (valid && cardAed > 0 && !cardValidation.valid) {
+  } else if (valid && cardRequired && !cardValidation.valid) {
     valid = false;
     reason = "card_required";
   } else if (valid && cvvRequired && !cvvValidation.valid) {
@@ -188,7 +210,7 @@ export function createDemoPaymentPlan({
     reason = cvvValidation.status === "required" ? "cvv_required" : "cvv_invalid";
   }
 
-  const fundingTotal = roundDemoMoney(appliedShareAed + appliedWalletAed + cardAed);
+  const fundingTotal = roundDemoMoney(appliedShareAed + appliedWalletAed + externalAed);
   if (valid && Math.abs(fundingTotal - payableTotal) > EPSILON) {
     valid = false;
     reason = "funding_mismatch";
@@ -208,10 +230,12 @@ export function createDemoPaymentPlan({
         }
       : null,
     offerResult: offerAdjustment.reason,
+    paymentMethod: paymentMethodRequired ? normalizedPaymentMethod : PAYMENT_METHODS.balances,
     cardValidation,
     cvvValidation,
     cardLast4: cardRequired ? cardValidation.last4 : "",
     requirements: {
+      paymentMethod: paymentMethodRequired,
       card: cardRequired,
       cvv: cvvRequired,
     },
@@ -223,7 +247,10 @@ export function createDemoPaymentPlan({
       shareAed: appliedShareAed,
       remainingAfterPointsAed: afterShare,
       walletAed: appliedWalletAed,
-      cardAed,
+      externalAed,
+      cardAed: normalizedPaymentMethod === PAYMENT_METHODS.card ? externalAed : 0,
+      applePayAed: normalizedPaymentMethod === PAYMENT_METHODS.applePay ? externalAed : 0,
+      samsungPayAed: normalizedPaymentMethod === PAYMENT_METHODS.samsungPay ? externalAed : 0,
     },
     sharePointsUsed,
     sharePointsRemaining: DEMO_SHARE_POINTS - sharePointsUsed,

@@ -8,6 +8,7 @@ import {
   DEMO_SHARE_POINTS,
   DEMO_SHARE_POINTS_PER_AED,
   DEMO_WALLET_BALANCE,
+  PAYMENT_METHODS,
   createDemoPaymentPlan,
   formatDemoCardNumber,
   maskDemoCardNumber,
@@ -16,6 +17,7 @@ import {
   validateDemoSharePoints,
   validateDemoWallet,
 } from "../src/lib/demoPaymentGateway.js";
+import { deriveRefundAllocation, refundRouteLabel } from "../src/lib/refundAllocation.js";
 import { OFFERS } from "../src/offers/offersData.js";
 import {
   FALLBACK_EXPERIENCE_MEDIA,
@@ -28,6 +30,7 @@ assert.match(DEMO_CARD_STORAGE_KEY, /demo/i);
 
 const checkoutSource = await readFile(new URL("../src/components/Checkout.jsx", import.meta.url), "utf8");
 const demoGatewaySource = await readFile(new URL("../src/components/DemoPaymentGateway.jsx", import.meta.url), "utf8");
+const feedbackSource = await readFile(new URL("../src/components/JourneyFeedback.jsx", import.meta.url), "utf8");
 assert.doesNotMatch(checkoutSource, /Noorul|DEFAULT_CARDS|["']vox_cards["']/, "checkout must not seed personal or legacy default cards");
 assert.doesNotMatch(checkoutSource, /VITE_VISTA_BASE/, "Vista read-data configuration must not change checkout behavior");
 assert.match(checkoutSource, /status !== "ready"/, "checkout must guard against duplicate dummy processing");
@@ -52,7 +55,10 @@ assert.match(demoGatewaySource, /disabled=\{!plan\.valid\}/, "an incomplete or f
 assert.match(demoGatewaySource, /Final payment summary/, "the guest must receive a separate final review before processing");
 assert.match(demoGatewaySource, /Process payment/, "payment processing must remain a guest-controlled on-screen action");
 assert.match(demoGatewaySource, /OFFERS\.map/, "all published offer groups must be selectable");
-assert.doesNotMatch(`${checkoutSource}\n${demoGatewaySource}`, /Apple Pay|Samsung Pay|walletButton|reviewCard/i, "non-integrated payment brands must not appear as checkout controls");
+assert.match(demoGatewaySource, /Samsung Pay/, "Samsung Pay must be available for an external balance");
+assert.match(demoGatewaySource, /Apple Pay/, "Apple Pay must be available for an external balance");
+assert.match(demoGatewaySource, /paymentMethod === PAYMENT_METHODS\.card[\s\S]*OFFERS\.map/, "card offers must render only for the Card method");
+assert.match(feedbackSource, /role="radiogroup"[\s\S]*feedback\.submit/, "completed journeys must expose accessible customer feedback controls");
 
 assert.equal(formatDemoCardNumber(DEMO_CARD_NUMBERS.eligible), "4111 1111 1111 1111", "eligible test card formatting must be deterministic");
 assert.equal(maskDemoCardNumber(DEMO_CARD_NUMBERS.notEligible), "**** **** **** 4444", "test card masking must expose only the final four digits");
@@ -75,6 +81,7 @@ const splitPlan = createDemoPaymentPlan({
   amount: 84,
   ticketCount: 2,
   offer: fabShareOffer,
+  paymentMethod: PAYMENT_METHODS.card,
   cardNumber: DEMO_CARD_NUMBERS.eligible,
   cvv: "123",
   sharePoints: 150,
@@ -88,7 +95,10 @@ assert.deepEqual(splitPlan.amounts, {
   shareAed: 15,
   remainingAfterPointsAed: 27,
   walletAed: 10,
+  externalAed: 17,
   cardAed: 17,
+  applePayAed: 0,
+  samsungPayAed: 0,
 }, "BOGO, SHARE, wallet, and card amounts must reconcile exactly");
 assert.equal(createDemoPaymentPlan({
   amount: 84,
@@ -114,6 +124,7 @@ assert.equal(cardlessPlan.valid, true, "SHARE and wallet may fully fund a payabl
 assert.equal(cardlessPlan.amounts.cardAed, 0, "fully funded payment must leave no card remainder");
 assert.equal(cardlessPlan.requirements.card, false, "a fully funded payment must not require card selection");
 assert.equal(cardlessPlan.requirements.cvv, false, "a fully funded payment must not require CVV");
+assert.equal(cardlessPlan.requirements.paymentMethod, false, "a fully funded payment must not require any external method");
 assert.equal(cardlessPlan.cardLast4, "", "a fully funded payment must not retain card display details");
 assert.equal(createDemoPaymentPlan({
   amount: 84,
@@ -121,6 +132,21 @@ assert.equal(createDemoPaymentPlan({
   cardNumber: DEMO_CARD_NUMBERS.eligible,
   cvv: "123",
 }).amounts.cardAed, 84, "declining SHARE and wallet redemption must leave the full amount on the test card");
+const applePayPlan = createDemoPaymentPlan({ amount: 84, paymentMethod: PAYMENT_METHODS.applePay, sharePoints: 150, walletAed: 10 });
+assert.equal(applePayPlan.valid, true, "Apple Pay must fund a remaining balance without card details");
+assert.equal(applePayPlan.amounts.applePayAed, 59, "Apple Pay must receive the exact external remainder");
+assert.equal(applePayPlan.requirements.card, false, "Apple Pay must not request a card profile or CVV");
+assert.equal(createDemoPaymentPlan({ amount: 84, ticketCount: 2, offer: fabShareOffer, paymentMethod: PAYMENT_METHODS.applePay }).reason, "offer_requires_card_payment", "card offers must not apply to Apple Pay");
+const samsungPayPlan = createDemoPaymentPlan({ amount: 84, paymentMethod: PAYMENT_METHODS.samsungPay });
+assert.equal(samsungPayPlan.valid, true, "Samsung Pay must fund a remaining balance without card details");
+assert.equal(samsungPayPlan.amounts.samsungPayAed, 84, "Samsung Pay must receive the full external amount when balances are declined");
+const refundAllocation = deriveRefundAllocation({
+  currency: "AED",
+  total: 42,
+  demoPayment: { status: "processed", paymentMethod: "card", sharePointsUsed: 150, amounts: { shareAed: 15, walletAed: 10, externalAed: 17, cardAed: 17 } },
+});
+assert.deepEqual(refundAllocation, { voxWalletAed: 27, sharePoints: 150, shareAed: 15, totalAed: 42, currency: "AED", paymentMethod: "card", status: "calculated" }, "refund allocation must restore exact points and consolidate all AED funding into VOX Wallet");
+assert.equal(refundRouteLabel(refundAllocation), "VOX Wallet + SHARE account", "split refunds must name both destinations");
 
 const visibleHorrorMovies = {
   view: "movies",
@@ -246,7 +272,7 @@ assert.doesNotMatch(handoverSource, /agent queue|pick up this conversation|UserR
 assert.match(appSource, /connectingStep:\s*t\("handover\.preparingStep"\)/, "handover progress must say preparing rather than connecting");
 assert.doesNotMatch(appSource, /booking (?:was|is) removed from this device|Booking summary [^\n]+ removed only from this device/i, "persisted cancellations must not be described as removed records");
 assert.match(voxiPromptSource, /two published card profiles[\s\S]*without transmitting or storing it/, "the voice prompt must describe the bounded card-profile contract");
-assert.match(voxiPromptSource, /combine optional SHARE points and VOX Wallet value[\s\S]*Do not claim external bank capture/, "the voice prompt must preserve the POC transaction boundary");
+assert.match(voxiPromptSource, /combines optional SHARE points and VOX Wallet value first[\s\S]*card validation apply only when Card is selected[\s\S]*Do not claim external bank capture/, "the voice prompt must preserve balances-first funding, Card-only offers, and the transaction boundary");
 assert.match(voxiPromptSource, /final review[\s\S]*Process payment[\s\S]*guest-controlled on-screen actions/, "the voice prompt must leave every payment-step choice to the guest");
 assert.match(voxiPromptSource, /payment was processed only after authoritative widget context/, "processed receipt claims must synchronize with authoritative UI state");
 assert.match(voxiPromptSource, /Never ask in chat for a card number[\s\S]*protected on-screen payment controls/, "the agent must never solicit card details in chat");

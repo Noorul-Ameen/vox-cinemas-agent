@@ -6,6 +6,7 @@ import {
   DEMO_SHARE_POINTS,
   DEMO_SHARE_POINTS_PER_AED,
   DEMO_WALLET_BALANCE,
+  PAYMENT_METHODS,
   createDemoPaymentPlan,
   maskDemoCardNumber,
 } from "../lib/demoPaymentGateway.js";
@@ -68,6 +69,7 @@ export default function DemoPaymentGateway({
   const ar = language === "ar";
   const [phase, setPhase] = useState("configure");
   const [offerId, setOfferId] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [cvv, setCvv] = useState("");
   const [useShare, setUseShare] = useState(true);
@@ -76,6 +78,17 @@ export default function DemoPaymentGateway({
   const [walletAed, setWalletAed] = useState(String(DEMO_WALLET_BALANCE));
 
   const copy = ar ? {
+    paymentMethod: "طريقة الدفع",
+    paymentMethodPlaceholder: "اختر طريقة الدفع",
+    samsungPay: "Samsung Pay",
+    applePay: "Apple Pay",
+    cardMethod: "بطاقة",
+    methodHelp: "اختر طريقة دفع للمبلغ المتبقي بعد نقاط SHARE ومحفظة VOX.",
+    offersCardOnly: "عروض البطاقات متاحة فقط عند اختيار البطاقة.",
+    balancesCoverTotal: "تغطي نقاط SHARE ومحفظة VOX المبلغ بالكامل، لذلك لا يلزم اختيار طريقة دفع إضافية.",
+    paymentMethodUsed: "طريقة الدفع",
+    externalRemainder: "المبلغ عبر طريقة الدفع",
+    pointsRedeemedExplicit: "نقاط SHARE المستخدمة",
     notice: "دفع آمن. اختر العرض وطريقة تقسيم المبلغ ثم راجع التفاصيل قبل المعالجة.",
     configure: "إعداد الدفع",
     offer: "عرض البطاقة",
@@ -127,6 +140,17 @@ export default function DemoPaymentGateway({
     unsupported: "لا يمكن تطبيق هذا العرض.",
     reviewHelp: "راجع جميع التفاصيل قبل معالجة الدفع.",
   } : {
+    paymentMethod: "Payment method",
+    paymentMethodPlaceholder: "Select a payment method",
+    samsungPay: "Samsung Pay",
+    applePay: "Apple Pay",
+    cardMethod: "Card",
+    methodHelp: "Choose a payment method for the balance remaining after SHARE points and VOX Wallet.",
+    offersCardOnly: "Card offers are available only when Card is selected.",
+    balancesCoverTotal: "SHARE points and VOX Wallet cover the full amount, so no additional payment method is required.",
+    paymentMethodUsed: "Payment method",
+    externalRemainder: "Payment method remainder",
+    pointsRedeemedExplicit: "SHARE points redeemed",
     notice: "Secure checkout. Choose an offer and funding split, then review the details before processing.",
     configure: "Configure payment",
     offer: "Card offer",
@@ -144,11 +168,11 @@ export default function DemoPaymentGateway({
     cvvRequired: "Enter the CVV for the selected card.",
     cvvInvalid: "CVV must contain 3 digits.",
     combined: "Combined payment",
-    combinedHelp: "Use SHARE points and VOX Wallet together, then pay any remaining amount with the selected card. Either balance can be declined before review.",
+    combinedHelp: "Use SHARE points and VOX Wallet together, then pay any remaining amount with the selected payment method. Either balance can be declined before review.",
     share: "Use SHARE points",
     shareAvailable: `Available SHARE balance: ${DEMO_SHARE_POINTS.toLocaleString("en-AE")} points worth AED ${DEMO_SHARE_AED_VALUE.toLocaleString("en-AE")}`,
     shareAmount: "SHARE points to redeem",
-    sharePointUnit: "points",
+    sharePointUnit: "SHARE points",
     shareBalanceExceeded: `You have ${DEMO_SHARE_POINTS.toLocaleString("en-AE")} SHARE points available. Enter ${DEMO_SHARE_POINTS.toLocaleString("en-AE")} points or fewer.`,
     shareWholePoints: "Enter a whole number of SHARE points.",
     wallet: "Use VOX Wallet",
@@ -174,7 +198,7 @@ export default function DemoPaymentGateway({
     offerCardRequired: "Choose the eligible card to apply the selected offer.",
     notEligible: "This card is not eligible for the selected offer.",
     cardRequired: "Choose either available card for the remaining card balance.",
-    noCardRequired: "No card or CVV is required because SHARE points and VOX Wallet cover the full amount.",
+    noCardRequired: "No payment method, card, or CVV is required because SHARE points and VOX Wallet cover the full amount.",
     unsupported: "This offer cannot be applied.",
     reviewHelp: "Review all details before processing the payment.",
   };
@@ -183,15 +207,25 @@ export default function DemoPaymentGateway({
     () => OFFERS.find((offer) => offer.id === offerId) || null,
     [offerId],
   );
+  const fundingPreview = useMemo(() => createDemoPaymentPlan({
+    amount,
+    ticketCount,
+    paymentMethod: "",
+    sharePoints: useShare ? sharePoints : 0,
+    walletAed: useWallet ? walletAed : 0,
+  }), [amount, ticketCount, useShare, sharePoints, useWallet, walletAed]);
+  const externalPaymentRequired = Number(fundingPreview.amounts?.externalAed || 0) > 0;
+  const activeOffer = externalPaymentRequired && paymentMethod === PAYMENT_METHODS.card ? selectedOffer : null;
   const plan = useMemo(() => createDemoPaymentPlan({
     amount,
     ticketCount,
-    offer: selectedOffer,
+    offer: activeOffer,
+    paymentMethod: externalPaymentRequired ? paymentMethod : PAYMENT_METHODS.balances,
     cardNumber,
     cvv,
     sharePoints: useShare ? sharePoints : 0,
     walletAed: useWallet ? walletAed : 0,
-  }), [amount, ticketCount, selectedOffer, cardNumber, cvv, useShare, sharePoints, useWallet, walletAed]);
+  }), [amount, ticketCount, activeOffer, paymentMethod, externalPaymentRequired, cardNumber, cvv, useShare, sharePoints, useWallet, walletAed]);
 
   const money = (value) => {
     if (typeof formatCurrency === "function") return formatCurrency(value, currency);
@@ -202,6 +236,8 @@ export default function DemoPaymentGateway({
     offer_requires_two_tickets: copy.twoTickets,
     offer_card_required: copy.offerCardRequired,
     offer_card_not_eligible: copy.notEligible,
+    offer_requires_card_payment: copy.offersCardOnly,
+    payment_method_required: copy.paymentMethodPlaceholder,
     card_required: copy.cardRequired,
     cvv_required: copy.cvvRequired,
     cvv_invalid: copy.cvvInvalid,
@@ -210,15 +246,20 @@ export default function DemoPaymentGateway({
     unsupported_offer: copy.unsupported,
     funding_mismatch: copy.unsupported,
   }[plan.reason] || "";
-  const cardOfferErrorShown = Boolean(cardNumber && selectedOffer && !plan.cardValidation?.eligible);
+  const cardOfferErrorShown = Boolean(cardNumber && activeOffer && !plan.cardValidation?.eligible);
   const shareValidationErrorShown = Boolean(useShare && plan.shareValidation && !plan.shareValidation.valid);
   const cardControlsRequired = Boolean(plan.requirements?.card);
   const cardSelectionNeedsCvv = Boolean(cardNumber && plan.requirements?.cvv);
   const cvvErrorShown = Boolean(cardSelectionNeedsCvv && cvv && !plan.cvvValidation?.valid);
-  const selectedOfferLabel = selectedOffer
-    ? `${localValue(selectedOffer.bank, language)} - ${localValue(selectedOffer.headline, language)}`
+  const selectedOfferLabel = activeOffer
+    ? `${localValue(activeOffer.bank, language)} - ${localValue(activeOffer.headline, language)}`
     : copy.noOffer;
-  const points = (value) => `${Math.max(0, Number(value) || 0).toLocaleString(ar ? "ar-AE" : "en-AE")} ${copy.sharePointUnit}`;
+  const paymentMethodLabel = {
+    [PAYMENT_METHODS.samsungPay]: copy.samsungPay,
+    [PAYMENT_METHODS.applePay]: copy.applePay,
+    [PAYMENT_METHODS.card]: copy.cardMethod,
+  }[plan.paymentMethod] || "";
+  const points = (value) => `${Math.max(0, Number(value) || 0).toLocaleString(ar ? "ar-AE" : "en-AE")} ${ar ? "نقطة SHARE" : copy.sharePointUnit}`;
 
   if (phase === "review") {
     return (
@@ -226,20 +267,20 @@ export default function DemoPaymentGateway({
         <div style={styles.notice}>{copy.notice}</div>
         <div style={styles.section}>
           <h3 style={styles.title}>{copy.final}</h3>
-          <div style={styles.offer}>
+          {activeOffer ? <div style={styles.offer}>
             <strong>{selectedOfferLabel}</strong>
-            {selectedOffer ? <span style={styles.help}>{localValue(selectedOffer.summary, language)}</span> : null}
-          </div>
+            <span style={styles.help}>{localValue(activeOffer.summary, language)}</span>
+          </div> : null}
           <div style={styles.totals}>
             <div style={styles.row}><span>{copy.original}</span><strong>{money(plan.amounts.originalTotal)}</strong></div>
             <div style={styles.row}><span>{copy.discount}</span><strong>-{money(plan.amounts.offerDiscount)}</strong></div>
             <div style={styles.strongRow}><span>{copy.payable}</span><span>{money(plan.amounts.payableTotal)}</span></div>
-            <div style={styles.row}><span>{copy.pointsRedeemed}</span><strong>{points(plan.sharePointsUsed)}</strong></div>
+            <div style={styles.row}><span>{copy.pointsRedeemedExplicit}</span><strong>{points(plan.sharePointsUsed)}</strong></div>
             <div style={styles.row}><span>{copy.pointsEquivalent}</span><strong>-{money(plan.amounts.shareAed)}</strong></div>
             <div style={styles.strongRow}><span>{copy.remainingPayment}</span><span>{money(plan.amounts.remainingAfterPointsAed)}</span></div>
             <div style={styles.row}><span>{copy.walletUsed}</span><strong>{money(plan.amounts.walletAed)}</strong></div>
-            {plan.amounts.cardAed > 0 ? (
-              <div style={styles.row}><span>{copy.cardUsed}{plan.cardLast4 ? ` •••• ${plan.cardLast4}` : ""}</span><strong>{money(plan.amounts.cardAed)}</strong></div>
+            {plan.amounts.externalAed > 0 ? (
+              <div style={styles.row} data-testid="review-external-payment-summary"><span>{paymentMethodLabel}{plan.cardLast4 ? ` •••• ${plan.cardLast4}` : ""}</span><strong>{money(plan.amounts.externalAed)}</strong></div>
             ) : null}
           </div>
           <p style={styles.help}>{copy.reviewHelp}</p>
@@ -256,30 +297,57 @@ export default function DemoPaymentGateway({
     <section style={styles.shell} dir={dir} data-testid="dummy-payment-gateway">
       <div style={styles.notice}>{copy.notice}</div>
       <div style={styles.section}>
-        <h3 style={styles.title}>{copy.configure}</h3>
-        <label style={styles.label}>
-          <span>{copy.offer}</span>
-          <select
-            style={styles.select}
-            value={offerId}
-            aria-label={copy.offer}
-            onChange={(event) => setOfferId(event.target.value)}
-          >
-            <option value="">{copy.noOffer}</option>
-            {OFFERS.map((offer) => (
-              <option key={offer.id} value={offer.id}>
-                {localValue(offer.bank, language)} - {localValue(offer.headline, language)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p style={styles.help}>{copy.offerHelp}</p>
-        {selectedOffer ? (
-          <div style={styles.offer} data-testid="selected-offer-summary">
-            <strong>{selectedOfferLabel}</strong>
-            <span style={styles.help}>{localValue(selectedOffer.summary, language)}</span>
-          </div>
-        ) : null}
+        <h3 style={styles.title}>{copy.paymentMethod}</h3>
+        {externalPaymentRequired ? (
+          <>
+            <label style={styles.label}>
+              <span>{copy.paymentMethod}</span>
+              <select
+                style={styles.select}
+                value={paymentMethod}
+                aria-label={copy.paymentMethod}
+                data-testid="payment-method-select"
+                onChange={(event) => {
+                  const nextMethod = event.target.value;
+                  setPaymentMethod(nextMethod);
+                  if (nextMethod !== PAYMENT_METHODS.card) {
+                    setOfferId("");
+                    setCardNumber("");
+                    setCvv("");
+                  }
+                }}
+              >
+                <option value="">{copy.paymentMethodPlaceholder}</option>
+                <option value={PAYMENT_METHODS.samsungPay}>{copy.samsungPay}</option>
+                <option value={PAYMENT_METHODS.applePay}>{copy.applePay}</option>
+                <option value={PAYMENT_METHODS.card}>{copy.cardMethod}</option>
+              </select>
+            </label>
+            <p style={styles.help}>{paymentMethod && paymentMethod !== PAYMENT_METHODS.card ? copy.offersCardOnly : copy.methodHelp}</p>
+            {paymentMethod === PAYMENT_METHODS.card ? (
+              <>
+                <label style={styles.label}>
+                  <span>{copy.offer}</span>
+                  <select style={styles.select} value={offerId} aria-label={copy.offer} onChange={(event) => setOfferId(event.target.value)}>
+                    <option value="">{copy.noOffer}</option>
+                    {OFFERS.map((offer) => (
+                      <option key={offer.id} value={offer.id}>
+                        {localValue(offer.bank, language)} - {localValue(offer.headline, language)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p style={styles.help}>{copy.offerHelp}</p>
+                {activeOffer ? (
+                  <div style={styles.offer} data-testid="selected-offer-summary">
+                    <strong>{selectedOfferLabel}</strong>
+                    <span style={styles.help}>{localValue(activeOffer.summary, language)}</span>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </>
+        ) : <p style={styles.success} role="status">{copy.balancesCoverTotal}</p>}
       </div>
 
       <div
@@ -335,7 +403,7 @@ export default function DemoPaymentGateway({
         ) : null}
       </div>
 
-      <div style={styles.section}>
+      {externalPaymentRequired && paymentMethod === PAYMENT_METHODS.card ? <div style={styles.section}>
         <h3 style={styles.title}>{copy.cards}</h3>
         {cardControlsRequired ? (
           <>
@@ -383,15 +451,17 @@ export default function DemoPaymentGateway({
         ) : (
           <p style={styles.success} role="status">{copy.noCardRequired}</p>
         )}
-      </div>
+      </div> : null}
 
       <div style={styles.totals}>
         <div style={styles.row}><span>{copy.discount}</span><strong>-{money(plan.amounts?.offerDiscount || 0)}</strong></div>
-        <div style={styles.row}><span>{copy.pointsRedeemed}</span><strong>{points(plan.sharePointsUsed)}</strong></div>
+        <div style={styles.row}><span>{copy.pointsRedeemedExplicit}</span><strong>{points(plan.sharePointsUsed)}</strong></div>
         <div style={styles.row}><span>{copy.pointsEquivalent}</span><strong>-{money(plan.amounts?.shareAed || 0)}</strong></div>
         <div style={styles.row}><span>{copy.walletUsed}</span><strong>{money(plan.amounts?.walletAed || 0)}</strong></div>
         <div style={styles.strongRow}><span>{copy.remainingPayment}</span><span>{money(plan.amounts?.remainingAfterPointsAed || 0)}</span></div>
-        <div style={styles.row}><span>{copy.cardRemainder}</span><strong>{money(plan.amounts?.cardAed || 0)}</strong></div>
+        {externalPaymentRequired ? (
+          <div style={styles.row} data-testid="external-payment-summary"><span>{paymentMethodLabel || copy.externalRemainder}</span><strong>{money(plan.amounts?.externalAed || 0)}</strong></div>
+        ) : null}
       </div>
       {plan.valid
         ? <p style={styles.success}>{copy.ready}</p>

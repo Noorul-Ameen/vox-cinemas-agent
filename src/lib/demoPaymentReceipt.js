@@ -1,5 +1,7 @@
 export function sanitizeDemoPaymentReceipt(payment, expectedTotal) {
   const source = payment?.amounts || {};
+  const paymentMethod = String(payment?.paymentMethod || (Number(source.cardAed) > 0 ? "card" : "balances"));
+  const externalAed = Number.isFinite(Number(source.externalAed)) ? Number(source.externalAed) : Number(source.cardAed);
   const amounts = {
     originalTotal: Number(source.originalTotal),
     offerDiscount: Number(source.offerDiscount),
@@ -7,12 +9,17 @@ export function sanitizeDemoPaymentReceipt(payment, expectedTotal) {
     shareAed: Number(source.shareAed),
     walletAed: Number(source.walletAed),
     cardAed: Number(source.cardAed),
+    externalAed,
+    applePayAed: Number(source.applePayAed || 0),
+    samsungPayAed: Number(source.samsungPayAed || 0),
   };
   const values = Object.values(amounts);
-  const funded = amounts.shareAed + amounts.walletAed + amounts.cardAed;
+  const funded = amounts.shareAed + amounts.walletAed + amounts.externalAed;
+  const validPaymentMethod = ["balances", "card", "apple_pay", "samsung_pay"].includes(paymentMethod);
   const valid = payment?.simulated === true
     && payment?.status === "processed"
     && /^TXN-[A-Z0-9-]+$/.test(String(payment?.transactionRef || ""))
+    && validPaymentMethod
     && values.every(Number.isFinite)
     && Math.abs(amounts.originalTotal - Number(expectedTotal)) < 0.011
     && amounts.originalTotal > 0
@@ -27,6 +34,7 @@ export function sanitizeDemoPaymentReceipt(payment, expectedTotal) {
     processedAt: String(payment.processedAt || new Date().toISOString()),
     offer: payment.offer || null,
     offerResult: String(payment.offerResult || ""),
+    paymentMethod,
     cardLast4: String(payment.cardLast4 || "").slice(-4),
     amounts,
     sharePointsUsed: Math.max(0, Number(payment.sharePointsUsed) || 0),

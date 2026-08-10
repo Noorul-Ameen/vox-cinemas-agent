@@ -143,7 +143,22 @@ try {
     "--max-days", process.env.VOX_REFRESH_MAX_DAYS || "45",
     "--workers", process.env.VOX_REFRESH_WORKERS || "2",
   ];
-  await run(process.execPath, extractorArgs, "extract official VOX UAE schedule");
+  try {
+    await run(process.execPath, extractorArgs, "extract official VOX UAE schedule");
+  } catch (error) {
+    console.error(`[refresh] Legacy API extraction unavailable: ${error.message}`);
+    console.error("[refresh] Falling back to official VOX UAE server-rendered showtime pages.");
+    const fallbackArgs = [
+      resolve(root, "scripts/extractVoxShowtimesHtml.mjs"),
+      "--output", nextJson,
+      "--movie-information-output", nextMovieInformation,
+      "--previous-movie-information", currentMovieInformation,
+      "--previous-schedule", currentJson,
+      "--max-days", process.env.VOX_REFRESH_MAX_DAYS || "45",
+      "--workers", process.env.VOX_REFRESH_WORKERS || "2",
+    ];
+    await run(process.execPath, fallbackArgs, "extract official VOX UAE server-rendered schedule");
+  }
   await retainPreviouslyVerifiedMedia();
   await run(process.execPath, [resolve(root, "scripts/validateShowtimeRefresh.mjs"), nextJson, currentJson], "validate freshness and completeness");
   await run(process.execPath, [
