@@ -157,7 +157,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "THEATRE": {
     "code": "THR",
@@ -177,7 +177,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "IMAX": {
     "code": "IMAX",
@@ -197,7 +197,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "MAX": {
     "code": "MAX",
@@ -217,7 +217,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "PREMIER": {
     "code": "PMR",
@@ -237,7 +237,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "GOLD": {
     "code": "GOLD",
@@ -257,7 +257,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "KIDS": {
     "code": "KIDS",
@@ -277,7 +277,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "PRIVATE_CINEMA": {
     "code": "PVT",
@@ -297,7 +297,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "4DX": {
     "code": "4DX",
@@ -317,7 +317,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "ONYX": {
     "code": "ONYX",
@@ -337,7 +337,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "STANDARD": {
     "code": "STD",
@@ -357,7 +357,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "COUCH_2_SEATER": {
     "code": "COUCH",
@@ -377,7 +377,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "PREMIUM": {
     "code": "PRE",
@@ -397,7 +397,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   }
 };
 
@@ -412,7 +412,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/fab%20no%20text_0a495d62-a4a6-4ccd-9b2e-5c96603ca6c9.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "MAWARID",
@@ -424,7 +424,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/Mawarid_b80cf684-eaba-4a93-b45e-2c8dfec56690.jpeg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "NBF",
@@ -436,7 +436,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/NBF_1ade2931-6d94-4ec2-8e4d-c6b2ba2e2620.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "ALLUENBD",
@@ -448,7 +448,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/enbd_Banner_e65f9338-d37f-438a-9b52-d4d8d94fb3a0.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "PLIV",
@@ -460,7 +460,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/live%202_92c9156a-c645-4c70-b0dc-a7f45ca50670.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "SIB50",
@@ -472,7 +472,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880x440_1a7e06f2-75e9-4454-bd71-2f497205d8be.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "AAFAQEX",
@@ -484,7 +484,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20%20880x440%20px%20without%20text%202_89b79c64-bfea-4326-99a1-7cad2f21b885.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "HSBC",
@@ -496,7 +496,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/HSBC_1bba660d-31ba-4f41-8b79-1a066927cecf.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "DEEM",
@@ -508,7 +508,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/DEEM_baa456fe-22df-4e85-831a-af98118009d1.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "CITI",
@@ -520,7 +520,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "citi30",
@@ -532,7 +532,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/CitiBank%20VOX%20Cinema%20Banner%20880x440%20no%20text_db1628e2-8fc7-4f5f-8413-c4265cc164b9.jpg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "SCB",
@@ -544,7 +544,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/STD_d91cee33-08bd-4e46-a7e2-8dfc619e4ec8.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "ARABBIN7",
@@ -556,7 +556,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880x440_042ba4a7-f581-4e05-a860-afbf0d71c687.jpg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "CBD",
@@ -568,7 +568,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880_b5fd5190-fc4e-45bb-aea6-16ea180987e4.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "ADCB",
@@ -580,7 +580,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/ADCB_1715028023_457a2624-b8a8-4ea6-be8a-bf1e6923054d.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "RAK",
@@ -592,19 +592,19 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/RAK_7abddfb4-c0ce-4db8-8f04-96ae7981cae5.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "UAB",
     "slug": "uab",
     "name": "UAB - Buy One Get One Free",
-    "imageUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/UAB%20logo_7cc53191-f9cd-4fb4-8f15-fd4908aeb9af.png",
-    "heroUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20cinema%20uab%202_b6c597c4-b611-4ff1-a58e-d2db99aaecd5.jpg",
-    "promoUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20cinema%20uab%20no%20text_6b4f7be1-43f6-4338-a279-747521c62b80.png",
-    "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20cinema%20uab%202_bf0e46a6-4778-4d2e-a783-5b5bd88ec589.jpg",
+    "imageUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/UAB%20logo_83026721-8842-45c2-8d20-61ceeb1aa766.png",
+    "heroUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
+    "promoUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
+    "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "ARAB",
@@ -616,7 +616,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880x440_2d19f644-46c5-4750-8883-570792deb4bc.jpg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "EIB",
@@ -628,7 +628,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/EIB_banner_1320b269-8bf6-4681-8f42-e754eebc568b.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "Mashreq",
@@ -640,7 +640,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/Mashreq-Credit-Card-VOX-Banner-880x440-B-without-text_82b17d91-5ab4-46bc-8be7-780a54d91c22.jpg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "ADCBTOUCHPOINT",
@@ -652,7 +652,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20Banner%20880x440_8c336136-d26d-42d9-ab8e-b4b2ce40a511.jpg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   }
 ];
 
@@ -1321,86 +1321,6 @@ export const FILMS = [
       "#B44BC7"
     ],
     "CinemaIds": [
-      "0005",
-      "0012",
-      "0046",
-      "0055",
-      "0105"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016025",
-    "CinemaId": "0015",
-    "Title": "Main Vaapas Aaunga",
-    "Rating": "PG13",
-    "Language": "Hindi",
-    "LanguageName": "Hindi",
-    "RunTime": 175,
-    "Genres": [
-      "Musical",
-      "Romance",
-      "Drama"
-    ],
-    "genre": "Musical",
-    "Synopsis": "A story of love, longing, and belonging rooted in Partition-era migration. Examines memory, nostalgia, and emotional ties to home and loved ones, exploring how the past shapes identity and sustains the human spirit across generations.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/14_VOX_2_0_Poster_bf2e18f1b7.jpg",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/14_VOX_2_0_Poster_bf2e18f1b7.jpg",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/14_VOX_2_0_Poster_bf2e18f1b7.jpg",
-      "medium": "https://uae.voxcinemas.com/images/14_VOX_2_0_Poster_bf2e18f1b7.jpg",
-      "thumbnail": "https://uae.voxcinemas.com/images/14_VOX_2_0_Poster_bf2e18f1b7.jpg",
-      "largeMobile": "https://uae.voxcinemas.com/images/14_VOX_2_0_Poster_bf2e18f1b7.jpg",
-      "mediumMobile": "https://uae.voxcinemas.com/images/14_VOX_2_0_Poster_bf2e18f1b7.jpg"
-    },
-    "movieUrl": "main-vaapas-aaunga-hindi",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/main-vaapas-aaunga-hindi",
-    "tint": [
-      "#6A2E7A",
-      "#B44BC7"
-    ],
-    "CinemaIds": [
-      "0015"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016180",
-    "CinemaId": "0002",
-    "Title": "Ice Cream Man",
-    "Rating": "18+",
-    "Language": "English",
-    "LanguageName": "English",
-    "RunTime": 90,
-    "Genres": [
-      "Horror",
-      "Thriller"
-    ],
-    "genre": "Horror",
-    "Synopsis": "Ice Cream-Man- An idyllic summer town descends into madness when an ice cream man serves kids sweet delights with horrifying results.",
-    "Subtitles": [
-      "Arabic"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-      "medium": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png"
-    },
-    "movieUrl": "ice-cream-man",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/ice-cream-man",
-    "tint": [
-      "#7A5A2E",
-      "#C79A4B"
-    ],
-    "CinemaIds": [
       "0002",
       "0004",
       "0005",
@@ -1791,7 +1711,6 @@ export const FILMS = [
       "0035",
       "0036",
       "0039",
-      "0045",
       "0046",
       "0049",
       "0055",

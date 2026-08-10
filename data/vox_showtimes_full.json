@@ -74,7 +74,7 @@
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/dc-tamil",
       "sourceUrl": "https://uae.voxcinemas.com/showtimes",
       "categories": [
-        "AdvanceBooking"
+        "NowShowing"
       ],
       "experiences": [
         "MAX",
@@ -412,8 +412,7 @@
         "NowShowing"
       ],
       "experiences": [
-        "STANDARD",
-        "PREMIUM"
+        "STANDARD"
       ],
       "images": {
         "large": "https://assets.voxcinemas.com/posters/P_HO00013537_1785322216903.png",
@@ -944,7 +943,6 @@
       "experiences": [
         "COUCH_-_2_SEATER",
         "GOLD",
-        "PRIVATE CINEMA",
         "IMAX",
         "MAX",
         "PREMIUM",
@@ -30220,201 +30218,6 @@
     },
     {
       "programmingDate": "2026-08-11",
-      "date": "2026-08-12",
-      "code": "HO00015860",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96382",
-      "showtime": "2026-08-12T00:00:00+00:00",
-      "time": "00:00",
-      "timeSlot": "LateNight",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00015994",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96679",
-      "showtime": "2026-08-11T20:45:00+00:00",
-      "time": "20:45",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016180",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96475",
-      "showtime": "2026-08-11T17:15:00+00:00",
-      "time": "17:15",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016180",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96477",
-      "showtime": "2026-08-11T22:30:00+00:00",
-      "time": "22:30",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016195",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96594",
-      "showtime": "2026-08-11T16:15:00+00:00",
-      "time": "16:15",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016195",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96596",
-      "showtime": "2026-08-11T22:30:00+00:00",
-      "time": "22:30",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016335",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96680",
-      "showtime": "2026-08-11T23:30:00+00:00",
-      "time": "23:30",
-      "timeSlot": "LateNight",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96557",
-      "showtime": "2026-08-11T12:00:00+00:00",
-      "time": "12:00",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96558",
-      "showtime": "2026-08-11T14:20:00+00:00",
-      "time": "14:20",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96559",
-      "showtime": "2026-08-11T16:40:00+00:00",
-      "time": "16:40",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96560",
-      "showtime": "2026-08-11T19:00:00+00:00",
-      "time": "19:00",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96561",
-      "showtime": "2026-08-11T21:20:00+00:00",
-      "time": "21:20",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96562",
-      "showtime": "2026-08-11T23:40:00+00:00",
-      "time": "23:40",
-      "timeSlot": "LateNight",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
       "date": "2026-08-11",
       "code": "HO00013488",
       "cinemaCode": "0013",
@@ -40948,51 +40751,6 @@
       "date": "2026-08-11",
       "code": "HO00013488",
       "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96268",
-      "showtime": "2026-08-11T20:15:00+00:00",
-      "time": "20:15",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016339",
-      "cinemaCode": "0105",
-      "experience": "GOLD",
-      "experienceCode": "GOLD",
-      "sessionId": "96438",
-      "showtime": "2026-08-11T20:50:00+00:00",
-      "time": "20:50",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016339",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96214",
-      "showtime": "2026-08-11T21:00:00+00:00",
-      "time": "21:00",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016339",
-      "cinemaCode": "0105",
       "experience": "IMAX",
       "experienceCode": "IMX",
       "sessionId": "95292",
@@ -41404,336 +41162,6 @@
       "showtime": "2026-08-11T19:20:00+04:00",
       "time": "19:20",
       "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016339",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96269",
-      "showtime": "2026-08-11T23:45:00+00:00",
-      "time": "23:45",
-      "timeSlot": "LateNight",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016375",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96593",
-      "showtime": "2026-08-11T13:15:00+00:00",
-      "time": "13:15",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016375",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96595",
-      "showtime": "2026-08-11T19:30:00+00:00",
-      "time": "19:30",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016381",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96513",
-      "showtime": "2026-08-11T13:00:00+00:00",
-      "time": "13:00",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016381",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96514",
-      "showtime": "2026-08-11T15:15:00+00:00",
-      "time": "15:15",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016381",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96515",
-      "showtime": "2026-08-11T17:30:00+00:00",
-      "time": "17:30",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016381",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96516",
-      "showtime": "2026-08-11T19:45:00+00:00",
-      "time": "19:45",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016381",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96517",
-      "showtime": "2026-08-11T22:00:00+00:00",
-      "time": "22:00",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016396",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96638",
-      "showtime": "2026-08-11T17:40:00+00:00",
-      "time": "17:40",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016396",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96639",
-      "showtime": "2026-08-11T20:00:00+00:00",
-      "time": "20:00",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016396",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96640",
-      "showtime": "2026-08-11T22:20:00+00:00",
-      "time": "22:20",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-11",
-      "date": "2026-08-11",
-      "code": "HO00016418",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96476",
-      "showtime": "2026-08-11T19:20:00+00:00",
-      "time": "19:20",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015724",
-      "cinemaCode": "0002",
-      "experience": "KIDS",
-      "experienceCode": "KIDS",
-      "sessionId": "623219",
-      "showtime": "2026-08-12T10:15:00+00:00",
-      "time": "10:15",
-      "timeSlot": "Morning",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015724",
-      "cinemaCode": "0002",
-      "experience": "KIDS",
-      "experienceCode": "KIDS",
-      "sessionId": "623220",
-      "showtime": "2026-08-12T12:20:00+00:00",
-      "time": "12:20",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015724",
-      "cinemaCode": "0002",
-      "experience": "KIDS",
-      "experienceCode": "KIDS",
-      "sessionId": "623221",
-      "showtime": "2026-08-12T14:25:00+00:00",
-      "time": "14:25",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015724",
-      "cinemaCode": "0002",
-      "experience": "KIDS",
-      "experienceCode": "KIDS",
-      "sessionId": "623222",
-      "showtime": "2026-08-12T16:30:00+00:00",
-      "time": "16:30",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015724",
-      "cinemaCode": "0002",
-      "experience": "KIDS",
-      "experienceCode": "KIDS",
-      "sessionId": "623223",
-      "showtime": "2026-08-12T18:35:00+00:00",
-      "time": "18:35",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015724",
-      "cinemaCode": "0002",
-      "experience": "KIDS",
-      "experienceCode": "KIDS",
-      "sessionId": "623224",
-      "showtime": "2026-08-12T20:40:00+00:00",
-      "time": "20:40",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015756",
-      "cinemaCode": "0002",
-      "experience": "PREMIER",
-      "experienceCode": "PMR",
-      "sessionId": "623165",
-      "showtime": "2026-08-12T10:00:00+00:00",
-      "time": "10:00",
-      "timeSlot": "Morning",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015756",
-      "cinemaCode": "0002",
-      "experience": "PREMIER",
-      "experienceCode": "PMR",
-      "sessionId": "623166",
-      "showtime": "2026-08-12T12:15:00+00:00",
-      "time": "12:15",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015756",
-      "cinemaCode": "0002",
-      "experience": "PREMIER",
-      "experienceCode": "PMR",
-      "sessionId": "623167",
-      "showtime": "2026-08-12T14:30:00+00:00",
-      "time": "14:30",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015756",
-      "cinemaCode": "0002",
-      "experience": "PREMIER",
-      "experienceCode": "PMR",
-      "sessionId": "623168",
-      "showtime": "2026-08-12T16:45:00+00:00",
-      "time": "16:45",
-      "timeSlot": "Afternoon",
       "status": "",
       "isAvailableForOffer": false,
       "comment": ""
@@ -42250,381 +41678,6 @@
     },
     {
       "programmingDate": "2026-08-12",
-      "date": "2026-08-13",
-      "code": "HO00015860",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139248",
-      "showtime": "2026-08-13T00:15:00+00:00",
-      "time": "00:15",
-      "timeSlot": "LateNight",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-13",
-      "code": "HO00015860",
-      "cinemaCode": "0039",
-      "experience": "THEATRE",
-      "experienceCode": "THR",
-      "sessionId": "139285",
-      "showtime": "2026-08-13T00:20:00+00:00",
-      "time": "00:20",
-      "timeSlot": "LateNight",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016337",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139228",
-      "showtime": "2026-08-12T12:10:00+00:00",
-      "time": "12:10",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016337",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139230",
-      "showtime": "2026-08-12T16:55:00+00:00",
-      "time": "16:55",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016337",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139232",
-      "showtime": "2026-08-12T21:40:00+00:00",
-      "time": "21:40",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139235",
-      "showtime": "2026-08-12T12:30:00+00:00",
-      "time": "12:30",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0039",
-      "experience": "THEATRE",
-      "experienceCode": "THR",
-      "sessionId": "139282",
-      "showtime": "2026-08-12T13:30:00+00:00",
-      "time": "13:30",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139236",
-      "showtime": "2026-08-12T16:00:00+00:00",
-      "time": "16:00",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139242",
-      "showtime": "2026-08-12T18:45:00+00:00",
-      "time": "18:45",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139237",
-      "showtime": "2026-08-12T19:30:00+00:00",
-      "time": "19:30",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0039",
-      "experience": "THEATRE",
-      "experienceCode": "THR",
-      "sessionId": "139284",
-      "showtime": "2026-08-12T20:30:00+00:00",
-      "time": "20:30",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139243",
-      "showtime": "2026-08-12T22:20:00+00:00",
-      "time": "22:20",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139238",
-      "showtime": "2026-08-12T23:20:00+00:00",
-      "time": "23:20",
-      "timeSlot": "LateNight",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016381",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139239",
-      "showtime": "2026-08-12T11:45:00+00:00",
-      "time": "11:45",
-      "timeSlot": "Morning",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016381",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139240",
-      "showtime": "2026-08-12T14:15:00+00:00",
-      "time": "14:15",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016381",
-      "cinemaCode": "0039",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "139241",
-      "showtime": "2026-08-12T16:30:00+00:00",
-      "time": "16:30",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016381",
-      "cinemaCode": "0039",
-      "experience": "KIDS",
-      "experienceCode": "KIDS",
-      "sessionId": "139226",
-      "showtime": "2026-08-12T19:45:00+00:00",
-      "time": "19:45",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015860",
-      "cinemaCode": "0045",
-      "experience": "PRIVATE CINEMA",
-      "experienceCode": "PVT",
-      "sessionId": "10348",
-      "showtime": "2026-08-12T14:00:00+00:00",
-      "time": "14:00",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0045",
-      "experience": "PRIVATE CINEMA",
-      "experienceCode": "PVT",
-      "sessionId": "10349",
-      "showtime": "2026-08-12T18:00:00+00:00",
-      "time": "18:00",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015724",
-      "cinemaCode": "0046",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "303723",
-      "showtime": "2026-08-12T10:00:00+00:00",
-      "time": "10:00",
-      "timeSlot": "Morning",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015724",
-      "cinemaCode": "0046",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "303724",
-      "showtime": "2026-08-12T12:05:00+00:00",
-      "time": "12:05",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015724",
-      "cinemaCode": "0046",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "303725",
-      "showtime": "2026-08-12T14:10:00+00:00",
-      "time": "14:10",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015756",
-      "cinemaCode": "0046",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "304367",
-      "showtime": "2026-08-12T10:00:00+00:00",
-      "time": "10:00",
-      "timeSlot": "Morning",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015756",
-      "cinemaCode": "0046",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "304368",
-      "showtime": "2026-08-12T12:15:00+00:00",
-      "time": "12:15",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015756",
-      "cinemaCode": "0046",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "304369",
-      "showtime": "2026-08-12T14:30:00+00:00",
-      "time": "14:30",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
       "date": "2026-08-12",
       "code": "HO00013355",
       "cinemaCode": "0001",
@@ -42828,201 +41881,6 @@
       "sessionId": "668366",
       "showtime": "2026-08-12T22:45:00+04:00",
       "time": "22:45",
-      "timeSlot": "LateNight",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-13",
-      "code": "HO00015860",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96387",
-      "showtime": "2026-08-13T00:00:00+00:00",
-      "time": "00:00",
-      "timeSlot": "LateNight",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00015994",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96685",
-      "showtime": "2026-08-12T23:00:00+00:00",
-      "time": "23:00",
-      "timeSlot": "LateNight",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016180",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96481",
-      "showtime": "2026-08-12T18:00:00+00:00",
-      "time": "18:00",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016180",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96482",
-      "showtime": "2026-08-12T20:05:00+00:00",
-      "time": "20:05",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016195",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96597",
-      "showtime": "2026-08-12T13:15:00+00:00",
-      "time": "13:15",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016195",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96599",
-      "showtime": "2026-08-12T19:30:00+00:00",
-      "time": "19:30",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016335",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96684",
-      "showtime": "2026-08-12T20:45:00+00:00",
-      "time": "20:45",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96563",
-      "showtime": "2026-08-12T12:00:00+00:00",
-      "time": "12:00",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96564",
-      "showtime": "2026-08-12T14:20:00+00:00",
-      "time": "14:20",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96565",
-      "showtime": "2026-08-12T16:40:00+00:00",
-      "time": "16:40",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96566",
-      "showtime": "2026-08-12T19:00:00+00:00",
-      "time": "19:00",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96567",
-      "showtime": "2026-08-12T21:20:00+00:00",
-      "time": "21:20",
-      "timeSlot": "Primetime",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016337",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96568",
-      "showtime": "2026-08-12T23:40:00+00:00",
-      "time": "23:40",
       "timeSlot": "LateNight",
       "status": "",
       "isAvailableForOffer": false,
@@ -62037,51 +60895,6 @@
       "programmingDate": "2026-08-12",
       "date": "2026-08-12",
       "code": "HO00013488",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96270",
-      "showtime": "2026-08-12T13:15:00+00:00",
-      "time": "13:15",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0105",
-      "experience": "GOLD",
-      "experienceCode": "GOLD",
-      "sessionId": "96440",
-      "showtime": "2026-08-12T13:30:00+00:00",
-      "time": "13:30",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
-      "cinemaCode": "0105",
-      "experience": "STANDARD",
-      "experienceCode": "STD",
-      "sessionId": "96215",
-      "showtime": "2026-08-12T14:00:00+00:00",
-      "time": "14:00",
-      "timeSlot": "Afternoon",
-      "status": "",
-      "isAvailableForOffer": false,
-      "comment": ""
-    },
-    {
-      "programmingDate": "2026-08-12",
-      "date": "2026-08-12",
-      "code": "HO00016339",
       "cinemaCode": "0105",
       "experience": "IMAX",
       "experienceCode": "IMX",
@@ -81133,7 +79946,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "THR",
@@ -81153,7 +79966,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "LIMAX",
@@ -81173,7 +79986,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "IMAX",
@@ -81193,7 +80006,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "MAX",
@@ -81213,7 +80026,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "PMR",
@@ -81233,7 +80046,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "GOLD",
@@ -81253,7 +80066,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "KIDS",
@@ -81273,7 +80086,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "PVT",
@@ -81293,7 +80106,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "4DX",
@@ -81313,7 +80126,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "ONYX",
@@ -81333,7 +80146,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "STD",
@@ -81353,7 +80166,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "COUCH",
@@ -81373,7 +80186,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "PRE",
@@ -81393,7 +80206,7 @@
       },
       "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     }
   ],
   "offerMedia": [
@@ -81407,7 +80220,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/fab%20no%20text_0a495d62-a4a6-4ccd-9b2e-5c96603ca6c9.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "MAWARID",
@@ -81419,7 +80232,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/Mawarid_b80cf684-eaba-4a93-b45e-2c8dfec56690.jpeg",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "NBF",
@@ -81431,7 +80244,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/NBF_1ade2931-6d94-4ec2-8e4d-c6b2ba2e2620.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "ALLUENBD",
@@ -81443,7 +80256,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/enbd_Banner_e65f9338-d37f-438a-9b52-d4d8d94fb3a0.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "PLIV",
@@ -81455,7 +80268,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/live%202_92c9156a-c645-4c70-b0dc-a7f45ca50670.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "SIB50",
@@ -81467,7 +80280,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880x440_1a7e06f2-75e9-4454-bd71-2f497205d8be.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "AAFAQEX",
@@ -81479,7 +80292,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20%20880x440%20px%20without%20text%202_89b79c64-bfea-4326-99a1-7cad2f21b885.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "HSBC",
@@ -81491,7 +80304,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/HSBC_1bba660d-31ba-4f41-8b79-1a066927cecf.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "DEEM",
@@ -81503,7 +80316,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/DEEM_baa456fe-22df-4e85-831a-af98118009d1.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "CITI",
@@ -81515,7 +80328,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "citi30",
@@ -81527,7 +80340,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/CitiBank%20VOX%20Cinema%20Banner%20880x440%20no%20text_db1628e2-8fc7-4f5f-8413-c4265cc164b9.jpg",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "SCB",
@@ -81539,7 +80352,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/STD_d91cee33-08bd-4e46-a7e2-8dfc619e4ec8.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "ARABBIN7",
@@ -81551,7 +80364,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880x440_042ba4a7-f581-4e05-a860-afbf0d71c687.jpg",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "CBD",
@@ -81563,7 +80376,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880_b5fd5190-fc4e-45bb-aea6-16ea180987e4.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "ADCB",
@@ -81575,7 +80388,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/ADCB_1715028023_457a2624-b8a8-4ea6-be8a-bf1e6923054d.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "RAK",
@@ -81587,19 +80400,19 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/RAK_7abddfb4-c0ce-4db8-8f04-96ae7981cae5.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "UAB",
       "slug": "uab",
       "name": "UAB - Buy One Get One Free",
-      "imageUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/UAB%20logo_7cc53191-f9cd-4fb4-8f15-fd4908aeb9af.png",
-      "heroUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20cinema%20uab%202_b6c597c4-b611-4ff1-a58e-d2db99aaecd5.jpg",
-      "promoUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20cinema%20uab%20no%20text_6b4f7be1-43f6-4338-a279-747521c62b80.png",
-      "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20cinema%20uab%202_bf0e46a6-4778-4d2e-a783-5b5bd88ec589.jpg",
+      "imageUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/UAB%20logo_83026721-8842-45c2-8d20-61ceeb1aa766.png",
+      "heroUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
+      "promoUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
+      "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "ARAB",
@@ -81611,7 +80424,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880x440_2d19f644-46c5-4750-8883-570792deb4bc.jpg",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "EIB",
@@ -81623,7 +80436,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/EIB_banner_1320b269-8bf6-4681-8f42-e754eebc568b.png",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "Mashreq",
@@ -81635,7 +80448,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/Mashreq-Credit-Card-VOX-Banner-880x440-B-without-text_82b17d91-5ab4-46bc-8be7-780a54d91c22.jpg",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     },
     {
       "code": "ADCBTOUCHPOINT",
@@ -81647,7 +80460,7 @@
       "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20Banner%20880x440_8c336136-d26d-42d9-ab8e-b4b2ce40a511.jpg",
       "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-      "fetchedAt": "2026-08-06T09:18:02.479Z"
+      "fetchedAt": "2026-08-03T04:55:19.042Z"
     }
   ],
   "crawl": {

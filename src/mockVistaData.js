@@ -134,7 +134,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "THEATRE": {
     "code": "THR",
@@ -154,7 +154,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "IMAX": {
     "code": "IMAX",
@@ -174,7 +174,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "MAX": {
     "code": "MAX",
@@ -194,7 +194,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "PREMIER": {
     "code": "PMR",
@@ -214,7 +214,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "GOLD": {
     "code": "GOLD",
@@ -234,7 +234,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "KIDS": {
     "code": "KIDS",
@@ -254,7 +254,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "PRIVATE_CINEMA": {
     "code": "PVT",
@@ -274,7 +274,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "4DX": {
     "code": "4DX",
@@ -294,7 +294,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "ONYX": {
     "code": "ONYX",
@@ -314,7 +314,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "STANDARD": {
     "code": "STD",
@@ -334,7 +334,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "COUCH_2_SEATER": {
     "code": "COUCH",
@@ -354,7 +354,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   "PREMIUM": {
     "code": "PRE",
@@ -374,7 +374,7 @@ export const EXPERIENCE_MEDIA = {
     },
     "sourcePageUrl": "https://uae.voxcinemas.com/ways-to-watch",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/api/Experience?region=UAE",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   }
 };
 
@@ -389,7 +389,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/fab%20no%20text_0a495d62-a4a6-4ccd-9b2e-5c96603ca6c9.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "MAWARID",
@@ -401,7 +401,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/Mawarid_b80cf684-eaba-4a93-b45e-2c8dfec56690.jpeg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "NBF",
@@ -413,7 +413,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/NBF_1ade2931-6d94-4ec2-8e4d-c6b2ba2e2620.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "ALLUENBD",
@@ -425,7 +425,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/enbd_Banner_e65f9338-d37f-438a-9b52-d4d8d94fb3a0.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "PLIV",
@@ -437,7 +437,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/live%202_92c9156a-c645-4c70-b0dc-a7f45ca50670.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "SIB50",
@@ -449,7 +449,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880x440_1a7e06f2-75e9-4454-bd71-2f497205d8be.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "AAFAQEX",
@@ -461,7 +461,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20%20880x440%20px%20without%20text%202_89b79c64-bfea-4326-99a1-7cad2f21b885.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "HSBC",
@@ -473,7 +473,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/HSBC_1bba660d-31ba-4f41-8b79-1a066927cecf.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "DEEM",
@@ -485,7 +485,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/DEEM_baa456fe-22df-4e85-831a-af98118009d1.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "CITI",
@@ -497,7 +497,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "citi30",
@@ -509,7 +509,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/CitiBank%20VOX%20Cinema%20Banner%20880x440%20no%20text_db1628e2-8fc7-4f5f-8413-c4265cc164b9.jpg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "SCB",
@@ -521,7 +521,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/STD_d91cee33-08bd-4e46-a7e2-8dfc619e4ec8.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "ARABBIN7",
@@ -533,7 +533,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880x440_042ba4a7-f581-4e05-a860-afbf0d71c687.jpg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "CBD",
@@ -545,7 +545,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880_b5fd5190-fc4e-45bb-aea6-16ea180987e4.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "ADCB",
@@ -557,7 +557,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/ADCB_1715028023_457a2624-b8a8-4ea6-be8a-bf1e6923054d.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "RAK",
@@ -569,19 +569,19 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/RAK_7abddfb4-c0ce-4db8-8f04-96ae7981cae5.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "UAB",
     "slug": "uab",
     "name": "UAB - Buy One Get One Free",
-    "imageUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/UAB%20logo_7cc53191-f9cd-4fb4-8f15-fd4908aeb9af.png",
-    "heroUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20cinema%20uab%202_b6c597c4-b611-4ff1-a58e-d2db99aaecd5.jpg",
-    "promoUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20cinema%20uab%20no%20text_6b4f7be1-43f6-4338-a279-747521c62b80.png",
-    "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20cinema%20uab%202_bf0e46a6-4778-4d2e-a783-5b5bd88ec589.jpg",
+    "imageUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/UAB%20logo_83026721-8842-45c2-8d20-61ceeb1aa766.png",
+    "heroUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
+    "promoUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
+    "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "ARAB",
@@ -593,7 +593,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/880x440_2d19f644-46c5-4750-8883-570792deb4bc.jpg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "EIB",
@@ -605,7 +605,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/EIB_banner_1320b269-8bf6-4681-8f42-e754eebc568b.png",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "Mashreq",
@@ -617,7 +617,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/Mashreq-Credit-Card-VOX-Banner-880x440-B-without-text_82b17d91-5ab4-46bc-8be7-780a54d91c22.jpg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   },
   {
     "code": "ADCBTOUCHPOINT",
@@ -629,7 +629,7 @@ export const OFFER_MEDIA = [
     "mobileUrl": "https://cdn-ent-prod-campaignassets.voxcinemas.org/VOX%20Banner%20880x440_8c336136-d26d-42d9-ab8e-b4b2ce40a511.jpg",
     "sourcePageUrl": "https://uae.voxcinemas.com/offers/bank-deals",
     "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/groups/groups/Offer/GetB2bOffer?region=UAE&type=bank",
-    "fetchedAt": "2026-08-06T09:18:02.479Z"
+    "fetchedAt": "2026-08-03T04:55:19.042Z"
   }
 ];
 
@@ -838,7 +838,7 @@ export const FILMS = [
     "Rating": "PG13",
     "Language": "English",
     "LanguageName": "English",
-    "RunTime": 100,
+    "RunTime": 145,
     "Genres": [
       "Action"
     ],
@@ -855,8 +855,8 @@ export const FILMS = [
       "largeMobile": "https://assets.voxcinemas.com/posters/P_HO00013065_1782227665332.jpg",
       "mediumMobile": "https://assets.voxcinemas.com/posters/P_HO00013065_1782227665332.jpg"
     },
-    "movieUrl": "panda-plan-the-magical-tribe",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/panda-plan-the-magical-tribe",
+    "movieUrl": "spider-man-brand-new-day",
+    "sourcePageUrl": "https://uae.voxcinemas.com/movies/spider-man-brand-new-day",
     "tint": [
       "#2E5A7A",
       "#4BA3C7"
@@ -2222,355 +2222,8 @@ export const FILMS = [
     "movieUrl": "sakr-w-canaria-arabic",
     "sourcePageUrl": "https://uae.voxcinemas.com/movies/sakr-w-canaria-arabic",
     "tint": [
-      "#6A2E7A",
-      "#B44BC7"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016191",
-    "CinemaId": "0015",
-    "Title": "Dhamaal 4",
-    "Rating": "PG13",
-    "Language": "Hindi",
-    "LanguageName": "Hindi",
-    "RunTime": 155,
-    "Genres": [
-      "Adventure",
-      "Comedy"
-    ],
-    "genre": "Adventure",
-    "Synopsis": "A new adventure, the same madness-only bigger than ever. The Dhamaal boys are back and ready to chase the “Treasure of Life,” facing crazy challenges along the way. What starts as a treasure hunt quickly turns into a rollercoster of hilarious misadventures.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/12_VOX_2_0_Poster_81bca8a282.jpg",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/12_VOX_2_0_Poster_81bca8a282.jpg",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/12_VOX_2_0_Poster_81bca8a282.jpg",
-      "medium": "https://uae.voxcinemas.com/images/12_VOX_2_0_Poster_81bca8a282.jpg",
-      "thumbnail": "https://uae.voxcinemas.com/images/12_VOX_2_0_Poster_81bca8a282.jpg",
-      "largeMobile": "https://uae.voxcinemas.com/images/12_VOX_2_0_Poster_81bca8a282.jpg",
-      "mediumMobile": "https://uae.voxcinemas.com/images/12_VOX_2_0_Poster_81bca8a282.jpg"
-    },
-    "movieUrl": "dhamaal-4-hindi",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/dhamaal-4-hindi",
-    "tint": [
-      "#7A5A2E",
-      "#C79A4B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016195",
-    "CinemaId": "0015",
-    "Title": "GDN",
-    "Rating": "PG13",
-    "Language": "Tamil",
-    "LanguageName": "Tamil",
-    "RunTime": 155,
-    "Genres": [
-      "Biographical",
-      "Drama"
-    ],
-    "genre": "Biographical",
-    "Synopsis": "GDN captures the struggles, resilience, and vision of legendary inventor G. D. Naidu as his groundbreaking innovations challenged powerful institutions in a rapidly changing India.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "medium": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "thumbnail": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "largeMobile": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "mediumMobile": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg"
-    },
-    "movieUrl": "gdn-tamil",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/gdn-tamil",
-    "tint": [
-      "#7A5A2E",
-      "#C79A4B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016375",
-    "CinemaId": "0015",
-    "Title": "Thudakkam",
-    "Rating": "PG15",
-    "Language": "Malayalam",
-    "LanguageName": "Malayalam",
-    "RunTime": 145,
-    "Genres": [
-      "Crime",
-      "Thriller"
-    ],
-    "genre": "Crime",
-    "Synopsis": "When unexpected danger enters her world, a young woman must rely on courage and determination to survive. Set against an emotionally charged backdrop, Thudakkam is a grounded thriller that explores resilience, hope, and the choices that define us.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-      "medium": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png"
-    },
-    "movieUrl": "thudakkam-malayalam",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/thudakkam-malayalam",
-    "tint": [
-      "#8D2E3A",
-      "#D9556B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016377",
-    "CinemaId": "0015",
-    "Title": "Bhai Tera Star Hai",
-    "Rating": "PG15",
-    "Language": "Hindi",
-    "LanguageName": "Hindi",
-    "RunTime": 120,
-    "Genres": [
-      "Comedy"
-    ],
-    "genre": "Comedy",
-    "Synopsis": "When a struggling actor loses £10,000 in cricket betting, he has one night to repay a dangerous gangster. But a lie about his sister's abortion triggers a chain of misunderstandings, a botched robbery, angry gangster, police involvement and total chaos across London before time runs out.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/BTSH_P3_199_5_X274_1_Poster_web_6ebf358dfb.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/BTSH_P3_199_5_X274_1_Poster_web_6ebf358dfb.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/BTSH_P3_199_5_X274_1_Poster_web_6ebf358dfb.png",
-      "medium": "https://uae.voxcinemas.com/images/BTSH_P3_199_5_X274_1_Poster_web_6ebf358dfb.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/BTSH_P3_199_5_X274_1_Poster_web_6ebf358dfb.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/BTSH_P3_199_5_X274_1_Poster_web_6ebf358dfb.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/BTSH_P3_199_5_X274_1_Poster_web_6ebf358dfb.png"
-    },
-    "movieUrl": "bhai-tera-star-hai-hindi",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/bhai-tera-star-hai-hindi",
-    "tint": [
-      "#63418D",
-      "#B6186C"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016403",
-    "CinemaId": "0015",
-    "Title": "Korean Kanararaju",
-    "Rating": "PG15",
-    "Language": "Telugu",
-    "LanguageName": "Telugu",
-    "RunTime": 160,
-    "Genres": [
-      "Comedy"
-    ],
-    "genre": "Comedy",
-    "Synopsis": "Follows a Rayalaseema youth named Kanakaraju whose life upends when a vessel from Korea brings a spirit that possesses him, transforming him into Korean Kanakaraju.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/Korean_70x100_1_1_Poster_web_83ba489e67.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/Korean_70x100_1_1_Poster_web_83ba489e67.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/Korean_70x100_1_1_Poster_web_83ba489e67.png",
-      "medium": "https://uae.voxcinemas.com/images/Korean_70x100_1_1_Poster_web_83ba489e67.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/Korean_70x100_1_1_Poster_web_83ba489e67.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/Korean_70x100_1_1_Poster_web_83ba489e67.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/Korean_70x100_1_1_Poster_web_83ba489e67.png"
-    },
-    "movieUrl": "korean-kanararaju-telugu",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/korean-kanararaju-telugu",
-    "tint": [
-      "#7A5A2E",
-      "#C79A4B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016406",
-    "CinemaId": "0015",
-    "Title": "Unmadham",
-    "Rating": "PG15",
-    "Language": "Malayalam",
-    "LanguageName": "Malayalam",
-    "RunTime": 150,
-    "Genres": [
-      "Crime"
-    ],
-    "genre": "Crime",
-    "Synopsis": "A police constable burdened by his past is drawn into a long-forgotten case that was never truly solved. As he digs deeper, hidden secrets and unsettling revelations begin to surface, forcing him to confront uncomfortable truths that challenge his beliefs and change his life forever.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/Unmadham_poster_1_450a1113f6.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/Unmadham_poster_1_450a1113f6.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/Unmadham_poster_1_450a1113f6.png",
-      "medium": "https://uae.voxcinemas.com/images/Unmadham_poster_1_450a1113f6.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/Unmadham_poster_1_450a1113f6.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/Unmadham_poster_1_450a1113f6.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/Unmadham_poster_1_450a1113f6.png"
-    },
-    "movieUrl": "unmadham-malayalam",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/unmadham-malayalam",
-    "tint": [
-      "#6A2E7A",
-      "#B44BC7"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016416",
-    "CinemaId": "0015",
-    "Title": "Srinivasa Mangapuram",
-    "Rating": "PG15",
-    "Language": "Telugu",
-    "LanguageName": "Telugu",
-    "RunTime": 160,
-    "Genres": [
-      "Action",
-      "Drama",
-      "Romance"
-    ],
-    "genre": "Action",
-    "Synopsis": "Vasu Babu and Manga are carefree young lovers whose romance faces sudden danger. When adversity threatens to separate them, \r\nVasu Babu fights with fierce determination to protect his beloved at any cost.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/SM_1_1_f3457f2e8d.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/SM_1_1_f3457f2e8d.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/SM_1_1_f3457f2e8d.png",
-      "medium": "https://uae.voxcinemas.com/images/SM_1_1_f3457f2e8d.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/SM_1_1_f3457f2e8d.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/SM_1_1_f3457f2e8d.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/SM_1_1_f3457f2e8d.png"
-    },
-    "movieUrl": "srinivasa-mangapuram-telugu",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/srinivasa-mangapuram-telugu",
-    "tint": [
-      "#6A2E7A",
-      "#B44BC7"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016418",
-    "CinemaId": "0015",
-    "Title": "DC",
-    "Rating": "18+",
-    "Language": "Tamil",
-    "LanguageName": "Tamil",
-    "RunTime": 155,
-    "Genres": [
-      "Action",
-      "Drama"
-    ],
-    "genre": "Action",
-    "Synopsis": "Rebel Devadas is drawn into a ruthless world where power is forged through violence and survival comes at a deadly price. When fate unites him with the fearless Chandra, they are forced into a dangerous alliance against powerful adversaries and unforgiving circumstances. As betrayal, vengeance, and sacrifice shape their journey, every step tests their courage and loyalty. With enemies closing in and the stakes rising, Devadas must embrace his destiny in a battle where only the strongest will survive.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-      "medium": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png"
-    },
-    "movieUrl": "dc-tamil",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/dc-tamil",
-    "tint": [
-      "#8D2E3A",
-      "#D9556B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00015860",
-    "CinemaId": "0017",
-    "Title": "Spider-Man: Brand New Day",
-    "Rating": "PG13",
-    "Language": "English",
-    "LanguageName": "English",
-    "RunTime": 145,
-    "Genres": [
-      "Action",
-      "Adventure"
-    ],
-    "genre": "Action",
-    "Synopsis": "After the record-breaking global success of Spider-Man: No Way Home, Spider-Man: Brand New Day marks an entirely new chapter for Peter Parker and Spider-Man. Four years have passed since the events of No Way Home, and Peter is now an adult living entirely alone, having voluntarily erased himself from the lives and memories of those he loves. Crime-fighting in a New York that no longer knows his name, he's devoted himself entirely to protecting his city - a full-time Spider-Man - but as the demands on him intensify, the pressure sparks a surprising physical evolution that threatens his existence, even as a strange new pattern of crimes gives rise to one of the most powerful threats he has ever faced.",
-    "Subtitles": [
-      "Arabic"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-      "medium": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png"
-    },
-    "movieUrl": "spider-man-brand-new-day",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/spider-man-brand-new-day",
-    "tint": [
-      "#8D2E3A",
-      "#D9556B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016195",
-    "CinemaId": "0017",
-    "Title": "GDN",
-    "Rating": "PG13",
-    "Language": "Tamil",
-    "LanguageName": "Tamil",
-    "RunTime": 155,
-    "Genres": [
-      "Biographical",
-      "Drama"
-    ],
-    "genre": "Biographical",
-    "Synopsis": "GDN captures the struggles, resilience, and vision of legendary inventor G. D. Naidu as his groundbreaking innovations challenged powerful institutions in a rapidly changing India.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "medium": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "thumbnail": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "largeMobile": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "mediumMobile": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg"
-    },
-    "movieUrl": "gdn-tamil",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/gdn-tamil",
-    "tint": [
-      "#7A5A2E",
-      "#C79A4B"
+      "#2E6A5A",
+      "#57C79A"
     ]
   },
   {
@@ -6568,414 +6221,8 @@ export const FILMS = [
     "movieUrl": "iron-maiden-burning-ambition",
     "sourcePageUrl": "https://uae.voxcinemas.com/movies/iron-maiden-burning-ambition",
     "tint": [
-      "#8D2E3A",
-      "#D9556B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00015724",
-    "CinemaId": "0057",
-    "Title": "Minions & Monsters",
-    "Rating": "PG",
-    "Language": "English",
-    "LanguageName": "English",
-    "RunTime": 90,
-    "Genres": [
-      "Animation"
-    ],
-    "genre": "Animation",
-    "Synopsis": "This is the rambunctious, ridiculous and totally true story of how the Minions conquered Hollywood, became movie stars, lost everything, unleashed monsters onto the world and then banded together to try and save the planet from the mayhem they had just created.",
-    "Subtitles": [
-      "Arabic"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/Minions_Monsters_eb517fb45b.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/Minions_Monsters_eb517fb45b.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/Minions_Monsters_eb517fb45b.png",
-      "medium": "https://uae.voxcinemas.com/images/Minions_Monsters_eb517fb45b.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/Minions_Monsters_eb517fb45b.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/Minions_Monsters_eb517fb45b.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/Minions_Monsters_eb517fb45b.png"
-    },
-    "movieUrl": "minions--monsters",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/minions--monsters",
-    "tint": [
-      "#7A2E2E",
-      "#C74B4B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00015756",
-    "CinemaId": "0057",
-    "Title": "Toy Story 5",
-    "Rating": "PG",
-    "Language": "English",
-    "LanguageName": "English",
-    "RunTime": 100,
-    "Genres": [
-      "Animation",
-      "Adventure",
-      "Comedy"
-    ],
-    "genre": "Animation",
-    "Synopsis": "Woody, Buzz, Jessie and the rest of the gang's jobs are challenged when they're introduced to electronics, a new threat to playtime.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/TOY_STORY_5_OFFICIAL_POSTER_3_ebb24bae88.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/TOY_STORY_5_OFFICIAL_POSTER_3_ebb24bae88.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/TOY_STORY_5_OFFICIAL_POSTER_3_ebb24bae88.png",
-      "medium": "https://uae.voxcinemas.com/images/TOY_STORY_5_OFFICIAL_POSTER_3_ebb24bae88.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/TOY_STORY_5_OFFICIAL_POSTER_3_ebb24bae88.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/TOY_STORY_5_OFFICIAL_POSTER_3_ebb24bae88.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/TOY_STORY_5_OFFICIAL_POSTER_3_ebb24bae88.png"
-    },
-    "movieUrl": "toy-story-5",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/toy-story-5",
-    "tint": [
-      "#8D2E3A",
-      "#D9556B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00015765",
-    "CinemaId": "0057",
-    "Title": "El Gawahergy",
-    "Rating": "15+",
-    "Language": "Arabic",
-    "LanguageName": "Arabic",
-    "RunTime": 110,
-    "Genres": [
-      "Comedy"
-    ],
-    "genre": "Comedy",
-    "Synopsis": "A jeweler gets into many troubles and embarrassing situations because of his wife, resulting into many comedic situations.",
-    "Subtitles": [],
-    "posterUrl": "https://uae.voxcinemas.com/images/El_Gawahergy_Poster_228x367_27e5eec274.jpg",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/El_Gawahergy_Poster_228x367_27e5eec274.jpg",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/El_Gawahergy_Poster_228x367_27e5eec274.jpg",
-      "medium": "https://uae.voxcinemas.com/images/El_Gawahergy_Poster_228x367_27e5eec274.jpg",
-      "thumbnail": "https://uae.voxcinemas.com/images/El_Gawahergy_Poster_228x367_27e5eec274.jpg",
-      "largeMobile": "https://uae.voxcinemas.com/images/El_Gawahergy_Poster_228x367_27e5eec274.jpg",
-      "mediumMobile": "https://uae.voxcinemas.com/images/El_Gawahergy_Poster_228x367_27e5eec274.jpg"
-    },
-    "movieUrl": "el-gawahergy-arabic",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/el-gawahergy-arabic",
-    "tint": [
-      "#7A2E2E",
-      "#C74B4B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00015858",
-    "CinemaId": "0057",
-    "Title": "Moana",
-    "Rating": "PG",
-    "Language": "English",
-    "LanguageName": "English",
-    "RunTime": 115,
-    "Genres": [
-      "Action",
-      "Comedy",
-      "Adventure"
-    ],
-    "genre": "Action",
-    "Synopsis": "Live-action adaptation of the 2016 Disney animated film 'Moana'.",
-    "Subtitles": [
-      "Arabic"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/Moana_LA_Insta_Post_1080_x_1350_2_a61c268e39.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/Moana_LA_Insta_Post_1080_x_1350_2_a61c268e39.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/Moana_LA_Insta_Post_1080_x_1350_2_a61c268e39.png",
-      "medium": "https://uae.voxcinemas.com/images/Moana_LA_Insta_Post_1080_x_1350_2_a61c268e39.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/Moana_LA_Insta_Post_1080_x_1350_2_a61c268e39.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/Moana_LA_Insta_Post_1080_x_1350_2_a61c268e39.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/Moana_LA_Insta_Post_1080_x_1350_2_a61c268e39.png"
-    },
-    "movieUrl": "moana",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/moana",
-    "tint": [
-      "#6A2E7A",
-      "#B44BC7"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00015860",
-    "CinemaId": "0057",
-    "Title": "Spider-Man: Brand New Day",
-    "Rating": "PG13",
-    "Language": "English",
-    "LanguageName": "English",
-    "RunTime": 145,
-    "Genres": [
-      "Action",
-      "Adventure"
-    ],
-    "genre": "Action",
-    "Synopsis": "After the record-breaking global success of Spider-Man: No Way Home, Spider-Man: Brand New Day marks an entirely new chapter for Peter Parker and Spider-Man. Four years have passed since the events of No Way Home, and Peter is now an adult living entirely alone, having voluntarily erased himself from the lives and memories of those he loves. Crime-fighting in a New York that no longer knows his name, he's devoted himself entirely to protecting his city - a full-time Spider-Man - but as the demands on him intensify, the pressure sparks a surprising physical evolution that threatens his existence, even as a strange new pattern of crimes gives rise to one of the most powerful threats he has ever faced.",
-    "Subtitles": [
-      "Arabic"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-      "medium": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/SMBND_INTL_Online_1080x1350_Dive_02_1_107dc8b6a5.png"
-    },
-    "movieUrl": "spider-man-brand-new-day",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/spider-man-brand-new-day",
-    "tint": [
-      "#8D2E3A",
-      "#D9556B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016180",
-    "CinemaId": "0057",
-    "Title": "Ice Cream Man",
-    "Rating": "18+",
-    "Language": "English",
-    "LanguageName": "English",
-    "RunTime": 90,
-    "Genres": [
-      "Horror",
-      "Thriller"
-    ],
-    "genre": "Horror",
-    "Synopsis": "Ice Cream-Man- An idyllic summer town descends into madness when an ice cream man serves kids sweet delights with horrifying results.",
-    "Subtitles": [
-      "Arabic"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-      "medium": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/Icecream_Man_1080x1350_1_9c5f17bb0e.png"
-    },
-    "movieUrl": "ice-cream-man",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/ice-cream-man",
-    "tint": [
-      "#7A5A2E",
-      "#C79A4B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016195",
-    "CinemaId": "0057",
-    "Title": "GDN",
-    "Rating": "PG13",
-    "Language": "Tamil",
-    "LanguageName": "Tamil",
-    "RunTime": 155,
-    "Genres": [
-      "Biographical",
-      "Drama"
-    ],
-    "genre": "Biographical",
-    "Synopsis": "GDN captures the struggles, resilience, and vision of legendary inventor G. D. Naidu as his groundbreaking innovations challenged powerful institutions in a rapidly changing India.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "medium": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "thumbnail": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "largeMobile": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg",
-      "mediumMobile": "https://uae.voxcinemas.com/images/1_VOX_2_0_Poster_4d04d0e17b.jpg"
-    },
-    "movieUrl": "gdn-tamil",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/gdn-tamil",
-    "tint": [
-      "#7A5A2E",
-      "#C79A4B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016337",
-    "CinemaId": "0057",
-    "Title": "Khali Balak Min Nafsik",
-    "Rating": "PG15",
-    "Language": "Arabic",
-    "LanguageName": "Arabic",
-    "RunTime": 105,
-    "Genres": [
-      "Comedy"
-    ],
-    "genre": "Comedy",
-    "Synopsis": "The story revolves around a couple who face numerous recurring disagreements and problems, leading them to a series of humorous and unexpected situations.",
-    "Subtitles": [],
-    "posterUrl": "https://uae.voxcinemas.com/images/couple_poster_TIKTOK_1_07d244e592.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/couple_poster_TIKTOK_1_07d244e592.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/couple_poster_TIKTOK_1_07d244e592.png",
-      "medium": "https://uae.voxcinemas.com/images/couple_poster_TIKTOK_1_07d244e592.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/couple_poster_TIKTOK_1_07d244e592.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/couple_poster_TIKTOK_1_07d244e592.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/couple_poster_TIKTOK_1_07d244e592.png"
-    },
-    "movieUrl": "khali-balak-min-nafsik-arabic",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/khali-balak-min-nafsik-arabic",
-    "tint": [
-      "#8D2E3A",
-      "#D9556B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016339",
-    "CinemaId": "0057",
-    "Title": "The Odyssey",
-    "Rating": "15+",
-    "Language": "English",
-    "LanguageName": "English",
-    "RunTime": 175,
-    "Genres": [
-      "Adventure"
-    ],
-    "genre": "Adventure",
-    "Synopsis": "The Odyssey - In Cinemas 16.07.26 Christopher Nolan’s next film, The Odyssey, is a mythic action epic shot across the world using brand new IMAX® film technology. The film brings Homer’s foundational saga to IMAX® film screens for the first time and opens in cinemas everywhere on July 16, 2026. The Odyssey stars Matt Damon, Tom Holland, Anne Hathaway, Robert Pattinson and Lupita Nyong’o, with Zendaya and Charlize Theron. The Odyssey is produced by Emma Thomas and Christopher Nolan for their company, Syncopy. The executive producer is Thomas Hayslip.",
-    "Subtitles": [
-      "Arabic"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/4x5_ODY_crt_Optimised_Poster_crn_Horse_siz_1080x1350_cta_17_Release_Date_cou_OV_Eng_des_5f09af54f3.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/4x5_ODY_crt_Optimised_Poster_crn_Horse_siz_1080x1350_cta_17_Release_Date_cou_OV_Eng_des_5f09af54f3.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/4x5_ODY_crt_Optimised_Poster_crn_Horse_siz_1080x1350_cta_17_Release_Date_cou_OV_Eng_des_5f09af54f3.png",
-      "medium": "https://uae.voxcinemas.com/images/4x5_ODY_crt_Optimised_Poster_crn_Horse_siz_1080x1350_cta_17_Release_Date_cou_OV_Eng_des_5f09af54f3.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/4x5_ODY_crt_Optimised_Poster_crn_Horse_siz_1080x1350_cta_17_Release_Date_cou_OV_Eng_des_5f09af54f3.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/4x5_ODY_crt_Optimised_Poster_crn_Horse_siz_1080x1350_cta_17_Release_Date_cou_OV_Eng_des_5f09af54f3.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/4x5_ODY_crt_Optimised_Poster_crn_Horse_siz_1080x1350_cta_17_Release_Date_cou_OV_Eng_des_5f09af54f3.png"
-    },
-    "movieUrl": "the-odyssey",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/the-odyssey",
-    "tint": [
-      "#2E5A7A",
-      "#4BA3C7"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016375",
-    "CinemaId": "0057",
-    "Title": "Thudakkam",
-    "Rating": "PG15",
-    "Language": "Malayalam",
-    "LanguageName": "Malayalam",
-    "RunTime": 145,
-    "Genres": [
-      "Crime",
-      "Thriller"
-    ],
-    "genre": "Crime",
-    "Synopsis": "When unexpected danger enters her world, a young woman must rely on courage and determination to survive. Set against an emotionally charged backdrop, Thudakkam is a grounded thriller that explores resilience, hope, and the choices that define us.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-      "medium": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/Thudakkam_Poster_web_7416693d7b.png"
-    },
-    "movieUrl": "thudakkam-malayalam",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/thudakkam-malayalam",
-    "tint": [
-      "#8D2E3A",
-      "#D9556B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016381",
-    "CinemaId": "0057",
-    "Title": "Panda Plan: The Magical Tribe",
-    "Rating": "PG13",
-    "Language": "English",
-    "LanguageName": "English",
-    "RunTime": 100,
-    "Genres": [
-      "Family",
-      "Adventure"
-    ],
-    "genre": "Family",
-    "Synopsis": "Giant Panda Hu Hu and Jackie Chan accidentally stumble into a mysterious primitive tribe, beginning an unprecedented and hilarious adventure.",
-    "Subtitles": [
-      "Arabic"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/Panda_Plan_The_Magical_Tribe_Poster_web_df32173812.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/Panda_Plan_The_Magical_Tribe_Poster_web_df32173812.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/Panda_Plan_The_Magical_Tribe_Poster_web_df32173812.png",
-      "medium": "https://uae.voxcinemas.com/images/Panda_Plan_The_Magical_Tribe_Poster_web_df32173812.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/Panda_Plan_The_Magical_Tribe_Poster_web_df32173812.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/Panda_Plan_The_Magical_Tribe_Poster_web_df32173812.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/Panda_Plan_The_Magical_Tribe_Poster_web_df32173812.png"
-    },
-    "movieUrl": "panda-plan-the-magical-tribe",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/panda-plan-the-magical-tribe",
-    "tint": [
-      "#7A2E2E",
-      "#C74B4B"
-    ]
-  },
-  {
-    "ScheduledFilmId": "HO00016418",
-    "CinemaId": "0057",
-    "Title": "DC",
-    "Rating": "18+",
-    "Language": "Tamil",
-    "LanguageName": "Tamil",
-    "RunTime": 155,
-    "Genres": [
-      "Action",
-      "Drama"
-    ],
-    "genre": "Action",
-    "Synopsis": "Rebel Devadas is drawn into a ruthless world where power is forged through violence and survival comes at a deadly price. When fate unites him with the fearless Chandra, they are forced into a dangerous alliance against powerful adversaries and unforgiving circumstances. As betrayal, vengeance, and sacrifice shape their journey, every step tests their courage and loyalty. With enemies closing in and the stakes rising, Devadas must embrace his destiny in a battle where only the strongest will survive.",
-    "Subtitles": [
-      "Arabic",
-      "English"
-    ],
-    "posterUrl": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-    "PosterStatus": "official",
-    "backdropUrl": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-    "images": {
-      "large": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-      "medium": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-      "thumbnail": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-      "largeMobile": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png",
-      "mediumMobile": "https://uae.voxcinemas.com/images/LQ_Van_Couple_Album_Art_1_03fe94a48d.png"
-    },
-    "movieUrl": "dc-tamil",
-    "sourcePageUrl": "https://uae.voxcinemas.com/movies/dc-tamil",
-    "tint": [
-      "#8D2E3A",
-      "#D9556B"
+      "#3A3A8D",
+      "#6B6BD9"
     ]
   },
   {
@@ -8196,8 +7443,7 @@ export const FILMS = [
     "LanguageName": "Malayalam",
     "RunTime": 145,
     "Genres": [
-      "Crime",
-      "Thriller"
+      "Crime"
     ],
     "genre": "Crime",
     "Synopsis": "When unexpected danger enters her world, a young woman must rely on courage and determination to survive. Set against an emotionally charged backdrop, Thudakkam is a grounded thriller that explores resilience, hope, and the choices that define us.",
@@ -8215,8 +7461,8 @@ export const FILMS = [
     "movieUrl": "thudakkam-malayalam",
     "sourcePageUrl": "https://uae.voxcinemas.com/movies/thudakkam-malayalam",
     "tint": [
-      "#8D2E3A",
-      "#D9556B"
+      "#6A2E7A",
+      "#B44BC7"
     ]
   },
   {
