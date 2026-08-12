@@ -489,9 +489,13 @@ function distinctiveMovieTitleTokens(value) {
 function partialMovieReferences(movies, text) {
   const query = normalizedMovieReferenceText(text);
   if (!query) return [];
+  const queryTokens = movieInformationQuestionTokens(query);
+  if (!queryTokens.length) return [];
   const entries = movies.map((movie) => {
     const title = normalizedMovieReferenceText(movie.title);
-    const matched = distinctiveMovieTitleTokens(title).filter((token) => ` ${query} `.includes(` ${token} `));
+    const matched = distinctiveMovieTitleTokens(title).filter((token) => queryTokens.some((queryToken) => (
+      queryToken.length >= 3 && token.startsWith(queryToken)
+    )));
     return {
       movie,
       title,
@@ -568,9 +572,9 @@ export function resolveMovieForInformationQuestion(options = {}) {
   addMovies([
     ...(Array.isArray(stage?.movies) ? stage.movies : []),
     ...(Array.isArray(input.visibleMovies) ? input.visibleMovies : []),
-    ...(Array.isArray(input.movies) ? input.movies : []),
   ], "visible");
   addMovies([pausedMovie, ...pausedStageMovies(input.pausedStage), ...pausedStageMovies(input.pausedJourney)], "paused");
+  addMovies(Array.isArray(input.movies) ? input.movies : [], "catalog");
   const movies = entries.map((entry) => entry.movie);
   const resultForMovie = (movie) => {
     const entry = entries.find((candidate) => {
@@ -589,8 +593,14 @@ export function resolveMovieForInformationQuestion(options = {}) {
 
   const fromQuestion = fuzzyMovieFromQuestion(movies, text, { informationQuestion: true });
   if (fromQuestion) return resultForMovie(fromQuestion);
-  // Partial catalog grounding is a separate pre-routing layer. The protected
-  // fuzzy resolver above remains unchanged.
+  const contextualPartialCandidates = partialMovieReferences(
+    entries.filter((entry) => entry.source !== "catalog").map((entry) => entry.movie),
+    text,
+  ).map((entry) => entry.movie);
+  if (contextualPartialCandidates.length === 1) return resultForMovie(contextualPartialCandidates[0]);
+  if (contextualPartialCandidates.length > 1) {
+    return Object.freeze({ movie: null, source: null, ambiguous: true, candidates: contextualPartialCandidates });
+  }
   const partialCandidates = partialMovieReferences(movies, text).map((entry) => entry.movie);
   if (partialCandidates.length === 1) return resultForMovie(partialCandidates[0]);
   if (partialCandidates.length > 1) {

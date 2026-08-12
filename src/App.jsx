@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useReducer, useRef, useState } from "rea
 import { BadgePercent, History, MapPin, Mic, MicOff, RotateCcw, Send, Sparkles } from "lucide-react";
 import { C } from "./theme.js";
 import { BookingCard, CinemaPicker, MovieGrid, SeatMap, Showtimes } from "./components/RichMedia.jsx";
+import JourneyFeedback from "./components/JourneyFeedback.jsx";
 import RetryableLazy from "./components/RetryableLazy.jsx";
 import { appendBooking, BOOKING_STORAGE_KEY, clearBookings, findBooking, readBookings } from "./bookingStore.js";
 import { DEMO_CARD_STORAGE_KEY, DEVICE_SESSION_EPOCH_KEY } from "./checkoutSafety.js";
@@ -219,7 +220,8 @@ const localizedOfferReason = (result, locale) => {
   return "لا تتحقق جميع شروط العرض في السياق المحدد؛ راجع الشروط أو أكد الأهلية فقط عند إتمام الحجز عبر موقع VOX الرسمي أو تطبيقه.";
 };
 
-const CONVERSATION_IDLE_MS = 15 * 60 * 1000;
+const CONVERSATION_RESPONSE_PROMPT_MS = 90 * 1000;
+const CONVERSATION_RESPONSE_GRACE_MS = 90 * 1000;
 const MAX_TICKETS = 10;
 const VISIBLE_TRANSCRIPT_MESSAGES = 8;
 const RICH_STAGE_TRANSCRIPT_MESSAGES = 4;
@@ -1357,6 +1359,7 @@ export default function App() {
   const [transportEnabled, setTransportEnabled] = useState(false);
   const [transportStatus, setTransportStatus] = useState("disconnected");
   const [cancellationState, setCancellationState] = useState(IDLE_CANCELLATION_STATE);
+  const [conversationFeedback, setConversationFeedback] = useState(null);
   const deviceSessionEpochRef = useRef(undefined);
   if (deviceSessionEpochRef.current === undefined) deviceSessionEpochRef.current = initializeDeviceSessionEpoch();
 
@@ -1434,6 +1437,8 @@ export default function App() {
   const transportConversationIdRef = useRef(null);
   const journeyRef = useRef(journey);
   const lastActivityRef = useRef(Date.now());
+  const lastCustomerInputRef = useRef(Date.now());
+  const idlePromptedAtRef = useRef(null);
   const sessionModeRef = useRef(null);
   const requestedSessionModeRef = useRef(null);
   const sessionStartRef = useRef(null);
@@ -1460,6 +1465,12 @@ export default function App() {
   const disconnectReasonRef = useRef("ended");
   const suppressDisconnectNoticeRef = useRef(false);
   const requestEpochRef = useRef(0);
+
+  const markCustomerActivity = useCallback(() => {
+    lastCustomerInputRef.current = Date.now();
+    idlePromptedAtRef.current = null;
+    setConversationFeedback(null);
+  }, []);
 
   const preserveJourneyForReleaseReload = useCallback(() => {
     // A release reload cannot safely resume an authorization-like review click
@@ -1522,6 +1533,7 @@ export default function App() {
   }, [historyFilter, seatQuote]);
 
   const beginDirectUiUserTurn = () => {
+    markCustomerActivity();
     userTurnSequenceRef.current += 1;
     pendingVoiceDiscoveryTurnRef.current = null;
   };
@@ -1717,6 +1729,7 @@ export default function App() {
     const at = new Date().toISOString();
     const customerSafeText = role === "user" ? text : normalizeCustomerFacingText(text);
     const message = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`, role, text: customerSafeText, at };
+    if (role === "user") markCustomerActivity();
     lastActivityRef.current = Date.now();
     setMessages((current) => {
       const next = [...current, message];
@@ -1724,7 +1737,7 @@ export default function App() {
       return next;
     });
     return message;
-  }, []);
+  }, [markCustomerActivity]);
 
   const updateIntentFromText = useCallback((text) => {
     const intent = inferIntent({ view: stageRef.current?.view, text, previousIntent: journeyRef.current.intent });
@@ -1971,6 +1984,11 @@ export default function App() {
     stageRevisionRef.current += 1;
     stageRef.current = next;
     stageVisibleRef.current = true;
+    const nextContextMovie = next?.movie
+      || (next?.order?.movieTitle ? { id: next.order.movieId || null, title: next.order.movieTitle, rating: next.order.movieRating || null } : null)
+      || (next?.booking?.movieTitle ? { id: next.booking.movieId || null, title: next.booking.movieTitle, rating: next.booking.movieRating || null } : null)
+      || (next?.view === "movies" && next.movies?.length === 1 ? next.movies[0] : null);
+    if (nextContextMovie?.title) movieInformationMovieRef.current = nextContextMovie;
     lastActivityRef.current = Date.now();
     setStage(next);
     setStageVisible(true);
@@ -3123,9 +3141,14 @@ export default function App() {
       : retainedStage?.view === "movies" && Array.isArray(retainedStage.movies)
         ? retainedStage.movies
         : [];
+    const rememberedMovie = movieInformationMovieRef.current;
+    const rememberedMovieIsRelevant = rememberedMovie && (
+      !visibleMovies.length
+      || visibleMovies.some((movie) => String(movie?.id || movie?.title) === String(rememberedMovie?.id || rememberedMovie?.title))
+    );
     const currentMovie = contextualMovie
-      || (visibleMovies.length ? null : movieInformationMovieRef.current)
-      || null;
+      || (rememberedMovieIsRelevant ? rememberedMovie : null)
+      || (visibleMovies.length === 1 ? visibleMovies[0] : null);
     const sessions = current.movie && currentMovie && String(current.movie.id) === String(currentMovie.id)
       ? (Array.isArray(current.sessions) ? current.sessions : sessionsRef.current)
       : retainedStage?.movie && currentMovie && String(retainedStage.movie.id) === String(currentMovie.id)
@@ -5874,6 +5897,9 @@ export default function App() {
     userTurnSequenceRef.current += 1;
     requestEpochRef.current += 1;
     lastActivityRef.current = Date.now();
+    lastCustomerInputRef.current = Date.now();
+    idlePromptedAtRef.current = null;
+    if (!["conversation_ended", "timeout"].includes(reason)) setConversationFeedback(null);
     cancellationReconciliationRequired();
     return true;
   }, []);
@@ -5980,8 +6006,12 @@ export default function App() {
           conversation.sendContextualUpdate?.("The guest explicitly ended the conversation. The widget cleared the active journey. Do not continue booking or cancellation and do not claim that any stored booking record was cancelled.");
           const closingGeneration = transportGenerationRef.current;
           const closingTransport = transportRef.current;
+          const endedConversationId = conversationIdRef.current;
           const cleared = clearConversationState("conversation_ended");
-          if (cleared) say("system", localeRef.current === "ar" ? "انتهت المحادثة وتم مسح رحلة الحجز النشطة." : "The conversation ended and the active booking journey was cleared.");
+          if (cleared) {
+            say("system", localeRef.current === "ar" ? "انتهت المحادثة وتم مسح رحلة الحجز النشطة." : "The conversation ended and the active booking journey was cleared.");
+            setConversationFeedback({ journeyId: endedConversationId, outcome: "conversation" });
+          }
           const operationEpoch = sessionEpochRef.current;
           const transitionOwner = beginOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
           suppressDisconnectNoticeRef.current = true;
@@ -6686,17 +6716,28 @@ export default function App() {
   useEffect(() => {
     const interval = window.setInterval(() => {
       const hasTransientState = messagesRef.current.length > 0 || stageRef.current.view !== "empty" || Boolean(sessionModeRef.current);
-      if (!hasTransientState || Date.now() - lastActivityRef.current < CONVERSATION_IDLE_MS) return;
+      if (!hasTransientState || conversationFeedback) return;
+      const now = Date.now();
+      if (!idlePromptedAtRef.current) {
+        if (now - lastCustomerInputRef.current < CONVERSATION_RESPONSE_PROMPT_MS) return;
+        idlePromptedAtRef.current = now;
+        say("agent", t("app.inactivityPrompt"));
+        return;
+      }
+      if (now - idlePromptedAtRef.current < CONVERSATION_RESPONSE_GRACE_MS) return;
       if (idleTimeoutOperationRef.current) return;
       if (checkoutPaymentActiveRef.current || activeCancellationMutation() || switchingSessionRef.current || sessionStartRef.current) {
+        lastCustomerInputRef.current = now;
+        idlePromptedAtRef.current = null;
         lastActivityRef.current = Date.now();
         return;
       }
+      const endedConversationId = conversationIdRef.current;
       sessionEpochRef.current += 1;
       const invalidatedEpoch = sessionEpochRef.current;
       const closingGeneration = transportGenerationRef.current;
       const closingTransport = transportRef.current;
-      const timeoutOperation = { epoch: invalidatedEpoch, promise: null, noticeSent: false, stateCleared: false };
+      const timeoutOperation = { epoch: invalidatedEpoch, promise: null, noticeSent: false, feedbackShown: false, stateCleared: false };
       idleTimeoutOperationRef.current = timeoutOperation;
       disconnectReasonRef.current = "timeout";
       suppressDisconnectNoticeRef.current = true;
@@ -6710,6 +6751,10 @@ export default function App() {
       if (timeoutOperation.stateCleared && !timeoutOperation.noticeSent) {
         timeoutOperation.noticeSent = true;
         say("system", t("app.timeoutMessage"));
+      }
+      if (timeoutOperation.stateCleared && !timeoutOperation.feedbackShown) {
+        timeoutOperation.feedbackShown = true;
+        setConversationFeedback({ journeyId: endedConversationId, outcome: "inactivity" });
       }
       suppressDisconnectNoticeRef.current = false;
       disconnectReasonRef.current = "ended";
@@ -6733,13 +6778,17 @@ export default function App() {
               timeoutOperation.noticeSent = true;
               say("system", t("app.timeoutMessage"));
             }
+            if (timeoutOperation.stateCleared && !timeoutOperation.feedbackShown) {
+              timeoutOperation.feedbackShown = true;
+              setConversationFeedback({ journeyId: endedConversationId, outcome: "inactivity" });
+            }
           }
           if (ownsOperation) idleTimeoutOperationRef.current = null;
         }
       })();
-    }, 30_000);
+    }, 5_000);
     return () => window.clearInterval(interval);
-  }, [clearConversationState, retireTransportGeneration, say, t]);
+  }, [clearConversationState, conversationFeedback, retireTransportGeneration, say, t]);
 
   const startTransportWithGuards = useCallback(async (options, epoch, timeoutMs) => {
     const generation = transportGenerationRef.current;
@@ -7220,8 +7269,12 @@ export default function App() {
       conversation.sendContextualUpdate?.("The guest explicitly ended the conversation. The widget is clearing the active journey. Do not continue booking or cancellation and do not claim an existing booking record was cancelled.");
       const closingGeneration = transportGenerationRef.current;
       const closingTransport = transportRef.current;
+      const endedConversationId = conversationIdRef.current;
       const cleared = clearConversationState("conversation_ended");
-      if (cleared) say("system", localeRef.current === "ar" ? "انتهت المحادثة وتم مسح رحلة الحجز النشطة." : "The conversation ended and the active booking journey was cleared.");
+      if (cleared) {
+        say("system", localeRef.current === "ar" ? "انتهت المحادثة وتم مسح رحلة الحجز النشطة." : "The conversation ended and the active booking journey was cleared.");
+        setConversationFeedback({ journeyId: endedConversationId, outcome: "conversation" });
+      }
       if (closingTransport) {
         suppressDisconnectNoticeRef.current = true;
         const transitionOwner = beginOwnedSessionSwitch({ ownerRef: switchingSessionOwnerRef, switchingRef: switchingSessionRef });
@@ -8991,7 +9044,10 @@ export default function App() {
               ))}
             </div>
           )}
-          {visibleStageView === "empty" && (!messages.length || messages.every((message) => message.role === "system")) && (
+          {conversationFeedback && (
+            <JourneyFeedback bookingRef={conversationFeedback.journeyId} outcome={conversationFeedback.outcome} />
+          )}
+          {visibleStageView === "empty" && !conversationFeedback && (!messages.length || messages.every((message) => message.role === "system")) && (
             <div style={{ display: "flex", height: "100%", minHeight: 240, flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
               <div style={{ display: "flex", height: 56, width: 56, alignItems: "center", justifyContent: "center", borderRadius: 16, background: C.primarySoft, marginBottom: 16 }}><Sparkles color={C.brand} size={26} /></div>
               <div style={{ fontSize: 17, fontWeight: 700, color: C.text }}>{t("app.emptyTitle")}</div>
@@ -9102,7 +9158,7 @@ export default function App() {
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}`, padding: 12 }}>
             <button onClick={isConnected && sessionMode === "voice" ? endVoiceSession : startVoiceSession} disabled={startingMode === "voice"} title={isConnected && sessionMode === "voice" ? t("app.endVoice") : t("app.enableVoice")} aria-label={isConnected && sessionMode === "voice" ? t("app.endVoice") : t("app.enableVoice")} style={{ display: "flex", height: 40, width: 40, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 999, border: "none", cursor: startingMode === "voice" ? "progress" : "pointer", color: C.onPrimary, opacity: startingMode === "voice" ? 0.65 : 1, background: isConnected && sessionMode === "voice" ? C.danger : C.primary }}>{isConnected && sessionMode === "voice" ? <MicOff size={17} /> : <Mic size={17} />}</button>
-            <input dir="auto" value={input} onChange={(event) => { lastActivityRef.current = Date.now(); setInput(event.target.value); if (isConnected && conversation.sendUserActivity) conversation.sendUserActivity(); }} onKeyDown={(event) => event.key === "Enter" && !event.nativeEvent.isComposing && sendText()} placeholder={t("app.inputPlaceholder")} aria-label={t("app.inputPlaceholder")} style={{ minWidth: 0, flex: 1, border: `1px solid ${C.border}`, borderRadius: 999, outline: "none", background: C.surfaceAlt, padding: "10px 14px", color: C.text, fontSize: 14, textAlign: "start" }} />
+            <input dir="auto" value={input} onChange={(event) => { markCustomerActivity(); lastActivityRef.current = Date.now(); setInput(event.target.value); if (isConnected && conversation.sendUserActivity) conversation.sendUserActivity(); }} onKeyDown={(event) => event.key === "Enter" && !event.nativeEvent.isComposing && sendText()} placeholder={t("app.inputPlaceholder")} aria-label={t("app.inputPlaceholder")} style={{ minWidth: 0, flex: 1, border: `1px solid ${C.border}`, borderRadius: 999, outline: "none", background: C.surfaceAlt, padding: "10px 14px", color: C.text, fontSize: 14, textAlign: "start" }} />
             <button onClick={() => sendText()} disabled={!input.trim()} aria-label={t("app.send")} style={{ display: "flex", height: 36, width: 36, flexShrink: 0, alignItems: "center", justifyContent: "center", borderRadius: 999, border: "none", cursor: "pointer", color: C.onPrimary, background: C.primary, opacity: input.trim() ? 1 : 0.3 }}><Send size={16} /></button>
           </div>
         </section>

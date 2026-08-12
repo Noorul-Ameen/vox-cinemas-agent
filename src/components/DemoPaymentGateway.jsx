@@ -72,9 +72,9 @@ export default function DemoPaymentGateway({
   const [paymentMethod, setPaymentMethod] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [cvv, setCvv] = useState("");
-  const [useShare, setUseShare] = useState(true);
+  const [useShare, setUseShare] = useState(false);
   const [sharePoints, setSharePoints] = useState(String(DEMO_SHARE_POINTS));
-  const [useWallet, setUseWallet] = useState(true);
+  const [useWallet, setUseWallet] = useState(false);
   const [walletAed, setWalletAed] = useState(String(DEMO_WALLET_BALANCE));
 
   const copy = ar ? {
@@ -138,6 +138,8 @@ export default function DemoPaymentGateway({
     cardRequired: "اختر إحدى البطاقتين لدفع المبلغ المتبقي.",
     noCardRequired: "لا يلزم اختيار بطاقة أو إدخال رمز CVV لأن نقاط SHARE ومحفظة VOX تغطيان المبلغ بالكامل.",
     unsupported: "لا يمكن تطبيق هذا العرض.",
+    offerBalancesRequireFullPrice: "لا يمكن دمج نقاط SHARE أو محفظة VOX مع هذا العرض لأن جميع التذاكر مشمولة بالعرض. أزل الأرصدة أو اختر الحجز بدون عرض بطاقة.",
+    offerBalancesLimit: (count, amount) => `يمكن استخدام نقاط SHARE ومحفظة VOX فقط مقابل قيمة التذاكر بالسعر الكامل: ${count}، بحد أقصى ${amount}.`,
     reviewHelp: "راجع جميع التفاصيل قبل معالجة الدفع.",
   } : {
     paymentMethod: "Payment method",
@@ -200,6 +202,8 @@ export default function DemoPaymentGateway({
     cardRequired: "Choose either available card for the remaining card balance.",
     noCardRequired: "No payment method, card, or CVV is required because SHARE points and VOX Wallet cover the full amount.",
     unsupported: "This offer cannot be applied.",
+    offerBalancesRequireFullPrice: "SHARE Points and VOX Wallet cannot be combined with this card offer because every ticket is covered by the offer. Remove the balances or choose no card offer.",
+    offerBalancesLimit: (count, amount) => `SHARE Points and VOX Wallet can be used only against the ${count} full-price ${count === 1 ? "ticket" : "tickets"}, up to ${amount}.`,
     reviewHelp: "Review all details before processing the payment.",
   };
 
@@ -243,6 +247,8 @@ export default function DemoPaymentGateway({
     cvv_invalid: copy.cvvInvalid,
     share_points_exceed_balance: copy.shareBalanceExceeded,
     share_points_invalid: copy.shareWholePoints,
+    offer_balances_require_full_price_ticket: copy.offerBalancesRequireFullPrice,
+    offer_balances_exceed_full_price_amount: copy.offerBalancesLimit(plan.storedValuePolicy?.fullPriceTicketCount || 0, money(plan.storedValuePolicy?.limitAed || 0)),
     unsupported_offer: copy.unsupported,
     funding_mismatch: copy.unsupported,
   }[plan.reason] || "";
@@ -356,6 +362,13 @@ export default function DemoPaymentGateway({
       >
         <h3 style={styles.title}>{copy.combined}</h3>
         <p style={styles.help}>{copy.combinedHelp}</p>
+        {activeOffer ? (
+          <p style={plan.storedValuePolicy?.fullPriceTicketCount > 0 ? styles.help : styles.error} role="status">
+            {plan.storedValuePolicy?.fullPriceTicketCount > 0
+              ? copy.offerBalancesLimit(plan.storedValuePolicy.fullPriceTicketCount, money(plan.storedValuePolicy.limitAed))
+              : copy.offerBalancesRequireFullPrice}
+          </p>
+        ) : null}
         <label style={styles.toggleRow}>
           <input type="checkbox" checked={useShare} onChange={(event) => setUseShare(event.target.checked)} />
           <span>{copy.share}</span>
