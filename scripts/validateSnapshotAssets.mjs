@@ -7,6 +7,14 @@ import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const OMITTED_FILM_MANIFEST_FIELDS = new Set([
+  "CinemaId",
+  "CinemaIds",
+  "sourcePageUrl",
+  "sourceUrl",
+  "categories",
+  "experiences",
+]);
 
 function parseArgs(argv) {
   const options = {
@@ -79,9 +87,14 @@ async function main() {
   for (const film of manifest.FILMS) {
     const expected = sourceFilmsById.get(String(film.ScheduledFilmId));
     assert.ok(expected, `manifest movie ${film.ScheduledFilmId} exists in source`);
-    const { CinemaIds, ...filmWithoutCinemas } = film;
-    assert.deepEqual(filmWithoutCinemas, expected.film, `movie metadata is retained for ${film.ScheduledFilmId}`);
-    assert.deepEqual(CinemaIds, [...new Set(expected.cinemas)].sort(), `cinema availability is retained for ${film.ScheduledFilmId}`);
+    const hasOfficialPoster = Boolean(expected.film.posterUrl || expected.film.PosterUrl);
+    const expectedFilm = Object.fromEntries(
+      Object.entries(expected.film).filter(([key]) => (
+        !OMITTED_FILM_MANIFEST_FIELDS.has(key)
+        && !(hasOfficialPoster && ["images", "backdropUrl"].includes(key))
+      )),
+    );
+    assert.deepEqual(film, expectedFilm, `runtime movie metadata is retained for ${film.ScheduledFilmId}`);
   }
 
   const versionEntries = await readdir(options.outputDir, { withFileTypes: true });
@@ -137,7 +150,6 @@ async function main() {
     EXPERIENCE_MEDIA: manifest.EXPERIENCE_MEDIA,
     OFFER_MEDIA: manifest.OFFER_MEDIA,
     DATES_BY_CINEMA: manifest.DATES_BY_CINEMA,
-    FILM_IDS_BY_CINEMA_DATE: manifest.FILM_IDS_BY_CINEMA_DATE,
     SESSIONS: restoredSessions,
   };
   const expectedVersionHash = createHash("sha256").update(JSON.stringify(versionPayload)).digest("hex").slice(0, 16);
@@ -149,12 +161,6 @@ async function main() {
       .filter((session) => String(session.CinemaId) === cinemaId)
       .map((session) => session.SourceProgrammingDate))].sort();
     assert.deepEqual(dates, expectedDates, `${cinemaId} date index matches its shards`);
-    for (const date of dates) {
-      const expectedFilmIds = [...new Set(source.SESSIONS
-        .filter((session) => String(session.CinemaId) === cinemaId && session.SourceProgrammingDate === date)
-        .map((session) => String(session.ScheduledFilmId)))].sort();
-      assert.deepEqual(manifest.FILM_IDS_BY_CINEMA_DATE[cinemaId][date], expectedFilmIds, `${cinemaId} ${date} film index matches its shard`);
-    }
   }
 
   const manifestBytes = Buffer.byteLength(manifestText);

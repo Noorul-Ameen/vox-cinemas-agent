@@ -5,6 +5,14 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const OMITTED_FILM_MANIFEST_FIELDS = new Set([
+  "CinemaId",
+  "CinemaIds",
+  "sourcePageUrl",
+  "sourceUrl",
+  "categories",
+  "experiences",
+]);
 
 function parseArgs(argv) {
   const options = {
@@ -51,24 +59,25 @@ function safePathSegment(value, label) {
 function buildFilmCatalog(films) {
   const byId = new Map();
   for (const sourceFilm of films) {
-    const film = normalizeCustomerPunctuation(sourceFilm);
+    const hasOfficialPoster = Boolean(sourceFilm.posterUrl || sourceFilm.PosterUrl);
+    const film = normalizeCustomerPunctuation(Object.fromEntries(
+      Object.entries(sourceFilm).filter(([key]) => (
+        !OMITTED_FILM_MANIFEST_FIELDS.has(key)
+        && !(hasOfficialPoster && ["images", "backdropUrl"].includes(key))
+      )),
+    ));
     const id = String(film.ScheduledFilmId || "");
     if (!id) throw new Error("A generated film is missing ScheduledFilmId");
-    const cinemaId = String(film.CinemaId || "");
     if (!byId.has(id)) {
-      byId.set(id, { ...film, CinemaIds: cinemaId ? [cinemaId] : [] });
+      byId.set(id, film);
       continue;
     }
     const existing = byId.get(id);
-    const comparableExisting = JSON.stringify({ ...existing, CinemaId: cinemaId, CinemaIds: undefined });
-    const comparableNext = JSON.stringify({ ...film, CinemaIds: undefined });
-    if (comparableExisting !== comparableNext) {
+    if (JSON.stringify(existing) !== JSON.stringify(film)) {
       throw new Error(`Film metadata differs between cinemas for ${id}`);
     }
-    if (cinemaId) existing.CinemaIds.push(cinemaId);
   }
   return [...byId.values()]
-    .map((film) => ({ ...film, CinemaIds: sortedUnique(film.CinemaIds) }))
     .sort((left, right) => String(left.ScheduledFilmId).localeCompare(String(right.ScheduledFilmId), "en"));
 }
 
@@ -90,15 +99,12 @@ function groupSessions(sessions) {
 
 function buildAvailability(groups) {
   const datesByCinema = {};
-  const filmIdsByCinemaDate = {};
   for (const group of groups) {
     if (!datesByCinema[group.cinemaId]) datesByCinema[group.cinemaId] = [];
     datesByCinema[group.cinemaId].push(group.date);
-    if (!filmIdsByCinemaDate[group.cinemaId]) filmIdsByCinemaDate[group.cinemaId] = {};
-    filmIdsByCinemaDate[group.cinemaId][group.date] = sortedUnique(group.sessions.map((session) => session.ScheduledFilmId));
   }
   for (const cinemaId of Object.keys(datesByCinema)) datesByCinema[cinemaId] = sortedUnique(datesByCinema[cinemaId]);
-  return { datesByCinema, filmIdsByCinemaDate };
+  return datesByCinema;
 }
 
 function contentVersion(payload, extractedAt) {
@@ -126,7 +132,7 @@ async function main() {
   }
 
   const groups = groupSessions(sessions);
-  const { datesByCinema, filmIdsByCinemaDate } = buildAvailability(groups);
+  const datesByCinema = buildAvailability(groups);
   const versionPayload = {
     DATA_STATS: dataStats,
     DATA_DATES: dataDates,
@@ -135,7 +141,6 @@ async function main() {
     EXPERIENCE_MEDIA: experienceMedia,
     OFFER_MEDIA: offerMedia,
     DATES_BY_CINEMA: datesByCinema,
-    FILM_IDS_BY_CINEMA_DATE: filmIdsByCinemaDate,
     SESSIONS: groups.flatMap((group) => group.sessions),
   };
   const version = contentVersion(versionPayload, dataStats.extractedAt);
@@ -186,7 +191,6 @@ async function main() {
     jsExport("CINEMAS", cinemas),
     jsExport("FILMS", films),
     jsExport("DATES_BY_CINEMA", datesByCinema),
-    jsExport("FILM_IDS_BY_CINEMA_DATE", filmIdsByCinemaDate),
   ].join("\n");
   await mkdir(dirname(options.manifest), { recursive: true });
   await writeFile(options.manifest, manifest, "utf8");

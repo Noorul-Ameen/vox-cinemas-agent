@@ -13,7 +13,6 @@ import {
   DATA_STATS,
   DATES_BY_CINEMA,
   FILMS,
-  FILM_IDS_BY_CINEMA_DATE,
   SNAPSHOT_BASE_PATH,
   SNAPSHOT_VERSION,
 } from "./generated/voxSnapshotManifest.js";
@@ -640,8 +639,7 @@ export async function getScheduledFilms(cinemaId, displayDate = demoDate()) {
       const shardFilmIds = [...new Set(scheduledSessions
         .map((session) => String(rawField(session, "ScheduledFilmId", "scheduledFilmId") || ""))
         .filter(Boolean))];
-      const publishedFilmIds = FILM_IDS_BY_CINEMA_DATE[id]?.[sourceDate] || shardFilmIds;
-      value = publishedFilmIds.map((filmId) => snapshotFilmsById.get(String(filmId))).filter(Boolean);
+      value = shardFilmIds.map((filmId) => snapshotFilmsById.get(String(filmId))).filter(Boolean);
     }
   } else {
     const filter = `CinemaId eq '${odataString(id)}'`;

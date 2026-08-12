@@ -124,6 +124,11 @@ function dateDistance(startDate, date) {
 
 export function parseShowtimeDateLinks(html) {
   const dates = new Set();
+  for (const match of String(html).matchAll(/<input\b([^>]*)>/giu)) {
+    if (attribute(match[1], "name") !== "d") continue;
+    const date = isoDateFromCompact(attribute(match[1], "value"));
+    if (date) dates.add(date);
+  }
   for (const match of String(html).matchAll(/<a\b([^>]*)>/giu)) {
     const href = attribute(match[1], "href");
     const compact = href.match(/[?&]d=(\d{8})(?:&|$)/u)?.[1];
