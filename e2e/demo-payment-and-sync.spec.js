@@ -195,6 +195,8 @@ test("typed journey reaches final review and processes a three-way payment", asy
   await expect(page.getByTestId("dummy-payment-gateway")).not.toContainText("4111 1111 1111 1111");
   await page.getByLabel("Card CVV").fill("123");
 
+  await page.getByTestId("dummy-payment-gateway").getByLabel("Card offer").selectOption("");
+
   await page.getByLabel("Use SHARE points").check();
   await page.getByLabel("SHARE points to redeem").fill("201");
   await expect(page.getByText("You have 200 SHARE points available. Enter 200 points or fewer.")).toBeVisible();
@@ -203,22 +205,24 @@ test("typed journey reaches final review and processes a three-way payment", asy
   await page.getByLabel("Use VOX Wallet").check();
   await page.getByLabel("Wallet value in AED").fill("10");
 
-  await expect(page.getByText(/Offer discount/).locator("..")).toContainText(/AED\s*42\.00/);
+  await expect(page.getByText(/Offer discount/).locator("..")).toContainText(/AED\s*0\.00/);
   await expect(page.getByText(/Equivalent AED discount/).locator("..")).toContainText(/AED\s*15\.00/);
-  await expect(page.getByText(/Remaining amount to be paid/).locator("..")).toContainText(/AED\s*27\.00/);
-  await expect(page.getByTestId("external-payment-summary")).toContainText(/Card\s*AED\s*17\.00/);
+  await expect(page.getByText(/Remaining amount to be paid/).locator("..")).toContainText(/AED\s*69\.00/);
+  await expect(page.getByTestId("external-payment-summary")).toContainText(/Card\s*AED\s*59\.00/);
   await expect(page.getByTestId("review-dummy-payment")).toBeEnabled();
   await page.getByTestId("review-dummy-payment").click();
   await expect(page.getByText("Final payment summary")).toBeVisible();
   await expect(page.getByText("SHARE points redeemed").locator("..")).toContainText(/150 SHARE points/);
   await expect(page.getByText("Equivalent AED discount").locator("..")).toContainText(/AED\s*15\.00/);
-  await expect(page.getByText("Remaining amount to be paid").locator("..")).toContainText(/AED\s*27\.00/);
+  await expect(page.getByText("Remaining amount to be paid").locator("..")).toContainText(/AED\s*69\.00/);
   await expect(page.getByText("VOX Wallet").locator("..")).toContainText(/AED\s*10\.00/);
   await page.getByTestId("process-dummy-payment").click();
   await expect(page.getByText("Processing payment")).toBeVisible();
   await expect(page.getByText("Payment receipt")).toBeVisible();
   await expect(page.getByText(/Payment processed successfully/)).toBeVisible();
   await expect(page.getByText(/^WL[A-HJ-NP-Z2-9]{5}$/).first()).toBeVisible();
+  await expect(page.getByPlaceholder("Share your feedback")).toHaveCount(0);
+  await sendText(page, "End conversation");
   await page.getByRole("radio", { name: "Rate 5 out of 5" }).click();
   await page.getByPlaceholder("Share your feedback").fill("Clear booking journey");
   await page.getByRole("button", { name: "Submit feedback" }).click();
@@ -227,7 +231,13 @@ test("typed journey reaches final review and processes a three-way payment", asy
 
 test("SHARE points and VOX Wallet fully fund checkout without card or CVV", async ({ page }) => {
   await reachCheckoutByText(page, { seatCount: 1 });
-  await expect(page.getByTestId("combined-payment-options")).toContainText(/200 SHARE points = AED\s*20\.00/);
+  await expect(page.getByTestId("combined-payment-options")).toContainText("Available SHARE balance: 200 points worth AED 20");
+  await expect(page.getByLabel("Use SHARE points")).not.toBeChecked();
+  await expect(page.getByLabel("Use VOX Wallet")).not.toBeChecked();
+  await expect(page.getByTestId("payment-method-select")).toBeVisible();
+
+  await page.getByLabel("Use SHARE points").check();
+  await page.getByLabel("Use VOX Wallet").check();
   await expect(page.getByText("SHARE points and VOX Wallet cover the full amount, so no additional payment method is required.")).toBeVisible();
   await expect(page.getByTestId("payment-method-select")).toHaveCount(0);
   await expect(page.getByTestId("payment-card-select")).toHaveCount(0);
@@ -244,6 +254,65 @@ test("SHARE points and VOX Wallet fully fund checkout without card or CVV", asyn
   await page.getByTestId("process-dummy-payment").click();
   await expect(page.getByText("Payment receipt")).toBeVisible();
   await expect(page.getByText("Card used", { exact: true })).toHaveCount(0);
+});
+
+test("card offers restrict SHARE points and VOX Wallet to full-price tickets", async ({ page }) => {
+  await reachCheckoutByText(page, { seatCount: 2 });
+  await page.getByTestId("payment-method-select").selectOption("card");
+  await page.getByTestId("dummy-payment-gateway").getByLabel("Card offer").selectOption("fab-share");
+  await page.getByTestId("payment-card-select").selectOption({ label: "**** **** **** 1111" });
+  await page.getByLabel("Card CVV").fill("123");
+  await page.getByLabel("Use SHARE points").check();
+  await expect(page.getByTestId("dummy-payment-gateway")).toContainText(/every ticket is covered by the offer/i);
+  await expect(page.getByTestId("review-dummy-payment")).toBeDisabled();
+
+  await page.getByRole("button", { name: /new conversation/i }).click();
+  await reachCheckoutByText(page, { seatCount: 3 });
+  await page.getByTestId("payment-method-select").selectOption("card");
+  await page.getByTestId("dummy-payment-gateway").getByLabel("Card offer").selectOption("fab-share");
+  await page.getByTestId("payment-card-select").selectOption({ label: "**** **** **** 1111" });
+  await page.getByLabel("Card CVV").fill("123");
+  await page.getByLabel("Use SHARE points").check();
+  await page.getByLabel("SHARE points to redeem").fill("120");
+  await page.getByLabel("Use VOX Wallet").check();
+  await page.getByLabel("Wallet value in AED").fill("30");
+
+  await expect(page.getByTestId("dummy-payment-gateway")).toContainText(/up to AED\s*42\.00/i);
+  await expect(page.getByTestId("external-payment-summary")).toContainText(/Card\s*AED\s*42\.00/);
+  await expect(page.getByTestId("review-dummy-payment")).toBeEnabled();
+});
+
+test("partial movie names select the movie and contextual questions preserve rendering", async ({ page }) => {
+  const cards = await reachMovieGridByText(page, "Show me any movie");
+  const titles = await cards.locator('[aria-label^="Relevant showtimes for "]').evaluateAll((nodes) => (
+    nodes.map((node) => String(node.getAttribute("aria-label") || "").replace(/^Relevant showtimes for\s+/i, "").trim())
+  ));
+  const targetTitle = titles.find((title) => title.split(/\s+/).some((word) => {
+    const prefix = word.replace(/[^a-z0-9]/gi, "").slice(0, 4).toLowerCase();
+    if (prefix.length < 3) return false;
+    return titles.filter((candidate) => candidate.split(/\s+/).some((token) => token.toLowerCase().startsWith(prefix))).length === 1;
+  }));
+  expect(targetTitle, "At least one rendered movie must have a unique title fragment").toBeTruthy();
+  const targetWord = targetTitle.split(/\s+/).find((word) => {
+    const prefix = word.replace(/[^a-z0-9]/gi, "").slice(0, 4).toLowerCase();
+    if (prefix.length < 3) return false;
+    return titles.filter((candidate) => candidate.split(/\s+/).some((token) => token.toLowerCase().startsWith(prefix))).length === 1;
+  });
+  const partialName = targetWord.replace(/[^a-z0-9]/gi, "").slice(0, 4);
+
+  await sendText(page, `What is ${partialName} about?`);
+  await expect(page.locator("main")).toContainText(targetTitle);
+  await expect(page.locator("main")).not.toContainText(/which movie|movie name/i);
+
+  await sendText(page, `I choose ${partialName}`);
+  await expect(page.getByText(/Select a showtime/).first()).toBeVisible();
+  const renderedShowtimes = page.locator("main button").filter({ hasText: /\d{1,2}:\d{2}/ });
+  expect(await renderedShowtimes.count()).toBeGreaterThan(0);
+
+  await sendText(page, "What is the rating of this movie?");
+  await expect(page.locator("main")).toContainText(targetTitle);
+  await expect(page.getByText(/Select a showtime/).first()).toBeVisible();
+  expect(await renderedShowtimes.count()).toBeGreaterThan(0);
 });
 
 test("Apple Pay and Samsung Pay never expose card offers, card profiles, or CVV", async ({ page }) => {

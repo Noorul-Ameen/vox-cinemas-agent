@@ -1033,6 +1033,12 @@ export function resolveDiscoveryMovieCandidate(movies, candidate) {
   if (!query) return null;
   const exact = list.filter((movie) => normalizeText(movieTitle(movie)) === query);
   if (exact.length === 1) return exact[0];
+  const prefix = list.filter((movie) => {
+    const title = normalizeText(movieTitle(movie));
+    if (!title || query.length < 3) return false;
+    return title.startsWith(query) || title.split(/\s+/).some((token) => token.startsWith(query));
+  });
+  if (prefix.length === 1) return prefix[0];
   const partial = list.filter((movie) => {
     const title = normalizeText(movieTitle(movie));
     if (!title || query.length < 4) return false;

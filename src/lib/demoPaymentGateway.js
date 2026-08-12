@@ -107,6 +107,7 @@ export function validateDemoSharePoints(points) {
 export function calculateDemoOfferAdjustment({ offer = null, amount, ticketCount = 1 } = {}) {
   const originalTotal = roundDemoMoney(Math.max(0, finiteAmount(amount)));
   const tickets = Math.max(1, Math.floor(finiteAmount(ticketCount) || 1));
+  const unitTicketAmount = roundDemoMoney(originalTotal / tickets);
   if (!offer) {
     return {
       valid: true,
@@ -114,27 +115,46 @@ export function calculateDemoOfferAdjustment({ offer = null, amount, ticketCount
       benefit: "none",
       discount: 0,
       payableTotal: originalTotal,
+      offerTicketCount: 0,
+      fullPriceTicketCount: tickets,
+      fullPriceAmount: originalTotal,
     };
   }
 
   let valid = true;
   let reason = "offer_applied";
   let discount = 0;
+  let offerTicketCount = 0;
+  let fullPriceTicketCount = tickets;
   if (offer.benefit === "bogo") {
     if (tickets < 2) {
       valid = false;
       reason = "offer_requires_two_tickets";
     } else {
-      discount = (originalTotal / tickets) * Math.floor(tickets / 2);
+      const pairs = Math.floor(tickets / 2);
+      discount = unitTicketAmount * pairs;
+      offerTicketCount = pairs * 2;
+      fullPriceTicketCount = tickets - offerTicketCount;
     }
   } else if (offer.benefit === "half_price") {
     discount = originalTotal * 0.5;
+    offerTicketCount = tickets;
+    fullPriceTicketCount = 0;
   } else if (offer.benefit === "mixed") {
-    discount = tickets >= 2
-      ? (originalTotal / tickets) * Math.floor(tickets / 2)
-      : originalTotal * 0.3;
+    if (tickets >= 2) {
+      const pairs = Math.floor(tickets / 2);
+      discount = unitTicketAmount * pairs;
+      offerTicketCount = pairs * 2;
+      fullPriceTicketCount = tickets - offerTicketCount;
+    } else {
+      discount = originalTotal * 0.3;
+      offerTicketCount = 1;
+      fullPriceTicketCount = 0;
+    }
   } else if (offer.benefit === "points_payment") {
     reason = "points_payment_offer";
+    offerTicketCount = tickets;
+    fullPriceTicketCount = 0;
   } else {
     valid = false;
     reason = "unsupported_offer";
@@ -147,6 +167,9 @@ export function calculateDemoOfferAdjustment({ offer = null, amount, ticketCount
     benefit: offer.benefit || "unknown",
     discount: safeDiscount,
     payableTotal: roundDemoMoney(originalTotal - safeDiscount),
+    offerTicketCount,
+    fullPriceTicketCount,
+    fullPriceAmount: roundDemoMoney(unitTicketAmount * fullPriceTicketCount),
   };
 }
 
@@ -174,11 +197,17 @@ export function createDemoPaymentPlan({
     ? Math.floor(Math.max(0, finiteAmount(shareAed)) * DEMO_SHARE_POINTS_PER_AED)
     : Math.max(0, finiteAmount(sharePoints));
   const shareValidation = validateDemoSharePoints(requestedSharePoints);
-  const maximumSharePointsForPayable = Math.floor((payableTotal * DEMO_SHARE_POINTS_PER_AED) + EPSILON);
+  const requestedWalletAed = Math.max(0, finiteAmount(walletAed));
+  const requestedStoredValueAed = roundDemoMoney(shareValidation.appliedAed + requestedWalletAed);
+  const storedValueLimitAed = offer
+    ? Math.min(payableTotal, offerAdjustment.fullPriceAmount)
+    : payableTotal;
+  const maximumSharePointsForPayable = Math.floor((storedValueLimitAed * DEMO_SHARE_POINTS_PER_AED) + EPSILON);
   const appliedSharePoints = Math.min(shareValidation.appliedPoints, maximumSharePointsForPayable);
   const appliedShareAed = roundDemoMoney(appliedSharePoints / DEMO_SHARE_POINTS_PER_AED);
   const afterShare = roundDemoMoney(payableTotal - appliedShareAed);
-  const appliedWalletAed = clampMoney(walletAed, 0, Math.min(afterShare, DEMO_WALLET_BALANCE));
+  const remainingStoredValueLimitAed = roundDemoMoney(Math.max(0, storedValueLimitAed - appliedShareAed));
+  const appliedWalletAed = clampMoney(walletAed, 0, Math.min(afterShare, remainingStoredValueLimitAed, DEMO_WALLET_BALANCE));
   const externalAed = roundDemoMoney(Math.max(0, payableTotal - appliedShareAed - appliedWalletAed));
   const cardValidation = validateDemoCardOffer(cardNumber);
   const cvvValidation = validateDemoCvv(cvv);
@@ -193,6 +222,12 @@ export function createDemoPaymentPlan({
     reason = shareValidation.status === "insufficient"
       ? "share_points_exceed_balance"
       : "share_points_invalid";
+  } else if (valid && offer && requestedStoredValueAed > EPSILON && offerAdjustment.fullPriceTicketCount < 1) {
+    valid = false;
+    reason = "offer_balances_require_full_price_ticket";
+  } else if (valid && offer && requestedStoredValueAed - storedValueLimitAed > EPSILON) {
+    valid = false;
+    reason = "offer_balances_exceed_full_price_amount";
   } else if (valid && paymentMethodRequired && !normalizedPaymentMethod) {
     valid = false;
     reason = "payment_method_required";
@@ -238,6 +273,12 @@ export function createDemoPaymentPlan({
       paymentMethod: paymentMethodRequired,
       card: cardRequired,
       cvv: cvvRequired,
+    },
+    storedValuePolicy: {
+      offerTicketCount: offerAdjustment.offerTicketCount,
+      fullPriceTicketCount: offerAdjustment.fullPriceTicketCount,
+      limitAed: storedValueLimitAed,
+      requestedAed: requestedStoredValueAed,
     },
     shareValidation,
     amounts: {

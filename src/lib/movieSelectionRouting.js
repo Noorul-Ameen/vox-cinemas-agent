@@ -49,12 +49,13 @@ export async function resolveVisibleMovieSelectionTurn({ text, stage } = {}) {
   const explicitTitleQuery = query.replace(/^(?:(?:i(?:'|’)d|i\s+would)\s+like|i\s+(?:choose|chose|select|selected|pick|picked|want)|choose|chose|select|selected|pick|picked|book|watch|اخترت|أختار|اختار|سأختار|أريد|اريد|أود|اود|احجز|أحجز|سأشاهد|اشاهد)\s+(?:(?:the\s+)?(?:movie|film)\s+|فيلم\s+)?/iu, "").trim();
   const selectionTitleQuery = explicitTitleQuery
     .replace(/^(?:اختر|إختر|حدد|حدّد)\s+(?:فيلم\s+)?/u, "")
+    .replace(/^(?:(?:the\s+)?(?:movie|film)|فيلم)\s+/iu, "")
     .trim();
   const directMovie = await resolveBilingualDiscoveryMovieCandidate(stage.movies, query);
-  const movie = directMovie
-    || (selectionTitleQuery !== query
-      ? await resolveBilingualDiscoveryMovieCandidate(stage.movies, selectionTitleQuery)
-      : null);
+  const titleQueryMovie = selectionTitleQuery !== query
+    ? await resolveBilingualDiscoveryMovieCandidate(stage.movies, selectionTitleQuery)
+    : null;
+  const movie = directMovie || titleQueryMovie;
   if (!movie) return null;
 
   const title = comparableTitle(movie.title);
@@ -72,6 +73,12 @@ export async function resolveVisibleMovieSelectionTurn({ text, stage } = {}) {
   const explicitNamedSelection = explicitSelection
     && selectionTitleQuery !== query
     && comparableTitle(selectionTitleQuery) === title;
+  const partialTitle = comparableTitle(selectionTitleQuery);
+  const uniquePartialSelection = Boolean(
+    movie
+    && partialTitle.length >= 3
+    && (title.startsWith(partialTitle) || title.split(/\s+/).some((token) => token.startsWith(partialTitle))),
+  );
 
-  return bareTitle || bilingualBareTitle || qualifiedBareTitle || explicitNamedSelection || (explicitSelection && !INFORMATION_ONLY.test(query)) ? movie : null;
+  return bareTitle || bilingualBareTitle || qualifiedBareTitle || explicitNamedSelection || uniquePartialSelection || (explicitSelection && !INFORMATION_ONLY.test(query)) ? movie : null;
 }

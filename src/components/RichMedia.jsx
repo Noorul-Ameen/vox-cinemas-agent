@@ -7,7 +7,6 @@ import { isCurrentBooking } from "../lib/cancellationRouting.js";
 import { localizeCatalogValue, localizeCinemaName } from "../lib/catalogLocalization.js";
 import { deriveRefundAllocation } from "../lib/refundAllocation.js";
 import RetryableLazy from "./RetryableLazy.jsx";
-import JourneyFeedback from "./JourneyFeedback.jsx";
 
 const loadBookingQRCode = () => import("./BookingQRCode.jsx");
 
@@ -474,7 +473,6 @@ export function BookingCard({
           </div>
         ) : null}
       </div>
-      {!cancellationActive && <JourneyFeedback bookingRef={booking.ref} outcome={isCancelled ? "cancellation" : "booking"} />}
     </section>
   );
 }

@@ -982,6 +982,23 @@ test("browser back and forward preserve the active in-page journey", async ({ pa
   await expectNoForbiddenCustomerFacingDashes(page);
 });
 
+test("inactive conversations prompt at 90 seconds, then end and request feedback", async ({ page }) => {
+  await page.clock.install();
+  await page.reload();
+  await page.getByRole("button", { name: "Card offers" }).click();
+  await expect(page.getByRole("heading", { name: "Bank offers" })).toBeVisible();
+  await expect(page.getByPlaceholder("Share your feedback")).toHaveCount(0);
+
+  await page.clock.fastForward(90_000);
+  await expect(page.locator("main")).toContainText("Are you still there?");
+  await expect(page.getByPlaceholder("Share your feedback")).toHaveCount(0);
+
+  await page.clock.fastForward(90_000);
+  await expect(page.locator("main")).toContainText(/conversation ended because no response/i);
+  await expect(page.getByPlaceholder("Share your feedback")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bank offers" })).toHaveCount(0);
+});
+
 test("forbidden dash validator detects both disallowed characters", async () => {
   expect(FORBIDDEN_DASH_PATTERN.test("\u2013")).toBe(true);
   expect(FORBIDDEN_DASH_PATTERN.test("\u2014")).toBe(true);

@@ -77,7 +77,7 @@ assert.equal(validateDemoCvv("123").valid, true, "a three-digit CVV must validat
 assert.equal(validateDemoCvv("12").status, "invalid", "an incomplete CVV must block review");
 const fabShareOffer = OFFERS.find((offer) => offer.id === "fab-share");
 assert.ok(fabShareOffer, "the published FAB SHARE offer must remain available");
-const splitPlan = createDemoPaymentPlan({
+const blockedBogoPlan = createDemoPaymentPlan({
   amount: 84,
   ticketCount: 2,
   offer: fabShareOffer,
@@ -87,19 +87,33 @@ const splitPlan = createDemoPaymentPlan({
   sharePoints: 150,
   walletAed: 10,
 });
-assert.equal(splitPlan.valid, true, "eligible BOGO plus three-way funding must produce a valid plan");
-assert.deepEqual(splitPlan.amounts, {
-  originalTotal: 84,
-  offerDiscount: 42,
-  payableTotal: 42,
-  shareAed: 15,
-  remainingAfterPointsAed: 27,
+assert.equal(blockedBogoPlan.valid, false, "stored value must not fund tickets already covered by a card offer");
+assert.equal(blockedBogoPlan.reason, "offer_balances_require_full_price_ticket", "a two-ticket BOGO booking must explain that no separate full-price ticket remains");
+const splitPlan = createDemoPaymentPlan({
+  amount: 126,
+  ticketCount: 3,
+  offer: fabShareOffer,
+  paymentMethod: PAYMENT_METHODS.card,
+  cardNumber: DEMO_CARD_NUMBERS.eligible,
+  cvv: "123",
+  sharePoints: 150,
   walletAed: 10,
-  externalAed: 17,
-  cardAed: 17,
+});
+assert.equal(splitPlan.valid, true, "eligible BOGO plus stored value may fund the separate full-price ticket in a three-ticket booking");
+assert.deepEqual(splitPlan.amounts, {
+  originalTotal: 126,
+  offerDiscount: 42,
+  payableTotal: 84,
+  shareAed: 15,
+  remainingAfterPointsAed: 69,
+  walletAed: 10,
+  externalAed: 59,
+  cardAed: 59,
   applePayAed: 0,
   samsungPayAed: 0,
-}, "BOGO, SHARE, wallet, and card amounts must reconcile exactly");
+}, "BOGO, SHARE, wallet, and card amounts must reconcile exactly against the separate full-price ticket");
+assert.equal(splitPlan.storedValuePolicy.fullPriceTicketCount, 1, "the three-ticket BOGO booking must retain exactly one full-price ticket");
+assert.equal(splitPlan.storedValuePolicy.limitAed, 42, "stored value must be capped at the separate full-price ticket amount");
 assert.equal(createDemoPaymentPlan({
   amount: 84,
   ticketCount: 2,

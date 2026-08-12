@@ -19,7 +19,10 @@ assert.doesNotMatch(app, /<TicketQuantityControl\b|function TicketQuantityContro
 assert.match(app, /requestedTarget=\{requestedSeatTarget\}/, "a spoken quantity may remain as non-interactive seat-selection guidance");
 assert.match(app, /voxi:new-conversation/);
 assert.match(app, /voxi:logout/);
-assert.match(app, /CONVERSATION_IDLE_MS/);
+assert.match(app, /CONVERSATION_RESPONSE_PROMPT_MS\s*=\s*90\s*\*\s*1000/, "customer inactivity must prompt after 90 seconds");
+assert.match(app, /CONVERSATION_RESPONSE_GRACE_MS\s*=\s*90\s*\*\s*1000/, "the response prompt must allow a bounded grace period before ending");
+assert.match(app, /conversationFeedback && \(/, "feedback must be controlled by explicit ended-conversation state");
+assert.doesNotMatch(media, /JourneyFeedback/, "booking and payment completion panels must not request feedback before the conversation ends");
 const appCallbacksStart = app.indexOf("const transportCallbacks = {");
 const disconnectStart = app.indexOf("onDisconnect:", appCallbacksStart);
 const disconnectFlow = app.slice(disconnectStart, app.indexOf("onMessage:", disconnectStart));
