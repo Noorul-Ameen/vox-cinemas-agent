@@ -14,6 +14,7 @@ import { resolveCancellationDecision as cancellationDecision } from "./lib/cance
 import { CANCELLATION_CONFIRMATION_TTL_MS, armCancellationConfirmationTimerState, clearCancellationConfirmationTimerState, consumeCancellationConfirmationTimeout, createCancellationConfirmationTimerState, resumeCancellationConfirmationTimerState, suspendCancellationConfirmationTimerState } from "./lib/cancellationConfirmationTimer.js";
 import { cancellationFlowMatchesBooking, planPausedCancellationRestoration, synchronizedCancellationRenderState } from "./lib/cancellationRestoration.js";
 import { CANCELLATION_JOURNAL_TTL_MS, classifyRefundFailure, hydrateCancellationJournal, normalizeCancellationJournal, withCancellationMutationLock } from "./lib/cancellationSafety.js";
+import { deriveRefundAllocation, formatRefundImpact, refundRouteLabel } from "./lib/refundAllocation.js";
 import { normalizeElevenLabsMessageEvent } from "./lib/conversationMessage.js";
 import { guardAgentStateClaim } from "./lib/agentStateTruth.js";
 import { sanitizeSensitiveConversationText } from "./lib/sensitiveText.js";
@@ -222,7 +223,7 @@ const CONVERSATION_IDLE_MS = 15 * 60 * 1000;
 const MAX_TICKETS = 10;
 const VISIBLE_TRANSCRIPT_MESSAGES = 8;
 const RICH_STAGE_TRANSCRIPT_MESSAGES = 4;
-const IDLE_CANCELLATION_STATE = Object.freeze({ phase: "idle", bookingRef: null, demoOnly: false, refundRoute: null, message: null, error: null, retryAllowed: true, dismissAllowed: true, outcomeUnknown: false, journalStartedAt: null });
+const IDLE_CANCELLATION_STATE = Object.freeze({ phase: "idle", bookingRef: null, demoOnly: false, refundRoute: null, refundAllocation: null, message: null, error: null, retryAllowed: true, dismissAllowed: true, outcomeUnknown: false, journalStartedAt: null });
 const sameSeatSelection = (left = [], right = []) => {
   const a = [...new Set(left.map((seat) => String(seat).toUpperCase()))].sort();
   const b = [...new Set(right.map((seat) => String(seat).toUpperCase()))].sort();
@@ -1550,6 +1551,7 @@ export default function App() {
       bookingRef: customerSafe.bookingRef || null,
       demoOnly: Boolean(customerSafe.demoOnly),
       refundRoute: customerSafe.refundRoute || null,
+      refundAllocation: customerSafe.refundAllocation || null,
       message: customerSafe.message || null,
       error: customerSafe.error || null,
       retryAllowed: customerSafe.retryAllowed !== false,
@@ -4965,21 +4967,28 @@ export default function App() {
         || ["snapshot_demo", "local_demo"].includes(displayed.dataMode)
         || displayed.paymentStatus === "simulated_not_charged"
         || ["confirmed_demo", "summary_saved", "locally_stored"].includes(displayed.bookingStatus);
+      const refundAllocation = deriveRefundAllocation(displayed);
+      const refundRoute = refundRouteLabel(refundAllocation);
+      const refundImpact = formatRefundImpact(refundAllocation, localeRef.current);
       if (demoOnly) {
         const summary = cancellationBookingSummary(displayed, localeRef.current);
         const message = localeRef.current === "ar"
           ? `${summary} الأثر: سيتم تحديث حالة الحجز إلى ملغى. هل تريد مني إلغاء هذا الحجز؟`
           : `${summary} Impact: the booking status will be updated to cancelled. Would you like me to cancel this booking?`;
+        const refundMessage = localeRef.current === "ar"
+          ? `${summary} الأثر: سيتم تحديث حالة الحجز إلى ملغى. ${refundImpact} هل تريد مني إلغاء هذا الحجز؟`
+          : `${summary} Impact: the booking status will be updated to cancelled. ${refundImpact} Would you like me to cancel this booking?`;
         setCancellationFlow({
           bookingRef: displayed.ref,
           phase: "final_confirmation",
-          refundRoute: null,
+          refundRoute,
+          refundAllocation,
           eligibilityStatus: "local_demo_only",
-        demoOnly: true,
-        message,
-      });
+          demoOnly: true,
+          message: refundMessage,
+        });
         armCancellationConfirmationTimer({ bookingRef: displayed.ref, phase: "final_confirmation" });
-        return JSON.stringify({ found: true, bookingRef: displayed.ref, eligible: true, simulationOnly: true, confirmationRequired: true, phase: "final_confirmation", refundRoute: null, message });
+        return JSON.stringify({ found: true, bookingRef: displayed.ref, eligible: true, simulationOnly: true, confirmationRequired: true, phase: "final_confirmation", refundRoute, refundAllocation, message: refundMessage });
       }
       if (displayed.cancellation?.status === "ineligible") {
         const message = localeRef.current === "ar" ? "هذا الحجز غير مؤهل للإلغاء." : "This booking is not eligible for cancellation.";
@@ -5012,16 +5021,20 @@ export default function App() {
       const message = localeRef.current === "ar"
         ? `${summary} الأثر: سيعاد المبلغ المؤهل افتراضياً إلى محفظة VOX. قل نعم لاختيار محفظة VOX، ثم سأطلب تأكيداً نهائياً.`
         : `${summary} Impact: the eligible amount will default to VOX Wallet credit. Say yes to choose VOX Wallet, then I will ask for final confirmation.`;
+      const refundMessage = localeRef.current === "ar"
+        ? `${summary} الأثر: ${refundImpact} تابع للانتقال إلى التأكيد النهائي.`
+        : `${summary} Impact: ${refundImpact} Continue to the final confirmation.`;
       setCancellationFlow({
         bookingRef: displayed.ref,
         phase: "route_confirmation",
-        refundRoute: "VOX Wallet",
+        refundRoute,
+        refundAllocation,
         eligibilityStatus: displayed.cancellation?.status || "unknown",
         demoOnly: false,
-        message,
+        message: refundMessage,
       });
       armCancellationConfirmationTimer({ bookingRef: displayed.ref, phase: "route_confirmation" });
-      return JSON.stringify({ found: true, bookingRef: displayed.ref, eligible: true, simulationOnly: false, confirmationRequired: true, phase: "route_confirmation", refundRoute: "VOX Wallet", message });
+      return JSON.stringify({ found: true, bookingRef: displayed.ref, eligible: true, simulationOnly: false, confirmationRequired: true, phase: "route_confirmation", refundRoute, refundAllocation, message: refundMessage });
     },
 
     show_offers: async ({ bankName = "", cardName = "", experience = "", detailTopic = "", format = "", seatType = "", ticketCount, isMember, monthlyTicketsUsed, monthlySpend } = {}) => {
@@ -8427,6 +8440,7 @@ export default function App() {
     }
     cancellationInFlightRef.current = true;
     setCancellationFlow({ ...flow, bookingRef: current.ref, phase: "processing", message: localeRef.current === "ar" ? "جارٍ معالجة طلب الإلغاء…" : "Processing cancellation…", error: null });
+    const refundAllocation = deriveRefundAllocation(current);
     let refundResult;
     let refundError = null;
     try {
@@ -8474,14 +8488,19 @@ export default function App() {
     const bookingPanelIsCurrent = stageRef.current.view === "booking" && bookingContextIsCurrent;
     if (operationIsCurrent) cancellationInFlightRef.current = false;
     const cancelledAt = new Date().toISOString();
+    const completedRefundAllocation = {
+      ...refundAllocation,
+      status: liveRefundSucceeded ? "confirmed" : "recorded",
+    };
     const updated = {
       ...current,
       cancelled: true,
       cancelledAt,
       bookingStatus: isDemoSimulation ? "cancelled_demo" : "cancelled",
-      refundRoute: isDemoSimulation ? null : "VOX Wallet",
-      refundStatus: isDemoSimulation ? "not_processed_demo" : "processed",
+      refundRoute: refundRouteLabel(completedRefundAllocation),
+      refundStatus: isDemoSimulation ? "processed_policy" : "processed",
       refundReference: isDemoSimulation ? null : refundReference,
+      refundAllocation: completedRefundAllocation,
     };
     if (!operationIsCurrent || !appSessionIsCurrent) {
       // Never repopulate device storage after a reset/logout. A verified live
@@ -8542,6 +8561,7 @@ export default function App() {
       storagePersisted,
       bookingRef: updated.ref,
       refundReference,
+      refundAllocation: completedRefundAllocation,
     });
     if (bookingContextIsCurrent) {
       bookingRef.current = updated;
@@ -8564,6 +8584,8 @@ export default function App() {
         bookingStatus: updated.bookingStatus,
         refundStatus: updated.refundStatus,
         refundReference,
+        refundAllocation: completedRefundAllocation,
+        refundRecorded: true,
         storagePersisted,
         message: completionMessage,
       };
@@ -8589,10 +8611,10 @@ export default function App() {
     }
     if (source === "ui") {
       if (isDemoSimulation) {
-        conversation.sendContextualUpdate?.(`Booking summary ${updated.ref} is marked cancelled only on this device. Refund status is not processed; no refund occurred and there is no refund reference. The deterministic system notice already states this outcome, so do not add another cancellation response or describe it as a completed refund.`);
+        conversation.sendContextualUpdate?.(`Booking ${updated.ref} is marked cancelled and the widget recorded this refund allocation: ${formatRefundImpact(completedRefundAllocation, "en")} The deterministic system notice already states this outcome, so do not add another cancellation response.`);
       } else {
         sendUiTurn(localeRef.current === "ar" ? `نعم، ألغِ الحجز ${updated.ref}` : `Yes, cancel booking ${updated.ref}`, {
-          context: `The verified refund adapter confirmed cancellation of ${updated.ref}. Refund route: VOX Wallet. Refund reference: ${refundReference}. Local storage persisted: ${storagePersisted ? "yes" : "no"}. Confirm the refund truthfully and disclose the local-storage warning when present.`,
+          context: `The verified refund adapter confirmed cancellation of ${updated.ref}. Refund allocation: ${formatRefundImpact(completedRefundAllocation, "en")} Refund reference: ${refundReference}. Local storage persisted: ${storagePersisted ? "yes" : "no"}. Confirm the refund truthfully and disclose the local-storage warning when present.`,
         });
       }
     }
@@ -8607,6 +8629,8 @@ export default function App() {
       bookingStatus: updated.bookingStatus,
       refundStatus: updated.refundStatus,
       refundReference,
+      refundAllocation: completedRefundAllocation,
+      refundRecorded: true,
       storagePersisted,
       message: completionMessage,
     };

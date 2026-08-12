@@ -184,7 +184,7 @@ assert.match(promptSource, /A request for new movies, different movies, another 
 assert.match(promptSource, /When a short hour such as "9" uniquely matches one visible showtime[\s\S]*Never restart movie discovery/, "the prompt must ground short-hour choices in visible showtimes and clarify ambiguity in place");
 assert.match(promptSource, /Never tell the guest that the booking process is paused[\s\S]*Do not apply that short reply as a global restore/, "the prompt must keep one-shot paused-journey recovery customer-safe and state-scoped");
 assert.match(promptSource, /two published card profiles[\s\S]*without transmitting or storing it/, "the live-agent prompt must define the bounded card-profile contract");
-assert.match(promptSource, /combine optional SHARE points and VOX Wallet value[\s\S]*Do not claim external bank capture/, "the live-agent prompt must preserve the POC transaction boundary");
+assert.match(promptSource, /combines optional SHARE points and VOX Wallet value first[\s\S]*card validation apply only when Card is selected[\s\S]*Do not claim external bank capture/, "the live-agent prompt must preserve balances-first funding, Card-only offers, and the transaction boundary");
 assert.match(promptSource, /final review[\s\S]*Process payment[\s\S]*guest-controlled on-screen actions/, "the live-agent prompt must reserve all payment-step choices for the guest");
 assert.match(promptSource, /payment was processed only after authoritative widget context explicitly confirms a payment receipt/, "the live-agent prompt must synchronize payment claims with the rendered receipt");
 assert.match(offerFacts, /use the official VOX website or app checkout/i, "offer redemption must direct guests to an official VOX checkout");

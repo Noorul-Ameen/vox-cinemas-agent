@@ -237,6 +237,7 @@ test("checkout gateway processes a payment receipt with reference QR guidance", 
 
   const reviewPayment = page.getByTestId("review-dummy-payment");
   await expect(reviewPayment).toBeDisabled();
+  await page.getByTestId("payment-method-select").selectOption("card");
   await page.getByTestId("payment-card-select").selectOption({ label: "**** **** **** 1111" });
   await page.getByLabel("Card CVV").fill("123");
   await expect(reviewPayment).toBeEnabled();
@@ -494,7 +495,7 @@ test("typed cancellation stays in the booking flow when a movie title is selecte
   await page.getByRole("button", { name: /Yes, (?:cancel booking|mark cancelled)/ }).click();
   const cancellationSuccess = page.getByText("Cancelled", { exact: true }).first();
   await expect(cancellationSuccess).toBeVisible();
-  await expect(page.getByText("Booking cancelled", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Booking Cancelled", { exact: true }).first()).toBeVisible();
 
   const storedAfterCancellation = await page.evaluate(() => JSON.parse(localStorage.getItem("vox_bookings") || "null"));
   const familyBooking = storedAfterCancellation.bookings.find((booking) => booking.ref === "E2ECAN1");
@@ -502,8 +503,16 @@ test("typed cancellation stays in the booking flow when a movie title is selecte
   expect(familyBooking).toMatchObject({
     cancelled: true,
     bookingStatus: "cancelled_demo",
-    refundStatus: "not_processed_demo",
+    refundStatus: "processed_policy",
+    refundRoute: "VOX Wallet",
+    refundAllocation: {
+      voxWalletAed: 84,
+      sharePoints: 0,
+    },
   });
+  await expect(page.getByText("Refund summary", { exact: true })).toBeVisible();
+  await expect(page.getByText("Refund to VOX Wallet").locator("..")).toContainText(/AED\s*84\.00/);
+  await expect(page.getByText("Returned to SHARE account").locator("..")).toContainText(/0 SHARE points/);
   expect(familyBooking.cancelledAt).toBeTruthy();
   expect(actionBooking.cancelled).toBe(false);
   await expect(page.locator("[data-qr-value]")).toHaveCount(0);

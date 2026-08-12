@@ -10,6 +10,7 @@ import {
   validateMovieInformationCatalog,
   validateScheduledMovieCoverage,
 } from "./lib/movieInformationCatalogValidation.mjs";
+import { parseShowtimeDateLinks } from "./extractVoxShowtimesHtml.mjs";
 
 const informationPath = resolve(process.argv[2] || "data/vox_movie_information_catalog.json");
 const schedulePath = resolve(process.argv[3] || "data/vox_showtimes_full.json");
@@ -135,10 +136,16 @@ assert.throws(
 assert.throws(
   () => validateMovieInformationCatalog(information, {
     now: validationNow,
-    previousCatalog: { movies: Array.from({ length: information.movies.length + 40 }, () => ({})) },
+    previousCatalog: { movies: Array.from({ length: Math.ceil(information.movies.length * 1.5) }, () => ({})) },
   }),
   /catalog count dropped more than 25%/u,
   "a large day-over-day catalog collapse must be rejected for manual review",
+);
+
+assert.deepEqual(
+  parseShowtimeDateLinks('<input type="hidden" name="d" value="20260812"><a href="/showtimes?d=20260813">Tomorrow</a>'),
+  ["2026-08-12", "2026-08-13"],
+  "the server-rendered fallback must include VOX's hidden current-date value",
 );
 
 const missingScheduledMovie = structuredClone(information);

@@ -175,6 +175,8 @@ export function consumeVoiceCancellationDecision(state, {
   };
 }
 
+import { formatRefundImpact } from "./refundAllocation.js";
+
 export function cancellationDecisionOutputOwner({ source } = {}) {
   return source === "voice_tool" ? "tool" : "local";
 }
@@ -191,8 +193,14 @@ export function buildCancellationCompletionMessage({
   storagePersisted = true,
   bookingRef,
   refundReference,
+  refundAllocation,
 } = {}) {
   if (isDemoSimulation) {
+    if (refundAllocation) {
+      return locale === "ar"
+        ? `تم إلغاء الحجز ${bookingRef}. ${formatRefundImpact(refundAllocation, locale)}`
+        : `Booking ${bookingRef} was cancelled. ${formatRefundImpact(refundAllocation, locale)}`;
+    }
     return locale === "ar"
       ? "تم تحديث حالة الحجز إلى ملغى."
       : "The booking status was updated to cancelled.";
@@ -201,6 +209,11 @@ export function buildCancellationCompletionMessage({
     return locale === "ar"
       ? `تم تأكيد الاسترداد بالمرجع ${refundReference}، لكن تعذر حفظ حالة الإلغاء على هذا الجهاز. تحقق من الحالة عبر خدمة إدارة الحجز الرسمية من VOX.`
       : `The live refund was confirmed with reference ${refundReference}, but the cancelled status could not be saved on this device. Check the status in the official VOX Manage Booking service.`;
+  }
+  if (refundAllocation) {
+    return locale === "ar"
+      ? `تم إلغاء الحجز ${bookingRef}. ${formatRefundImpact(refundAllocation, locale)} مرجع الاسترداد ${refundReference}.`
+      : `Booking ${bookingRef} was cancelled. ${formatRefundImpact(refundAllocation, locale)} Refund reference ${refundReference}.`;
   }
   return locale === "ar"
     ? `تم إلغاء الحجز ${bookingRef}. تمت معالجة الاسترداد إلى محفظة VOX بالمرجع ${refundReference}.`

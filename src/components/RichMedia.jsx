@@ -5,7 +5,9 @@ import { useI18n } from "../i18n/I18nProvider.jsx";
 import { getExperienceMedia, getMoviePosterUrl, getSupportedImageUrl } from "../mediaData.js";
 import { isCurrentBooking } from "../lib/cancellationRouting.js";
 import { localizeCatalogValue, localizeCinemaName } from "../lib/catalogLocalization.js";
+import { deriveRefundAllocation } from "../lib/refundAllocation.js";
 import RetryableLazy from "./RetryableLazy.jsx";
+import JourneyFeedback from "./JourneyFeedback.jsx";
 
 const loadBookingQRCode = () => import("./BookingQRCode.jsx");
 
@@ -332,7 +334,10 @@ export function BookingCard({
     || booking.demo === true
     || booking.paymentStatus === "simulated_not_charged"
     || ["confirmed_demo", "summary_saved", "locally_stored"].includes(booking.bookingStatus);
-  const isDemoCancellation = isCancelled && (isDemo || booking.refundStatus === "not_processed_demo");
+  const refundAllocation = isCancelled && booking.refundStatus !== "not_processed_demo"
+    ? deriveRefundAllocation(booking)
+    : null;
+  const isDemoCancellation = isCancelled && !refundAllocation && booking.refundStatus === "not_processed_demo";
   const posterUrl = getMoviePosterUrl(booking);
   const cinemaName = localizeCinemaName(booking.cinemaName || t("booking.unknownCinema"), locale);
   const storedPerformanceDate = booking.performanceDate || booking.sourceDate || booking.date;
@@ -429,6 +434,12 @@ export function BookingCard({
           <Row k={t("booking.total")} v={<span dir="ltr">{formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}</span>} />
           {isCancelled && !isDemoCancellation && booking.refundRoute && <Row k={t("booking.refundRoute")} v={<bdi dir="auto">{booking.refundRoute}</bdi>} />}
           {isCancelled && !isDemoCancellation && booking.refundReference && <Row k={t("booking.refundReference")} v={<span dir="ltr" style={{ fontFamily: "monospace", color: C.primary }}>{booking.refundReference}</span>} />}
+          {refundAllocation && <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 7 }}>
+            <div style={{ color: C.text, fontSize: 12, fontWeight: 800 }}>{t("booking.refundSummary")}</div>
+            <Row k={t("booking.refundWallet")} v={<span dir="ltr">{formatCurrency(refundAllocation.voxWalletAed, refundAllocation.currency)}</span>} />
+            <Row k={t("booking.refundSharePoints")} v={<span dir="ltr">{refundAllocation.sharePoints.toLocaleString(locale === "ar" ? "ar-AE" : "en-AE")} {t("booking.sharePointsUnit")}</span>} />
+            {refundAllocation.sharePoints > 0 && <Row k={t("booking.refundShareValue")} v={<span dir="ltr">{formatCurrency(refundAllocation.shareAed, refundAllocation.currency)}</span>} />}
+          </div>}
         </div>
         {cancellationActive && (
           <CancellationPanel
@@ -438,6 +449,7 @@ export function BookingCard({
             busy={cancellationBusy}
             bookingRef={cancellationRef}
             amount={formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED")}
+            refundAllocation={cancellation?.refundAllocation || deriveRefundAllocation(booking)}
             error={cancellation?.error}
             message={cancellation?.message}
             retryAllowed={cancellation?.retryAllowed !== false}
@@ -458,10 +470,11 @@ export function BookingCard({
           </button>
         ) : isCancelled ? (
           <div style={{ ...cardFootBtn, color: isDemoCancellation ? C.warning : C.green, cursor: "default" }}>
-            <Check size={14} /> {isDemoCancellation ? t("booking.noRefundProcessed") : t("booking.refundAmount", { amount: formatCurrency(booking.total ?? booking.refundAmount, booking.currency || "AED") })}
+            <Check size={14} /> {isDemoCancellation ? t("booking.noRefundProcessed") : t("booking.refundAllocationConfirmed")}
           </div>
         ) : null}
       </div>
+      {!cancellationActive && <JourneyFeedback bookingRef={booking.ref} outcome={isCancelled ? "cancellation" : "booking"} />}
     </section>
   );
 }
@@ -472,6 +485,7 @@ const CancellationPanel = React.forwardRef(function CancellationPanel({
   busy,
   bookingRef,
   amount,
+  refundAllocation,
   error,
   message,
   retryAllowed,
@@ -496,9 +510,14 @@ const CancellationPanel = React.forwardRef(function CancellationPanel({
       ? t("booking.cancelProcessing", { ref: bookingRef })
       : isError
         ? (message || (/[_-]/.test(String(error || "")) ? "" : error) || t("booking.cancelError"))
-        : phase === "route_confirmation"
+        : message || (phase === "route_confirmation"
           ? t("booking.walletQuestion", { ref: bookingRef, amount })
-          : t(demoOnly ? "booking.cancelDemoQuestion" : "booking.cancelQuestion", { ref: bookingRef, amount });
+          : t(demoOnly ? "booking.cancelDemoQuestion" : "booking.cancelQuestion", {
+              ref: bookingRef,
+              amount,
+              wallet: refundAllocation?.voxWalletAed,
+              points: refundAllocation?.sharePoints,
+            }));
 
   return (
     <div
@@ -525,7 +544,7 @@ const CancellationPanel = React.forwardRef(function CancellationPanel({
             retryAllowed ? <button type="button" onClick={onRetry} disabled={busy || !onRetry} style={{ ...primaryCancelButton, opacity: onRetry ? 1 : 0.5 }}>{t("common.retry")}</button> : null
           ) : (
             <button type="button" onClick={onConfirm} disabled={busy || !onConfirm} style={{ ...primaryCancelButton, opacity: onConfirm ? 1 : 0.5 }}>
-              {t(phase === "route_confirmation" ? "booking.useWallet" : demoOnly ? "booking.confirmCancelDemo" : "booking.confirmCancel")}
+              {t(phase === "route_confirmation" ? "booking.continueCancellation" : demoOnly ? "booking.confirmCancelDemo" : "booking.confirmCancel")}
             </button>
           )}
         </div>
