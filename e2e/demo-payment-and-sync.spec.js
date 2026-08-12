@@ -107,7 +107,7 @@ test("typed horror discovery keeps the response synchronized with the rendered m
   if (cardCount > 0) {
     await expect(cards.first()).toBeVisible();
   } else {
-    await expect(main).toContainText(/couldn't match|no matching movies|no movies (?:are )?available/i);
+    await expect(main).toContainText(/couldn't match|no matching movies|no (?:horror )?movies (?:are )?available/i);
   }
   await expect(main).not.toContainText(STALE_DISCOVERY_QUESTION);
 });
