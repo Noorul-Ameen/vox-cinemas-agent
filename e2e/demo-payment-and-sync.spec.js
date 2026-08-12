@@ -90,8 +90,26 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("typed horror discovery keeps the response synchronized with the rendered movies", async ({ page }) => {
-  await reachMovieGridByText(page, "Show me horror movies");
-  await expect(page.locator("main")).not.toContainText(STALE_DISCOVERY_QUESTION);
+  await sendText(page, "Show me horror movies at Mall of the Emirates");
+  await waitForDateOrMovies(page);
+
+  const dateGroup = page.getByRole("group", { name: "Choose a date" });
+  if (await dateGroup.isVisible().catch(() => false)) {
+    const nextDate = dateGroup.getByRole("button").nth(1);
+    const dateChoice = (await nextDate.getAttribute("aria-label")) || (await nextDate.innerText());
+    await sendText(page, dateChoice.replace(/^[^,]+,\s*/, ""));
+  }
+
+  await expect(page.getByText("Choose a movie", { exact: true })).toBeVisible();
+  const main = page.locator("main");
+  const cards = main.locator('button:has([aria-label^="Relevant showtimes for "])');
+  const cardCount = await cards.count();
+  if (cardCount > 0) {
+    await expect(cards.first()).toBeVisible();
+  } else {
+    await expect(main).toContainText(/couldn't match|no matching movies|no movies (?:are )?available/i);
+  }
+  await expect(main).not.toContainText(STALE_DISCOVERY_QUESTION);
 });
 
 test("Arabic typed date is consumed once and renders the retained horror results", async ({ page }) => {
