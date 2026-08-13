@@ -1,11 +1,11 @@
 {
   "format": "vox-official-movie-information-v1",
-  "extractedAt": "2026-08-12T04:40:03.070Z",
+  "extractedAt": "2026-08-13T04:24:09.846Z",
   "region": "UAE",
   "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
   "sourcePageUrl": "https://uae.voxcinemas.com/movies/whatson",
-  "sourceRecordCount": 126,
-  "acceptedRecordCount": 126,
+  "sourceRecordCount": 128,
+  "acceptedRecordCount": 128,
   "rejectedRecordCount": 0,
   "movies": [
     {
@@ -24,7 +24,7 @@
       "movieUrl": "above-and-below",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/above-and-below",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/above-and-below",
       "runtimeVerifiedAt": "2026-08-12T04:40:03.070Z"
     },
@@ -110,7 +110,7 @@
       "movieUrl": "awarapan-2-hindi",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/awarapan-2-hindi",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/awarapan-2-hindi",
       "runtimeVerifiedAt": "2026-08-12T04:40:03.070Z"
     },
@@ -154,7 +154,7 @@
       "movieUrl": "batwara-1947-hindi",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/batwara-1947-hindi",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/batwara-1947-hindi",
       "runtimeVerifiedAt": "2026-08-12T04:40:03.070Z"
     },
@@ -335,6 +335,26 @@
       "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/by-any-means",
       "runtimeVerifiedAt": "2026-08-03T04:55:19.042Z"
+    },
+    {
+      "code": "HO00013556",
+      "title": "Cahim 2",
+      "rating": "15+",
+      "language": "Turkish",
+      "languageName": "Turkish",
+      "runtime": 85,
+      "genres": [
+        "Horror"
+      ],
+      "synopsis": "Some dreams are not meant to be seen, but to never wake up.",
+      "subtitles": [],
+      "released": "",
+      "movieUrl": "cahim-2-turkish",
+      "sourcePageUrl": "https://uae.voxcinemas.com/movies/cahim-2-turkish",
+      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
+      "runtimeStatus": "official_detail_page",
+      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/cahim-2-turkish",
+      "runtimeVerifiedAt": "2026-08-13T04:24:09.846Z"
     },
     {
       "code": "HO00016397",
@@ -1459,7 +1479,7 @@
       "movieUrl": "magudam-tamil",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/magudam-tamil",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/magudam-tamil",
       "runtimeVerifiedAt": "2026-08-12T04:40:03.070Z"
     },
@@ -2228,7 +2248,7 @@
     {
       "code": "HO00013360",
       "title": "The Get Out",
-      "rating": "18TC",
+      "rating": "15+",
       "language": "English",
       "languageName": "English",
       "runtime": 95,
@@ -2241,7 +2261,7 @@
       "movieUrl": "the-get-out",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/the-get-out",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-get-out",
       "runtimeVerifiedAt": "2026-08-12T04:40:03.070Z"
     },
@@ -2372,7 +2392,7 @@
       "movieUrl": "the-rivals-of-amziah-king",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/the-rivals-of-amziah-king",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-rivals-of-amziah-king",
       "runtimeVerifiedAt": "2026-08-12T04:40:03.070Z"
     },
@@ -2398,6 +2418,26 @@
       "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-weight",
       "runtimeVerifiedAt": "2026-08-03T04:55:19.042Z"
+    },
+    {
+      "code": "HO00013555",
+      "title": "The Wrong Girls",
+      "rating": "18+",
+      "language": "English",
+      "languageName": "English",
+      "runtime": 100,
+      "genres": [
+        "Comedy"
+      ],
+      "synopsis": "Two aimless young women inadvertently gain telepathic abilities after ingesting an experimental drug, pitting them against dangerous rivals pursuing the same powerful substance.",
+      "subtitles": [],
+      "released": "",
+      "movieUrl": "the-wrong-girls",
+      "sourcePageUrl": "https://uae.voxcinemas.com/movies/the-wrong-girls",
+      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
+      "runtimeStatus": "official_detail_page",
+      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-wrong-girls",
+      "runtimeVerifiedAt": "2026-08-13T04:24:09.846Z"
     },
     {
       "code": "HO00013510",
@@ -2661,7 +2701,7 @@
       "movieUrl": "vishwanath-and-sons-tamil",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/vishwanath-and-sons-tamil",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/vishwanath-and-sons-tamil",
       "runtimeVerifiedAt": "2026-08-12T04:40:03.070Z"
     },
@@ -2681,7 +2721,7 @@
       "movieUrl": "vishwanath-and-sons-telugu",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/vishwanath-and-sons-telugu",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/vishwanath-and-sons-telugu",
       "runtimeVerifiedAt": "2026-08-12T04:40:03.070Z"
     },
@@ -2756,7 +2796,7 @@
     {
       "code": "HO00013546",
       "title": "Yaar Jigree Kasooti Degree",
-      "rating": "18TC",
+      "rating": "PG13",
       "language": "Punjabi",
       "languageName": "Punjabi",
       "runtime": 185,
@@ -2769,7 +2809,7 @@
       "movieUrl": "yaar-jigree-kasooti-degree-punjabi",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/yaar-jigree-kasooti-degree-punjabi",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/yaar-jigree-kasooti-degree-punjabi",
       "runtimeVerifiedAt": "2026-08-12T04:40:03.070Z"
     }
@@ -2778,10 +2818,10 @@
     "workers": 2,
     "retries": 1,
     "totalTimeoutMs": 120000,
-    "requestedCount": 126,
-    "enrichedCount": 9,
+    "requestedCount": 128,
+    "enrichedCount": 2,
     "failedCount": 0,
     "timedOutCount": 0,
-    "retainedCount": 116
+    "retainedCount": 125
   }
 }
