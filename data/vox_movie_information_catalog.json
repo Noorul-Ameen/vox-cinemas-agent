@@ -1,6 +1,6 @@
 {
   "format": "vox-official-movie-information-v1",
-  "extractedAt": "2026-08-13T04:24:09.846Z",
+  "extractedAt": "2026-08-13T07:59:09.375Z",
   "region": "UAE",
   "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
   "sourcePageUrl": "https://uae.voxcinemas.com/movies/whatson",
@@ -352,7 +352,7 @@
       "movieUrl": "cahim-2-turkish",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/cahim-2-turkish",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/cahim-2-turkish",
       "runtimeVerifiedAt": "2026-08-13T04:24:09.846Z"
     },
@@ -2435,7 +2435,7 @@
       "movieUrl": "the-wrong-girls",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/the-wrong-girls",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/the-wrong-girls",
       "runtimeVerifiedAt": "2026-08-13T04:24:09.846Z"
     },
@@ -2819,9 +2819,9 @@
     "retries": 1,
     "totalTimeoutMs": 120000,
     "requestedCount": 128,
-    "enrichedCount": 2,
+    "enrichedCount": 0,
     "failedCount": 0,
     "timedOutCount": 0,
-    "retainedCount": 125
+    "retainedCount": 127
   }
 }
