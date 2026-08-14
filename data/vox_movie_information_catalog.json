@@ -1,11 +1,11 @@
 {
   "format": "vox-official-movie-information-v1",
-  "extractedAt": "2026-08-13T07:59:09.375Z",
+  "extractedAt": "2026-08-14T04:21:22.502Z",
   "region": "UAE",
   "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
   "sourcePageUrl": "https://uae.voxcinemas.com/movies/whatson",
-  "sourceRecordCount": 128,
-  "acceptedRecordCount": 128,
+  "sourceRecordCount": 131,
+  "acceptedRecordCount": 131,
   "rejectedRecordCount": 0,
   "movies": [
     {
@@ -490,6 +490,26 @@
       "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/dc-tamil",
       "runtimeVerifiedAt": "2026-08-09T20:37:41.949Z"
+    },
+    {
+      "code": "HO00013557",
+      "title": "DC",
+      "rating": "18+",
+      "language": "Telugu",
+      "languageName": "Telugu",
+      "runtime": 155,
+      "genres": [
+        "Action"
+      ],
+      "synopsis": "Rebel Devadas is drawn into a ruthless world where power is forged through violence and survival comes at a deadly price. When fate unites him with the fearless Chandra, they are forced into a dangerous alliance against powerful adversaries and unforgiving circumstances. As betrayal, vengeance, and sacrifice shape their journey, every step tests their courage and loyalty. With enemies closing in and the stakes rising, Devadas must embrace his destiny in a battle where only the strongest will survive.",
+      "subtitles": [],
+      "released": "",
+      "movieUrl": "dc-telugu",
+      "sourcePageUrl": "https://uae.voxcinemas.com/movies/dc-telugu",
+      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
+      "runtimeStatus": "official_detail_page",
+      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/dc-telugu",
+      "runtimeVerifiedAt": "2026-08-14T04:21:22.502Z"
     },
     {
       "code": "HO00016418",
@@ -1091,6 +1111,26 @@
       "runtimeVerifiedAt": "2026-08-03T04:55:19.042Z"
     },
     {
+      "code": "HO00013153",
+      "title": "Insidious: Out Of The Further",
+      "rating": "15+",
+      "language": "English",
+      "languageName": "English",
+      "runtime": 105,
+      "genres": [
+        "Horror"
+      ],
+      "synopsis": "Having earned over $740 million at the global box office, the Insidious franchise returns with a new family and a terror that redefines what The Further is capable of. In Insidious: Out of the Further, Amelia Eve stars as Gemma, a young mother raising her daughter in the house she grew up in who discovers she can travel into The Further, the purgatorial realm of lost souls at the heart of the Insidious universe. When something evil comes after her, Gemma discovers an ability that changes everything: she doesn’t just enter The Further, she can bring what lives there back to the real world. Once the demons realize her power, our world becomes their playground.",
+      "subtitles": [],
+      "released": "",
+      "movieUrl": "insidious-out-of-the-further",
+      "sourcePageUrl": "https://uae.voxcinemas.com/movies/insidious-out-of-the-further",
+      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
+      "runtimeStatus": "official_detail_page",
+      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/insidious-out-of-the-further",
+      "runtimeVerifiedAt": "2026-08-14T04:21:22.502Z"
+    },
+    {
       "code": "HO00015969",
       "title": "Insidious: Out Of The Further",
       "rating": "18TC",
@@ -1482,6 +1522,26 @@
       "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/magudam-tamil",
       "runtimeVerifiedAt": "2026-08-12T04:40:03.070Z"
+    },
+    {
+      "code": "HO00013538",
+      "title": "Mahmoud El Tany",
+      "rating": "PG13",
+      "language": "Arabic",
+      "languageName": "Arabic",
+      "runtime": 105,
+      "genres": [
+        "Comedy"
+      ],
+      "synopsis": "When a polished, high-powered businessman and a quick-witted street hustler discover they share the same name, a bizarre twist of fate forces them to swap lives-leading to chaos, comedy, and an unexpected journey of self-discovery.",
+      "subtitles": [],
+      "released": "",
+      "movieUrl": "mahmoud-el-tany-arabic",
+      "sourcePageUrl": "https://uae.voxcinemas.com/movies/mahmoud-el-tany-arabic",
+      "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
+      "runtimeStatus": "official_detail_page",
+      "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/mahmoud-el-tany-arabic",
+      "runtimeVerifiedAt": "2026-08-14T04:21:22.502Z"
     },
     {
       "code": "HO00016415",
@@ -2818,8 +2878,8 @@
     "workers": 2,
     "retries": 1,
     "totalTimeoutMs": 120000,
-    "requestedCount": 128,
-    "enrichedCount": 0,
+    "requestedCount": 131,
+    "enrichedCount": 3,
     "failedCount": 0,
     "timedOutCount": 0,
     "retainedCount": 127
