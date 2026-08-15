@@ -1,6 +1,6 @@
 {
   "format": "vox-official-movie-information-v1",
-  "extractedAt": "2026-08-14T04:21:22.502Z",
+  "extractedAt": "2026-08-15T03:10:11.092Z",
   "region": "UAE",
   "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
   "sourcePageUrl": "https://uae.voxcinemas.com/movies/whatson",
@@ -507,7 +507,7 @@
       "movieUrl": "dc-telugu",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/dc-telugu",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/dc-telugu",
       "runtimeVerifiedAt": "2026-08-14T04:21:22.502Z"
     },
@@ -1126,7 +1126,7 @@
       "movieUrl": "insidious-out-of-the-further",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/insidious-out-of-the-further",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/insidious-out-of-the-further",
       "runtimeVerifiedAt": "2026-08-14T04:21:22.502Z"
     },
@@ -1539,7 +1539,7 @@
       "movieUrl": "mahmoud-el-tany-arabic",
       "sourcePageUrl": "https://uae.voxcinemas.com/movies/mahmoud-el-tany-arabic",
       "sourceUrl": "https://uae-apife.voxcinemas.com/v1/vox2-0/content/movies?region=UAE",
-      "runtimeStatus": "official_detail_page",
+      "runtimeStatus": "retained_official_detail_page",
       "runtimeSourceUrl": "https://uae.voxcinemas.com/movies/mahmoud-el-tany-arabic",
       "runtimeVerifiedAt": "2026-08-14T04:21:22.502Z"
     },
@@ -2879,9 +2879,9 @@
     "retries": 1,
     "totalTimeoutMs": 120000,
     "requestedCount": 131,
-    "enrichedCount": 3,
+    "enrichedCount": 0,
     "failedCount": 0,
     "timedOutCount": 0,
-    "retainedCount": 127
+    "retainedCount": 130
   }
 }
